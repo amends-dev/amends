@@ -21,6 +21,7 @@ import {
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { button, field, iconButton, searchField, sending, submit as submitButton } from "./control.ts"
+import { turnStatus } from "./details.ts"
 import { columns } from "./directory.ts"
 import {
   pane,
@@ -949,6 +950,123 @@ describe("pane with its body anchored to the bottom", () => {
         expect(scrollingBody).not.toHaveClass("flex-col"),
         expect(scrollingBody).not.toHaveClass("[&>:first-child]:mt-auto"),
         expect(scrollingBody).not.toHaveAttr("data-anchor")
+      )
+    }
+  })
+})
+
+describe("pane back that is always shown", () => {
+  const turnLogPane = (isAlways: boolean) => (_: Model, h: HtmlBuilder<Message>) =>
+    pane(h, {
+      variant: "side",
+      label: "Turn log",
+      header: {
+        title: "Turn log",
+        leading: paneBack(h, Message.WentBack(), "Back to thread", { isAlways }),
+        actions: [paneClose(h, Message.ClosedThread(), "Close turn log")]
+      },
+      body: []
+    })
+
+  it("shows on every layout when it is always shown, and goes back, not away", () => {
+    scene(
+      { update, view: paneView(turnLogPane(true)) },
+      given(initial),
+      expect(selector("span.-ms-4")).not.toHaveClass("tablet:hidden"),
+      expect(within(selector("span.-ms-4"), role("button", { name: "Back to thread" }))).toExist(),
+      click(role("button", { name: "Back to thread" })),
+      expect(role("note")).toHaveText("Back 1"),
+      expect(role("status")).toHaveText("Tab threads, closed 0, settings 0")
+    )
+  })
+
+  it("shows only below 48rem otherwise", () => {
+    scene(
+      { update, view: paneView(turnLogPane(false)) },
+      given(initial),
+      expect(selector("span.-ms-4")).toHaveClass("tablet:hidden")
+    )
+  })
+})
+
+describe("pane with a subtitle of several pieces", () => {
+  const subtitled = (_: Model, h: HtmlBuilder<Message>) =>
+    pane(h, {
+      variant: "side",
+      label: "Turn log",
+      header: { title: "Turn log", subtitle: [h.span([], ["Scout"]), turnStatus(h, "working")] },
+      body: []
+    })
+
+  it("lays them out side by side in a line under the title, 10px apart", () => {
+    scene(
+      { update, view: paneView(subtitled) },
+      given(initial),
+      expect(selector("p.flex")).toHaveClass("items-center"),
+      expect(selector("p.flex")).toHaveClass("gap-2.5"),
+      expect(selector("p.flex")).toHaveClass("text-control"),
+      expect(selector("p.flex")).toHaveClass("text-ink-secondary"),
+      expect(within(selector("p.flex"), text("Scout"))).toExist(),
+      expect(within(selector("p.flex"), role("status"))).toHaveText("Working")
+    )
+  })
+
+  it("is the same line as words alone make, but for the pieces", () => {
+    scene(
+      { update, view: paneView(sidePane) },
+      given(initial),
+      expect(selector("p.truncate")).toHaveText("Thread in #general"),
+      expect(selector("p.flex")).toBeAbsent()
+    )
+  })
+
+  it("gives way to the tabs, as words do", () => {
+    scene(
+      {
+        update,
+        view: paneView((model, h) =>
+          pane(h, {
+            variant: "main",
+            header: { title: "general", tabs: tabs(model, h), subtitle: [h.span([], ["Scout"])] },
+            body: []
+          })
+        )
+      },
+      given(initial),
+      expect(text("Scout")).toBeAbsent()
+    )
+  })
+})
+
+describe("pane with a body that follows its end", () => {
+  const log = (followsEnd: boolean | undefined) => (_: Model, h: HtmlBuilder<Message>) =>
+    pane(h, {
+      variant: "side",
+      label: "Turn log",
+      header: { title: "Turn log" },
+      body: [h.ol([h.AriaLabel("Activity")], [h.li([], ["Work accepted"])])],
+      ...(followsEnd === undefined ? {} : { followsEnd })
+    })
+
+  const scrollingBody = selector("div.overflow-y-auto")
+
+  it("says it does, so that a program that keeps a log at its end finds it, and still begins at the top", () => {
+    scene(
+      { update, view: paneView(log(true)) },
+      given(initial),
+      expect(scrollingBody).toHaveAttr("data-follows-end", ""),
+      expect(within(selector("[data-follows-end]"), role("list", { name: "Activity" }))).toExist(),
+      expect(scrollingBody).not.toHaveAttr("data-anchor"),
+      expect(scrollingBody).not.toHaveClass("[&>:first-child]:mt-auto")
+    )
+  })
+
+  it("says nothing of it unless it is told to", () => {
+    for (const followsEnd of [undefined, false]) {
+      scene(
+        { update, view: paneView(log(followsEnd)) },
+        given(initial),
+        expect(scrollingBody).not.toHaveAttr("data-follows-end")
       )
     }
   })

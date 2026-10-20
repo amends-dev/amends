@@ -19,7 +19,7 @@ bun run --filter @amends-dev/design workshop   # http://127.0.0.1:4420/
 ```
 
 A small Foldkit app in `workshop/` that shows every renderer in every state under a heading each:
-buttons by variant, disabled, large, and wide, with the link in a sentence, and a link to another page, and a link in the look of a button to the page's own address, and with an icon before the label, and icon buttons, regular and compact, and as a switch, off and pressed, and disabled, also as a switch; a field empty, with a
+buttons by variant, disabled, large, and wide, with the link in a sentence, and the button that reads as part of a line, quiet until it is hovered, and a link to another page, and a link in the look of a button to the page's own address, and with an icon before the label, and icon buttons, regular and compact, and as a switch, off and pressed, and disabled, also as a switch; a field empty, with a
 placeholder, filled, invalid, disabled, and with a hint under it; a hint; a textarea, and with a hint, refused, and
 disabled; a grid of selects, side
 by side and wrapping in a narrow column; a select with its label hidden, in a row beside a name; a
@@ -74,7 +74,7 @@ pane's section that is one form; a
 conversation's messages as the threads of a group under their day, with the time of day after each author, a person's mark on the slate ground and an agent's on the lilac with its name in the agent's color, the task a thread tracks as a chip, the button that opens each thread, and a reply as the action the pointer brings up, the open thread's row filled and following a click; a person's messages within five minutes stacked under the one before; the button of a thread with replies, with one reply, three people, more people than it shows, replies not read yet, and while an agent works and someone types; a thread with no replies yet, with Reply in thread and what is going on beside it; the chip of a task in each drawing a status has; and, as a list, with a note,
 an edited mark after the text, a deleted message, actions, and meta, with a mention in the text as a chip, in a message and in
 the current row, with markdown in the text as blocks in a message and as a preview in a notification, with a form in place of the text, and set apart by dividers, centered and at the
-start, with notes of who took part, an agent's turn in each of its states with the actions it offers and what it says under its line, a turn's log opened under its row, a stop that did not go through, a turn that replied with View turn log among its message's actions and its log under it, and a turn's row in a column 20rem wide, and notifications under the days Today and Yesterday, unread with a dot and read, an agent's on the lilac tone and one whose thread is unavailable with the message icon in place of letters, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; rich text as a message's text with every form markdown has and a mention of a member the workshop knows and one it does not, as the inline form of the same text for a preview, and in a narrow column, where a long word wraps and a wide table scrolls; a pane's empty state with a title
+start, with notes of who took part, an agent's turn in each of its states with the actions it offers and what it says under its line, a turn's log opened under its row, a stop that did not go through, a turn that replied with View turn log among its message's actions and its log under it, a failed turn's detail with Agent settings at its end, and a turn's row in a column 20rem wide, where the actions drop under the name and Agent settings under the failure, and notifications under the days Today and Yesterday, unread with a dot and read, an agent's on the lilac tone and one whose thread is unavailable with the message icon in place of letters, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; a turn's log as the side pane, each in a frame of its own: a turn that works, with Stop in the header, what it runs on, its activity with a response it recorded and did not post, and the footer that follows it live; one that is stopping, with Stop dimmed and named Stopping; one that waits, with the Queued card and the footer that waits for activity; one that replied, with its reply recorded and posted and the footer that opens it in its thread; one that was interrupted and ran again and finished with no reply; one that failed before it started, with the caution card that points to the agent's setup, an alert, and Retry turn in the footer; activity that arrived while the reader was scrolled up, whose footer is one wide button; and the pane while its log is being read, not available, and could not be read; rich text as a message's text with every form markdown has and a mention of a member the workshop knows and one it does not, as the inline form of the same text for a preview, and in a narrow column, where a long word wraps and a wide table scrolls; a pane's empty state with a title
 and a line of copy under a header with an action, with two lines of copy, with an action of its own under the copy, with a title alone, with its mark working, and for a failure with Try again, each in a frame of its
 own; a pane's column keeping its measure around a form and, wide, spanning the pane around a table of
 groups, each in a frame wider than the measure; the composer empty, whose Send waits for words, filled, with only spaces, and with its list of people to mention open on the second, an agent among them in its tone; the sidebar's rows as three columns, each in a frame the sidebar's width: groups read, unread, with a count read as 2 for you, an agent at work with the logo working, queued, and stopping, and one still sending, the open thread under its group with the drawing of its task in each of its six statuses, the message icon, and a thread that is a button, and direct messages as people on the slate mark with a count and with the dot, several people by the people icon, an agent on the lilac mark at work and needing setup, and the teammates with no conversation yet; the shell twice, with and without its side pane, each in a
@@ -285,6 +285,10 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   page itself, `href: ""`, loads it again, which is how a screen that has no messages left reloads: the crash screen's
   Reload is `linkButton(h, { label: "Reload", href: "" }, { variant: "primary" })`. It opens in the same tab and is a
   link to assistive technology, which Enter follows.
+- `lineButton(h, label, onClick)` is a button that reads as part of a line of text, as `apps/ui` draws the link beside a
+  turn's failure: `label` at `control` size in medium weight and `ink-secondary`, with no box and no padding, that
+  darkens to `ink` and is underlined only while it is hovered. It is a button, since it does something on the page and
+  goes nowhere; a `turnRow` holds one at the end of its `detail`.
 - `buttonRow(h, children, options?)` is a row of controls with an 8px gap, wrapping onto a new line when
   they do not fit, such as a thread's Follow and Rename or a form's Save and Cancel. With `isCentered`
   the controls are in the middle of the row's width, for the quiet button that ends a list, such as
@@ -742,7 +746,7 @@ The frame of the first four layout patterns, which the modules below fill.
 
 The third and fourth layout patterns share one structure.
 
-- `pane(h, { variant, label?, header, toolbar?, body, anchor?, footer? })` is a column of a header, a `body` that
+- `pane(h, { variant, label?, header, toolbar?, body, anchor?, followsEnd?, footer? })` is a column of a header, a `body` that
   scrolls, and a `footer` that stays in place. The `toolbar`, for a list, is what stays under the header while the body
   scrolls: a `paneToolbar`, then, over a list, the `summary` line and the `columns`. The body then starts flush under it,
   with no padding above, so the first row is the one under the column labels. The `"main"` variant is the page's `main` landmark,
@@ -752,7 +756,9 @@ The third and fourth layout patterns share one structure.
   body it rests against the footer's composer, as `apps/ui`'s timeline does, and where it is taller the body
   scrolls as any other does, because the element's top margin is automatic (`mt-auto`), which is no space once there is
   none to spare. The body is then a column whose children keep their own height, and says `data-anchor="bottom"`, so
-  that a program that keeps a conversation at its end finds the body that scrolls it from a message list in it.
+  that a program that keeps a conversation at its end finds the body that scrolls it from a message list in it. A body
+  that begins at its start but whose content a program keeps at its end as it grows, such as a turn's log, says
+  `followsEnd`, which draws it as any body is and says `data-follows-end`, so that the program finds it the same way.
 - The `header` is `{ title, icon?, taskStatus?, mark?, status?, context?, phoneContext?, leading?, actions?, tabs?, subtitle? }`,
   96px tall, and 104px below 64rem, so the main pane's, the side pane's, and the sidebar's line up: a 60px
   row, then the `tabs` or a `subtitle`. In the row, `leading` is a control that brings its own
@@ -766,7 +772,8 @@ The third and fourth layout patterns share one structure.
   title with one stacks over it there. The main pane's row starts 40px
   further in below 64rem, for the shell's menu button over it; its tabs and subtitle keep the pane's
   gutter, and the side pane's row is not moved. The line under the header is drawn inside it, so the
-  current tab's bar sits over the line. A `subtitle` shows only when there are no `tabs`.
+  current tab's bar sits over the line. A `subtitle` shows only when there are no `tabs`: words, or an array of pieces,
+  such as an agent's name and its `turnStatus`, laid side by side 10px apart and level with each other.
 - `paneToolbar(h, { start, end? })` is the row at the top of a `toolbar`: the `start` controls, a `searchField` and the
   menus that narrow the list, then, at the end, the actions on it, such as a sort and a `button` that adds to it. It is one
   row where the search gives way first; below 48rem it wraps, the search a line of its own and the actions at the start
@@ -809,9 +816,11 @@ onClick }` tabs: buttons that are `aria-selected`, the current one in `ink` and 
 - `paneClose(h, onClick, label?)` is the side pane's close button, an `iconButton` named Close, or by `label` for what
   it closes, such as "Close task" or "Close thread", for the header's `actions`. It shows from 48rem; below that the
   side pane is full screen and has `paneBack`.
-- `paneBack(h, onClick, label?)` is the side pane's Back button, an `iconButton` named Back, or by `label` for where
+- `paneBack(h, onClick, label?, options?)` is the side pane's Back button, an `iconButton` named Back, or by `label` for where
   it goes back to, such as "Back to Members", for the header's `leading`, pulled to the pane's edge. It shows below 48rem only. Page code gives the two the same
-  message, so each way out of the side pane does the same.
+  message, so each way out of the side pane does the same. With `options.isAlways` it shows on every layout, as
+  `apps/ui`'s `Pane.Back always` does for the way from a turn's log back to its thread, which is not the way
+  `paneClose` leaves the pane by; it then sends its own message.
 
 ### `@amends-dev/design/details`
 
@@ -984,13 +993,15 @@ What a conversation is made of.
   it at `meta` size in `ink-muted`, in a `time` element that is given the moment it was (`dateTime`) and a longer
   `title` for a tooltip, when the caller has them. It has 10px above and below, as a message's row does, and draws nothing before its words, which sets it apart from
   an `event`.
-- `turnRow(h, { key, label, mark, name, status, actions, detail?, problem?, children? })` is an agent's turn where it
+- `turnRow(h, { key, label, mark, name, status, actions, detail?, detailAction?, problem?, children? })` is an agent's turn where it
   took on the work, an item of the list among its messages and notes, a `group` named `label` for assistive technology,
   such as "Atlas's turn", as `apps/ui`'s `TurnRow` draws it: the agent's `mark` at 24px in its lilac tone, the `name` at
   item size in medium weight in the agent's color (`text-agent`), the `status` after it (a `turnStatus`), and the
   `actions` at the end, buttons 4px apart. The row has 10px above and below, and is a container: where it is narrower than 22.5rem the actions drop to
   a line of their own under the name. Under the first line, in line with the name, 4px down, the `detail` says how the
-  turn ended, such as "No reply posted.", at `control` size in `ink-secondary`; the `problem` says why a stop or retry
+  turn ended, such as "No reply posted.", at `control` size in `ink-secondary`, with the `detailAction`, a `lineButton`
+  such as Agent settings, at its end, 12px from it, or under it below 48rem, and with no effect when there is no
+  `detail` to hold it; the `problem` says why a stop or retry
   did not go through, at `control` size in the caution color, as an alert; and the `children` follow, 8px apart, such
   as the turn's `log`.
 - `turnLog(h, { key, label, children })` is the log of the turn that posted the message above it, an item of the list
@@ -1004,6 +1015,42 @@ What a conversation is made of.
   and Delete. `isCurrent` fills it with `selected`, draws the `indicator-bar` at its start, and makes it
   `aria-current="true"`, reaching 12px into the pane's gutter as a message's row does. `attributes` go onto it as
   they go onto a message's row.
+
+### `@amends-dev/design/turnLog`
+
+What an agent's turn log is made of in the side pane, as `apps/ui`'s `TurnLogPane` draws it. The pane itself is a `pane`
+of the `"side"` variant titled "Turn log", with a `paneBack` that is `isAlways`, a Stop and a `paneClose` among its
+`actions`, and a `subtitle` of the agent's name and its `turnStatus`; its body says `followsEnd` and holds a
+`turnLogColumn`, and its footer a `turnLogFooter`.
+
+- `turnLogColumn(h, children)` is the column that holds a log's summary, activity, and cards, 20px apart.
+- `turnLogSummary(h, lines)` is what the turn runs on, a box on `subtle` with 12px above and below and 14px at the sides,
+  a line each (`{ text, isCode? }`), 8px apart, at `control` size in `ink-secondary`: where it works, the model, the
+  harness, and the sandbox. A line that is an identifier, such as the model's, says `isCode` and shows in mono.
+- `turnLogActivity(h, { id?, label, children })` is an ordered list named `label` that begins with a `divider` of the
+  same words at the start, as the task pane's activity does, its items 18px apart, oldest first: `turnLogEntry`s and
+  `turnLogResponse`s. Given an `id`, a Command finds the pane body that scrolls it from the list, to keep it at its
+  end.
+- `turnLogEntry(h, { key, title, time, dateTime, timeTitle?, text? })` is one thing that happened, an item of the
+  activity, as a grid of a 5px dot, hidden from assistive technology, the `title` at `control` size in medium weight and
+  `ink`, and the `time`, already formatted, at the end of the line at `meta` size in `ink-secondary`, in a `time`
+  element given the moment (`dateTime`) and a longer `timeTitle` for a tooltip when the caller has one; the `text`
+  is under the title, at `control` size in `ink-secondary`, and breaks anywhere so that a long reason wraps.
+- `turnLogCard(h, { title, mark?, label?, tone?, text?, note, action? })` is a bordered box on `panel` with 12px above
+  and below and 14px at the sides, its pieces 10px apart: the `title` at `control` size in medium weight with a `mark`
+  before it, such as the logo moving while the turn waits, and a `label` at the end of its line at `meta` size, the
+  `text` an agent wrote, as markdown (`richText`) at `body` size, the `note` at `hint` size in `ink-secondary`, and the
+  `action`. With `tone: "caution"` it is on the caution surface and border for what needs fixing, and its note is in
+  `ink`, since `ink-secondary` falls short of contrast there.
+- `turnLogResponse(h, { key, title, label, text, note })` is a response the agent recorded, an item of the activity: a
+  `turnLogCard` of that title, label, text, and note, such as "Reply recorded", "Complete", the markdown, and "This
+  response was posted to the thread."
+- `turnLogProblem(h, text)` is why a stop or retry did not go through, under the rest of the log, at `control` size in
+  the caution color, as an alert, as a `turnRow`'s `problem` is.
+- `turnLogFooter(h, { mark?, action?, text? })` is the line at a log's foot, at least 36px tall, its pieces 12px apart
+  at `control` size in `ink-secondary`: a `mark` of how following stands, `"following"`, the logo working, or
+  `"waiting"`, a clock, each 0.875rem and hidden from assistive technology; the `action` to take, such as a `button`
+  that is `wide` for the one that jumps to the latest or opens the reply; and the `text`.
 
 ### `@amends-dev/design/richText`
 
@@ -1352,7 +1399,7 @@ blocks, which give the same values, by `theme.test.ts`; a sidebar item by its na
 `aria-current` and its count, read as "5 unread" when the row names what it counts, the dot of an unread row, read as "new activity", with its label in ink and medium weight, and no dot beside a count or while the row is pending, the row under it as a button or as a plain row, drawn with the status of a task in place of its icon and a word for it that only assistive technology reads, the working logo at the end of a row at
 work, the shape of a status at the end of a row with no mark, and the sections of
 `sidebarSections` among the sidebar's own, a section's title as a button inside its heading, current or not; a tab by `role("tab")` with `aria-selected`; a pane's
-section by `role("region")` and its `h3`, its trailing pieces and children, and its stitch, hidden from assistive technology, when it has one; a pane header's mark in its tone with its status as the patch, its hover text, and an `sr-only` word, and its phone-only line under the title; a pane's empty state by
+section by `role("region")` and its `h3`, its trailing pieces and children, and its stitch, hidden from assistive technology, when it has one; a pane header's mark in its tone with its status as the patch, its hover text, and an `sr-only` word, and its phone-only line under the title, its subtitle as words or as pieces side by side, and its Back on every layout when it is always shown; a body that follows its end by `data-follows-end`; a line button as a button that sends its message and reads as part of the line; a turn's detail action at the detail's end and absent without a detail; the turn log's column, its summary with the model in mono, its activity as a list named Activity under its divider with each entry's dot, title, time, and line, its response as a card with its markdown, its cards plain and caution with their mark, note, and action, its problem as an alert in the caution color, and its footer in each of its forms; a pane's empty state by
 its `h2` under the pane's `h1`, or its `h1` with `level` 1, its copy, a paragraph for each line of several, its action, and its art as `aria-hidden`, with a working one in a live region; a detail list's labels
 and values, a value that is a button, a person's mark in its size and tone, hidden from assistive technology, and its name and detail; a badge by its label, and the logo in its motion; an entry list by `role("list")`, an
 entry by its title, its mark hidden from assistive technology, its trailing pieces and its children,

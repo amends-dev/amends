@@ -1,9 +1,9 @@
 /**
  * The controls the app's views share, over `@foldkit/ui`'s headless components: buttons and the row they lie in, a link
- * to another page, labelled fields and boxes and the grid they lie in, a labelled switch, a choice from a list, a
- * six-digit code, a line of hint, what is being waited for, what just happened, why an entry was refused, a boxed note
- * for a page as a whole, that an action is on its way, and the column that holds a few of these together. Each renders
- * with the caller's builder and messages, and carries the look.
+ * to another page, a button that reads as part of a line, labelled fields and boxes and the grid they lie in, a
+ * labelled switch, a choice from a list, a six-digit code, a line of hint, what is being waited for, what just
+ * happened, why an entry was refused, a boxed note for a page as a whole, that an action is on its way, and the column
+ * that holds a few of these together. Each renders with the caller's builder and messages, and carries the look.
  */
 
 import * as Button from "@foldkit/ui/button"
@@ -31,6 +31,9 @@ const buttonLooks = {
 }
 
 const linkLook = "text-ink underline underline-offset-2 focus-ring hover:text-ink-secondary"
+
+const lineButtonLook =
+  "inline cursor-pointer border-0 bg-transparent p-0 text-control font-medium text-ink-secondary focus-ring hover:text-ink hover:underline"
 
 const buttonRegularSizes = {
   primary: "min-h-9 text-control max-desktop:min-h-11",
@@ -356,6 +359,26 @@ export const linkButton = <Message, Requirements>(
   config: Readonly<{ label: string; href: string }>,
   look: ButtonLook = {}
 ): Html => h.a([h.Href(config.href), h.Class(buttonClass(look))], buttonContent(h, config.label, look))
+
+/**
+ * A button that reads as part of a line of text, as `apps/ui` draws the link beside a turn's failure: its `label` at
+ * `control` size in medium weight and `ink-secondary`, with no box around it, that darkens and is underlined while it is
+ * hovered, and sends `onClick`. It is a button, since it does something on the page and goes nowhere.
+ */
+export const lineButton = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  label: string,
+  onClick: Message
+): Html =>
+  Button.view(
+    {
+      type: "button",
+      onClick,
+      isDisabled: false,
+      toView: (attributes) => h.button([...attributes.button, h.Class(lineButtonLook)], [label])
+    },
+    h
+  )
 
 /**
  * A button of one icon in the look of `iconButton`, named by `label`, over `attributes` that already give it its

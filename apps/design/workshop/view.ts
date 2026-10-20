@@ -18,6 +18,7 @@ import {
   fieldGrid,
   hint,
   iconButton,
+  lineButton,
   link,
   linkButton,
   loadingLine,
@@ -136,6 +137,17 @@ import { type StateArtKind, stateArt, stateArtKinds } from "../src/stateArt.ts"
 import { taskHeadings, taskList, taskListEmpty, type TaskListRow } from "../src/taskList.ts"
 import { confirmation, confirmationStack, toast, toastStack } from "../src/toast.ts"
 import { tooltip } from "../src/tooltip.ts"
+import {
+  type SummaryLine,
+  turnLogActivity,
+  turnLogCard,
+  turnLogColumn,
+  turnLogEntry,
+  turnLogFooter,
+  turnLogProblem,
+  turnLogResponse,
+  turnLogSummary
+} from "../src/turnLog.ts"
 import {
   AccountBinding,
   AddPickerBinding,
@@ -412,6 +424,12 @@ const buttonGroup = (h: ApplicationViewBuilder, pressCount: number): Html => {
     sample(h, "Link", [
       h.p([], ["Wrong address? ", button(h, "Change email", press, { variant: "link" })]),
       button(h, "Disabled link", press, { variant: "link", isDisabled: true })
+    ]),
+    sample(h, "Button that reads as part of a line, quiet until it is hovered", [
+      h.p(
+        [h.Class("text-control text-ink-secondary")],
+        ["Anthropic needs its API key. ", lineButton(h, "Agent settings", press)]
+      )
     ]),
     sample(h, "Link to another page, which opens in a new tab", [
       h.p([], ["MCP server · ", link(h, { label: "Documentation", href: "https://modelcontextprotocol.io" })])
@@ -2538,6 +2556,16 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               status: turnStatus(h, "stopped"),
               actions: [button(h, "View log", press, { variant: "quiet" }), button(h, "Retry", press)],
               detail: "Atlas stopped taking part in this thread."
+            }),
+            turnRow(h, {
+              key: "narrow-failed",
+              label: "Atlas's turn",
+              mark: "A",
+              name: "Atlas",
+              status: turnStatus(h, "failed"),
+              actions: [button(h, "View log", press, { variant: "quiet" })],
+              detail: "Anthropic needs its API key.",
+              detailAction: lineButton(h, "Agent settings", press)
             })
           ]
         })
@@ -2553,7 +2581,14 @@ const turnStates: ReadonlyArray<TurnState> = ["queued", "working", "stopping", "
 const turnRowSamples = (h: ApplicationViewBuilder): ReadonlyArray<Html> => {
   const press = Message.ClickedButton()
   const viewLog = button(h, "View log", press, { variant: "quiet", isExpanded: false })
-  const row = (key: string, name: string, state: TurnState, actions: ReadonlyArray<Html>, detail?: string) =>
+  const row = (
+    key: string,
+    name: string,
+    state: TurnState,
+    actions: ReadonlyArray<Html>,
+    detail?: string,
+    detailAction?: Html
+  ) =>
     turnRow(h, {
       key,
       label: `${name}'s turn`,
@@ -2561,7 +2596,8 @@ const turnRowSamples = (h: ApplicationViewBuilder): ReadonlyArray<Html> => {
       name,
       status: turnStatus(h, state),
       actions,
-      detail
+      detail,
+      detailAction
     })
 
   return [
@@ -2569,11 +2605,313 @@ const turnRowSamples = (h: ApplicationViewBuilder): ReadonlyArray<Html> => {
     row("working", "Atlas", "working", [viewLog, button(h, "Stop", press, { name: "Stop Atlas" })]),
     row("stopping", "Atlas", "stopping", [viewLog, button(h, "Stop", press, { name: "Stopping", isDisabled: true })]),
     row("done", "Atlas", "done", [viewLog], "No reply posted."),
-    row("failed", "Atlas", "failed", [viewLog, button(h, "Retry", press)], "Anthropic needs its API key."),
+    row(
+      "failed",
+      "Atlas",
+      "failed",
+      [viewLog, button(h, "Retry", press)],
+      "Anthropic needs its API key.",
+      lineButton(h, "Agent settings", press)
+    ),
     row("departed", "Atlas", "stopped", [viewLog], "Atlas stopped taking part in this thread."),
     row("task", "Atlas", "stopped", [viewLog], "The task no longer asks Atlas to work on it."),
     row("requested", "Atlas", "stopped", [viewLog, button(h, "Retry", press)])
   ]
+}
+
+const turnLogPaneFrame = "flex h-176 w-98 max-w-full flex-col outline outline-outline"
+
+const turnLogSummaryLines: ReadonlyArray<SummaryLine> = [
+  { text: "Thread in #general" },
+  { text: "Anthropic · claude-sonnet-5", isCode: true },
+  { text: "Harness · opencode" },
+  { text: "Sandbox · Daytona" }
+]
+
+const turnLogUnstartedLines = (words: string): ReadonlyArray<SummaryLine> => [
+  { text: "Thread in #general" },
+  { text: words }
+]
+
+/** An agent's turn log as the side pane has it: Back to the thread, Stop while it can be stopped, Close, and its state. */
+const turnLogPane = (
+  h: ApplicationViewBuilder,
+  config: Readonly<{
+    state: TurnState
+    stop?: Html
+    body: ReadonlyArray<Html>
+    footer?: Html
+  }>
+): Html => {
+  const press = Message.ClickedButton()
+
+  return h.div(
+    [h.Class(turnLogPaneFrame)],
+    [
+      pane(h, {
+        variant: "side",
+        label: "Turn log",
+        header: {
+          title: "Turn log",
+          leading: paneBack(h, press, "Back to thread", { isAlways: true }),
+          actions: [...(config.stop === undefined ? [] : [config.stop]), paneClose(h, press, "Close turn log")],
+          subtitle: [h.span([], ["Yumi"]), turnStatus(h, config.state)]
+        },
+        body: config.body,
+        followsEnd: true,
+        ...(config.footer === undefined ? {} : { footer: [config.footer] })
+      })
+    ]
+  )
+}
+
+const turnLogGroup = (h: ApplicationViewBuilder): Html => {
+  const press = Message.ClickedButton()
+  const reply =
+    "Deploy the API first, verify compatibility, then release clients on Thursday. Keep rollback ready if error rates rise."
+  const entry = (key: string, title: string, time: string, text?: string) =>
+    turnLogEntry(h, {
+      key,
+      title,
+      time,
+      dateTime: `2026-10-18T${time.slice(0, 2)}:${time.slice(3, 5)}:00.000Z`,
+      timeTitle: `Sunday, October 18, 2026 at ${time}`,
+      text
+    })
+  const stop = button(h, "Stop", press, { name: "Stop Yumi" })
+
+  return group(h, "Turn log", [
+    sample(
+      h,
+      "A turn that works: Stop in the header, what it runs on, its activity with a response it recorded but did not post, and the footer that follows it live",
+      [
+        turnLogPane(h, {
+          state: "working",
+          stop,
+          body: [
+            turnLogColumn(h, [
+              turnLogSummary(h, turnLogSummaryLines),
+              turnLogActivity(h, {
+                label: "Activity",
+                children: [
+                  entry("accepted", "Work accepted", "10:02 AM", "Yumi picked up the request from this thread."),
+                  entry("started", "Turn started", "10:02 AM", "Running on the recorded harness, model, and sandbox."),
+                  entry("input", "Thread input received", "10:02 AM", "The request and prior conversation were added."),
+                  turnLogResponse(h, {
+                    key: "response",
+                    title: "Response recorded",
+                    label: "Complete",
+                    text: reply,
+                    note: "Not posted to the thread."
+                  })
+                ]
+              })
+            ])
+          ],
+          footer: turnLogFooter(h, { mark: "following", text: "Following live" })
+        })
+      ],
+      "flex"
+    ),
+    sample(
+      h,
+      "A turn that is stopping: Stop is dimmed and named Stopping, and the state says so",
+      [
+        turnLogPane(h, {
+          state: "stopping",
+          stop: button(h, "Stop", press, { name: "Stopping", isDisabled: true }),
+          body: [
+            turnLogColumn(h, [
+              turnLogSummary(h, turnLogSummaryLines),
+              turnLogActivity(h, {
+                label: "Activity",
+                children: [
+                  entry("accepted", "Work accepted", "10:02 AM", "Yumi picked up the request from this thread."),
+                  entry("started", "Turn started", "10:02 AM", "Running on the recorded harness, model, and sandbox.")
+                ]
+              })
+            ])
+          ],
+          footer: turnLogFooter(h, { mark: "following", text: "Following live" })
+        })
+      ],
+      "flex"
+    ),
+    sample(
+      h,
+      "A turn that waits to start: nothing is recorded yet, a card says so, and the footer waits for activity",
+      [
+        turnLogPane(h, {
+          state: "queued",
+          stop,
+          body: [
+            turnLogColumn(h, [
+              turnLogSummary(
+                h,
+                turnLogUnstartedLines("The harness, model, and sandbox are recorded when work starts.")
+              ),
+              turnLogActivity(h, {
+                label: "Activity",
+                children: [
+                  entry("accepted", "Work accepted", "10:02 AM", "Yumi picked up the request from this thread.")
+                ]
+              }),
+              turnLogCard(h, {
+                title: "Queued",
+                mark: activityMark(h, "thread"),
+                note: "Waiting to start. There is no output yet."
+              })
+            ])
+          ],
+          footer: turnLogFooter(h, { mark: "waiting", text: "Waiting for activity" })
+        })
+      ],
+      "flex"
+    ),
+    sample(
+      h,
+      "A turn that replied: its response was posted, and the footer opens the reply in its thread",
+      [
+        turnLogPane(h, {
+          state: "done",
+          body: [
+            turnLogColumn(h, [
+              turnLogSummary(h, turnLogSummaryLines),
+              turnLogActivity(h, {
+                label: "Activity",
+                children: [
+                  entry("accepted", "Work accepted", "10:02 AM", "Yumi picked up the request from this thread."),
+                  entry("started", "Turn started", "10:02 AM", "Running on the recorded harness, model, and sandbox."),
+                  entry("input", "Thread input received", "10:02 AM", "The request and prior conversation were added."),
+                  turnLogResponse(h, {
+                    key: "response",
+                    title: "Reply recorded",
+                    label: "Complete",
+                    text: reply,
+                    note: "This response was posted to the thread."
+                  }),
+                  entry("replied", "Reply posted", "10:03 AM", "Turn completed. Open the reply in its thread.")
+                ]
+              })
+            ])
+          ],
+          footer: turnLogFooter(h, { action: button(h, "View reply in thread", press, { wide: true }) })
+        })
+      ],
+      "flex"
+    ),
+    sample(
+      h,
+      "A turn that was interrupted and ran again, and that finished with no reply",
+      [
+        turnLogPane(h, {
+          state: "done",
+          body: [
+            turnLogColumn(h, [
+              turnLogSummary(h, turnLogSummaryLines),
+              turnLogActivity(h, {
+                label: "Activity",
+                children: [
+                  entry("accepted", "Work accepted", "10:02 AM", "Yumi picked up the request from this thread."),
+                  entry("started", "Turn started", "10:02 AM", "Running on the recorded harness, model, and sandbox."),
+                  entry("input", "Thread input received", "10:02 AM", "2 more messages from the thread were added."),
+                  entry("interrupted", "Interrupted", "10:03 AM", "The model was unavailable. Trying again."),
+                  entry("finished", "Turn completed", "10:04 AM", "No reply was posted.")
+                ]
+              })
+            ])
+          ],
+          footer: turnLogFooter(h, { text: "This turn has finished." })
+        })
+      ],
+      "flex"
+    ),
+    sample(
+      h,
+      "A turn that failed before it started: why, a caution card with the way to fix it, and Retry turn in the footer",
+      [
+        turnLogPane(h, {
+          state: "failed",
+          body: [
+            turnLogColumn(h, [
+              turnLogSummary(h, turnLogUnstartedLines("This turn failed before execution started.")),
+              turnLogActivity(h, {
+                label: "Activity",
+                children: [
+                  entry("accepted", "Work accepted", "10:02 AM", "Yumi picked up the request from this thread."),
+                  entry("failed", "Turn failed", "10:02 AM", "Anthropic needs its API key.")
+                ]
+              }),
+              turnLogCard(h, {
+                title: "Review the agent's setup",
+                tone: "caution",
+                note: "Fix what stopped this turn before starting another attempt.",
+                action: button(h, "Agent settings", press)
+              }),
+              turnLogProblem(h, "Couldn't start another attempt. Try again.")
+            ])
+          ],
+          footer: turnLogFooter(h, {
+            action: button(h, "Retry turn", press),
+            text: "Previous log stays available."
+          })
+        })
+      ],
+      "flex"
+    ),
+    sample(
+      h,
+      "Activity that arrived while the reader was scrolled up: the footer is one wide button to the latest",
+      [
+        turnLogPane(h, {
+          state: "working",
+          stop,
+          body: [
+            turnLogColumn(h, [
+              turnLogSummary(h, turnLogSummaryLines),
+              turnLogActivity(h, {
+                label: "Activity",
+                children: [
+                  entry("accepted", "Work accepted", "10:02 AM", "Yumi picked up the request from this thread.")
+                ]
+              })
+            ])
+          ],
+          footer: turnLogFooter(h, { action: button(h, "New activity · Jump to latest", press, { wide: true }) })
+        })
+      ],
+      "flex"
+    ),
+    sample(
+      h,
+      "A turn log that is being read, that is not available, and that could not be read, in the body of the pane",
+      [
+        turnLogPane(h, { state: "working", stop, body: [loadingLine(h, "Loading the turn log…")] }),
+        turnLogPane(h, {
+          state: "done",
+          body: [
+            paneEmpty(h, {
+              art: "held-back",
+              title: "This turn log isn't available",
+              copy: "It may be in a thread you can no longer open."
+            })
+          ]
+        }),
+        turnLogPane(h, {
+          state: "working",
+          body: [
+            paneEmpty(h, {
+              art: "came-apart",
+              title: "Can't load this turn log",
+              copy: "The log could not be followed. Check the connection.",
+              action: button(h, "Try again", press)
+            })
+          ]
+        })
+      ],
+      "flex flex-wrap gap-6"
+    )
+  ])
 }
 
 /** A message that uses every form markdown has, and the mention of a member the workshop does not know. */
@@ -5712,6 +6050,7 @@ export const view = ApplicationComposition.makeView((model, h) => ({
           tooltipGroup(h),
           detailsGroup(h, model),
           messageGroup(h, model.openThread, model.editText),
+          turnLogGroup(h),
           richTextGroup(h),
           paneEmptyGroup(h),
           stateArtGroup(h),

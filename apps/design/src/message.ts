@@ -127,6 +127,8 @@ const turnActions = "flex items-center justify-end gap-1 @max-[22.5rem]:col-star
 
 const turnDetail = "col-[2/-1] m-0 text-control text-ink-secondary"
 
+const turnDetailWithAction = `${turnDetail} flex items-baseline justify-between gap-3 max-tablet:flex-col max-tablet:gap-1`
+
 const turnProblem = "col-[2/-1] m-0 text-control text-caution-text"
 
 const turnUnder = "col-[2/-1] flex min-w-0 flex-col gap-2"
@@ -683,6 +685,20 @@ export const note = <Message, Requirements>(
     ]
   )
 
+const renderTurnDetail = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  detail: string | undefined,
+  action: Html | undefined
+): Html => {
+  if (detail === undefined) {
+    return h.empty
+  }
+
+  return action === undefined
+    ? h.p([h.Class(turnDetail)], [detail])
+    : h.p([h.Class(turnDetailWithAction)], [detail, action])
+}
+
 /**
  * An agent's turn where it took on the work, an item of a `messageList` among its messages and notes, as `apps/ui`'s
  * `TurnRow` draws it, named `label` for assistive technology, such as "Atlas's turn": the agent's `mark` at 24px in the
@@ -690,8 +706,9 @@ export const note = <Message, Requirements>(
  * `turnStatus`, and the `actions` at the end, buttons 4px apart, such as View log, Stop, and Retry. Where the row is
  * narrower than 22.5rem the actions drop to a line of their own under the name. Under the first line, 4px down and in
  * line with the name, the `detail` says how the turn ended, such as "No reply posted.", at `control` size in
- * `ink-secondary`; the `problem` says why a stop or retry did not go through, in the caution color, as an alert; and
- * the `children` follow, 8px apart, such as the turn's log.
+ * `ink-secondary`, with the `detailAction`, such as a `lineButton`, at its end, 12px from it, or under it on a phone;
+ * the `problem` says why a stop or retry did not go through, in the caution color, as an alert; and the `children`
+ * follow, 8px apart.
  */
 export const turnRow = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -703,6 +720,7 @@ export const turnRow = <Message, Requirements>(
     status: Html
     actions: ReadonlyArray<Html>
     detail?: string | undefined
+    detailAction?: Html | undefined
     problem?: string | undefined
     children?: ReadonlyArray<Html>
   }>
@@ -719,7 +737,7 @@ export const turnRow = <Message, Requirements>(
           mark(h, { text: config.mark, tone: "lilac" }),
           h.span([h.Class(turnWho)], [h.span([h.Class(turnName)], [config.name]), config.status]),
           config.actions.length === 0 ? h.empty : h.div([h.Class(turnActions)], config.actions),
-          config.detail === undefined ? h.empty : h.p([h.Class(turnDetail)], [config.detail]),
+          renderTurnDetail(h, config.detail, config.detailAction),
           config.problem === undefined ? h.empty : h.p([h.Role("alert"), h.Class(turnProblem)], [config.problem]),
           children.length === 0 ? h.empty : h.div([h.Class(turnUnder)], children)
         ]

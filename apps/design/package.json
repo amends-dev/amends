@@ -31,6 +31,7 @@
     "./taskList": "./src/taskList.ts",
     "./toast": "./src/toast.ts",
     "./tooltip": "./src/tooltip.ts",
+    "./turnLog": "./src/turnLog.ts",
     "./viewport": "./src/viewport.ts"
   },
   "scripts": {

@@ -23,7 +23,9 @@ const titleRows = {
   side: "flex h-15 flex-none items-center"
 }
 
-const backSlot = "-ms-4 me-2 flex flex-none items-center tablet:hidden"
+const backSlot = "-ms-4 me-2 flex flex-none items-center"
+
+const backSlotOnPhones = `${backSlot} tablet:hidden`
 
 const closeSlot = "flex flex-none items-center max-tablet:hidden"
 
@@ -50,6 +52,8 @@ const actionsRow = "flex flex-none items-center gap-2 ps-4"
 const tabsSlot = "mt-auto flex"
 
 const subtitleLine = "m-0 truncate pt-1.5 pb-3 text-control leading-4.5 text-ink-secondary"
+
+const subtitleParts = `${subtitleLine} flex items-center gap-2.5`
 
 const bodyScroll = "min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5"
 
@@ -123,8 +127,11 @@ export type PaneHeader = Readonly<{
   actions?: ReadonlyArray<Html>
   /** The `paneTabs` under the title. */
   tabs?: Html
-  /** A line under the title, when it has no tabs. */
-  subtitle?: string
+  /**
+   * A line under the title, when it has no tabs: words, or several pieces side by side, such as a name and where
+   * something stands.
+   */
+  subtitle?: string | ReadonlyArray<Html | string>
 }>
 
 export type PaneTab<Message> = Readonly<{
@@ -184,6 +191,18 @@ const renderTitle = <Message, Requirements>(
   )
 }
 
+const renderSubtitle = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, header: PaneHeader): Html => {
+  const { subtitle } = header
+
+  if (header.tabs !== undefined || subtitle === undefined) {
+    return h.empty
+  }
+
+  return Predicate.isString(subtitle)
+    ? h.p([h.Class(subtitleLine)], [subtitle])
+    : h.p([h.Class(subtitleParts)], subtitle)
+}
+
 const renderHeader = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   variant: PaneVariant,
@@ -197,9 +216,7 @@ const renderHeader = <Message, Requirements>(
         [header.leading ?? h.empty, renderTitle(h, variant, header), h.div([h.Class(actionsRow)], header.actions ?? [])]
       ),
       header.tabs === undefined ? h.empty : h.div([h.Class(tabsSlot)], [header.tabs]),
-      header.tabs === undefined && header.subtitle !== undefined
-        ? h.p([h.Class(subtitleLine)], [header.subtitle])
-        : h.empty
+      renderSubtitle(h, header)
     ]
   )
 
@@ -217,7 +234,8 @@ const renderHeader = <Message, Requirements>(
  * The body's first element rests against its start unless the `anchor` is `bottom`, which a conversation takes: where
  * it is shorter than the body it rests against the footer's composer, as `apps/ui`'s timeline does, and where it is
  * taller the body scrolls as it does for any other. An anchored body says so as `data-anchor="bottom"`, which is how a
- * program that keeps a conversation at its end finds the body that scrolls it.
+ * program that keeps a conversation at its end finds the body that scrolls it. A body whose content a program keeps
+ * at its end as it grows, such as a log, though it begins at the top, says `followsEnd` as `data-follows-end`.
  */
 export const pane = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -228,6 +246,7 @@ export const pane = <Message, Requirements>(
     toolbar?: ReadonlyArray<Html>
     body: ReadonlyArray<Html>
     anchor?: "top" | "bottom"
+    followsEnd?: boolean
     footer?: ReadonlyArray<Html>
   }>
 ): Html => {
@@ -238,7 +257,10 @@ export const pane = <Message, Requirements>(
     config.toolbar === undefined ? h.empty : h.div([h.Class(toolbarBand)], config.toolbar),
     config.anchor === "bottom"
       ? h.div([h.DataAttribute("anchor", "bottom"), h.Class(`${scroll} ${bodyAtEnd}`)], config.body)
-      : h.div([h.Class(scroll)], config.body),
+      : h.div(
+          [...(config.followsEnd === true ? [h.DataAttribute("follows-end", "")] : []), h.Class(scroll)],
+          config.body
+        ),
     config.footer === undefined ? h.empty : h.div([h.Class(footerBar)], config.footer)
   ]
 
@@ -429,10 +451,16 @@ export const paneClose = <Message, Requirements>(
 /**
  * The side panel's Back button, named Back unless `label` names where it goes back to, such as "Back to Members",
  * for the header's `leading`. It shows below 48rem, where the side panel is full screen over the main pane, and
- * sends the same message as `paneClose` does.
+ * sends the same message as `paneClose` does, unless it is `isAlways`: then it shows on every layout, as `apps/ui`'s
+ * does for the way from a turn's log back to its thread, which is not the way `paneClose` leaves the panel by.
  */
 export const paneBack = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   onClick: Message,
-  label = "Back"
-): Html => h.span([h.Class(backSlot)], [iconButton(h, { icon: "mark-back", label, onClick })])
+  label = "Back",
+  options: Readonly<{ isAlways?: boolean }> = {}
+): Html =>
+  h.span(
+    [h.Class(options.isAlways === true ? backSlot : backSlotOnPhones)],
+    [iconButton(h, { icon: "mark-back", label, onClick })]
+  )

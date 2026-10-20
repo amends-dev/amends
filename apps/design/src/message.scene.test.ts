@@ -5,7 +5,7 @@ import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
 import { all, click, expect, expectAll, given, nth, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { button } from "./control.ts"
+import { button, lineButton } from "./control.ts"
 import { log, turnStatus } from "./details.ts"
 import type { MarkContent } from "./mark.ts"
 import {
@@ -1454,6 +1454,77 @@ describe("turnRow", () => {
       expect(text("The model provider is unavailable.")).toHaveClass("col-[2/-1]"),
       expect(role("alert")).toHaveText("Couldn't start another attempt. Try again."),
       expect(role("alert")).toHaveClass("text-caution-text")
+    )
+  })
+
+  it("holds the action of its detail at the detail's end, 12px from it, or under it on a phone", () => {
+    const withAction = (_: Model, h: HtmlBuilder<Message>) =>
+      messageList(h, {
+        label: "Thread",
+        children: [
+          turnRow(h, {
+            key: "turn-3",
+            label: "Atlas's turn",
+            mark: "A",
+            name: "Atlas",
+            status: turnStatus(h, "failed"),
+            actions: [],
+            detail: "The model provider is unavailable.",
+            detailAction: lineButton(h, "Agent settings", Message.ClickedEdit({ key: "turn-3" }))
+          })
+        ]
+      })
+
+    scene(
+      { update, view: viewOf(withAction) },
+      given(initial),
+      expect(within(role("group", { name: "Atlas's turn" }), selector("p"))).toHaveClass("flex"),
+      expect(within(role("group", { name: "Atlas's turn" }), selector("p"))).toHaveClass("justify-between"),
+      expect(within(role("group", { name: "Atlas's turn" }), selector("p"))).toHaveClass("gap-3"),
+      expect(within(role("group", { name: "Atlas's turn" }), selector("p"))).toHaveClass("max-tablet:flex-col"),
+      expect(within(role("group", { name: "Atlas's turn" }), selector("p"))).toHaveClass("col-[2/-1]"),
+      expect(within(role("group", { name: "Atlas's turn" }), selector("p"))).toHaveClass("text-ink-secondary"),
+      expect(within(role("group", { name: "Atlas's turn" }), selector("p"))).toContainText(
+        "The model provider is unavailable."
+      ),
+      expect(
+        within(
+          within(role("group", { name: "Atlas's turn" }), selector("p")),
+          role("button", { name: "Agent settings" })
+        )
+      ).toExist(),
+      click(role("button", { name: "Agent settings" })),
+      expect(role("status")).toHaveText("Current thread-2, edits 1, deletions 0")
+    )
+  })
+
+  it("leaves the action out when it has no detail to hold it, and lays the detail out alone as a block", () => {
+    const withoutDetail = (_: Model, h: HtmlBuilder<Message>) =>
+      messageList(h, {
+        label: "Thread",
+        children: [
+          turnRow(h, {
+            key: "turn-4",
+            label: "Atlas's turn",
+            mark: "A",
+            name: "Atlas",
+            status: turnStatus(h, "stopped"),
+            actions: [],
+            detailAction: lineButton(h, "Agent settings", Message.ClickedEdit({ key: "turn-4" }))
+          })
+        ]
+      })
+
+    scene(
+      { update, view: viewOf(withoutDetail) },
+      given(initial),
+      expect(role("button", { name: "Agent settings" })).toBeAbsent()
+    )
+    scene(
+      { update, view: viewOf(turn) },
+      given(initial),
+      expect(text("The model provider is unavailable.")).not.toHaveClass("flex"),
+      expect(text("The model provider is unavailable.")).not.toHaveClass("justify-between")
     )
   })
 

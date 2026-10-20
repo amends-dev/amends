@@ -43,6 +43,7 @@ import {
   hint,
   iconButton,
   iconSubmit,
+  lineButton,
   link,
   linkButton,
   loadingLine,
@@ -972,6 +973,41 @@ describe("linkButton", () => {
       expect(role("link", { name: "Reload" })).toHaveClass("text-item"),
       expect(role("link", { name: "New task" })).toHaveClass("gap-2"),
       expect(within(role("link", { name: "New task" }), selector("svg"))).toHaveAttr("aria-hidden", "true")
+    )
+  })
+})
+
+describe("lineButton", () => {
+  it("is a button found by its name that sends its message and reads as part of the line around it", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          h.p([], ["The model was unavailable. ", lineButton(h, "Agent settings", Message.ClickedSave())])
+        ])
+      },
+      given(initial),
+      expect(role("button", { name: "Agent settings" })).toHaveText("Agent settings"),
+      expect(role("button", { name: "Agent settings" })).toHaveClass("inline"),
+      expect(role("button", { name: "Agent settings" })).toHaveClass("p-0"),
+      expect(role("button", { name: "Agent settings" })).toHaveClass("border-0"),
+      expect(role("button", { name: "Agent settings" })).toHaveClass("bg-transparent"),
+      click(role("button", { name: "Agent settings" })),
+      expect(role("status")).toHaveText("Saved 1, removed 0, submitted 0")
+    )
+  })
+
+  it("is quiet and medium at control size, and darkens and is underlined while it is hovered", () => {
+    scene(
+      { update, view: viewOf((_, h) => [lineButton(h, "Agent settings", Message.ClickedSave())]) },
+      given(initial),
+      expect(role("button", { name: "Agent settings" })).toHaveClass("text-control"),
+      expect(role("button", { name: "Agent settings" })).toHaveClass("font-medium"),
+      expect(role("button", { name: "Agent settings" })).toHaveClass("text-ink-secondary"),
+      expect(role("button", { name: "Agent settings" })).toHaveClass("hover:text-ink"),
+      expect(role("button", { name: "Agent settings" })).toHaveClass("hover:underline"),
+      expect(role("button", { name: "Agent settings" })).toHaveClass("focus-ring"),
+      expect(role("button", { name: "Agent settings" })).not.toHaveClass("underline")
     )
   })
 })
