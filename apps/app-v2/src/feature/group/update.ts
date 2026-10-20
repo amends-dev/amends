@@ -1,10 +1,19 @@
-import type { GroupMembership } from "@amends-dev/core/group"
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
-import { AdmitMember, FollowGroup, JoinGroup, LeaveGroup, RemoveMember, RenameGroup, UnfollowGroup } from "./command.ts"
-import { DialogBinding, GroupComposition } from "./composition.ts"
 import {
+  AdmitMembers,
+  FocusAdmitMembers,
+  FollowGroup,
+  JoinGroup,
+  LeaveGroup,
+  RemoveMember,
+  RenameGroup,
+  UnfollowGroup
+} from "./command.ts"
+import { DialogBinding, GroupComposition, MembersBinding } from "./composition.ts"
+import {
+  chooseToAdmit,
   GroupDefinition,
   Message,
   type Model,
@@ -12,7 +21,8 @@ import {
   OutMessage,
   ownAdmission,
   type SettingsTab,
-  teamName
+  teamName,
+  unchooseToAdmit
 } from "./definition.ts"
 
 /** Whose store the action is written to, and the group it acts on. */
@@ -20,9 +30,6 @@ const inGroup = ({ workspaceId, memberId, groupId }: Model) => ({ workspaceId, m
 
 /** Show the settings' section `tab`. */
 const showSettingsTab = (tab: SettingsTab) => GroupDefinition.stepFields(() => ({ settingsTab: () => tab }))
-
-/** The settings section that lists the members: a team's Members tab, and General for a conversation, with none. */
-const membersTabOf = (model: Model): SettingsTab => (Option.isSome(teamName(model)) ? "Members" : "General")
 
 /** Close the thread open in the group. */
 const closeThread = GroupDefinition.stepFields(() => ({ thread: () => Option.none() }))
@@ -41,20 +48,26 @@ const writeRenamingWhenChanged = GroupDefinition.step((model: Model) =>
   })
 )
 
-/** End the person's admission `membershipId` to the group. */
-const writeLeaving = (membershipId: GroupMembership.GroupMembershipId) =>
-  GroupDefinition.step((model: Model) => ({ model, commands: [LeaveGroup({ ...inGroup(model), membershipId })] }))
+/** Admit the members chosen, one action written for each, and leave none chosen and the phone's own view for it. */
+const admitChosen = GroupDefinition.step((model: Model) => ({
+  model: modifyFields(model, { admitting: () => [], admitQuery: () => "", isAddViewOpen: () => false }),
+  commands: model.admitting.length === 0 ? [] : [AdmitMembers({ ...inGroup(model), admitMemberIds: model.admitting })]
+}))
 
 export const update = GroupComposition.makeUpdate((model, message) =>
   Message.match(message, {
-    ReceivedGroup: ({ group, memberships, follow }) => ({
-      model: modifyFields(model, {
+    ReceivedGroup: ({ group, memberships, follow }) => {
+      const received = modifyFields(model, {
         group: () => group,
         isLoaded: () => true,
         memberships: () => memberships,
         follow: () => follow
       })
-    }),
+
+      return Option.isNone(group) && model.dialog.isOpen
+        ? Update.combine(received, [DialogBinding.requestClose()])
+        : { model: received }
+    },
     ReceivedMembers: ({ members }) => ({ model: modifyFields(model, { members: () => members }) }),
     ReceivedGrants: ({ grants }) => ({ model: modifyFields(model, { grants: () => grants }) }),
     ReceivedPresence: ({ present }) => ({ model: modifyFields(model, { present: () => present }) }),
@@ -65,7 +78,7 @@ export const update = GroupComposition.makeUpdate((model, message) =>
     ClickedSettings: () =>
       Update.combine(model, [showSettingsTab("General"), startRenaming, DialogBinding.requestOpen()]),
     ClickedMembers: () =>
-      Update.combine(model, [showSettingsTab(membersTabOf(model)), startRenaming, DialogBinding.requestOpen()]),
+      Update.combine(model, [showSettingsTab("Members"), startRenaming, DialogBinding.requestOpen()]),
     ChoseSettingsTab: ({ tab }) => ({ model: modifyFields(model, { settingsTab: () => tab }) }),
     TypedName: ({ name }) => ({ model: modifyFields(model, { renaming: () => Option.some(name) }) }),
     SubmittedRename: () => Update.combine(model, [writeRenamingWhenChanged, DialogBinding.requestClose()]),
@@ -75,17 +88,21 @@ export const update = GroupComposition.makeUpdate((model, message) =>
     ClickedLeave: () =>
       Option.match(ownAdmission(model), {
         onNone: () => ({ model }),
-        onSome: ({ membership }) => Update.combine(model, [writeLeaving(membership.id), DialogBinding.requestClose()])
-      }),
-    ChoseMemberToAdmit: ({ memberId }) => ({ model: modifyFields(model, { admitting: () => memberId }) }),
-    SubmittedAdmit: () =>
-      Option.match(model.admitting, {
-        onNone: () => ({ model }),
-        onSome: (admitMemberId) => ({
-          model: modifyFields(model, { admitting: () => Option.none() }),
-          commands: [AdmitMember({ ...inGroup(model), admitMemberId })]
+        onSome: ({ membership }) => ({
+          model,
+          commands: [LeaveGroup({ ...inGroup(model), membershipId: membership.id })]
         })
       }),
+    ClickedAddMembers: () => ({ model: modifyFields(model, { isAddViewOpen: () => true }) }),
+    ClickedBackToMembers: () => ({ model: modifyFields(model, { isAddViewOpen: () => false }) }),
+    TypedAdmitQuery: ({ query }) => ({ model: modifyFields(model, { admitQuery: () => query }) }),
+    PickedAdmitMember: ({ memberId }) => ({ model: chooseToAdmit(model, memberId) }),
+    ClickedRemoveAdmitting: ({ memberId }) => ({
+      model: unchooseToAdmit(model, memberId),
+      commands: [FocusAdmitMembers({})]
+    }),
+    ClickedAdmit: () => Update.combine(model, [admitChosen, MembersBinding.requestClose()]),
+    CompletedFocusAdmitMembers: () => ({ model }),
     ClickedRemoveMember: ({ membershipId }) => ({
       model,
       commands: [RemoveMember({ ...inGroup(model), membershipId })]

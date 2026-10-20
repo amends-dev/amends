@@ -19,14 +19,14 @@ import {
 import { Message, Open, openThreadTitle } from "./definition.ts"
 
 /**
- * The time now, which the inbox, the tasks, and the group open are given, and the workspace's name, which the group
- * is given too.
+ * The time now, which the inbox, the tasks, and the group open are given, and the workspace's name, which the inbox and
+ * the group are given too.
  */
 export type ViewInputs = Readonly<{ now: DateTime.Utc; workspaceName: string }>
 
 /**
  * The main pane: what the person opened, the inbox at first. The inbox, the tasks, and the open group are given the
- * time now, and the inbox and the group the workspace's name too.
+ * time now, and the inbox and the group the workspace's name too, and the group the width of the window Home holds.
  */
 export const view = HomeComposition.makeView.withInputs<ViewInputs>((model, { now, workspaceName }, h) =>
   Open.match(model.open, {
@@ -39,7 +39,12 @@ export const view = HomeComposition.makeView.withInputs<ViewInputs>((model, { no
     Groups: () => h.block(GroupsBinding.embedView({ slotId: "browse", model: model.groups, view: browseView })),
     Group: ({ groupId, model: open }) =>
       h.block(
-        GroupBinding.embedView({ key: groupId, slotId: "group", model: open, viewInputs: { now, workspaceName } })
+        GroupBinding.embedView({
+          key: groupId,
+          slotId: "group",
+          model: open,
+          viewInputs: { now, workspaceName, viewport: model.viewport }
+        })
       )
   })
 )

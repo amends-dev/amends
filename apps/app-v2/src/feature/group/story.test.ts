@@ -1,23 +1,32 @@
 import { Grant, Scope } from "@amends-dev/core/authorization"
 import { Group, GroupId, GroupPermissions } from "@amends-dev/core/group"
 import { ThreadId } from "@amends-dev/core/thread"
-import { MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
-import { Option, Schema } from "effect"
+import { Effect, Layer, Option, Schema } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
-import { aliceInDesign, bobInDesign, design, membership, now } from "../../../test/fixtures.ts"
+import { aliceInDesign, bob, bobInDesign, design, membership, now, scout } from "../../../test/fixtures.ts"
+import { recordingStores } from "../../../test/recordingStores.ts"
+import { unwritable } from "../../store/Stores.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { ReadDraft } from "../composer/command.ts"
 import { ThreadsBlock } from "../threads/block.ts"
-import { AdmitMember, FollowGroup, JoinGroup, LeaveGroup, RemoveMember, RenameGroup, UnfollowGroup } from "./command.ts"
+import {
+  AdmitMembers,
+  FocusAdmitMembers,
+  FollowGroup,
+  JoinGroup,
+  LeaveGroup,
+  RemoveMember,
+  RenameGroup,
+  UnfollowGroup
+} from "./command.ts"
 import { DialogBinding, ThreadsBinding } from "./composition.ts"
 import { availabilityOf, Message, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
 const { workspace, member } = membership
-const carolId = MemberId.MemberId.make("member-4")
 const threadId = ThreadId.ThreadId.make("thread-1")
 
 /** A public team the person does not belong to. */
@@ -55,6 +64,9 @@ const received = message(
     follow: Option.none()
   })
 )
+
+/** The workspace's members: the person, bob, who is in the team, and scout, an agent who is not. */
+const receivedMembers = message(Message.ReceivedMembers({ members: [member, bob, scout] }))
 
 /** The person may rename the team. */
 const receivedRenameGrant = message(
@@ -108,7 +120,7 @@ describe("a group", () => {
     )
   })
 
-  it("opens its settings on the Members section for a team, and on General for a conversation, from its members", () => {
+  it("opens its settings on the Members section, for a team and for a conversation, from its members", () => {
     story(
       update,
       given(opened),
@@ -130,12 +142,11 @@ describe("a group", () => {
           follow: Option.none()
         })
       ),
-      message(Message.ChoseSettingsTab({ tab: "Members" })),
       message(Message.ClickedMembers()),
       dialogOpened,
       model((model) => {
         expect(model.dialog.isOpen).toBe(true)
-        expect(model.settingsTab).toBe("General")
+        expect(model.settingsTab).toBe("Members")
       })
     )
   })
@@ -206,21 +217,27 @@ describe("a group", () => {
     )
   })
 
-  it("drops the drafts of the name and of the member to admit when its settings close", () => {
+  it("drops the drafts of the name, of the members to admit, and of their search when its settings close", () => {
     story(
       update,
       given(opened),
       received,
+      receivedMembers,
       receivedRenameGrant,
       message(Message.ClickedSettings()),
       dialogOpened,
       message(Message.TypedName({ name: "Design team" })),
-      message(Message.ChoseMemberToAdmit({ memberId: Option.some(carolId) })),
+      message(Message.TypedAdmitQuery({ query: "sc" })),
+      message(Message.PickedAdmitMember({ memberId: scout.id })),
+      message(Message.TypedAdmitQuery({ query: "bo" })),
+      message(Message.ClickedAddMembers()),
       message(fromDialog(DialogBlock.Message.RequestedClose())),
       dialogClosed,
       model((model) => {
         expect(model.renaming).toEqual(Option.none())
-        expect(model.admitting).toEqual(Option.none())
+        expect(model.admitting).toEqual([])
+        expect(model.admitQuery).toBe("")
+        expect(model.isAddViewOpen).toBe(false)
         expect(model.dialog.isOpen).toBe(false)
       }),
       message(Message.ClickedSettings()),
@@ -231,7 +248,7 @@ describe("a group", () => {
     )
   })
 
-  it("is followed and unfollowed as the person says, and left from its settings, which close", () => {
+  it("is followed and unfollowed as the person says, and left from its settings, which stay open", () => {
     story(
       update,
       given(opened),
@@ -248,33 +265,120 @@ describe("a group", () => {
       message(Message.ClickedSettings()),
       dialogOpened,
       message(Message.ClickedLeave()),
-      Command.expectHas(LeaveGroup({ ...inDesign, membershipId: aliceInDesign.id }), Dialog.test.CloseDialog),
+      Command.expectExact(LeaveGroup({ ...inDesign, membershipId: aliceInDesign.id })),
       Command.resolve(LeaveGroup, Message.FailedWriteAction({ error: "This browser could not keep that. Try again." })),
-      dialogClosed,
       model((model) => {
-        expect(model.dialog.isOpen).toBe(false)
+        expect(model.dialog.isOpen).toBe(true)
         expect(model.notice).toEqual(Option.some("This browser could not keep that. Try again."))
       })
     )
   })
 
-  it("admits the member chosen and removes an admission, where the person manages them", () => {
+  it("chooses the members to admit one at a time, as the workspace's members who are not in the team, once each", () => {
     story(
       update,
       given(opened),
       received,
-      message(Message.SubmittedAdmit()),
-      Command.expectNone(),
-      message(Message.ChoseMemberToAdmit({ memberId: Option.some(carolId) })),
-      message(Message.SubmittedAdmit()),
-      Command.expectExact(AdmitMember({ ...inDesign, admitMemberId: carolId })),
-      Command.resolve(AdmitMember, Message.WroteAction()),
+      receivedMembers,
+      message(Message.TypedAdmitQuery({ query: "sc" })),
       model((model) => {
-        expect(model.admitting).toEqual(Option.none())
+        expect(model.admitQuery).toBe("sc")
+      }),
+      message(Message.PickedAdmitMember({ memberId: scout.id })),
+      message(Message.PickedAdmitMember({ memberId: scout.id })),
+      message(Message.PickedAdmitMember({ memberId: bob.id })),
+      message(Message.PickedAdmitMember({ memberId: "someone-else" })),
+      model((model) => {
+        expect(model.admitting).toEqual([scout.id])
+        expect(model.admitQuery).toBe("")
+      })
+    )
+  })
+
+  it("takes a member off those chosen, and asks for the focus back in the picker's input", () => {
+    story(
+      update,
+      given(opened),
+      received,
+      receivedMembers,
+      message(Message.PickedAdmitMember({ memberId: scout.id })),
+      message(Message.ClickedRemoveAdmitting({ memberId: scout.id })),
+      Command.expectExact(FocusAdmitMembers({})),
+      Command.resolve(FocusAdmitMembers, Message.CompletedFocusAdmitMembers()),
+      model((model) => {
+        expect(model.admitting).toEqual([])
+      })
+    )
+  })
+
+  it("admits the members chosen in one command, writing an admission for each, and removes an admission", () => {
+    story(
+      update,
+      given(opened),
+      received,
+      receivedMembers,
+      message(Message.ClickedAdmit()),
+      Command.expectNone(),
+      message(Message.PickedAdmitMember({ memberId: scout.id })),
+      message(Message.ClickedAdmit()),
+      Command.expectHas(AdmitMembers({ ...inDesign, admitMemberIds: [scout.id] })),
+      Command.resolve(AdmitMembers, Message.WroteAction()),
+      model((model) => {
+        expect(model.admitting).toEqual([])
       }),
       message(Message.ClickedRemoveMember({ membershipId: bobInDesign.id })),
       Command.expectExact(RemoveMember({ ...inDesign, membershipId: bobInDesign.id })),
       Command.resolve(RemoveMember, Message.WroteAction())
+    )
+  })
+
+  it("moves to its own view for adding members and back, keeping who is chosen, and leaves it once they are admitted", () => {
+    story(
+      update,
+      given(opened),
+      received,
+      receivedMembers,
+      message(Message.ClickedAddMembers()),
+      model((model) => {
+        expect(model.isAddViewOpen).toBe(true)
+      }),
+      message(Message.PickedAdmitMember({ memberId: scout.id })),
+      message(Message.ClickedBackToMembers()),
+      model((model) => {
+        expect(model.isAddViewOpen).toBe(false)
+        expect(model.admitting).toEqual([scout.id])
+      }),
+      message(Message.ClickedAddMembers()),
+      message(Message.ClickedAdmit()),
+      Command.expectHas(AdmitMembers({ ...inDesign, admitMemberIds: [scout.id] })),
+      Command.resolve(AdmitMembers, Message.WroteAction()),
+      model((model) => {
+        expect(model.isAddViewOpen).toBe(false)
+        expect(model.admitting).toEqual([])
+      })
+    )
+  })
+
+  it("closes its settings when the group stops being there while they are open, and not when they are closed", () => {
+    story(
+      update,
+      given(opened),
+      received,
+      message(Message.ClickedSettings()),
+      dialogOpened,
+      message(Message.ReceivedGroup({ group: Option.none(), memberships: [], follow: Option.none() })),
+      Command.expectExact(Dialog.test.CloseDialog),
+      dialogClosed,
+      model((model) => {
+        expect(model.dialog.isOpen).toBe(false)
+      })
+    )
+    story(
+      update,
+      given(opened),
+      received,
+      message(Message.ReceivedGroup({ group: Option.none(), memberships: [], follow: Option.none() })),
+      Command.expectNone()
     )
   })
 
@@ -438,4 +542,35 @@ describe("a group being read", () => {
       })
     )
   })
+})
+
+describe("admitting members", () => {
+  it.effect("writes a member added action for each member in the order given, and tells it written", () =>
+    Effect.gen(function* () {
+      const { written, layer } = recordingStores()
+
+      const result = yield* AdmitMembers({ ...inDesign, admitMemberIds: [scout.id, bob.id] }).effect.pipe(
+        Effect.provide(Layer.provide(AdmitMembers.layer, layer))
+      )
+
+      expect(written).toEqual([
+        { action: "GroupMemberAdded", payload: { groupId: design.id, memberId: scout.id } },
+        { action: "GroupMemberAdded", payload: { groupId: design.id, memberId: bob.id } }
+      ])
+      expect(result).toEqual(Message.WroteAction())
+    })
+  )
+
+  it.effect("stops at the first action the store refuses, and says it could not keep that", () =>
+    Effect.gen(function* () {
+      const { written, layer } = recordingStores(1)
+
+      const result = yield* AdmitMembers({ ...inDesign, admitMemberIds: [scout.id, bob.id] }).effect.pipe(
+        Effect.provide(Layer.provide(AdmitMembers.layer, layer))
+      )
+
+      expect(written).toEqual([{ action: "GroupMemberAdded", payload: { groupId: design.id, memberId: scout.id } }])
+      expect(result).toEqual(Message.FailedWriteAction({ error: unwritable }))
+    })
+  )
 })

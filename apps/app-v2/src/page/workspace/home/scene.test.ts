@@ -442,7 +442,7 @@ describe("home", () => {
         role("dialog", { name: "Group settings" }),
         expect(text("# General")).toExist(),
         expect(role("tab", { name: "General" })).toHaveAttr("aria-selected", "true"),
-        expect(text("Everyone in the workspace belongs to general.")).toExist(),
+        expect(text("Everyone in the workspace belongs to this group.")).toExist(),
         click(role("tab", { name: "Members" })),
         expect(within(role("list", { name: "Members" }), text("Alice"))).toExist(),
         click(role("button", { name: "Done" }))

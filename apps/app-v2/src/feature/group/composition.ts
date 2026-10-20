@@ -3,9 +3,11 @@ import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
+import * as Update from "foldkit/update"
+import { MembersComboboxBlock } from "../../memberPicker.ts"
 import { ThreadBlock } from "../thread/block.ts"
 import { ThreadsBlock } from "../threads/block.ts"
-import { GroupDefinition, type Model, OutMessage } from "./definition.ts"
+import { admitMembersId, chooseToAdmit, GroupDefinition, type Model, OutMessage } from "./definition.ts"
 
 /** Open the thread `threadId` in the group. */
 export const openThread = (threadId: ThreadId.ThreadId) =>
@@ -36,7 +38,16 @@ export const ThreadsBinding = GroupDefinition.bindChild(ThreadsBlock, {
 /** The dialog closing, by the person or by the settings' own submit, drops the drafts it held. */
 const foldDialogOutMessage = DialogBlock.OutMessage.match({
   Opened: () => GroupDefinition.stepNoop(),
-  Closed: () => GroupDefinition.stepFields(() => ({ renaming: () => Option.none(), admitting: () => Option.none() })),
+  Closed: () =>
+    Update.combine([
+      GroupDefinition.stepFields(() => ({
+        renaming: () => Option.none(),
+        admitting: () => [],
+        admitQuery: () => "",
+        isAddViewOpen: () => false
+      })),
+      MembersBinding.requestClose()
+    ]),
   CompletedClose: () => GroupDefinition.stepNoop()
 })
 
@@ -44,6 +55,27 @@ export const DialogBinding = GroupDefinition.bindChild(DialogBlock, {
   field: "dialog",
   init: { contextToArgs: () => [{ id: "group-settings" }] },
   outMessage: { fold: foldDialogOutMessage }
+})
+
+/**
+ * Choosing a member chooses them to admit, unless they are not one of the people who may be admitted or are chosen
+ * already. The combobox does not empty the text typed once a choice is made, so the list is closed and opened again,
+ * which empties it and leaves the list open for the next choice.
+ */
+const foldMembersOutMessage = MembersComboboxBlock.OutMessage.match({
+  Selected: ({ value }) =>
+    Update.combine([
+      GroupDefinition.step((model: Model) => ({ model: chooseToAdmit(model, value) })),
+      MembersBinding.requestClose(),
+      MembersBinding.requestOpen()
+    ]),
+  ClearedSelection: () => GroupDefinition.stepNoop()
+})
+
+export const MembersBinding = GroupDefinition.bindChild(MembersComboboxBlock, {
+  field: "membersCombobox",
+  init: { contextToArgs: () => [{ id: admitMembersId }] },
+  outMessage: { fold: foldMembersOutMessage }
 })
 
 /** The open thread, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong one. */
@@ -59,6 +91,6 @@ export const ThreadBinding = GroupDefinition.bindChild(ThreadBlock, {
 })
 
 export const GroupComposition = GroupDefinition.makeComposition({
-  bindings: [ThreadsBinding, ThreadBinding, DialogBinding]
+  bindings: [ThreadsBinding, ThreadBinding, DialogBinding, MembersBinding]
 })
 export type GroupViewBuilder = Block.ViewBuilderFor<typeof GroupComposition>

@@ -9,14 +9,19 @@ export interface Written {
   readonly payload: unknown
 }
 
-/** `Stores` whose store keeps each action written to it, in `written`, so a test reads what a command wrote. */
-export const recordingStores = () => {
+/**
+ * `Stores` whose store keeps each action written to it, in `written`, so a test reads what a command wrote. A store
+ * given `refusesAfter` keeps that many and refuses every one after, as a store that fails partway does.
+ */
+export const recordingStores = (refusesAfter = Number.POSITIVE_INFINITY) => {
   const written: Array<Written> = []
   const store = {
     write: (action: string, payload: unknown) =>
-      Effect.sync(() => {
-        written.push({ action, payload })
-      })
+      written.length >= refusesAfter
+        ? Effect.fail("This store refuses the action.")
+        : Effect.sync(() => {
+            written.push({ action, payload })
+          })
   } as never
 
   const stores = Stores.Stores.of({

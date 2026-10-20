@@ -1,13 +1,20 @@
 /**
  * A group as the person has it open: its name, their part in it, its threads, and the thread open
- * among them, and its settings in a modal: a team's name and members, and the person's membership.
+ * among them, and its settings in a modal: a team's name, visibility, and members, and the person's membership.
  * They follow a group or stop, rename a team, join a public team or leave one, and, where they manage
- * its members, admit and remove them. It reports when its thread opens and when the person closes it, and
- * closes the thread when its parent asks.
+ * its members, admit several at once and remove them. It reports when its thread opens and when the person closes
+ * it, and closes the thread when its parent asks.
  */
 
 import { Grant } from "@amends-dev/core/authorization"
-import { Group, GroupFollow, GroupId, GroupMembership, GroupPermissions } from "@amends-dev/core/group"
+import {
+  Group,
+  GroupFollow,
+  GroupId,
+  GroupMembership,
+  GroupMembershipPermissions,
+  GroupPermissions
+} from "@amends-dev/core/group"
 import { Presence } from "@amends-dev/core/presence"
 import { ThreadId } from "@amends-dev/core/thread"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
@@ -16,6 +23,8 @@ import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
+import { modifyFields } from "foldkit/struct"
+import { MembersComboboxBlock } from "../../memberPicker.ts"
 import { groupTarget, may } from "../../permissions.ts"
 import { ThreadBlock } from "../thread/block.ts"
 import { ThreadsBlock } from "../threads/block.ts"
@@ -40,11 +49,15 @@ export type OpenThread = typeof OpenThread.Type
 export const SettingsTab = Schema.Literals(["General", "Members"])
 export type SettingsTab = typeof SettingsTab.Type
 
+/** The `id` of the members picker of the Members section, which names its elements, such as the input that takes focus. */
+export const admitMembersId = "group-admit-members"
+
 /**
  * The group, while the replica holds it, whether it was read yet, its admissions, the person's follow of it, the
- * workspace's members, what the person may do, who is present, the name being given the team, the member
- * chosen to admit, the group's threads, the thread open among them, the settings' dialog and the
- * section of it shown, how many times the person asked to read the group again, and why the last read or write
+ * workspace's members, what the person may do, who is present, the name being given the team, the members chosen to
+ * admit and the text typed to search for them, whether a phone has moved to its own view for adding them, the group's
+ * threads, the thread open among them, the settings' dialog and the section of it shown, with the combobox that
+ * chooses whom to admit, how many times the person asked to read the group again, and why the last read or write
  * failed.
  */
 export const Model = Schema.Struct({
@@ -59,10 +72,13 @@ export const Model = Schema.Struct({
   grants: Schema.Array(Grant.Grant),
   present: Schema.Array(Presence.Present),
   renaming: Schema.Option(Schema.String),
-  admitting: Schema.Option(MemberId.MemberId),
+  admitting: Schema.Array(MemberId.MemberId),
+  admitQuery: Schema.String,
+  isAddViewOpen: Schema.Boolean,
   threads: ThreadsBlock.Model,
   thread: Schema.Option(OpenThread),
   dialog: DialogBlock.Model,
+  membersCombobox: MembersComboboxBlock.Model,
   settingsTab: SettingsTab,
   reads: Schema.Int,
   notice: Schema.Option(Schema.String)
@@ -96,8 +112,13 @@ export const Message = defineMessageUnion({
   ClickedUnfollow: {},
   ClickedJoin: {},
   ClickedLeave: {},
-  ChoseMemberToAdmit: { memberId: Schema.Option(MemberId.MemberId) },
-  SubmittedAdmit: {},
+  ClickedAddMembers: {},
+  ClickedBackToMembers: {},
+  TypedAdmitQuery: { query: Schema.String },
+  PickedAdmitMember: { memberId: Schema.String },
+  ClickedRemoveAdmitting: { memberId: Schema.String },
+  ClickedAdmit: {},
+  CompletedFocusAdmitMembers: {},
   ClickedRemoveMember: { membershipId: GroupMembership.GroupMembershipId },
   ClickedAllThreads: {},
   RequestedCloseThread: {},
@@ -166,3 +187,37 @@ export const mayRename = (model: Model): boolean =>
   Option.isSome(teamName(model)) &&
   belongs(model) &&
   may(model.grants, GroupPermissions.Rename, groupTarget(model.workspaceId, model.groupId))
+
+/** Whether a change to the person's own admission is on its way: their joining, or their leaving. */
+export const isMembershipChanging = (model: Model): boolean =>
+  model.memberships.some(({ membership, pending }) => pending && membership.memberId === model.memberId)
+
+/**
+ * Whether the person may admit members to the group and remove them: a team they belong to, except general, which
+ * every member belongs to, where they are granted to manage its members.
+ */
+export const mayManageMembers = (model: Model): boolean =>
+  Option.isSome(teamName(model)) &&
+  belongs(model) &&
+  !Group.isGeneral({ id: model.groupId }) &&
+  may(model.grants, GroupMembershipPermissions.Manage, groupTarget(model.workspaceId, model.groupId))
+
+/** The workspace's active members who are not in the group, whom the person may admit to it. */
+export const admissibleMembers = (model: Model): ReadonlyArray<Member.Member> => {
+  const memberIds = membersOf(model)
+
+  return model.members.filter((member) => member.status === "active" && !memberIds.includes(member.id))
+}
+
+/** The model with `memberId` among the members chosen to admit, unless they cannot be admitted or are chosen already. */
+export const chooseToAdmit = (model: Model, memberId: string): Model => {
+  const member = admissibleMembers(model).find(({ id }) => id === memberId)
+
+  return member === undefined || model.admitting.includes(member.id)
+    ? model
+    : modifyFields(model, { admitting: (admitting) => [...admitting, member.id], admitQuery: () => "" })
+}
+
+/** The model without `memberId` among the members chosen to admit. */
+export const unchooseToAdmit = (model: Model, memberId: string): Model =>
+  modifyFields(model, { admitting: (admitting) => admitting.filter((id) => id !== memberId) })

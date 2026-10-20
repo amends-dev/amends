@@ -1,28 +1,28 @@
-import { Group, GroupMembershipPermissions } from "@amends-dev/core/group"
+import { Group } from "@amends-dev/core/group"
 import type { MemberId } from "@amends-dev/core/workspace"
-import {
-  button,
-  buttonRow,
-  field,
-  fieldGrid,
-  hint,
-  iconButton,
-  notice,
-  sending,
-  submit
-} from "@amends-dev/design/control"
-import { badge, entry, entryList } from "@amends-dev/design/details"
-import { form, settingRow } from "@amends-dev/design/form"
+import { button, field, hint, iconButton, notice, submit } from "@amends-dev/design/control"
+import { settingRow } from "@amends-dev/design/form"
 import { type MarkContent, markStack } from "@amends-dev/design/mark"
+import { type GroupMember, memberCount, memberList, memberPicker, memberPickerList } from "@amends-dev/design/members"
 import { type ModalConfig, modal } from "@amends-dev/design/modal"
 import { pane, paneColumn, paneEmpty, paneTabs } from "@amends-dev/design/pane"
+import type { Viewport } from "@amends-dev/design/viewport"
+import { inputId } from "@foldkit/ui/combobox"
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { memberChoice } from "../../memberChoice.ts"
-import { groupTarget, may } from "../../permissions.ts"
-import { groupName, initials, isJoinable, memberMark, memberName, pluralize } from "../../seen.ts"
+import { pickerPeople, pickerPeopleChosen } from "../../memberPicker.ts"
+import {
+  groupName,
+  initials,
+  isAgent,
+  isJoinable,
+  memberMark,
+  memberName,
+  pluralize,
+  visibilityHint
+} from "../../seen.ts"
 import { followView, replyView, sidePane } from "../thread/view.ts"
 import { selfName } from "../threads/definition.ts"
 import {
@@ -32,12 +32,23 @@ import {
   toolbarView,
   type ViewInputs as ThreadsViewInputs
 } from "../threads/view.ts"
-import { DialogBinding, GroupComposition, type GroupViewBuilder, ThreadBinding, ThreadsBinding } from "./composition.ts"
 import {
+  DialogBinding,
+  GroupComposition,
+  type GroupViewBuilder,
+  MembersBinding,
+  ThreadBinding,
+  ThreadsBinding
+} from "./composition.ts"
+import {
+  admissibleMembers,
+  admitMembersId,
   admitted,
   type Availability,
   availabilityOf,
   belongs,
+  isMembershipChanging,
+  mayManageMembers,
   mayRename,
   Message,
   type Model,
@@ -46,10 +57,11 @@ import {
 } from "./definition.ts"
 
 /**
- * The time now, which the days the threads and their messages were published on are read from, and the workspace's
- * name, which a phone shows under the group's title.
+ * The time now, which the days the threads and their messages were published on are read from, the workspace's name,
+ * which a phone shows under the group's title, and the window's width, which decides whether the settings add members
+ * in a field or, on a phone, in a view of their own.
  */
-export type ViewInputs = Readonly<{ now: DateTime.Utc; workspaceName: string }>
+export type ViewInputs = Readonly<{ now: DateTime.Utc; workspaceName: string; viewport: Viewport }>
 
 /** The time now, which the days the thread's messages were published on are read from. */
 export type ThreadViewInputs = Readonly<{ now: DateTime.Utc }>
@@ -148,135 +160,166 @@ const settingsActions = (model: Model, h: GroupViewBuilder): ReadonlyArray<Html>
     ? [iconButton(h, { icon: "mark-settings", label: "Group settings", onClick: Message.ClickedSettings() })]
     : []
 
-/** What a section of the settings gives the modal: its body, and the footer's action and submit that go with it. */
+/** What a section of the settings gives the modal: its body, and the footer's controls and submit that go with it. */
 type SettingsPanel = Pick<ModalConfig<Message>, "body" | "footer" | "onSubmit">
 
-/** The person's membership of the group in words, with the way to join or leave where there is one. */
-const membershipSetting = (group: Group.Group, model: Model, h: GroupViewBuilder): Html => {
-  if (group.kind !== "Team") {
-    return settingRow(h, { label: "Membership", copy: "A conversation between its members." })
+/**
+ * The person's membership of the group in words, with the way to join or leave where there is one, which is unavailable
+ * while a change to their membership is on its way.
+ */
+const membershipSetting = (group: Group.Team, model: Model, h: GroupViewBuilder): Html => {
+  if (Group.isGeneral(group)) {
+    return settingRow(h, { label: "Membership", copy: "Everyone in the workspace belongs to this group." })
   }
 
-  if (Group.isGeneral(group)) {
-    return settingRow(h, { label: "Membership", copy: "Everyone in the workspace belongs to general." })
-  }
+  const isChanging = isMembershipChanging(model)
 
   return belongs(model)
     ? settingRow(h, {
         label: "Membership",
         copy: "You're a member of this group.",
-        action: button(h, "Leave", Message.ClickedLeave())
+        action: button(h, "Leave group", Message.ClickedLeave(), { isDisabled: isChanging })
       })
     : settingRow(h, {
         label: "Membership",
-        copy: "You're not a member.",
-        action: isJoinable(group) ? button(h, "Join", Message.ClickedJoin(), { variant: "primary" }) : undefined
+        copy: "You're not a member of this group.",
+        action: isJoinable(group)
+          ? button(h, "Join group", Message.ClickedJoin(), { isDisabled: isChanging })
+          : undefined
       })
 }
 
 /**
- * The General section: the group's name, a field for someone who may rename the team and its Save changes in
- * the footer, a team's visibility in words, and the person's membership.
+ * The General section: the team's name in a field, which only someone who may rename the team can change, its
+ * visibility in words, which no one can change here, and the person's membership, with Save changes in the footer.
  */
-const generalPanel = (group: Group.Group, model: Model, render: RenderInfo, h: GroupViewBuilder): SettingsPanel => {
+const generalPanel = (group: Group.Team, model: Model, render: RenderInfo, h: GroupViewBuilder) => {
   const name = nameOf(model)
   const draft = Option.getOrElse(model.renaming, () => name)
-  const mayRenameTeam = mayRename(model)
+  const isRenamable = mayRename(model)
+
   return {
     body: [
-      ...(mayRenameTeam
-        ? [
-            field(
-              h,
-              {
-                id: "group-name",
-                label: "Group name",
-                type: "text",
-                value: draft,
-                onInput: (name) => Message.TypedName({ name }),
-                hint: "Everyone in this group sees this name.",
-                isAutofocus: false,
-                attributes: render.initialFocus
-              },
-              Option.none()
-            )
-          ]
-        : [settingRow(h, { label: "Group name", copy: name })]),
-      group.kind === "Team"
-        ? settingRow(h, {
-            label: "Visibility",
-            copy:
-              group.visibility === "Public"
-                ? "Public. Anyone in the workspace can join."
-                : "Private. Members are admitted by the group."
-          })
-        : h.empty,
+      field(
+        h,
+        {
+          id: "group-name",
+          label: "Group name",
+          type: "text",
+          value: draft,
+          onInput: (name) => Message.TypedName({ name }),
+          hint: isRenamable
+            ? "Everyone in this group sees this name."
+            : "Only people who manage this group can rename it.",
+          maxLength: 80,
+          isDisabled: !isRenamable,
+          isAutofocus: false,
+          attributes: isRenamable ? render.initialFocus : []
+        },
+        Option.none()
+      ),
+      settingRow(h, { label: "Visibility", copy: `${group.visibility}. ${visibilityHint[group.visibility]}` }),
       membershipSetting(group, model, h)
     ],
-    ...(mayRenameTeam
-      ? { footer: [submit(h, "Save changes", { isDisabled: draft === name })], onSubmit: Message.SubmittedRename() }
-      : {})
-  }
+    footer: [submit(h, "Save changes", { isDisabled: draft === name })],
+    onSubmit: Message.SubmittedRename()
+  } satisfies SettingsPanel
+}
+
+/** What a row of the list says after the member's name, if anything: that they are the person, an agent, sending, or online. */
+const noteOf = (model: Model, memberId: MemberId.MemberId, isPending: boolean): Pick<GroupMember<Message>, "note"> => {
+  const member = model.members.find(({ id }) => id === memberId)
+  const isSelf = memberId === model.memberId
+  const notes = [
+    isSelf ? "You" : undefined,
+    member !== undefined && isAgent(member) ? "Agent" : undefined,
+    isPending ? "Sending…" : undefined,
+    !isSelf && isPresent(model, memberId) ? "Online" : undefined
+  ].filter((note) => note !== undefined)
+
+  return notes.length === 0 ? {} : { note: notes.join(" · ") }
 }
 
 /**
- * The Members section: a team's members, and for a member of it who may manage them, removing them and admitting
- * another member, except to general, which every member belongs to.
+ * The group's members as rows of the list: a team's admitted ones, each with Remove, named for them, where the person
+ * manages the members, dimmed while the admission is on its way, and none for the person themself, who leaves
+ * instead; and a conversation's own, with none.
  */
-const membersPanel = (model: Model, h: GroupViewBuilder): SettingsPanel => {
-  const admissions = admitted(model)
-  const isManaged =
-    belongs(model) &&
-    !Group.isGeneral({ id: model.groupId }) &&
-    may(model.grants, GroupMembershipPermissions.Manage, groupTarget(model.workspaceId, model.groupId))
-  const admissible = model.members.filter(
-    (member) =>
-      member.id !== model.memberId &&
-      member.status === "active" &&
-      !admissions.some(({ membership }) => membership.memberId === member.id)
-  )
+const memberRows = (model: Model, isManaged: boolean): ReadonlyArray<GroupMember<Message>> =>
+  Option.match(model.group, {
+    onNone: () => [],
+    onSome: ({ group }) =>
+      group.kind === "Team"
+        ? admitted(model).map(({ membership, pending }) => {
+            const name = memberName(model.members, membership.memberId)
+
+            return {
+              key: membership.id,
+              name,
+              mark: markOfMember(model, membership.memberId),
+              ...noteOf(model, membership.memberId, pending),
+              ...(isManaged && membership.memberId !== model.memberId
+                ? {
+                    action: {
+                      label: "Remove",
+                      name: `Remove ${name}`,
+                      isDisabled: pending,
+                      onClick: Message.ClickedRemoveMember({ membershipId: membership.id })
+                    }
+                  }
+                : {})
+            }
+          })
+        : group.memberIds.map((memberId) => ({
+            key: memberId,
+            name: memberName(model.members, memberId),
+            mark: markOfMember(model, memberId),
+            ...noteOf(model, memberId, false)
+          }))
+  })
+
+/** The words of the button that admits the members chosen: Add, Add 2. */
+const addLabel = (chosen: number): string => (chosen === 0 ? "Add" : `Add ${chosen}`)
+
+/** The words of the wide button of a phone's view that admits the members chosen. */
+const addViewLabel = (chosen: number): string =>
+  chosen === 0 ? "Add members" : `Add ${pluralize(chosen, "member", "members")}`
+
+/**
+ * Where the person chooses whom to add: a picker of the workspace's members who are not in the group, with the button
+ * that adds those chosen beside it, or, on a phone, a wide button that opens a view of its own for them.
+ */
+const addMembers = (model: Model, viewport: Viewport, h: GroupViewBuilder): Html =>
+  viewport === "Phone"
+    ? button(h, "Add members", Message.ClickedAddMembers(), { icon: "mark-new", wide: true })
+    : memberPicker(h, {
+        id: admitMembersId,
+        label: "Add members",
+        chosen: pickerPeopleChosen(model.members, model.admitting),
+        candidates: pickerPeople(admissibleMembers(model)),
+        query: model.membersCombobox.inputValue,
+        isOpen: model.membersCombobox.isOpen,
+        action:
+          model.admitting.length === 0
+            ? button(h, addLabel(0), Message.ClickedAdmit(), { isDisabled: true })
+            : button(h, addLabel(model.admitting.length), Message.ClickedAdmit(), { variant: "primary" }),
+        onRemove: (memberId) => Message.ClickedRemoveAdmitting({ memberId }),
+        embed: (viewInputs) =>
+          h.block(MembersBinding.embedView({ slotId: "admit-members", model: model.membersCombobox, viewInputs }))
+      })
+
+/**
+ * The Members section: where the person adds members, if they manage them, how many the group has, and its members,
+ * each with Remove where the person manages them.
+ */
+const membersPanel = (model: Model, viewport: Viewport, h: GroupViewBuilder): SettingsPanel => {
+  const isManaged = mayManageMembers(model)
+
   return {
     body: [
-      entryList(h, {
-        label: "Members",
-        children: admissions.map(({ membership, pending }) => {
-          const name = memberName(model.members, membership.memberId)
-          return entry(h, {
-            key: membership.id,
-            mark: initials(name),
-            title: name,
-            trailing: [
-              isPresent(model, membership.memberId) ? badge(h, { label: "Online", tone: "success" }) : h.empty,
-              sending(h, pending)
-            ],
-            children:
-              !isManaged || pending || membership.memberId === model.memberId
-                ? []
-                : [
-                    buttonRow(h, [
-                      button(h, "Remove", Message.ClickedRemoveMember({ membershipId: membership.id }), {
-                        variant: "quiet"
-                      })
-                    ])
-                  ]
-          })
-        })
-      }),
-      !isManaged || admissible.length === 0
-        ? h.empty
-        : form(h, { onSubmit: Message.SubmittedAdmit(), label: "Add a member", variant: "pane" }, [
-            fieldGrid(h, [
-              memberChoice(h, {
-                id: "admit-member",
-                label: "Add a member",
-                none: "Choose a member",
-                members: admissible,
-                value: model.admitting,
-                onChange: (memberId) => Message.ChoseMemberToAdmit({ memberId })
-              })
-            ]),
-            buttonRow(h, [submit(h, "Add")])
-          ])
+      ...(isManaged ? [addMembers(model, viewport, h)] : []),
+      memberCount(h, membersOf(model).length),
+      memberList(h, { label: "Members", members: memberRows(model, isManaged) })
     ]
   }
 }
@@ -301,24 +344,68 @@ const settingsTabs = (model: Model, h: GroupViewBuilder): Html =>
   })
 
 /**
- * The modal for the group's settings, with the group's name as its context: the General section, and, for a team,
- * its Members section, in tabs. While the group is not read the dialog has no content to show, so it is an empty
- * frame.
+ * The view a phone moves the settings to for adding members, with Back to the members in place of Close: the field of
+ * those chosen over the list of the workspace's members who can be added, and the wide button that adds them.
  */
-const settingsModal = (render: RenderInfo, model: Model, h: GroupViewBuilder): Html =>
+const addMembersView = (render: RenderInfo, model: Model, h: GroupViewBuilder): Html =>
+  modal(h, render, {
+    title: "Add members",
+    context: `# ${nameOf(model)}`,
+    back: { label: "Back to members", onClick: Message.ClickedBackToMembers() },
+    body: [
+      memberPickerList(h, {
+        id: inputId(admitMembersId),
+        label: "Search workspace members",
+        chosen: pickerPeopleChosen(model.members, model.admitting),
+        candidates: pickerPeople(admissibleMembers(model)),
+        query: model.admitQuery,
+        onQuery: (query) => Message.TypedAdmitQuery({ query }),
+        onPick: (memberId) => Message.PickedAdmitMember({ memberId }),
+        onRemove: (memberId) => Message.ClickedRemoveAdmitting({ memberId })
+      })
+    ],
+    footer: [
+      model.admitting.length === 0
+        ? button(h, addViewLabel(0), Message.ClickedAdmit(), { variant: "primary", wide: true, isDisabled: true })
+        : button(h, addViewLabel(model.admitting.length), Message.ClickedAdmit(), { variant: "primary", wide: true })
+    ]
+  })
+
+/**
+ * The modal for the group's settings. A team's has its name beside the title, and its General section and Members
+ * section in tabs, and on a phone its Members section moves to a view of its own to add members. A conversation's is
+ * its Members alone, titled so, with the other members' names beside it. While the group is not read the dialog has
+ * no content to show, so it is an empty frame.
+ */
+const settingsModal = (render: RenderInfo, model: Model, viewport: Viewport, h: GroupViewBuilder): Html =>
   Option.match(model.group, {
-    onNone: () => modal(h, render, { title: "Group settings", body: [] }),
+    onNone: () => modal(h, render, { title: "Group settings", closeLabel: "Close settings", body: [] }),
     onSome: ({ group }) => {
-      const isTeam = group.kind === "Team"
-      const panel =
-        isTeam && model.settingsTab === "Members" ? membersPanel(model, h) : generalPanel(group, model, render, h)
+      if (group.kind !== "Team") {
+        return modal(h, render, {
+          title: "Members",
+          context: nameOf(model),
+          closeLabel: "Close settings",
+          width: "wide",
+          cancelLabel: "Done",
+          ...membersPanel(model, viewport, h)
+        })
+      }
+
+      if (viewport === "Phone" && model.isAddViewOpen && mayManageMembers(model)) {
+        return addMembersView(render, model, h)
+      }
+
+      const isMembers = model.settingsTab === "Members"
+
       return modal(h, render, {
         title: "Group settings",
-        context: isTeam ? `# ${nameOf(model)}` : nameOf(model),
+        context: `# ${nameOf(model)}`,
+        closeLabel: "Close settings",
         width: "wide",
-        ...(isTeam ? { tabs: settingsTabs(model, h) } : {}),
-        cancelLabel: isTeam && model.settingsTab === "General" ? "Cancel" : "Done",
-        ...panel
+        tabs: settingsTabs(model, h),
+        cancelLabel: isMembers ? "Done" : "Cancel",
+        ...(isMembers ? membersPanel(model, viewport, h) : generalPanel(group, model, render, h))
       })
     }
   })
@@ -368,7 +455,7 @@ const columnOf = (
  * one in the footer, or the line that says to join the team to read them; or, in place of both, that the group is not
  * available or could not be read; and the settings' modal.
  */
-export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, { now, workspaceName }, h) => {
+export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, { now, workspaceName, viewport }, h) => {
   const name = nameOf(model)
   const availability = availabilityOf(model)
   // Until the group is read, and when it could not be, its threads list as they would for a member.
@@ -423,7 +510,7 @@ export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, { n
         DialogBinding.embedView({
           slotId: "settings",
           model: model.dialog,
-          viewInputs: { toView: (render) => settingsModal(render, model, h) }
+          viewInputs: { toView: (render) => settingsModal(render, model, viewport, h) }
         })
       )
     ],

@@ -26,3 +26,9 @@ export const pickerPicked = [
  * since one that has acknowledged a mount ending acknowledges nothing the next time.
  */
 export const pickerEnded = () => Mount.expectEnded(Combobox.test.AttachPreventBlur)
+
+/**
+ * The picker's list closed, with the picker still on the page: it is no longer placed against the field, and its
+ * backdrop is gone. A step is made for each use, for the reason `pickerEnded` is.
+ */
+export const pickerClosed = () => Mount.expectEnded(Combobox.test.Anchor, Combobox.test.PortalBackdrop)

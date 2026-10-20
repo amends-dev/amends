@@ -5,8 +5,9 @@ import { MemberId } from "@amends-dev/core/workspace"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
+import { focusMembersInput } from "../../memberPicker.ts"
 import * as Stores from "../../store/Stores.ts"
-import { GroupDefinition, Message } from "./definition.ts"
+import { admitMembersId, GroupDefinition, Message } from "./definition.ts"
 
 const written = [Message.WroteAction, Message.FailedWriteAction]
 
@@ -70,14 +71,27 @@ export const LeaveGroup = GroupDefinition.command("LeaveGroup", {
   }
 })
 
-/** Admit `admitMemberId` to `groupId`. */
-export const AdmitMember = GroupDefinition.command("AdmitMember", {
-  args: { ...Stores.AsMember, groupId: GroupId.GroupId, admitMemberId: MemberId.MemberId },
+/** Admit each of `admitMemberIds` to `groupId`, one action written for each, in the order given. */
+export const AdmitMembers = GroupDefinition.command("AdmitMembers", {
+  args: { ...Stores.AsMember, groupId: GroupId.GroupId, admitMemberIds: Schema.Array(MemberId.MemberId) },
   messages: written,
   handler: function* () {
     const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
-    return ({ groupId, admitMemberId, ...member }) =>
-      write(member, (store) => store.write("GroupMemberAdded", { groupId, memberId: admitMemberId }))
+    return ({ groupId, admitMemberIds, ...member }) =>
+      write(member, (store) =>
+        Effect.forEach(admitMemberIds, (memberId) => store.write("GroupMemberAdded", { groupId, memberId }), {
+          discard: true
+        })
+      )
+  }
+})
+
+/** Move focus to the input of the members picker of the Members section, which the chip the person removed held. */
+export const FocusAdmitMembers = GroupDefinition.command("FocusAdmitMembers", {
+  args: {},
+  messages: [Message.CompletedFocusAdmitMembers],
+  handler: function* () {
+    return () => focusMembersInput(admitMembersId).pipe(Effect.as(Message.CompletedFocusAdmitMembers()))
   }
 })
 
@@ -98,6 +112,7 @@ export const EffectsLayer = Layer.mergeAll(
   UnfollowGroup.layer,
   JoinGroup.layer,
   LeaveGroup.layer,
-  AdmitMember.layer,
+  AdmitMembers.layer,
+  FocusAdmitMembers.layer,
   RemoveMember.layer
 )

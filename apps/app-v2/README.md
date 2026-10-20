@@ -179,9 +179,10 @@ the `paneForm` of its integration's settings under a stitch, and `paneSection`s 
 `detailList`, which links its integration's documentation with `link`, and of its removal; each channel an entry of its name, a badge when it opens tasks, a hint of where its
 conversations come from and open, and its quiet buttons. The group's settings are the design's
 `modal` of `paneTabs`: the General tab is a `field` for the team's name with a `hint`, and a
-`settingRow` each for the visibility and the person's membership, with Leave or Join as its action; the
-Members tab is an `entryList` with each member's initials, name, and an Online `badge` while they have
-the workspace open, and the admit form below it.
+`settingRow` each for the visibility and the person's membership, with Leave group or Join group as its action; the
+Members tab is the design's `memberPicker` over its Add button, the `memberCount`, and a `memberList` of each member's
+28px mark, name, and a note of You, Agent, Online, or Sending…, and on a phone the picker is a wide button that moves the
+modal to its own Add members view, a `memberPickerList` under a Back button.
 
 ## The program
 
@@ -399,7 +400,7 @@ below it counted at each level above.
   person picks a thread and `ClosedThread` when they close it, by Close thread, Close task, or Back, so its parent can
   hold the side pane in step; its parent closes the thread with the operation `requestCloseThread`,
   which reports nothing, since it asked. They follow a group or stop, join a public team, and, in its
-  settings, rename a team, leave one, and, where they manage its members, admit and remove them. It
+  settings, rename a team, leave one, and, where they manage its members, admit several at once and remove them. It
   has two views. `view`, its canonical one, is the group's main pane, titled by its name, with the drawing of a
   channel before it for a team and of a message for a conversation, as `apps/ui` marks them, and the workspace's name
   under it on a phone (`workspaceName`, a view input from the page), under the
@@ -407,8 +408,8 @@ below it counted at each level above.
   with, as the header's buttons, its members as a stack of their first three marks, overlapping, at 22px in their
   tones (`memberMark`, an agent's lilac), named for how many there are
   ("7 members", for a team its admitted ones and for a conversation both people), which opens the
-  settings on the Members tab, or on General for a conversation, which has none, and which a phone does not show, as
-  `apps/ui`'s header does not; Follow as a bell named Follow, or Following and filled and pressed while the person
+  settings on the Members tab, or, for a conversation, which has no tabs, on its Members, and which a phone does not
+  show, as `apps/ui`'s header does not; Follow as a bell named Follow, or Following and filled and pressed while the person
   follows the group, which stops following, and disabled as it was while a change is on its way, or Join, where
   they apply; and a gear that opens the settings; and under them, on the Tasks tab, the toolbar of the tasks, and the
   tab's content, threads or tasks, with the composer to start one in the footer, which a team the person has not joined does
@@ -422,16 +423,39 @@ below it counted at each level above.
   conversation" with "Try again once the host is reachable." and a Try again, which clears the reason and raises
   `reads`, the dependency of the subscription that reads it, and keeps the tabs and the composer. The settings' dialog is a child of the Block, bound from `@foldkit/ui/dialog` and
   rendered with the design's `modal` inside the pane, titled "Group settings" with the group's name
-  beside it. Its General tab holds the team's name, a field with a line under it saying who sees the
-  name, and Save changes, which is disabled while the draft is the name the team has, for someone
-  who may rename the team, its draft starting from the name as the dialog opens, and plain text for
-  everyone else; the team's visibility in words, which nothing changes yet; and the person's
-  membership, with Leave for a team they belong to, except general, and Join for a public team they do not. Its
-  Members tab, for a team only, lists the members, each marked Online while they have the workspace
-  open, with Remove and the form to admit another where the person manages them, and counts them in
-  the tab. The dialog opens on General, and closing it, by Cancel on General or Done on Members and in a conversation,
-  as `apps/ui` words them, Close, Escape, a click on the scrim, Save changes, or Leave, drops the draft of the name and
-  the member chosen to admit.
+  beside it, and closed by a Close button named "Close settings". The window's width (`viewport`, a view input from
+  Home, which keeps it) decides how members are added. Its General tab holds the team's name, a field
+  that is always shown, with a line under it saying who sees the name and the most it takes, 80
+  characters, which only someone who may rename the team can change, its draft starting from the name as the dialog
+  opens, and dimmed, with "Only people who manage this group can rename it." under it, for everyone else; the team's
+  visibility as a line in `apps/ui`'s words, "Private. Only people added to this group can find it.", which nothing
+  changes, since core has no input for it (`GroupService` renames a team and admits or removes members, and the
+  visibility is only given when a team is created); the person's membership, "You're a member of this group." or
+  "You're not a member of this group." or, for general, "Everyone in the workspace belongs to this group.", with Leave
+  group for a team they belong to, except general, and Join group for a public team they do not, either dimmed while a
+  change to their own admission is on its way (`isMembershipChanging`, read from the admission the replica holds as
+  pending); and Save changes in the footer, dimmed unless the name is changed. Leaving keeps the dialog open, to show
+  the change, and it closes of itself when the group stops being there to show, as it does for a private team the person
+  left. Its Members tab, for a team, has "Add members" for someone who manages them, the picker of the workspace's
+  members who are not in the team (`admissibleMembers`), with the Add button beside it, "Add" while none is
+  chosen, dimmed, and "Add 2" for two, which writes **one command**, `AdmitMembers`, that runs one `GroupMemberAdded`
+  action for each person chosen, in the order chosen, each its own entry in the person's store, in a single write
+  session, so that a failure stops the rest and is shown as the one notice; then "N members", over a dashed rule, and the
+  members as rows of a 28px mark in their tone and the name with You, Agent, Online, or Sending… after it, and Remove,
+  named for the person ("Remove Sara"), where the person manages the members (`mayManageMembers`: a team they belong to,
+  not general, with the right to manage members), none for themself, and dimmed while the admission is on its way. The
+  picker is the Create group form's, bound as a combobox child (`MembersBinding`, id `group-admit-members`), with its
+  chosen members in the model (`admitting`) and the focus taken back into its input by `FocusAdmitMembers` after a chip is
+  removed. On a phone the picker is a wide button, "Add members", that moves the dialog to a view of its own
+  (`isAddViewOpen`), titled "Add members" with `# name` beside it and Back to members in place of Close, which shows
+  the people who can be added as the design's `memberPickerList`, always under the chips and search (the Foldkit
+  combobox's list is an anchored popover, which a phone has no room for), narrowed by `admitQuery`, with a wide
+  button, "Add members", "Add 1 member", "Add 3 members", that writes the same command and returns to the members; Back
+  keeps who was chosen. A conversation's dialog is titled "Members" with the other member's name beside it, and holds only
+  their count and list, with no tabs, no name, no visibility, and no membership, and Done. The dialog opens on General,
+  and closing it, by Cancel on General or Done on Members and in a conversation, as `apps/ui` words them, Close
+  settings, Escape, a click on the scrim, or Save changes, drops the draft of the name, the members chosen to admit,
+  the text typed to search for them, and the phone's own view.
   `threadView` is the thread open in it as a side pane (the thread Block's `sidePane`), titled by the
   thread with "Thread in #Design" or "Thread with Bob" under it (`sideSubtitle`), or, for a thread
   that tracks a task, by the task's status drawing with "Task in #Design" under it, and the thread's own bell,
@@ -1195,10 +1219,10 @@ member's ID. The menu reports a choice as a string, `Anyone`, `Unassigned`, or `
 (`assigneeChoiceOf`, `assigneeFilterOf`), and `assigneeChoices` lists the members still in the workspace, by name, with
 the mark `seen.ts` gives them (`memberMark`: their initials, lilac for an agent).
 `memberChoice.ts`, the choice of a workspace member over the design's select, is the groups'
-conversation form's, the group's admit form's, and the task's assignee, each saying what its empty
+conversation form's and the task's assignee, each saying what its empty
 choice is.
-`memberPicker.ts`, the choice of several workspace members over the design's `memberPicker`, is the Create group form's:
-it holds the combobox Block every picker binds (`MembersComboboxBlock`), the members as the picker offers them, with
+`memberPicker.ts`, the choice of several workspace members over the design's `memberPicker`, is the Create group form's
+and the group settings' Add members: it holds the combobox Block every picker binds (`MembersComboboxBlock`), the members as the picker offers them, with
 their name, mark, and whether they are a person or an agent (`pickerPeople`), the person themself locked as "You"
 (`youInPicker`), the line under the field that counts who is in (`includedHint`), and the focus a picker takes back
 after a chip is removed (`focusMembersInput`).
@@ -1331,8 +1355,10 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   was dismissed for, opening none for a draft read, and writing the member picked as a link; a group
   opening its settings on General, with the draft of the team's name started only for someone who
   may rename it, renamed from the name seen, writing nothing when the name is unchanged, and closing
-  its settings, which drop their drafts, whichever way they close; followed, left from its settings,
-  or joined, a member admitted and an admission removed,
+  its settings, which drop their drafts, whichever way they close, and close of themselves when the group is no
+  longer there; followed, left from its settings, which stay open, or joined, the members chosen to admit one at a
+  time, once each and only from those who can be admitted, taken off again, and admitted in one command with a write
+  for each, the phone's own view for it opened and left, and an admission removed,
   and the thread picked opened and closed, each reported, open already as the group opens without a
   report, or closed as its parent asks, without one; the groups starting a
   team in a dialog it opens on a blank form, private and with no one added, a team written once with the name
@@ -1447,7 +1473,8 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   one, and the platform from the flags. The commands that write a message's text run their handlers over `test/recordingStores.ts`, a
   `Stores` whose store keeps what is written: a thread, a reply, an edit, and a conversation written
   with the members their text mentions, and with none when it mentions no one, and a public team joined by the
-  action `GroupJoined`. The workspaces page's
+  action `GroupJoined`, and members admitted by `AdmitMembers`, a `GroupMemberAdded` for each in the order given, which
+  stops at the first the store refuses (`recordingStores` takes the number it keeps before it does). The workspaces page's
   stories start the listing for the person's address with the name it suggests, open an empty form, send
   its names with no key and read the list again once the workspace exists to report it opened, keep the key
   of a failed request for the request sent again and start a new one once a name changes, clear the refusal at
@@ -1515,12 +1542,17 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   reads it again, and
   joining in place of the threads and the tabs of a team they do not belong to,
   with the composer to start a thread in its footer; its settings in a dialog named for them, in a
-  team's name beside the title, with General and Members as tabs, the name a field for someone who
-  may rename the team, saved only once it differs, and text for everyone else, the visibility and
-  the membership in words, with leaving, closing the dialog, and joining, which keeps it open, and a conversation's with neither tabs nor
-  visibility; its members, those present marked
-  Online and one on its way marked sending, with removing for the others, admitting, offered only to
-  someone who manages them; and its side pane for the thread open in it, titled by the thread
+  team's name beside the title, with General and Members as tabs, and Close settings, the name a field that is dimmed,
+  with why, for someone who may not rename the team, saved only once it differs, the visibility as a line and the
+  membership in words, with Leave group and Join group, each dimmed while the change to the person's own admission is
+  on its way, and leaving and joining keeping the dialog open, and a conversation's, titled Members, with neither tabs nor
+  visibility; its members counted over their list, You and Agent beside the names, those present marked
+  Online and one on its way marked sending, with Remove named for the person for the others, and the picker named Add
+  members with its Add button, "Add 1" and "Add 2", offering the workspace's members who are not in the team, taking
+  them as chips, writing one admission for each in order and leaving none chosen, and dropping the choice when the
+  dialog closes, all offered only to someone who manages the members; on a phone, the wide Add members button in
+  its place that moves the dialog to a view of its own with Back to members, the people to add as a list that is
+  always shown and narrows as the search is typed, chips, and the wide button counting them; and its side pane for the thread open in it, titled by the thread
   under the group it is in, with the composer to reply in its footer, closed by its Close button or its Back, which send the
   same message; the groups listed in the
   sidebar's sections, the teams to join not among them, in order, "No groups yet" only once the groups are read,

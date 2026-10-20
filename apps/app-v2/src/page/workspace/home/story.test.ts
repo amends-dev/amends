@@ -79,7 +79,7 @@ const fromGroup = (message: typeof GroupBlock.Message.Type) =>
     key: groupId,
     slotId: "group",
     model: openGroupModel,
-    viewInputs: { now, workspaceName: "Studio" }
+    viewInputs: { now, workspaceName: "Studio", viewport: "Desktop" }
   }).toParentMessage(message)
 
 /** What the open group's threads report, as Home receives it. */
