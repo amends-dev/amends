@@ -1,15 +1,15 @@
 /**
  * Home, the rail's first destination in a workspace: the person's inbox, the tasks in triage and every open task, and
- * the groups to browse or to open, each in the main pane, with a group's threads and the thread open among them, and
- * a conversation the person has not started, as it will be, until they send its first message. The sidebar lists the
+ * the groups to browse or to open, each in the main pane, with a group's threads and the thread open among them, and a
+ * conversation the person has not started, as it will be, until they send its first message. The sidebar lists the
  * inbox, the triage, the tasks, and the groups. A thread opens in the side pane, beside the group's threads or beside
  * the inbox, which stays, and the Block lays the pane out by the window's width, which its parent informs it of: below
  * 80rem the pane is in a dialog of its own, which follows the thread opening and closing. It reports when the person
  * moved within Home from its sidebar or its lists, when they joined a group, with where it is as a line says it, when
- * they created one, when they asked, from a turn that failed in a thread, for the settings of its agent, when they asked,
- * from a group's header on a phone, for the search, and its
- * parent asks it to open a group, a thread in its group, or a conversation with a member, which is the one they have or
- * one not started, and to show the inbox again, as leaving Home does. Home opens on the inbox.
+ * they created one, when they asked, from a turn that failed in a thread, for the settings of its agent, when they
+ * asked, from a group's header on a phone, for the search, and its parent asks it to open a group, a thread in its
+ * group, or a conversation with a member, which is the one they have or one not started, and to show the inbox again,
+ * as leaving Home does. Home opens on the inbox.
  */
 
 import { GroupId } from "@amends-dev/core/group"
