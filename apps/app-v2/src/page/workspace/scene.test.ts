@@ -1608,6 +1608,28 @@ describe("a workspace", () => {
       expect(role("main", { name: "A group" })).toExist()
     )
   })
+
+  it("has a Search button in the header of the open group on a phone only, which asks the app to open the search", () => {
+    scene(
+      { update, view: sceneView },
+      given(inWindow(withoutThread, "Phone")),
+      expect(within(role("main", { name: "General" }), role("button", { name: "Search" }))).toExist(),
+      expect(role("dialog", { name: "Jump to" })).toBeAbsent(),
+      click(within(role("main", { name: "General" }), role("button", { name: "Search" }))),
+      expectOutMessage(OutMessage.RequestedSearch()),
+      expect(role("dialog", { name: "Jump to" })).toBeAbsent()
+    )
+
+    for (const viewport of ["Tablet", "Desktop", "Split"] as const) {
+      scene(
+        { update, view: sceneView },
+        given(inWindow(withoutThread, viewport)),
+        expect(role("main", { name: "General" })).toExist(),
+        expect(within(role("main", { name: "General" }), role("button", { name: "Search" }))).toBeAbsent()
+      )
+    }
+  })
+
   it("has the workspace in the sidebar's header as one button: its first letter as a 28px mark, its name, and a chevron", () => {
     scene(
       { update, view: sceneView },

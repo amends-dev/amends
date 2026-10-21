@@ -13,8 +13,8 @@
  * the page, opens from the sidebar and when its parent asks, and what it finds opens a group, a thread in its group,
  * or a conversation with a member, in Home. Its rail ends with the person's account, which the settings draw: a menu
  * of their Appearance, the way to another workspace, the workspace's settings, which it shows, a dialog that changes
- * their name, which the settings open, and signing out. It reports when the person leaves it, and the entries they
- * choose that the app acts on.
+ * their name, which the settings open, and signing out. It reports when the person leaves it, the entries they
+ * choose that the app acts on, and the search a group's header asks for on a phone, which the app asks it to open.
  */
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
@@ -129,7 +129,8 @@ export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
   ClosedWorkspace: {},
-  ChoseAccountEntry: { entry: AppAccountEntry }
+  ChoseAccountEntry: { entry: AppAccountEntry },
+  RequestedSearch: {}
 })
 export type OutMessage = typeof OutMessage.Type
 

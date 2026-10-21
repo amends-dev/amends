@@ -507,6 +507,20 @@ describe("a workspace", () => {
     story(update, given(opened), message(choseAccountEntry("ChangeName")), expectNoOutMessage())
   })
 
+  it("reports that the header of the open group asked for the search, for the app to open, and opens none itself", () => {
+    story(
+      update,
+      given(opened),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      message(fromGroup(GroupBlock.Message.ClickedSearch())),
+      expectOutMessage(OutMessage.RequestedSearch()),
+      model((model) => {
+        expect(model.search.dialog.isOpen).toBe(false)
+      })
+    )
+  })
+
   it("shows the workspace's settings page when the person chooses it in the account menu, in place of what is open", () => {
     story(
       update,

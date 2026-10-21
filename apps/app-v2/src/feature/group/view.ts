@@ -118,6 +118,15 @@ const partActions = (model: Model, h: GroupViewBuilder): ReadonlyArray<Html> =>
           : []
   })
 
+/**
+ * The button that opens the search, named Search, which a phone's header has, since the rail with its Search is in the
+ * drawer there, and only for a group the person belongs to, as the bell is.
+ */
+const searchActions = (model: Model, viewport: Viewport, h: GroupViewBuilder): ReadonlyArray<Html> =>
+  viewport === "Phone" && belongs(model)
+    ? [iconButton(h, { icon: "mark-search", label: "Search", onClick: Message.ClickedSearch() })]
+    : []
+
 /** How many of the group's members the stack in its header shows. */
 const stackedMembers = 3
 
@@ -455,7 +464,8 @@ const columnOf = (
 
 /**
  * The group's main pane: its name, titled by its mark, a channel for a team and a message for a conversation, with the
- * workspace's name under it on a phone, and its members, the person's part in it, and the button to open its settings,
+ * workspace's name under it on a phone, and its members, the person's part in it, on a phone the button to open the
+ * search, and the button to open its settings,
  * under the tabs of its threads and its tasks, named for the group, and the tab shown, with the composer to start
  * one in the footer, or the line that says to join the team to read them; or, in place of both, that the group is not
  * available or could not be read; and the settings' modal.
@@ -483,7 +493,12 @@ export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, { n
       title: name,
       icon: iconOf(model),
       phoneContext: workspaceName,
-      actions: [...membersActions(model, h), ...partActions(model, h), ...settingsActions(model, h)],
+      actions: [
+        ...membersActions(model, h),
+        ...partActions(model, h),
+        ...searchActions(model, viewport, h),
+        ...settingsActions(model, h)
+      ],
       ...(isReadable
         ? {
             tabs: h.block(

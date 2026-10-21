@@ -6,7 +6,8 @@
  * the inbox, which stays, and the Block lays the pane out by the window's width, which its parent informs it of: below
  * 80rem the pane is in a dialog of its own, which follows the thread opening and closing. It reports when the person
  * moved within Home from its sidebar or its lists, when they joined a group, with where it is as a line says it, when
- * they created one, and when they asked, from a turn that failed in a thread, for the settings of its agent, and its
+ * they created one, when they asked, from a turn that failed in a thread, for the settings of its agent, when they asked,
+ * from a group's header on a phone, for the search, and its
  * parent asks it to open a group, a thread in its group, or a conversation with a member, which is the one they have or
  * one not started, and to show the inbox again, as leaving Home does. Home opens on the inbox.
  */
@@ -116,7 +117,8 @@ export const OutMessage = defineMessageUnion({
   CreatedGroup: { groupId: GroupId.GroupId },
   OpenedAgent: { agentId: Identity.AgentId },
   FollowedGroup: { place: Schema.String },
-  UnfollowedGroup: { place: Schema.String }
+  UnfollowedGroup: { place: Schema.String },
+  RequestedSearch: {}
 })
 export type OutMessage = typeof OutMessage.Type
 

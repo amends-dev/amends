@@ -1043,3 +1043,17 @@ describe("home with a group open running the slash commands of its composer", ()
     )
   })
 })
+
+describe("home with a group open, whose header asks for the search", () => {
+  it("reports it for the page, since the search is not Home's to open", () => {
+    story(
+      update,
+      given(opened),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      draftRead,
+      receivedGroup,
+      message(fromGroup(GroupBlock.Message.ClickedSearch())),
+      expectOutMessage(OutMessage.RequestedSearch())
+    )
+  })
+})

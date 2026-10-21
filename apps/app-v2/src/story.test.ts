@@ -1,3 +1,4 @@
+import { GroupId } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { Accounts, type SignIn, WorkspaceDirectory } from "@amends-dev/gateway"
 import { describe, expect, it } from "@effect/vitest"
@@ -7,6 +8,11 @@ import { Command, given, message, model, story } from "foldkit/story"
 import { now } from "../test/fixtures.ts"
 import { KeepAppearance, ShowAppearance, SignOut } from "./command.ts"
 import { SignInBinding, WorkspaceBinding, WorkspacesBinding } from "./composition.ts"
+import { ComposerBlock } from "./feature/composer/block.ts"
+import { ReadDraft } from "./feature/composer/command.ts"
+import { GroupBlock } from "./feature/group/block.ts"
+import { init as initGroup } from "./feature/group/init.ts"
+import { GroupsBlock } from "./feature/groups/block.ts"
 import { AccountBinding } from "./feature/settings/composition.ts"
 import { AccountEntry, AccountMenu } from "./feature/settings/definition.ts"
 import { init } from "./init.ts"
@@ -17,8 +23,11 @@ import { CheckCode, SendCode } from "./page/signIn/command.ts"
 import { SignInForm } from "./page/signIn/definition.ts"
 import { WorkspaceBlock } from "./page/workspace/block.ts"
 import { LoadIntegrations } from "./page/workspace/command.ts"
-import { SettingsBinding } from "./page/workspace/composition.ts"
+import { HomeBinding, SettingsBinding } from "./page/workspace/composition.ts"
 import { Open } from "./page/workspace/definition.ts"
+import type { HomeBlock } from "./page/workspace/home/block.ts"
+import { GroupBinding, GroupsBinding } from "./page/workspace/home/composition.ts"
+import { view as homeView } from "./page/workspace/home/view.ts"
 import { WorkspacesBlock } from "./page/workspaces/block.ts"
 import { LoadWorkspaces } from "./page/workspaces/command.ts"
 import { update } from "./update.ts"
@@ -88,6 +97,34 @@ const choseAccountEntry = (entry: AccountEntry) =>
         viewInputs: { items: [], itemToConfig: () => ({ content: null }), buttonContent: null }
       }).toParentMessage(AccountMenu.Message.SelectedItem({ index: AccountEntry.literals.indexOf(entry), item: entry }))
     )
+  )
+
+/** The group the person opens in Home. */
+const groupId = GroupId.GroupId.make("general")
+
+/** The open workspace, before anything is read. */
+const workspaceModel = WorkspaceBlock.init(membership.workspace.id, membership.member.id, "Studio", "Split").model
+
+/** What Home reports, as the open workspace and then the root receive it. */
+const fromHome = (message: typeof HomeBlock.Message.Type) =>
+  fromWorkspace(
+    HomeBinding.embedView({
+      slotId: "home",
+      model: workspaceModel.home,
+      view: homeView,
+      viewInputs: { now, workspaceName: "Studio" }
+    }).toParentMessage(message)
+  )
+
+/** What the open group reports, as Home, the open workspace, and then the root receive it. */
+const fromGroup = (message: typeof GroupBlock.Message.Type) =>
+  fromHome(
+    GroupBinding.embedView({
+      key: groupId,
+      slotId: "group",
+      model: initGroup(membership.workspace.id, membership.member.id, groupId, Option.none()).model,
+      viewInputs: { now, workspaceName: "Studio", viewport: "Split" }
+    }).toParentMessage(message)
   )
 
 /** The app signed in with a workspace open, its integrations loaded. */
@@ -410,6 +447,39 @@ describe("the app", () => {
       model((model) => {
         expect(model.viewport).toBe("Phone")
         expect(Option.map(openedIn(model), ({ model: opened }) => opened.viewport)).toEqual(Option.some("Phone"))
+      })
+    )
+  })
+
+  it("opens the search of the workspace when the header of a group open in it asks for the search", () => {
+    story(
+      update,
+      given(
+        init({ session: Option.some(session), appearance: "System", viewport: "Phone", now, isApplePlatform: true })
+          .model
+      ),
+      ...inWorkspace,
+      message(
+        fromHome(
+          GroupsBinding.embedView({
+            slotId: "groups",
+            model: workspaceModel.home.groups,
+            viewInputs: { openThread: Option.none(), isBrowsing: false, unsentWith: Option.none() }
+          }).toParentMessage(GroupsBlock.Message.ClickedGroup({ groupId }))
+        )
+      ),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(Option.map(openedIn(model), ({ model: opened }) => opened.search.dialog.isOpen)).toEqual(
+          Option.some(false)
+        )
+      }),
+      message(fromGroup(GroupBlock.Message.ClickedSearch())),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      model((model) => {
+        expect(Option.map(openedIn(model), ({ model: opened }) => opened.search.dialog.isOpen)).toEqual(
+          Option.some(true)
+        )
       })
     )
   })

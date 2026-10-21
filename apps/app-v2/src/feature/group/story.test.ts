@@ -417,6 +417,18 @@ describe("a group", () => {
     )
   })
 
+  it("reports that the person asked for the search, and changes nothing in itself", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.ClickedSearch()),
+      expectOutMessage(OutMessage.RequestedSearch()),
+      model((model) => {
+        expect(model).toEqual(opened)
+      })
+    )
+  })
+
   it("opens the thread picked among its threads and reports it, then closes it and reports that", () => {
     story(
       update,

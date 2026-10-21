@@ -103,7 +103,10 @@ const goToHome = () => Update.combine([MenuBinding.requestClose(), hideAside, sh
  * Home reports that the person moved within it, which shows it and closes the navigation drawer, that they joined a
  * group, which is confirmed to them, with the offer to open it, that they followed the open group or stopped, which is
  * confirmed to them, that they created one, which is confirmed to them and shown, as it is already open, and that they
- * asked for the settings of an agent whose turn failed, which opens its page as picking the agent does.
+ * asked for the settings of an agent whose turn failed, which opens its page as picking the agent does. The search a
+ * group's header asks for on a phone is reported to the app by the binding below, which asks this page to open it, as
+ * it does for the key for it; opening it here needs the search's step in the type of this fold, whose search fold
+ * already needs Home's, and TypeScript gives up on the page's update.
  */
 const foldHomeOutMessage = HomeBlock.OutMessage.match({
   Navigated: () => goToHome(),
@@ -112,7 +115,8 @@ const foldHomeOutMessage = HomeBlock.OutMessage.match({
   FollowedGroup: ({ place }) => ActionsBinding.confirm({ text: `Following ${place}` }),
   UnfollowedGroup: ({ place }) => ActionsBinding.confirm({ text: `Unfollowed ${place}` }),
   CreatedGroup: () => Update.combine([ActionsBinding.confirm({ text: "Group created" }), goToHome()]),
-  OpenedAgent: ({ agentId }) => goTo(showAgent(agentId))
+  OpenedAgent: ({ agentId }) => goTo(showAgent(agentId)),
+  RequestedSearch: () => WorkspaceDefinition.stepNoop()
 })
 
 /** Open the group `groupId` in Home, as picking it in the sidebar does, and show Home. */
@@ -272,7 +276,19 @@ export const SearchBinding = WorkspaceDefinition.bindChild(SearchBlock, {
 export const HomeBinding = WorkspaceDefinition.bindChild(HomeBlock, {
   field: "home",
   init: { contextToArgs: ({ workspaceId, memberId, viewport }) => [workspaceId, memberId, viewport] },
-  outMessage: { fold: foldHomeOutMessage }
+  outMessage: {
+    /** The search a group asks for is reported to the app, which opens it as the key for it does. */
+    forward: HomeBlock.OutMessage.match({
+      Navigated: () => undefined,
+      JoinedGroup: () => undefined,
+      FollowedGroup: () => undefined,
+      UnfollowedGroup: () => undefined,
+      CreatedGroup: () => undefined,
+      OpenedAgent: () => undefined,
+      RequestedSearch: () => OutMessage.RequestedSearch()
+    }),
+    fold: foldHomeOutMessage
+  }
 })
 
 export const ConnectionsBinding = WorkspaceDefinition.bindChild(ConnectionsBlock, {

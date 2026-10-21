@@ -2,8 +2,9 @@
  * A group as the person has it open: its name, their part in it, its threads, and the thread open
  * among them, and its settings in a modal: a team's name, visibility, and members, and the person's membership.
  * They follow a group or stop, rename a team, join a public team or leave one, and, where they manage
- * its members, admit several at once and remove them. It reports when its thread opens and when the person closes
- * it, when they follow the group or stop with a slash command, and closes the thread when its parent asks.
+ * its members, admit several at once and remove them. On a phone, where the rail with its Search is in a drawer, its
+ * header has a Search button. It reports when its thread opens and when the person closes it, when they follow the
+ * group or stop with a slash command, and when they ask for the search, and closes the thread when its parent asks.
  */
 
 import { Grant } from "@amends-dev/core/authorization"
@@ -120,6 +121,7 @@ export const Message = defineMessageUnion({
   ClickedUnfollow: {},
   ClickedJoin: {},
   ClickedLeave: {},
+  ClickedSearch: {},
   ClickedAddMembers: {},
   ClickedBackToMembers: {},
   TypedAdmitQuery: { query: Schema.String },
@@ -140,7 +142,8 @@ export const OutMessage = defineMessageUnion({
   ClosedThread: {},
   OpenedAgent: { agentId: Identity.AgentId },
   FollowedGroup: { place: Schema.String },
-  UnfollowedGroup: { place: Schema.String }
+  UnfollowedGroup: { place: Schema.String },
+  RequestedSearch: {}
 })
 export type OutMessage = typeof OutMessage.Type
 

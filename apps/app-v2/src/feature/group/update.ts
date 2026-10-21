@@ -76,6 +76,7 @@ export const update = GroupComposition.makeUpdate((model, message) =>
           commands: [LeaveGroup({ ...inGroup(model), membershipId: membership.id })]
         })
       }),
+    ClickedSearch: () => ({ model, outMessage: OutMessage.RequestedSearch() }),
     ClickedAddMembers: () => ({ model: modifyFields(model, { isAddViewOpen: () => true }) }),
     ClickedBackToMembers: () => ({ model: modifyFields(model, { isAddViewOpen: () => false }) }),
     TypedAdmitQuery: ({ query }) => ({ model: modifyFields(model, { admitQuery: () => query }) }),

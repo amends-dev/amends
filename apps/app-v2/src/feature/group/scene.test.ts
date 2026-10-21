@@ -622,6 +622,70 @@ describe("a group's main pane", () => {
   })
 })
 
+describe("a group's header on a phone", () => {
+  it("has a Search button between the person's part and the group's settings, named as apps/ui names it", () => {
+    scene(
+      { update, view: phoneView },
+      given(opened),
+      expect(within(role("main"), role("button", { name: "Search" }))).toExist(),
+      expect(nth(all.role("button"), 0)).toHaveAccessibleName("2 members"),
+      expect(nth(all.role("button"), 1)).toHaveAccessibleName("Follow"),
+      expect(nth(all.role("button"), 2)).toHaveAccessibleName("Search"),
+      expect(nth(all.role("button"), 3)).toHaveAccessibleName("Group settings")
+    )
+  })
+
+  it("has it for a conversation too, which the person belongs to", () => {
+    scene(
+      { update, view: phoneView },
+      given(openedConversation),
+      expect(within(role("main"), role("button", { name: "Search" }))).toExist()
+    )
+  })
+
+  it("leaves it to the rail on any wider window, where the rail has the Search", () => {
+    for (const wideView of [
+      view,
+      withViewInputs(GroupView.view, { now, workspaceName: "Studio", viewport: "Tablet" })(),
+      withViewInputs(GroupView.view, { now, workspaceName: "Studio", viewport: "Split" })()
+    ]) {
+      scene({ update, view: wideView }, given(opened), expect(role("button", { name: "Search" })).toBeAbsent())
+    }
+  })
+
+  it("leaves it out of a team the person has not joined, which shows only the way to join it, and of one not read", () => {
+    scene(
+      { update, view: phoneView },
+      given(openedAnnouncements),
+      expect(role("button", { name: "Join" })).toExist(),
+      expect(role("button", { name: "Search" })).toBeAbsent()
+    )
+    scene(
+      { update, view: phoneView },
+      given(unavailable),
+      expect(role("heading", { name: "This group isn't available", level: 2 })).toExist(),
+      expect(role("button", { name: "Search" })).toBeAbsent()
+    )
+    scene(
+      { update, view: phoneView },
+      given(init(workspace.id, member.id, design.id, Option.none()).model),
+      expect(role("button", { name: "Search" })).toBeAbsent()
+    )
+  })
+
+  it("reports that the person asked for the search, and changes nothing else in the group", () => {
+    scene(
+      { update, view: phoneView },
+      given(opened),
+      click(role("button", { name: "Search" })),
+      expectOutMessage(OutMessage.RequestedSearch()),
+      expect(role("dialog", { name: "Group settings" })).toBeAbsent(),
+      expect(role("button", { name: "Follow" })).toHaveAttr("aria-pressed", "false"),
+      expect(role("heading", { name: "Design", level: 1 })).toExist()
+    )
+  })
+})
+
 describe("a group's members", () => {
   it("open in the settings' dialog on the Members section when the person asks for them from a team's cluster", () => {
     scene(

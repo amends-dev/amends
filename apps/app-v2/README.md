@@ -528,8 +528,9 @@ below it counted at each level above.
   result cannot land in the wrong one, and its settings in a modal. It opens with a thread already
   open when its parent gives one, and reports nothing for it. It reports `OpenedThread` when the
   person picks a thread and `ClosedThread` when they close it, by Close thread, Close task, Back, or Close turn log, so its parent can
-  hold the side pane in step, and `OpenedAgent` when they ask, from a turn that failed in the thread, for the settings
-  of its agent; its parent closes the thread with the operation `requestCloseThread`,
+  hold the side pane in step, `OpenedAgent` when they ask, from a turn that failed in the thread, for the settings
+  of its agent, and `RequestedSearch` when they press the Search button its header has on a phone; its parent closes the
+  thread with the operation `requestCloseThread`,
   which reports nothing, since it asked. They follow a group or stop, join a public team, and, in its
   settings, rename a team, leave one, and, where they manage its members, admit several at once and remove them. The
   composer of its threads offers the slash commands of a team the person belongs to (`slashCommandsOf`): `/follow`,
@@ -552,7 +553,9 @@ below it counted at each level above.
   settings on the Members tab, or, for a conversation, which has no tabs, on its Members, and which a phone does not
   show, as `apps/ui`'s header does not; Follow as a bell named Follow, or Following and filled and pressed while the person
   follows the group, which stops following, and disabled as it was while a change is on its way, or Join, where
-  they apply; and a gear that opens the settings; and under them, on the Tasks tab, the toolbar of the tasks, and the
+  they apply; Search, on a phone only, where the rail with its Search is in the drawer, and, as the bell is, for a
+  group the person belongs to (`searchActions`), which reports that the search was asked for; and a gear that opens the
+  settings; and under them, on the Tasks tab, the toolbar of the tasks, and the
   tab's content, threads or tasks, with the composer to start one in the footer, which a team the person has not joined does
   not have. The group is one of four, by what the store has answered (`availabilityOf`): `Loading` until its first
   answer (`isLoaded`, set by the first `ReceivedGroup`), in which its threads list as they would for a member;
@@ -1394,8 +1397,11 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   following moves nowhere either. A group the
   person created, which the groups Block reports as `CreatedGroup`, Home opens without a thread, as picking it does, and
   reports as it is, for the page to confirm. The settings of an agent that a thread's turn asked for, which the open
-  group and the inbox report as `OpenedAgent`, Home reports as they are, for the page to open the agent's page. The page
-  asks it for the rest: to reset
+  group and the inbox report as `OpenedAgent`, Home reports as they are, for the page to open the agent's page. The search
+  the open group's header asks for on a phone, which the group reports as `RequestedSearch`, Home reports as it is,
+  and the page's Home binding forwards it to the app, which opens the workspace's search as it does for the search key.
+  The page does not fold it itself: its step would be in the type of the fold of Home's report, whose search fold
+  already holds Home's steps, and TypeScript gives up on the page's `makeUpdate` (TS2589). The page asks it for the rest: to reset
   (`requestReset`), which closes the thread, leaves no group marked, shows the inbox, and closes the dialog, as leaving
   Home does; to open a group without a thread (`requestOpenGroup`) or a thread in its group (`requestOpenThread`);
   and to open the conversation with a member (`requestConversationWith`), the one the person has or, when there is
@@ -1436,7 +1442,7 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   `Tick` sends `Ticked` each minute (the first at once, a moment after the flags read it), whose update sets it.
   The subscription `OpenSearch` follows Control+K, or Command+K on an Apple platform, which Foldkit's
   `Mod` decides from the user agent, also from a field, and sends `PressedSearchKey` while a workspace is open, which the update asks the workspace
-  to open its search for; with none open the key is left to the browser. Nothing acts on the time, so it goes no further than views: the root's view gives the open
+  to open its search for, as the workspace's `RequestedSearch` report does when a group's Search button asks (the root's `foldWorkspaceOutMessage`); with none open the key is left to the browser. Nothing acts on the time, so it goes no further than views: the root's view gives the open
   workspace's view the time now beside the email, as a view input and not a message, and the page
   gives it on to the inbox and the open group, the destinations that show ages and days; the workspace
   list's view takes it too, for when each invitation closes. `entry.ts` assembles the application over `services.ts`, which supplies the stores, the
@@ -1846,7 +1852,8 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   a conversation's other member, with the drawing of a channel or of a message before it, the workspace's name
   under it on a phone, its tabs named for it, its members as a stack of three marks named for how many there are, which
   opens them in the settings, the person's part in it as a bell named Following and pressed while they follow, and
-  disabled while a change is on its way, and the gear to its settings, a team's welcome naming its members as a list in
+  disabled while a change is on its way, a Search button after it on a phone only and for a group they belong to, and
+  the gear to its settings, a team's welcome naming its members as a list in
   three forms, a group it is not available to and one that could not be read, saying so, the second with a Try again that
   reads it again, and
   joining in place of the threads and the tabs of a team they do not belong to,
