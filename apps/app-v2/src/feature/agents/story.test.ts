@@ -1412,7 +1412,7 @@ describe("trying again", () => {
         expect(model.notice).toEqual(Option.some("This browser could not read the workspace's copy."))
         expect(model.reads).toBe(0)
       }),
-      message(Message.ClickedTryAgain()),
+      message(Message.ClickedRetry()),
       model((model) => {
         expect(model.notice).toEqual(Option.none())
         expect(model.isLoaded).toBe(false)
@@ -1712,7 +1712,7 @@ describe("what the agents are doing", () => {
     story(
       update,
       given(opened),
-      message(Message.ClickedTryAgain()),
+      message(Message.ClickedRetry()),
       model((model) => {
         expect(model.reads).toBe(opened.reads + 1)
       })

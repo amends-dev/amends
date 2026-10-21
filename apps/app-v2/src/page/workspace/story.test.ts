@@ -285,12 +285,16 @@ const fromConnections = (message: typeof ConnectionsBlock.Message.Type) =>
   ConnectionsBinding.embedView({
     slotId: "connections",
     model: opened.connections,
-    viewInputs: { workspaceName: "Studio" }
+    viewInputs: { workspaceName: "Studio", viewport: "Desktop" }
   }).toParentMessage(message)
 
 /** What the agents report, as the workspace receives it. */
 const fromAgents = (message: typeof AgentsBlock.Message.Type) =>
-  AgentsBinding.embedView({ slotId: "agents", model: opened.agents }).toParentMessage(message)
+  AgentsBinding.embedView({
+    slotId: "agents",
+    model: opened.agents,
+    viewInputs: { workspaceName: "Studio", viewport: "Desktop" }
+  }).toParentMessage(message)
 
 /** What the settings report, as the workspace receives it. */
 const fromSettings = (message: typeof SettingsBlock.Message.Type) =>

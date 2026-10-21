@@ -20,6 +20,7 @@ import { form } from "@amends-dev/design/form"
 import { modal } from "@amends-dev/design/modal"
 import { pane, paneColumn, paneEmpty, paneForm, paneSection, paneTabs, paneToolbar } from "@amends-dev/design/pane"
 import { sidebarEmpty, sidebarItem, sidebarSection, sidebarSections } from "@amends-dev/design/sidebar"
+import type { Viewport } from "@amends-dev/design/viewport"
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
@@ -292,7 +293,7 @@ const unreadAgents = (model: Model, h: AgentsViewBuilder): Html =>
     art: "came-apart",
     title: "Couldn't load agents",
     ...Option.match(model.notice, { onNone: () => ({}), onSome: (copy) => ({ copy }) }),
-    action: button(h, "Try again", Message.ClickedTryAgain())
+    action: button(h, "Retry", Message.ClickedRetry())
   })
 
 /**
@@ -315,18 +316,29 @@ const listBody = (model: Model, h: AgentsViewBuilder): Html => {
 const hasAgentList = (model: Model): boolean => model.isLoaded && listedAgents(model).length > 0
 
 /**
+ * The name of the workspace, which a phone shows under the title, and the width of the window, which a phone has the
+ * button to add an agent say Add for.
+ */
+export type ListInputs = Readonly<{ workspaceName: string; viewport: Viewport }>
+
+/** The button to add an agent, for a person who may, which is called Add where there is no room for more. */
+const addActions = (model: Model, viewport: Viewport, h: AgentsViewBuilder): ReadonlyArray<Html> =>
+  mayAdd(model) ? [button(h, viewport === "Phone" ? "Add" : "Add agent", Message.ClickedAdd())] : []
+
+/**
  * The agents as the list page, the main content: All and those that need setup on a tab each, with the button to add
  * one for a person who may, which opens the dialog `dialogView` renders, a toolbar with a search that narrows the tab
  * by name, and a row for each agent, which picking opens as its own page.
  */
-export const view = AgentsComposition.makeView((model, h) =>
+export const view = AgentsComposition.makeView.withInputs<ListInputs>((model, { workspaceName, viewport }, h) =>
   pane(h, {
     variant: "main",
     label: "Agents",
     header: {
       title: "Agents",
       icon: "mark-agents",
-      actions: mayAdd(model) ? [button(h, "Add agent", Message.ClickedAdd())] : [],
+      phoneContext: workspaceName,
+      actions: addActions(model, viewport, h),
       tabs: browseTabs(model, h)
     },
     ...(hasAgentList(model) ? { toolbar: agentToolbar(model, h) } : {}),

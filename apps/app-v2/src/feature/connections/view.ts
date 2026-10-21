@@ -21,6 +21,7 @@ import { form, settingRow } from "@amends-dev/design/form"
 import { modal, modalList } from "@amends-dev/design/modal"
 import { pane, paneColumn, paneEmpty, paneForm, paneSection, paneTabs, paneToolbar } from "@amends-dev/design/pane"
 import { sidebarEmpty, sidebarItem, sidebarSection, sidebarSections } from "@amends-dev/design/sidebar"
+import type { Viewport } from "@amends-dev/design/viewport"
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
@@ -317,7 +318,7 @@ const unreadConnections = (model: Model, h: ConnectionsViewBuilder): Html =>
     art: "came-apart",
     title: "Couldn't load connections",
     ...Option.match(model.notice, { onNone: () => ({}), onSome: (copy) => ({ copy }) }),
-    action: button(h, "Try again", Message.ClickedTryAgain())
+    action: button(h, "Retry", Message.ClickedRetry())
   })
 
 /**
@@ -339,15 +340,24 @@ const listBody = (model: Model, h: ConnectionsViewBuilder): Html => {
 /** Whether the list has connections to search and label, which is when it has a toolbar. */
 const hasConnectionList = (model: Model): boolean => model.isLoaded && model.connections.length > 0
 
-/** The name of the workspace, which a phone shows under the title. */
-export type ListInputs = Readonly<{ workspaceName: string }>
+/**
+ * The name of the workspace, which a phone shows under the title, and the width of the window, which a phone has the
+ * button to add a connection say Add for.
+ */
+export type ListInputs = Readonly<{ workspaceName: string; viewport: Viewport }>
+
+/** The button to add a connection, for a person who may, which is called Add where there is no room for more. */
+const addActions = (model: Model, viewport: Viewport, h: ConnectionsViewBuilder): ReadonlyArray<Html> =>
+  mayAdd(model)
+    ? [button(h, viewport === "Phone" ? "Add" : "Add connection", Message.ClickedAdd({ capability: Option.none() }))]
+    : []
 
 /**
  * The connections as the list page, the main content: All and each thing a connection gives on a tab, with how many
  * connections each holds, a toolbar with a search that narrows the tab by the name of a connection or of its
  * integration, and a row for each connection, which picking opens as its own page.
  */
-export const view = ConnectionsComposition.makeView.withInputs<ListInputs>((model, { workspaceName }, h) =>
+export const view = ConnectionsComposition.makeView.withInputs<ListInputs>((model, { workspaceName, viewport }, h) =>
   pane(h, {
     variant: "main",
     label: "Connections",
@@ -355,7 +365,7 @@ export const view = ConnectionsComposition.makeView.withInputs<ListInputs>((mode
       title: "Connections",
       icon: "mark-connections",
       phoneContext: workspaceName,
-      actions: mayAdd(model) ? [button(h, "Add connection", Message.ClickedAdd({ capability: Option.none() }))] : [],
+      actions: addActions(model, viewport, h),
       tabs: browseTabs(model, h)
     },
     ...(hasConnectionList(model) ? { toolbar: connectionToolbar(model, h) } : {}),

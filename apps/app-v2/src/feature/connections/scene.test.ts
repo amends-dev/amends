@@ -81,7 +81,8 @@ const machine = connectionTo("connection-3", "local", "This machine")
 const runner = connectionTo("connection-4", "amends", "amends")
 const support = connectionTo("connection-5", "chat", "Support chat")
 
-const listView = withViewInputs(view, { workspaceName: workspace.name })()
+const listView = withViewInputs(view, { workspaceName: workspace.name, viewport: "Desktop" })()
+const phoneListView = withViewInputs(view, { workspaceName: workspace.name, viewport: "Phone" })()
 
 /** The connections as an owner of the workspace reads them, with the integrations the host installs listed. */
 const opened: Model = modifyFields(init(workspace.id, member.id).model, {
@@ -381,7 +382,8 @@ describe("the connections list", () => {
       expect(art("came-apart")).toExist(),
       expect(role("alert")).toBeAbsent(),
       expect(role("status")).toBeAbsent(),
-      click(role("button", { name: "Try again" })),
+      expect(role("button", { name: "Try again" })).toBeAbsent(),
+      click(role("button", { name: "Retry" })),
       expect(art("came-apart")).toBeAbsent(),
       expect(role("status")).toHaveText("Loading connections…")
     )
@@ -1066,7 +1068,7 @@ describe("a connection's page", () => {
       expect(art("came-apart")).toExist(),
       expect(role("status")).toBeAbsent(),
       expect(role("heading", { name: "This connection isn't here" })).toBeAbsent(),
-      click(role("button", { name: "Try again" })),
+      click(role("button", { name: "Retry" })),
       expect(art("came-apart")).toBeAbsent(),
       expect(role("status")).toHaveText("Loading connection…")
     )
@@ -1208,6 +1210,49 @@ describe("adding a connection", () => {
         expect(role("button", { name: "Add connection" })).toBeAbsent()
       )
     }
+  })
+
+  it("calls the button that adds a connection Add on a phone, which opens the same dialog, and Add connection on a wider window", () => {
+    scene(
+      { update, view: withSeveralAdded },
+      given(withSeveral),
+      expect(within(role("main", { name: "Connections" }), role("button", { name: "Add" }))).toBeAbsent(),
+      expect(within(role("main", { name: "Connections" }), role("button", { name: "Add connection" }))).toExist()
+    )
+    scene(
+      { update, view: withDialog(phoneListView) },
+      given(withSeveral),
+      expect(within(role("main", { name: "Connections" }), role("button", { name: "Add" }))).toExist(),
+      expect(role("button", { name: "Add connection" })).toBeAbsent(),
+      click(role("button", { name: "Add" })),
+      ...dialogOpened(),
+      expect(chooserDialog).toExist()
+    )
+
+    for (const viewport of ["Tablet", "Desktop", "Split"] as const) {
+      scene(
+        { update, view: withViewInputs(view, { workspaceName: workspace.name, viewport })() },
+        given(withSeveral),
+        expect(role("button", { name: "Add connection" })).toExist(),
+        expect(role("button", { name: "Add" })).toBeAbsent()
+      )
+    }
+  })
+
+  it("keeps the empty list's button as Add connection on a phone, beside the Add of the header, and offers neither to one who may not", () => {
+    scene(
+      { update, view: phoneListView },
+      given(modifyFields(opened, { connections: () => [] })),
+      expect(within(role("main", { name: "Connections" }), role("button", { name: "Add" }))).toExist(),
+      expectAll(all.role("button", { name: "Add connection" })).toHaveCount(1)
+    )
+    scene(
+      { update, view: phoneListView },
+      given(modifyFields(withSeveral, { grants: () => memberGrants })),
+      expect(role("heading", { name: "Connections", level: 1 })).toExist(),
+      expect(role("button", { name: "Add" })).toBeAbsent(),
+      expect(role("button", { name: "Add connection" })).toBeAbsent()
+    )
   })
 
   it("opens a dialog on the integrations the host installs, with what each gives and how it authenticates", () => {

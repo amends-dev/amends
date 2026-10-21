@@ -566,6 +566,43 @@ describe("a workspace", () => {
     )
   })
 
+  it("fits the lists of the connections and the agents to the window: Add on a phone, and the workspace's name under the title", () => {
+    const connectionsAt = (viewport: typeof opened.viewport) =>
+      modifyFields(inWindow(withSearchConnection, viewport), { open: () => Open.Connections() })
+    const agentsAt = (viewport: typeof opened.viewport) =>
+      modifyFields(inWindow(withAgent, viewport), { open: () => Open.Agents() })
+
+    scene(
+      { update, view: sceneView },
+      given(connectionsAt("Phone")),
+      expect(within(role("main", { name: "Connections" }), role("button", { name: "Add" }))).toExist(),
+      expect(within(role("main", { name: "Connections" }), role("button", { name: "Add connection" }))).toBeAbsent(),
+      expect(within(role("main", { name: "Connections" }), text(workspace.name))).toHaveClass("max-tablet:block")
+    )
+    scene(
+      { update, view: sceneView },
+      given(agentsAt("Phone")),
+      expect(within(role("main", { name: "Agents" }), role("button", { name: "Add" }))).toExist(),
+      expect(within(role("main", { name: "Agents" }), role("button", { name: "Add agent" }))).toBeAbsent(),
+      expect(within(role("main", { name: "Agents" }), text(workspace.name))).toHaveClass("max-tablet:block")
+    )
+
+    for (const viewport of ["Tablet", "Desktop", "Split"] as const) {
+      scene(
+        { update, view: sceneView },
+        given(connectionsAt(viewport)),
+        expect(within(role("main", { name: "Connections" }), role("button", { name: "Add connection" }))).toExist(),
+        expect(within(role("main", { name: "Connections" }), role("button", { name: "Add" }))).toBeAbsent()
+      )
+      scene(
+        { update, view: sceneView },
+        given(agentsAt(viewport)),
+        expect(within(role("main", { name: "Agents" }), role("button", { name: "Add agent" }))).toExist(),
+        expect(within(role("main", { name: "Agents" }), role("button", { name: "Add" }))).toBeAbsent()
+      )
+    }
+  })
+
   it("shows the agents on request, with what they run on and what the person may do with them", () => {
     scene(
       { update, view: sceneView },

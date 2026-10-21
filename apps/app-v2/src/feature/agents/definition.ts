@@ -186,7 +186,7 @@ export const Message = defineMessageUnion({
   ReceivedIntegrations: { integrations: Schema.Array(Connection.IntegrationView) },
   FailedLoadIntegrations: { error: Schema.String },
   FailedRead: { error: Schema.String },
-  ClickedTryAgain: {},
+  ClickedRetry: {},
   ClickedReloadIntegrations: {},
   ClickedBrowse: {},
   ChoseBrowseTab: { tab: BrowseTab },

@@ -91,7 +91,8 @@ shows `loadingLine`, "Loading your inbox…", "Loading settings…", "Loading th
 "Loading connection…"; a destination's first read that failed says why in the place of the list, "Couldn't load
 agents", "Couldn't load connections", "Can't load your inbox", with a Try again, as the settings have, that forgets why
 and reads again (`ClickedTryAgain`, which raises the Block's `reads`, the dependency that restarts its subscription, and
-shows the loading rows or line until the read answers).
+shows the loading rows or line until the read answers). The agents' and the connections' button is Retry (`ClickedRetry`),
+as `apps/ui`'s lists name it, and does the same.
 A turn's state is the design's
 `turnStatus`, which carries the logo moving while the turn waits (`thread`), runs (`working`), or stops (`tug`), and a
 check, a warning, or a dash once it ended. The open workspace is on the design's shell: `page/workspace` renders `shell`, `rail`, `sidebar`,
@@ -971,7 +972,8 @@ below it counted at each level above.
   row for each: the connections drawing on a mark with the status's patch, the name over the integration and
   what it gives ("Anthropic · Models", or "Integration not installed"), and how it authenticates ("API key", or
   "No authentication"). With none it says "No connections yet", and what a person who may add one can do, with
-  the primary Add connection in its body as the header has it; a tab with none says "No sandboxes connections
+  the primary Add connection in its body as the header has it; the header's is called Add on a phone, by the view input
+  `viewport`, as `apps/ui`'s is, and the body's keeps its name; a tab with none says "No sandboxes connections
   yet." and a search that matches none says what it searched for, with Clear search. `connectionView` is a
   connection's page, in one column, for the view inputs `connectionId` and `workspaceName`: a note when its
   integration refuses its setup ("MCP server refuses this setup", with why) or is not installed, which nothing can
@@ -1027,7 +1029,8 @@ below it counted at each level above.
   "Atlas, Working in #design", and the logo at the row's end, moving as its turn does (`motionOfState`); one that is
   ready and idle shows nothing, and so does one still on its way, which says "Sending…" at its end. The
   Block's list page, `view`, is a pane titled Agents with All and Needs setup tabs, each with how
-  many agents it holds, an "Add agent" button that opens the dialog, a toolbar with a search that narrows the tab by name, in any case
+  many agents it holds, an "Add agent" button that opens the dialog, called Add on a phone by the view input `viewport`,
+  with the workspace's name under the title there (`workspaceName`, the list's other view input), a toolbar with a search that narrows the tab by name, in any case
   and whatever the accents, and a row for each agent in the design's columns Agent, Harness,
   Model, and Activity: the lilac 32px mark and name, the harness (a connection's name, or "Auto")
   over its sandbox (a connection's name, or "No sandbox"), the model's id over its connection's
@@ -2038,7 +2041,8 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   name and settings, key, adding, and removal confirmed the same way, the dialog of the connections opened from
   the sidebar and from the list, a connection added, shown by its page after it is checked, and the
   connections listing the integrations
-  again after the host could not be reached. Home's scenes show the sidebar counting what waits beside "Inbox" and "Triage", each count read aloud with what it counts, its groups in their sections, Browse groups opening
+  again after the host could not be reached, and the lists of the connections and the agents fitted to the window: the
+  workspace's name under the title and Add in the header on a phone, and Add connection or Add agent on a wider window. Home's scenes show the sidebar counting what waits beside "Inbox" and "Triage", each count read aloud with what it counts, its groups in their sections, Browse groups opening
   the groups to browse on Discover and the Groups title on Your groups, marked while they show, then the inbox, the tasks in triage, and every open task in a main pane named for it,
   the inbox saying nothing waits or that it is being read, the group's threads as messages in the main pane with the composer to start
   one, the thread picked opened in the side pane beside the main pane with no dialog, with its messages and the composer to reply, marked in

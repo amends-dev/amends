@@ -78,10 +78,13 @@ const sandbox = keylessConnection("sandbox-1", "test-sandbox", "Sandbox")
 
 const agentId = scoutAgent.id
 
+const listView = withViewInputs(view, { workspaceName: workspace.name, viewport: "Desktop" })()
+const phoneListView = withViewInputs(view, { workspaceName: workspace.name, viewport: "Phone" })()
 const dialog = withViewInputs(dialogView, { workspaceName: workspace.name })()
 
 /** The list and the dialog for adding an agent or confirming its removal, which the shell keeps beside them. */
-const withDialog: typeof dialog = (model, h) => h.div([], [view(model, h), dialog(model, h)])
+const withDialog: typeof dialog = (model, h) => h.div([], [listView(model, h), dialog(model, h)])
+const phoneWithDialog: typeof dialog = (model, h) => h.div([], [phoneListView(model, h), dialog(model, h)])
 
 const addDialog = role("dialog", { name: "Add agent" })
 
@@ -428,7 +431,7 @@ describe("the agents", () => {
 
   it("report the agent picked from the list, and ask for the models of its connection once", () => {
     scene(
-      { update, view },
+      { update, view: listView },
       given(opened),
       click(role("button", { name: "Scout" })),
       expectOutMessage(OutMessage.OpenedAgent({ agentId })),
@@ -442,7 +445,7 @@ describe("the agents", () => {
 
   it("show an ordinary member each agent with what it runs on, and no way to add one", () => {
     scene(
-      { update, view, subscriptions: AgentsBlock.subscriptions },
+      { update, view: listView, subscriptions: AgentsBlock.subscriptions },
       given(modifyFields(opened, { grants: () => memberGrants })),
       inside(
         role("list", { name: "Agents" }),
@@ -475,7 +478,7 @@ describe("the agents", () => {
 
   it("say an agent is on its way while its change is, with no status until the server says how ready it is", () => {
     scene(
-      { update, view },
+      { update, view: listView },
       given(modifyFields(opened, { agents: () => [{ agent: incompleteAgent, pending: true }] })),
       inside(
         role("list", { name: "Agents" }),
@@ -528,7 +531,7 @@ describe("the agents", () => {
       }
     })
     scene(
-      { update, view },
+      { update, view: listView },
       given(
         modifyFields(opened, {
           agents: () => [onConnections, incomplete].map((agent) => ({ agent, pending: false })),
@@ -570,7 +573,7 @@ describe("the agents", () => {
     ]
     for (const [issue, sentence] of reasons) {
       scene(
-        { update, view },
+        { update, view: listView },
         given(modifyFields(opened, { agents: () => [{ agent: stranded(issue), pending: false }] })),
         expect(within(role("button", { name: "Scout, Needs setup" }), text("Needs setup"))).toHaveClass(
           "text-caution-text"
@@ -582,7 +585,7 @@ describe("the agents", () => {
 
   it("name the agent an unnamed membership is, and list none whose membership left", () => {
     scene(
-      { update, view },
+      { update, view: listView },
       given(modifyFields(opened, { members: () => [alice, { ...scout, status: "removed" }] })),
       expect(role("heading", { name: "No agents yet", level: 2 })).toExist(),
       expect(text("Scout")).toBeAbsent()
@@ -591,7 +594,7 @@ describe("the agents", () => {
 
   it("say why the integrations could not be listed, and ask the page to list them again, offering to add only once they are", () => {
     scene(
-      { update, view },
+      { update, view: listView },
       given(
         modifyFields(opened, {
           integrations: () => Integrations.Failed({ error: "The host could not be reached. Try again." })
@@ -622,7 +625,7 @@ describe("the agents", () => {
 
   it("say why they could not be read", () => {
     scene(
-      { update, view, subscriptions: AgentsBlock.subscriptions },
+      { update, view: listView, subscriptions: AgentsBlock.subscriptions },
       given(opened),
       Subscription.emit(
         subscriptions.agents,
@@ -635,7 +638,7 @@ describe("the agents", () => {
 
   it("say why they could not be read in place of the list, with the header kept, when none was read", () => {
     scene(
-      { update, view, subscriptions: AgentsBlock.subscriptions },
+      { update, view: listView, subscriptions: AgentsBlock.subscriptions },
       given(init(workspace.id, alice.id).model),
       Subscription.emit(
         subscriptions.agents,
@@ -648,7 +651,8 @@ describe("the agents", () => {
       expect(role("alert")).toBeAbsent(),
       expect(role("status")).toBeAbsent(),
       expect(role("heading", { name: "No agents yet" })).toBeAbsent(),
-      click(role("button", { name: "Try again" })),
+      expect(role("button", { name: "Try again" })).toBeAbsent(),
+      click(role("button", { name: "Retry" })),
       expect(art("came-apart")).toBeAbsent(),
       expect(role("status")).toHaveText("Loading agents…")
     )
@@ -656,7 +660,7 @@ describe("the agents", () => {
 
   it("show rows that stand in for the list, and say so, not even that there are none, until the agents are read", () => {
     scene(
-      { update, view, subscriptions: AgentsBlock.subscriptions },
+      { update, view: listView, subscriptions: AgentsBlock.subscriptions },
       given(init(workspace.id, alice.id).model),
       expect(role("heading", { name: "Agents", level: 1 })).toExist(),
       expect(role("status")).toHaveText("Loading agents…"),
@@ -719,7 +723,7 @@ const withSeveral: Model = (() => {
 describe("the agents list", () => {
   it("has the tabs All and Needs setup, each with how many agents it holds, All the one shown", () => {
     scene(
-      { update, view },
+      { update, view: listView },
       given(withSeveral),
       expect(role("tab", { name: "All" })).toHaveAttr("aria-selected", "true"),
       expect(role("tab", { name: "All" })).toHaveAttr("aria-description", "3"),
@@ -738,7 +742,7 @@ describe("the agents list", () => {
 
   it("labels the columns Agent, Harness, Model, and Activity over its rows, which leave the activity blank", () => {
     scene(
-      { update, view },
+      { update, view: listView },
       given(withSeveral),
       expect(text("Agent")).toExist(),
       expect(text("Harness")).toExist(),
@@ -754,7 +758,7 @@ describe("the agents list", () => {
 
   it("puts the patch of a lilac mark on an agent that needs setup, and none on one that is ready", () => {
     scene(
-      { update, view },
+      { update, view: listView },
       given(withSeveral),
       expect(within(role("button", { name: "Review helper, Needs setup" }), text("Needs setup"))).toHaveClass(
         "text-caution-text"
@@ -772,7 +776,7 @@ describe("the agents list", () => {
 
   it("narrows its rows by name as the person searches, in any case and whatever the accents", () => {
     scene(
-      { update, view },
+      { update, view: listView },
       given(withSeveral),
       type(label("Search agents"), "REVIEW"),
       expect(role("button", { name: "Review helper, Needs setup" })).toExist(),
@@ -786,7 +790,7 @@ describe("the agents list", () => {
 
   it("says nothing matches the search, with the search quoted, and clears it from a quiet button", () => {
     scene(
-      { update, view },
+      { update, view: listView },
       given(withSeveral),
       type(label("Search agents"), "zzz"),
       expect(role("heading", { name: "No agents match “zzz”.", level: 2 })).toExist(),
@@ -800,7 +804,7 @@ describe("the agents list", () => {
 
   it("says every agent can run while the Needs setup tab has none", () => {
     scene(
-      { update, view },
+      { update, view: listView },
       given(modifyFields(opened, { browse: () => ({ tab: "NeedsSetup", query: "" }) })),
       expect(role("heading", { name: "Every agent can run as it is set up.", level: 2 })).toExist(),
       expect(art("rest")).toExist(),
@@ -812,7 +816,7 @@ describe("the agents list", () => {
 
   it("offers adding the first agent to a person who may, and says who can to one who may not", () => {
     scene(
-      { update, view },
+      { update, view: listView },
       given(modifyFields(opened, { agents: () => [] })),
       expect(role("heading", { name: "No agents yet", level: 2 })).toExist(),
       expect(art("sew-in")).toExist(),
@@ -820,7 +824,7 @@ describe("the agents list", () => {
       expectAll(all.role("button", { name: "Add agent" })).toHaveCount(2)
     )
     scene(
-      { update, view },
+      { update, view: listView },
       given(modifyFields(opened, { agents: () => [], grants: () => memberGrants })),
       expect(role("heading", { name: "No agents yet", level: 2 })).toExist(),
       expect(text("An administrator can add agents to your workspace.")).toExist(),
@@ -828,9 +832,60 @@ describe("the agents list", () => {
     )
   })
 
+  it("names the workspace under the title, which a phone shows", () => {
+    scene(
+      { update, view: listView },
+      given(opened),
+      expect(within(role("main", { name: "Agents" }), text(workspace.name))).toHaveClass("max-tablet:block")
+    )
+  })
+
+  it("calls the button that adds an agent Add on a phone, which opens the same dialog, and Add agent on a wider window", () => {
+    scene(
+      { update, view: withDialog },
+      given(opened),
+      expect(within(role("main", { name: "Agents" }), role("button", { name: "Add" }))).toBeAbsent(),
+      expect(within(role("main", { name: "Agents" }), role("button", { name: "Add agent" }))).toExist()
+    )
+    scene(
+      { update, view: phoneWithDialog },
+      given(opened),
+      expect(within(role("main", { name: "Agents" }), role("button", { name: "Add" }))).toExist(),
+      expect(role("button", { name: "Add agent" })).toBeAbsent(),
+      click(role("button", { name: "Add" })),
+      ...dialogOpened(),
+      expect(addDialog).toExist()
+    )
+
+    for (const viewport of ["Tablet", "Desktop", "Split"] as const) {
+      scene(
+        { update, view: withViewInputs(view, { workspaceName: workspace.name, viewport })() },
+        given(opened),
+        expect(role("button", { name: "Add agent" })).toExist(),
+        expect(role("button", { name: "Add" })).toBeAbsent()
+      )
+    }
+  })
+
+  it("keeps the empty list's button as Add agent on a phone, beside the Add of the header, and offers neither to one who may not", () => {
+    scene(
+      { update, view: phoneListView },
+      given(modifyFields(opened, { agents: () => [] })),
+      expect(within(role("main", { name: "Agents" }), role("button", { name: "Add" }))).toExist(),
+      expectAll(all.role("button", { name: "Add agent" })).toHaveCount(1)
+    )
+    scene(
+      { update, view: phoneListView },
+      given(modifyFields(opened, { agents: () => [], grants: () => memberGrants })),
+      expect(role("heading", { name: "Agents", level: 1 })).toExist(),
+      expect(role("button", { name: "Add" })).toBeAbsent(),
+      expect(role("button", { name: "Add agent" })).toBeAbsent()
+    )
+  })
+
   it("is the list alone, with no search or columns, while the workspace has no agent", () => {
     scene(
-      { update, view },
+      { update, view: listView },
       given(modifyFields(opened, { agents: () => [] })),
       expect(label("Search agents")).toBeAbsent(),
       expect(text("Harness")).toBeAbsent()
@@ -1195,7 +1250,7 @@ describe("an agent's page", () => {
       expect(art("came-apart")).toExist(),
       expect(role("status")).toBeAbsent(),
       expect(role("heading", { name: "This agent isn't here" })).toBeAbsent(),
-      click(role("button", { name: "Try again" })),
+      click(role("button", { name: "Retry" })),
       expect(art("came-apart")).toBeAbsent(),
       expect(role("status")).toHaveText("Loading agent…")
     )
@@ -1369,7 +1424,7 @@ describe("what the agents are doing, in the list", () => {
 
   it("says in the Activity column the state of an agent at work, with the logo moving as it does, over where", () => {
     scene(
-      { update, view },
+      { update, view: listView },
       given(atWork),
       expect(within(scoutRow, text("Working"))).toExist(),
       expect(within(scoutRow, text("#General + 1 more"))).toExist(),
@@ -1385,7 +1440,7 @@ describe("what the agents are doing, in the list", () => {
 
   it("puts the state before the place on one line below 48rem, where the cells fold under the name", () => {
     scene(
-      { update, view },
+      { update, view: listView },
       given(atWork),
       expect(within(scoutRow, text("· #General + 1 more"))).toExist(),
       expect(within(noraRow, text("· #General"))).toExist()
@@ -1394,7 +1449,7 @@ describe("what the agents are doing, in the list", () => {
 
   it("leaves the Activity blank for an agent that is idle, or whose turns have all finished", () => {
     scene(
-      { update, view },
+      { update, view: listView },
       given(
         modifyFields(withSeveral, {
           groups: () => [general],
@@ -1413,7 +1468,7 @@ describe("what the agents are doing, in the list", () => {
 
   it("names the agent by what it is doing in its mark's tooltip, as it names one that needs setup", () => {
     scene(
-      { update, view },
+      { update, view: listView },
       given(atWork),
       expect(within(scoutRow, text("Working in #General + 1 more"))).toExist(),
       expect(within(scoutRow, text("Working in #General + 1 more"))).not.toHaveClass("text-caution-text"),
@@ -1424,7 +1479,7 @@ describe("what the agents are doing, in the list", () => {
 
   it("describes the row by the activity beside what it runs on", () => {
     scene(
-      { update, view },
+      { update, view: listView },
       given(atWork),
       expect(scoutRow).toHaveAttr(
         "aria-description",
@@ -1435,7 +1490,7 @@ describe("what the agents are doing, in the list", () => {
 
   it("follows the turns the store holds, as they start and finish", () => {
     scene(
-      { update, view, subscriptions: AgentsBlock.subscriptions },
+      { update, view: listView, subscriptions: AgentsBlock.subscriptions },
       given(withSeveral),
       expect(role("button", { name: "Nora" })).toExist(),
       Subscription.emit(
@@ -1464,7 +1519,7 @@ describe("what the agents are doing, in the list", () => {
 
   it("says the state alone while the store has not the group of the turn", () => {
     scene(
-      { update, view },
+      { update, view: listView },
       given(modifyFields(atWork, { groups: () => [] })),
       expect(role("button", { name: "Scout, Working" })).toExist(),
       expect(within(role("button", { name: "Scout, Working" }), text("Working"))).toExist()

@@ -9,7 +9,8 @@ import type { Appearance } from "../../appearance.ts"
 import {
   agentView,
   dialogView as agentsDialogView,
-  sidebarView as agentsSidebarView
+  sidebarView as agentsSidebarView,
+  view as agentsView
 } from "../../feature/agents/view.ts"
 import {
   connectionView,
@@ -202,7 +203,7 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
           slotId: "connections",
           model: model.connections,
           view: connectionsView,
-          viewInputs: { workspaceName: nameOf(model) }
+          viewInputs: { workspaceName: nameOf(model), viewport: model.viewport }
         })
       ),
     Connection: ({ connectionId }) =>
@@ -214,7 +215,15 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
           viewInputs: { connectionId, workspaceName: nameOf(model) }
         })
       ),
-    Agents: () => h.block(AgentsBinding.embedView({ slotId: "agents", model: model.agents })),
+    Agents: () =>
+      h.block(
+        AgentsBinding.embedView({
+          slotId: "agents",
+          model: model.agents,
+          view: agentsView,
+          viewInputs: { workspaceName: nameOf(model), viewport: model.viewport }
+        })
+      ),
     Agent: ({ agentId }) =>
       h.block(
         AgentsBinding.embedView({
