@@ -63,11 +63,18 @@ import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { MarkNotificationSeen } from "../../feature/inbox/command.ts"
 import { ThreadBinding as InboxThreadBinding } from "../../feature/inbox/composition.ts"
+import { ProfileCardBlock } from "../../feature/profileCard/block.ts"
+import { Card, type MemberProfile } from "../../feature/profileCard/definition.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
 import { Item as SearchItem } from "../../feature/search/definition.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { AccountBinding } from "../../feature/settings/composition.ts"
-import { AccountEntry, AccountMenu, Written as SettingsWritten } from "../../feature/settings/definition.ts"
+import {
+  AccountEntry,
+  AccountMenu,
+  Entering as SettingsEntering,
+  Written as SettingsWritten
+} from "../../feature/settings/definition.ts"
 import { TasksBlock } from "../../feature/tasks/block.ts"
 import { TurnsBinding } from "../../feature/thread/composition.ts"
 import { init as initThread } from "../../feature/thread/init.ts"
@@ -75,7 +82,7 @@ import { ThreadsBlock } from "../../feature/threads/block.ts"
 import { ComposerBinding as ThreadsComposerBinding } from "../../feature/threads/composition.ts"
 import { TurnsBlock } from "../../feature/turns/block.ts"
 import * as Drafts from "../../store/Drafts.ts"
-import { LoadIntegrations } from "./command.ts"
+import { LoadIntegrations, RequestNameChange } from "./command.ts"
 import {
   AgentsBinding,
   AsideBinding,
@@ -88,7 +95,7 @@ import {
 } from "./composition.ts"
 import { type AppAccountEntry, Message, Open, OutMessage, openMemberId } from "./definition.ts"
 import { HomeBlock } from "./home/block.ts"
-import { GroupBinding, GroupsBinding, InboxBinding, TasksBinding } from "./home/composition.ts"
+import { GroupBinding, GroupsBinding, InboxBinding, ProfileCardBinding, TasksBinding } from "./home/composition.ts"
 import { isThreadOpen, Open as HomeOpen } from "./home/definition.ts"
 import { view as homeView } from "./home/view.ts"
 import { init } from "./init.ts"
@@ -266,8 +273,14 @@ const fromInbox = (message: typeof InboxBlock.Message.Type) =>
     InboxBinding.embedView({
       slotId: "inbox",
       model: opened.home.inbox,
-      viewInputs: { now, workspaceName: "Studio" }
+      viewInputs: { now, workspaceName: "Studio", openTriggerId: undefined }
     }).toParentMessage(message)
+  )
+
+/** What the member's card reports, as Home and then the workspace receive it. */
+const fromProfileCard = (message: typeof ProfileCardBlock.Message.Type) =>
+  fromHome(
+    ProfileCardBinding.embedView({ slotId: "profile-card", model: opened.home.profileCard }).toParentMessage(message)
   )
 
 /** What the tasks report, as Home and then the workspace receive it. */
@@ -336,7 +349,7 @@ const fromGroup = (message: typeof GroupBlock.Message.Type) =>
       key: groupId,
       slotId: "group",
       model: openGroupModel,
-      viewInputs: { now, workspaceName: "Studio", viewport: "Desktop" }
+      viewInputs: { now, workspaceName: "Studio", viewport: "Desktop", openTriggerId: undefined }
     }).toParentMessage(message)
   )
 
@@ -352,6 +365,7 @@ const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
         isTeam: true,
         memberNames: [],
         openThreadId: Option.none(),
+        openTriggerId: undefined,
         present: [],
         now
       }
@@ -376,7 +390,7 @@ const fromTurnsOfGroupThread = (message: typeof TurnsBlock.Message.Type) =>
       key: thread.id,
       slotId: "thread",
       model: openThreadModel,
-      viewInputs: { now, highlightedMessageId: Option.none() }
+      viewInputs: { now, openTriggerId: undefined, highlightedMessageId: Option.none() }
     }).toParentMessage(fromTurnsOfThread(message))
   )
 
@@ -387,7 +401,7 @@ const fromTurnsOfInboxThread = (message: typeof TurnsBlock.Message.Type) =>
       key: thread.id,
       slotId: "thread",
       model: openThreadModel,
-      viewInputs: { now, highlightedMessageId: Option.none() }
+      viewInputs: { now, openTriggerId: undefined, highlightedMessageId: Option.none() }
     }).toParentMessage(fromTurnsOfThread(message))
   )
 
@@ -1833,6 +1847,85 @@ describe("the workspace with a group open running the slash commands of its comp
         expect(model.actions.confirmations).toEqual([{ id: 2, text: "Unfollowed #General", offer: Option.none() }])
       }),
       Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 2 }))
+    )
+  })
+})
+
+describe("a workspace, with the card of a member", () => {
+  const triggerId = "inbox-notification-1-name"
+
+  const person: MemberProfile = {
+    memberId: bob.id,
+    name: "Bob",
+    kind: "Person",
+    isYou: false,
+    isFormer: false,
+    agentId: Option.none(),
+    standing: Option.none(),
+    motion: Option.none()
+  }
+
+  /** The card of `profile` open, from the name in the inbox's notification, and read. */
+  const showing = (profile: MemberProfile) =>
+    [
+      message(fromInbox(InboxBlock.Message.OpenedProfile({ memberId: profile.memberId, triggerId }))),
+      message(fromProfileCard(ProfileCardBlock.Message.ReceivedProfile({ profile: Option.some(profile) })))
+    ] as const
+
+  it("opens the conversation with the person on Message, as the search does", () => {
+    story(
+      update,
+      given(
+        modifyFields(opened, {
+          home: (home) => modifyFields(home, { groups: (groups) => modifyFields(groups, { members: () => [bob] }) })
+        })
+      ),
+      ...showing(person),
+      message(fromProfileCard(ProfileCardBlock.Message.ClickedMessage())),
+      Command.resolve(
+        ReadDraft({ workspaceId, memberId, place: Drafts.Place.cases.Conversation.make({ memberIds: [bob.id] }) }),
+        ComposerBlock.Message.ReceivedDraft({ text: "" })
+      ),
+      model((model) => {
+        expect(HomeOpen.isAnyOf(["Unsent"])(model.home.open)).toBe(true)
+        expect(model.home.profileCard.card).toEqual(Card.Closed())
+      })
+    )
+  })
+
+  it("opens the agent's page on Open agent, as picking the agent does", () => {
+    story(
+      update,
+      given(opened),
+      ...showing({
+        ...person,
+        memberId: scout.id,
+        name: "Scout",
+        kind: "Agent",
+        agentId: Option.some(agentId)
+      }),
+      message(fromProfileCard(ProfileCardBlock.Message.ClickedOpenAgent())),
+      model((model) => {
+        expect(model.open).toEqual(Open.Agent({ agentId }))
+        expect(model.home.profileCard.card).toEqual(Card.Closed())
+      })
+    )
+  })
+
+  it("asks the settings for the dialog that changes the person's name on Change name, as the account menu does", () => {
+    story(
+      update,
+      given(settingsRead),
+      ...showing({ ...person, memberId: membership.member.id, name: "Alice", isYou: true }),
+      message(fromProfileCard(ProfileCardBlock.Message.ClickedChangeName())),
+      Command.expectExact(RequestNameChange({})),
+      Command.resolve(RequestNameChange, Message.CompletedRequestNameChange()),
+      dialogShown,
+      model((model) => {
+        expect(model.settings.dialog.isOpen).toBe(true)
+        expect(Option.exists(model.settings.entering, SettingsEntering.isAnyOf(["ChangingName"]))).toBe(true)
+        expect(model.home.profileCard.card).toEqual(Card.Closed())
+      })
     )
   })
 })

@@ -59,7 +59,7 @@ export const openDialog = (entering: Entering) =>
   ])
 
 /** Ask for the dialog that changes the person's own name, from the one they have, once the replica holds them. */
-const askToChangeName = SettingsDefinition.step((model: Model) =>
+export const askToChangeName = SettingsDefinition.step((model: Model) =>
   Option.isSome(findMember(model, model.memberId))
     ? openDialog(Entering.ChangingName({ name: ownName(model), isSending: false, failure: Option.none() }))
     : SettingsDefinition.stepNoop()

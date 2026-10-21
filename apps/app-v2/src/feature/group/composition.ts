@@ -81,19 +81,21 @@ const runSlashCommand = (command: SlashCommand) =>
     Match.exhaustive
   )
 
-/** Picking a thread opens it in the group, and a slash command picked runs. */
+/** Picking a thread opens it in the group, and a slash command picked runs; opening a member's card changes nothing. */
 const foldThreadsOutMessage = ThreadsBlock.OutMessage.match({
   SelectedThread: ({ threadId }) => openThread(threadId),
-  RanSlashCommand: ({ command }) => runSlashCommand(command)
+  RanSlashCommand: ({ command }) => runSlashCommand(command),
+  OpenedProfile: () => GroupDefinition.stepNoop()
 })
 
 /**
- * Picking a thread, which opens it, is reported to the group's parent as the thread opening. What the slash commands
- * report is said when they run.
+ * Picking a thread, which opens it, is reported to the group's parent as the thread opening, and the card opened as it
+ * is. What the slash commands report is said when they run.
  */
 const forwardThreadsOutMessage = ThreadsBlock.OutMessage.match({
   SelectedThread: () => OutMessage.OpenedThread(),
-  RanSlashCommand: () => undefined
+  RanSlashCommand: () => undefined,
+  OpenedProfile: ({ memberId, triggerId }) => OutMessage.OpenedProfile({ memberId, triggerId })
 })
 
 export const ThreadsBinding = GroupDefinition.bindChild(ThreadsBlock, {
@@ -150,22 +152,24 @@ export const closeThread = GroupDefinition.stepFields(() => ({ thread: () => Opt
 
 /**
  * The person closing the log of one of the open thread's turns leaves the thread too; asking for the settings of an
- * agent changes nothing in the group.
+ * agent, or opening a member's card, changes nothing in the group.
  */
 const foldThreadOutMessage = (_threadId: ThreadId.ThreadId, outMessage: typeof ThreadBlock.OutMessage.Type) =>
   ThreadBlock.OutMessage.match(outMessage, {
     ClosedTurnLog: () => closeThread,
-    OpenedAgent: () => GroupDefinition.stepNoop()
+    OpenedAgent: () => GroupDefinition.stepNoop(),
+    OpenedProfile: () => GroupDefinition.stepNoop()
   })
 
 /**
  * Closing the log of one of the open thread's turns is reported to the group's parent as the thread closing, and the
- * settings of an agent asked for as they are.
+ * settings of an agent asked for and the card opened as they are.
  */
 const forwardThreadOutMessage = (_threadId: ThreadId.ThreadId, outMessage: typeof ThreadBlock.OutMessage.Type) =>
   ThreadBlock.OutMessage.match(outMessage, {
     ClosedTurnLog: () => OutMessage.ClosedThread(),
-    OpenedAgent: ({ agentId }) => OutMessage.OpenedAgent({ agentId })
+    OpenedAgent: ({ agentId }) => OutMessage.OpenedAgent({ agentId }),
+    OpenedProfile: ({ memberId, triggerId }) => OutMessage.OpenedProfile({ memberId, triggerId })
   })
 
 /** The open thread, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong one. */

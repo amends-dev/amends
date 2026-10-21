@@ -22,7 +22,7 @@ import {
   within
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { art, bob, membership, now, opening, saying, scout, task, thread } from "../../../test/fixtures.ts"
+import { art, bob, dana, membership, now, opening, saying, scout, task, thread } from "../../../test/fixtures.ts"
 import { chooseFromMenu, chooseMenuItem, closeMenu, openMenu } from "../../../test/menu.ts"
 import { shortTimeOf, timeOf } from "../../seen.ts"
 import * as Drafts from "../../store/Drafts.ts"
@@ -48,6 +48,7 @@ const inputs = {
   memberNames: ["You", "Bob"],
   openThreadId: Option.none<ThreadId.ThreadId>(),
   present: [],
+  openTriggerId: undefined,
   now
 }
 
@@ -98,6 +99,9 @@ const place = Drafts.Place.cases.Thread.make({ groupId })
 
 /** The item of the list at `index`, a day's divider or a thread. */
 const item = (index: number) => nth(all.role("listitem"), index)
+
+/** The marks drawn with `letter`, each of which reads as the letter twice: itself, and the trigger around it that opens its author's card. */
+const expectMarks = (letter: string, count: number) => expectAll(all.text(letter)).toHaveCount(count * 2)
 
 /** Bob's thread, which was created a day before the time now. */
 const yesterdays = {
@@ -1042,7 +1046,7 @@ describe("a group's threads as a timeline", () => {
     scene(
       { update, view: sceneView },
       given(listing(first, second)),
-      expectAll(all.text("A")).toHaveCount(1),
+      expectMarks("A", 1),
       expect(within(item(2), text(shortTimeOf(second.thread.createdAt)))).toHaveAttr("aria-hidden", "true"),
       expect(within(item(2), text("And the numbers"))).toExist(),
       expect(within(item(2), text("Alice"))).toExist()
@@ -1055,18 +1059,18 @@ describe("a group's threads as a timeline", () => {
     scene(
       { update, view: sceneView },
       given(listing(first, openedAt("thread-b", 5, "A bit later"))),
-      expectAll(all.text("A")).toHaveCount(2)
+      expectMarks("A", 2)
     )
     scene(
       { update, view: sceneView },
       given(listing(first, openedAt("thread-b", 20, "Much later"))),
-      expectAll(all.text("A")).toHaveCount(2)
+      expectMarks("A", 2)
     )
     scene(
       { update, view: sceneView },
       given(listing(first, openedAt("thread-b", 1, "Me too", bobAuthor))),
       expect(within(item(2), text("B"))).toExist(),
-      expectAll(all.text("A")).toHaveCount(1)
+      expectMarks("A", 1)
     )
   })
 
@@ -1080,12 +1084,12 @@ describe("a group's threads as a timeline", () => {
     scene(
       { update, view: sceneView },
       given(listing(replied("thread-a", 0), openedAt("thread-b", 1, "And the numbers"))),
-      expectAll(all.text("A")).toHaveCount(2)
+      expectMarks("A", 2)
     )
     scene(
       { update, view: sceneView },
       given(listing(openedAt("thread-a", 0, "Looking at it"), replied("thread-b", 1))),
-      expectAll(all.text("A")).toHaveCount(2)
+      expectMarks("A", 2)
     )
   })
 
@@ -1096,7 +1100,7 @@ describe("a group's threads as a timeline", () => {
       { update, view: sceneView },
       given(listing(openedAt("thread-a", 0, "Looking at it"), beginning)),
       expect(within(item(2), text("?"))).toExist(),
-      expectAll(all.text("A")).toHaveCount(1)
+      expectMarks("A", 1)
     )
     scene(
       { update, view: sceneView },
@@ -1121,11 +1125,7 @@ describe("a group's threads as a timeline", () => {
       }
     }
 
-    scene(
-      { update, view: sceneView },
-      given(listing(longBefore, justBefore, evening)),
-      expectAll(all.text("A")).toHaveCount(2)
-    )
+    scene({ update, view: sceneView }, given(listing(longBefore, justBefore, evening)), expectMarks("A", 2))
   })
 
   it("marks the thread open as the current one, and the stacked row too", () => {
@@ -1281,6 +1281,85 @@ describe("a group's threads offering the composer slash commands", () => {
       type(label("Message #General"), "/"),
       Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
       expect(role("listbox")).toBeAbsent()
+    )
+  })
+})
+
+describe("a group's threads opening the card of an author", () => {
+  const alicesOpening = listing(openedAt("thread-a", 0, "Looking at it"))
+  const nameOfAlice = role("button", { name: "Alice" })
+
+  it("opens it from the author's name, which says it opens a dialog and is not expanded", () => {
+    scene(
+      { update, view: sceneView },
+      given(alicesOpening),
+      expect(nameOfAlice).toHaveAttr("id", "threads-thread-a-name"),
+      expect(nameOfAlice).toHaveAttr("aria-haspopup", "dialog"),
+      expect(nameOfAlice).toHaveAttr("aria-expanded", "false"),
+      click(nameOfAlice),
+      expectOutMessage(OutMessage.OpenedProfile({ memberId: member.id, triggerId: "threads-thread-a-name" }))
+    )
+  })
+
+  it("opens it from the author's mark, which is hidden from assistive technology, as the name is there to meet", () => {
+    scene(
+      { update, view: sceneView },
+      given(alicesOpening),
+      expect(selector("#threads-thread-a-mark")).toHaveAttr("aria-hidden", "true"),
+      click(selector("#threads-thread-a-mark")),
+      expectOutMessage(OutMessage.OpenedProfile({ memberId: member.id, triggerId: "threads-thread-a-mark" }))
+    )
+  })
+
+  it("opens an agent's card from its name as it does a person's", () => {
+    scene(
+      { update, view: withMembers([member, bob, scout]) },
+      given(listing(openedAt("thread-b", 0, "Checked", scoutAuthor))),
+      click(role("button", { name: "Scout" })),
+      expectOutMessage(OutMessage.OpenedProfile({ memberId: scout.id, triggerId: "threads-thread-b-name" }))
+    )
+  })
+
+  it("opens it from a mention in the opening, which the row shows as a chip", () => {
+    const mentioning = openedAt("thread-a", 0, `Over to ${ThreadMessage.mentionText(bob.id, "Bob")}`)
+
+    scene(
+      { update, view: withMembers([member, bob]) },
+      given(listing(mentioning)),
+      click(role("button", { name: "@Bob" })),
+      expectOutMessage(OutMessage.OpenedProfile({ memberId: bob.id, triggerId: "threads-thread-a-mention-0" }))
+    )
+  })
+
+  it("says the trigger whose card is open is expanded, and no other", () => {
+    const withOpenName = withViewInputs(view, { ...inputs, openTriggerId: "threads-thread-a-name" })()
+
+    scene(
+      { update, view: withOpenName },
+      given(listing(openedAt("thread-a", 0, "Looking at it"), openedAt("thread-b", 30, "Later", bobAuthor))),
+      expect(nameOfAlice).toHaveAttr("aria-expanded", "true"),
+      expect(role("button", { name: "Bob" })).toHaveAttr("aria-expanded", "false")
+    )
+  })
+
+  it("opens none from the author of a thread whose opening is not read, or who is a contact", () => {
+    const byDana = {
+      ...openedAt("thread-c", 0, "Hello from outside"),
+      opening: Option.some({
+        ...saying(opening, "Hello from outside"),
+        author: ThreadMessage.Author.cases.Contact.make({ contactId: dana.id })
+      })
+    }
+
+    scene(
+      { update, view: sceneView },
+      given(listing(starting, byDana)),
+      expectAll(all.selector('[aria-haspopup="dialog"]')).toHaveCount(0)
+    )
+    scene(
+      { update, view: sceneView },
+      given(alicesOpening),
+      expectAll(all.selector('[aria-haspopup="dialog"]')).toHaveCount(1)
     )
   })
 })

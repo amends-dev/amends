@@ -121,6 +121,7 @@ export const Message = defineMessageUnion({
   ClickedMenu: {},
   ClickedSearch: {},
   RequestedSearch: {},
+  CompletedRequestNameChange: {},
   InformedOfViewport: { viewport: Viewport },
   ReceivedIntegrations: { integrations: Schema.Array(Connection.IntegrationView) },
   FailedLoadIntegrations: { error: Schema.String }

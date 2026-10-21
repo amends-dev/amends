@@ -1,14 +1,13 @@
 /**
  * The card a member's mark, name, or mention opens, as `apps/ui` draws it: who they are, what they are, and what the
- * person can do about them, on a popover placed against what opened it. One card is open at a time in a pane: opening
- * another replaces it. The Block reads the member it shows from the person's store and reports what the person chose on
- * the card: to message a person, to open an agent, or to change their own name.
+ * person can do about them, on a popover placed against what opened it. One card is open at a time in the workspace:
+ * opening another replaces it. The Block reads the member it shows from the person's store and reports what the person
+ * chose on the card: to message a person, to open an agent, or to change their own name.
  */
 
 import { Identity } from "@amends-dev/core/identity"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { logoMotions } from "@amends-dev/design/logo"
-import type { ProfileOpener } from "@amends-dev/design/profile"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
@@ -85,7 +84,10 @@ export type OutMessage = typeof OutMessage.Type
 
 export const ProfileCardDefinition = Block.makeDefinition("ProfileCard", { Model, Message, OutMessage })
 
-/** The trigger whose card is open or being read, none while it is closed. */
+/**
+ * The trigger whose card is open or being read, none while it is closed: what the panes' triggers say is expanded, and
+ * what the card returns the focus to.
+ */
 export const openTriggerIdOf = (model: Model): string | undefined =>
   Card.matchOrElse(
     model.card,
@@ -95,14 +97,3 @@ export const openTriggerIdOf = (model: Model): string | undefined =>
     },
     () => undefined
   )
-
-/**
- * How a pane's triggers open the card in its `model`: each has an ID that begins with `scope`, which tells it from the
- * triggers of every other pane, says it is expanded while it opened the card that is open, and sends what `open` makes
- * of the member it is for and its ID.
- */
-export const profileOpener = <Message>(
-  scope: string,
-  model: Model,
-  open: (memberId: string, triggerId: string) => Message
-): ProfileOpener<Message> => ({ scope, openTriggerId: openTriggerIdOf(model), open })

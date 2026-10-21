@@ -11,6 +11,7 @@ import * as Update from "foldkit/update"
 import { GroupBlock } from "../../../feature/group/block.ts"
 import { GroupsBlock } from "../../../feature/groups/block.ts"
 import { InboxBlock } from "../../../feature/inbox/block.ts"
+import { ProfileCardBlock } from "../../../feature/profileCard/block.ts"
 import { TasksBlock } from "../../../feature/tasks/block.ts"
 import { UnsentConversationBlock } from "../../../feature/unsentConversation/block.ts"
 import { HomeDefinition, type Model, Open, OutMessage } from "./definition.ts"
@@ -132,19 +133,21 @@ const forwardGroupsOutMessage = GroupsBlock.OutMessage.match({
 
 /**
  * A notification's thread opening beside the inbox opens the side pane's dialog where the pane is one, and closing it
- * closes the dialog. The settings of an agent that its thread's turn asked for are the page's to open, which Home
- * reports as they are.
+ * closes the dialog, and an author or thread opening a member's card opens it. The settings of an agent that its
+ * thread's turn asked for are the page's to open, which Home reports as they are.
  */
 const foldInboxOutMessage = InboxBlock.OutMessage.match({
   OpenedThread: () => showAside,
   ClosedThread: () => hideAside,
-  OpenedAgent: () => HomeDefinition.stepNoop()
+  OpenedAgent: () => HomeDefinition.stepNoop(),
+  OpenedProfile: ({ memberId, triggerId }) => ProfileCardBinding.requestOpen({ memberId, triggerId })
 })
 
 const forwardInboxOutMessage = InboxBlock.OutMessage.match({
   OpenedThread: () => undefined,
   ClosedThread: () => undefined,
-  OpenedAgent: ({ agentId }) => OutMessage.OpenedAgent({ agentId })
+  OpenedAgent: ({ agentId }) => OutMessage.OpenedAgent({ agentId }),
+  OpenedProfile: () => undefined
 })
 
 /** Opening a task's thread opens it in its group. */
@@ -210,6 +213,22 @@ export const GroupsBinding = HomeDefinition.bindChild(GroupsBlock, {
   outMessage: { forward: forwardGroupsOutMessage, fold: foldGroupsOutMessage }
 })
 
+/**
+ * What the person chose on a member's card is the page's to do, which Home reports as it is: Message opens the
+ * conversation with them, Open agent opens their agent's page, and Change name asks for the dialog of the account menu.
+ */
+const forwardProfileCardOutMessage = ProfileCardBlock.OutMessage.match({
+  OpenedPerson: ({ memberId }) => OutMessage.OpenedPerson({ memberId }),
+  OpenedAgent: ({ agentId }) => OutMessage.OpenedAgent({ agentId }),
+  RequestedNameChange: () => OutMessage.RequestedNameChange()
+})
+
+export const ProfileCardBinding = HomeDefinition.bindChild(ProfileCardBlock, {
+  field: "profileCard",
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
+  outMessage: { forward: forwardProfileCardOutMessage }
+})
+
 export const InboxBinding = HomeDefinition.bindChild(InboxBlock, {
   field: "inbox",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
@@ -223,15 +242,16 @@ export const TasksBinding = HomeDefinition.bindChild(TasksBlock, {
 })
 
 /**
- * The open group's thread opening opens the side pane's dialog where the pane is one, and closing it closes it.
- * Following the group and stopping, the settings of an agent its thread's turn asked for, and the search a phone's
- * header asks for, change nothing in Home.
+ * The open group's thread opening opens the side pane's dialog where the pane is one, and closing it closes it, and an
+ * author or mention opening a member's card opens it. Following the group and stopping, the settings of an agent its
+ * thread's turn asked for, and the search a phone's header asks for, change nothing in Home.
  */
 const foldGroupOutMessage = (_groupId: GroupId.GroupId, outMessage: typeof GroupBlock.OutMessage.Type) =>
   GroupBlock.OutMessage.match(outMessage, {
     OpenedThread: () => showAside,
     ClosedThread: () => hideAside,
     OpenedAgent: () => HomeDefinition.stepNoop(),
+    OpenedProfile: ({ memberId, triggerId }) => ProfileCardBinding.requestOpen({ memberId, triggerId }),
     FollowedGroup: () => HomeDefinition.stepNoop(),
     UnfollowedGroup: () => HomeDefinition.stepNoop(),
     RequestedSearch: () => HomeDefinition.stepNoop()
@@ -247,6 +267,7 @@ const forwardGroupOutMessage = (_groupId: GroupId.GroupId, outMessage: typeof Gr
     OpenedThread: () => undefined,
     ClosedThread: () => undefined,
     OpenedAgent: ({ agentId }) => OutMessage.OpenedAgent({ agentId }),
+    OpenedProfile: () => undefined,
     FollowedGroup: ({ place }) => OutMessage.FollowedGroup({ place }),
     UnfollowedGroup: ({ place }) => OutMessage.UnfollowedGroup({ place }),
     RequestedSearch: () => OutMessage.RequestedSearch()
@@ -289,6 +310,6 @@ export const UnsentBinding = HomeDefinition.bindChild(UnsentConversationBlock, {
 })
 
 export const HomeComposition = HomeDefinition.makeComposition({
-  bindings: [AsideBinding, GroupsBinding, InboxBinding, TasksBinding, GroupBinding, UnsentBinding]
+  bindings: [AsideBinding, GroupsBinding, ProfileCardBinding, InboxBinding, TasksBinding, GroupBinding, UnsentBinding]
 })
 export type HomeViewBuilder = Block.ViewBuilderFor<typeof HomeComposition>

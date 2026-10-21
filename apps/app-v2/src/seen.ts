@@ -314,6 +314,10 @@ export const isAuthorAgent = (author: ThreadMessage.Author, members: ReadonlyArr
     Contact: () => false
   })
 
+/** The member `author` is, whose card their name and mark open: none for a channel's contact, who has no card. */
+export const authorMemberId = (author: ThreadMessage.Author): MemberId.MemberId | undefined =>
+  ThreadMessage.Author.match(author, { Member: ({ memberId }) => memberId, Contact: () => undefined })
+
 /**
  * `author`'s mark: a member's own, on the agent's tone for an agent, or the letters of the name a channel's contact
  * gave, or of the name a member without a record here is called.

@@ -16,6 +16,7 @@ import {
   opening,
   reply,
   scout,
+  scoutAgent,
   task,
   thread
 } from "../../../../test/fixtures.ts"
@@ -23,21 +24,34 @@ import { ComposerBlock } from "../../../feature/composer/block.ts"
 import { ReadDraft, SaveDraft } from "../../../feature/composer/command.ts"
 import { GroupBlock } from "../../../feature/group/block.ts"
 import { FollowGroup, UnfollowGroup } from "../../../feature/group/command.ts"
-import { ThreadsBinding } from "../../../feature/group/composition.ts"
+import { ThreadBinding as GroupThreadBinding, ThreadsBinding } from "../../../feature/group/composition.ts"
 import { init as initGroup } from "../../../feature/group/init.ts"
 import { GroupsBlock } from "../../../feature/groups/block.ts"
 import { Starting } from "../../../feature/groups/definition.ts"
 import { InboxBlock } from "../../../feature/inbox/block.ts"
 import { MarkNotificationSeen } from "../../../feature/inbox/command.ts"
+import { ThreadBinding as InboxThreadBinding } from "../../../feature/inbox/composition.ts"
 import { waitingCount } from "../../../feature/inbox/definition.ts"
+import { ProfileCardBlock } from "../../../feature/profileCard/block.ts"
+import { Card, type MemberProfile, openTriggerIdOf } from "../../../feature/profileCard/definition.ts"
 import { TasksBlock } from "../../../feature/tasks/block.ts"
 import { triageCount } from "../../../feature/tasks/definition.ts"
+import { ThreadBlock } from "../../../feature/thread/block.ts"
+import { init as initThread } from "../../../feature/thread/init.ts"
 import { ThreadsBlock } from "../../../feature/threads/block.ts"
 import { ComposerBinding as ThreadsComposerBinding } from "../../../feature/threads/composition.ts"
 import { UnsentConversationBlock } from "../../../feature/unsentConversation/block.ts"
 import { init as initUnsent } from "../../../feature/unsentConversation/init.ts"
 import * as Drafts from "../../../store/Drafts.ts"
-import { AsideBinding, GroupBinding, GroupsBinding, InboxBinding, TasksBinding, UnsentBinding } from "./composition.ts"
+import {
+  AsideBinding,
+  GroupBinding,
+  GroupsBinding,
+  InboxBinding,
+  ProfileCardBinding,
+  TasksBinding,
+  UnsentBinding
+} from "./composition.ts"
 import { isThreadOpen, Message, Open, OutMessage, openThreadTitle, unsentMemberId } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
@@ -64,8 +78,37 @@ const fromInbox = (message: typeof InboxBlock.Message.Type) =>
   InboxBinding.embedView({
     slotId: "inbox",
     model: opened.inbox,
-    viewInputs: { now, workspaceName: "Studio" }
+    viewInputs: { now, workspaceName: "Studio", openTriggerId: undefined }
   }).toParentMessage(message)
+
+/** What the member's card reports, as Home receives it. */
+const fromProfileCard = (message: typeof ProfileCardBlock.Message.Type) =>
+  ProfileCardBinding.embedView({ slotId: "profile-card", model: opened.profileCard }).toParentMessage(message)
+
+/** The thread of the notification, as it opens before its messages are read. */
+const openThreadModel = initThread(workspaceId, memberId, thread.id).model
+
+/** What the open group's thread reports, as the group and then Home receive it. */
+const fromGroupThread = (message: typeof ThreadBlock.Message.Type) =>
+  fromGroup(
+    GroupThreadBinding.embedView({
+      key: thread.id,
+      slotId: "thread",
+      model: openThreadModel,
+      viewInputs: { now, openTriggerId: undefined }
+    }).toParentMessage(message)
+  )
+
+/** What the thread beside the inbox reports, as the inbox and then Home receive it. */
+const fromInboxThread = (message: typeof ThreadBlock.Message.Type) =>
+  fromInbox(
+    InboxThreadBinding.embedView({
+      key: thread.id,
+      slotId: "thread",
+      model: openThreadModel,
+      viewInputs: { now, openTriggerId: undefined }
+    }).toParentMessage(message)
+  )
 
 /** What the tasks report, as Home receives it. */
 const fromTasks = (message: typeof TasksBlock.Message.Type) =>
@@ -86,7 +129,7 @@ const fromGroup = (message: typeof GroupBlock.Message.Type) =>
     key: groupId,
     slotId: "group",
     model: openGroupModel,
-    viewInputs: { now, workspaceName: "Studio", viewport: "Desktop" }
+    viewInputs: { now, workspaceName: "Studio", viewport: "Desktop", openTriggerId: undefined }
   }).toParentMessage(message)
 
 /** What the open group's threads report, as Home receives it. */
@@ -101,6 +144,7 @@ const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
         isTeam: true,
         memberNames: [],
         openThreadId: Option.none(),
+        openTriggerId: undefined,
         present: [],
         now
       }
@@ -1054,6 +1098,153 @@ describe("home with a group open, whose header asks for the search", () => {
       receivedGroup,
       message(fromGroup(GroupBlock.Message.ClickedSearch())),
       expectOutMessage(OutMessage.RequestedSearch())
+    )
+  })
+})
+
+describe("Home, with the card of a member", () => {
+  const person: MemberProfile = {
+    memberId: bob.id,
+    name: "Bob",
+    kind: "Person",
+    isYou: false,
+    isFormer: false,
+    agentId: Option.none(),
+    standing: Option.none(),
+    motion: Option.none()
+  }
+
+  const agent: MemberProfile = {
+    ...person,
+    memberId: scout.id,
+    name: "Scout",
+    kind: "Agent",
+    agentId: Option.some(scoutAgent.id)
+  }
+
+  /** The card of `profile` open, from the trigger `triggerId` of the inbox, and read. */
+  const showing = (profile: MemberProfile, triggerId: string) =>
+    [
+      message(fromInbox(InboxBlock.Message.OpenedProfile({ memberId: profile.memberId, triggerId }))),
+      message(fromProfileCard(ProfileCardBlock.Message.ReceivedProfile({ profile: Option.some(profile) })))
+    ] as const
+
+  it("starts with no card open, so that no trigger is expanded", () => {
+    story(
+      update,
+      given(opened),
+      model((model) => {
+        expect(model.profileCard.card).toEqual(Card.Closed())
+        expect(openTriggerIdOf(model.profileCard)).toBeUndefined()
+      })
+    )
+  })
+
+  it("opens the card of the member an author of the inbox named, reading them under the trigger that opened it", () => {
+    story(
+      update,
+      given(opened),
+      message(
+        fromInbox(InboxBlock.Message.OpenedProfile({ memberId: bob.id, triggerId: "inbox-notification-1-name" }))
+      ),
+      expectNoOutMessage(),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.profileCard.card).toEqual(
+          Card.Reading({ subject: bob.id, triggerId: "inbox-notification-1-name" })
+        )
+        expect(openTriggerIdOf(model.profileCard)).toBe("inbox-notification-1-name")
+      })
+    )
+  })
+
+  it("opens the card of the member the open group's threads named, in place of the card that was open", () => {
+    story(
+      update,
+      given(opened),
+      ...showing(person, "inbox-notification-1-name"),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      draftRead,
+      message(
+        fromThreads(ThreadsBlock.Message.OpenedProfile({ memberId: scout.id, triggerId: "threads-thread-1-name" }))
+      ),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.profileCard.card).toEqual(Card.Reading({ subject: scout.id, triggerId: "threads-thread-1-name" }))
+      })
+    )
+  })
+
+  it("opens the card of the member a message of the open group's thread named", () => {
+    story(
+      update,
+      given(opened),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      draftRead,
+      message(fromThreads(ThreadsBlock.Message.ClickedThread({ threadId: thread.id }))),
+      draftRead,
+      message(
+        fromGroupThread(ThreadBlock.Message.OpenedProfile({ memberId: bob.id, triggerId: "thread-message-2-name" }))
+      ),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.profileCard.card).toEqual(Card.Reading({ subject: bob.id, triggerId: "thread-message-2-name" }))
+      })
+    )
+  })
+
+  it("opens the card of the member a message of the thread beside the inbox named", () => {
+    story(
+      update,
+      given(opened),
+      ...notificationOpened,
+      ...threadBesideInboxOpened,
+      message(
+        fromInboxThread(ThreadBlock.Message.OpenedProfile({ memberId: bob.id, triggerId: "thread-message-2-name" }))
+      ),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.profileCard.card).toEqual(Card.Reading({ subject: bob.id, triggerId: "thread-message-2-name" }))
+      })
+    )
+  })
+
+  it("reports the person to message, which the page opens the conversation with, and closes the card", () => {
+    story(
+      update,
+      given(opened),
+      ...showing(person, "inbox-notification-1-name"),
+      message(fromProfileCard(ProfileCardBlock.Message.ClickedMessage())),
+      expectOutMessage(OutMessage.OpenedPerson({ memberId: bob.id })),
+      model((model) => {
+        expect(model.profileCard.card).toEqual(Card.Closed())
+      })
+    )
+  })
+
+  it("reports the agent whose page to open, and closes the card", () => {
+    story(
+      update,
+      given(opened),
+      ...showing(agent, "inbox-notification-1-name"),
+      message(fromProfileCard(ProfileCardBlock.Message.ClickedOpenAgent())),
+      expectOutMessage(OutMessage.OpenedAgent({ agentId: scoutAgent.id })),
+      model((model) => {
+        expect(model.profileCard.card).toEqual(Card.Closed())
+      })
+    )
+  })
+
+  it("reports that the person asked to change their name, and closes the card", () => {
+    story(
+      update,
+      given(opened),
+      ...showing({ ...person, memberId, name: "Alice", isYou: true }, "inbox-notification-1-name"),
+      message(fromProfileCard(ProfileCardBlock.Message.ClickedChangeName())),
+      expectOutMessage(OutMessage.RequestedNameChange()),
+      model((model) => {
+        expect(model.profileCard.card).toEqual(Card.Closed())
+      })
     )
   })
 })

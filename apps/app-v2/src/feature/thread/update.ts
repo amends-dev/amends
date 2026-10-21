@@ -11,7 +11,7 @@ import {
   UnfollowThread
 } from "./command.ts"
 import { ThreadComposition } from "./composition.ts"
-import { Message, type Model, textOf } from "./definition.ts"
+import { Message, type Model, OutMessage, textOf } from "./definition.ts"
 
 /** Whose store the action is written to, and the thread it acts on. */
 const inThread = ({ workspaceId, memberId, threadId }: Model) => ({ workspaceId, memberId, threadId })
@@ -115,6 +115,10 @@ export const update = ThreadComposition.makeUpdate((model, message) =>
           commands: [UnfollowThread({ ...inThread(model), participationId })]
         })
       }),
+    OpenedProfile: ({ memberId, triggerId }) => ({
+      model,
+      outMessage: OutMessage.OpenedProfile({ memberId, triggerId })
+    }),
     ToldTyping: () => ({ model: modifyFields(model, { typingTold: () => false }) }),
     CompletedScrollMessagesToEnd: () => ({ model }),
     CompletedRevealHighlightedMessage: () => ({ model }),

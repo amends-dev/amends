@@ -3,7 +3,7 @@ import { Option } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import { bob, membership, scout, scoutAgent } from "../../../test/fixtures.ts"
 import { FocusTrigger } from "./command.ts"
-import { Card, type MemberProfile, Message, openTriggerIdOf, OutMessage, profileOpener } from "./definition.ts"
+import { Card, type MemberProfile, Message, openTriggerIdOf, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -52,18 +52,10 @@ describe("the profile card", () => {
     )
   })
 
-  it("makes the opener of a pane's triggers: its scope, the trigger whose card is open, and what a trigger sends", () => {
-    const sends = (memberId: string, triggerId: string) => `${memberId} from ${triggerId}`
-
-    expect(profileOpener("thread", started, sends).scope).toBe("thread")
-    expect(profileOpener("thread", started, sends).openTriggerId).toBeUndefined()
-    expect(profileOpener("thread", { ...started, card: readingBob }, sends).openTriggerId).toBe("thread-message-1-name")
-    expect(profileOpener("thread", { ...started, card: showingScout }, sends).openTriggerId).toBe(
-      "thread-message-2-mention-0"
-    )
-    expect(profileOpener("thread", started, sends).open("member-2", "thread-message-1-name")).toBe(
-      "member-2 from thread-message-1-name"
-    )
+  it("says which trigger opened the card that is open or being read, and none while it is closed", () => {
+    expect(openTriggerIdOf(started)).toBeUndefined()
+    expect(openTriggerIdOf({ ...started, card: readingBob })).toBe("thread-message-1-name")
+    expect(openTriggerIdOf({ ...started, card: showingScout })).toBe("thread-message-2-mention-0")
   })
 
   it("opens the card of the member a trigger names, reads them, and then shows them", () => {

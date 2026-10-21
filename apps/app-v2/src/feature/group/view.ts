@@ -63,13 +63,21 @@ import {
 
 /**
  * The time now, which the days the threads and their messages were published on are read from, the workspace's name,
- * which a phone shows under the group's title, and the window's width, which decides whether the settings add members
- * in a field or, on a phone, in a view of their own.
+ * which a phone shows under the group's title, the window's width, which decides whether the settings add members
+ * in a field or, on a phone, in a view of their own, and the trigger whose member's card is open.
  */
-export type ViewInputs = Readonly<{ now: DateTime.Utc; workspaceName: string; viewport: Viewport }>
+export type ViewInputs = Readonly<{
+  now: DateTime.Utc
+  workspaceName: string
+  viewport: Viewport
+  openTriggerId: string | undefined
+}>
 
-/** The time now, which the days the thread's messages were published on are read from. */
-export type ThreadViewInputs = Readonly<{ now: DateTime.Utc }>
+/**
+ * The time now, which the days the thread's messages were published on are read from, and the trigger whose member's
+ * card is open.
+ */
+export type ThreadViewInputs = Readonly<{ now: DateTime.Utc; openTriggerId: string | undefined }>
 
 /** Whether `memberId` has the workspace open now. */
 const isPresent = (model: Model, memberId: MemberId.MemberId): boolean =>
@@ -470,7 +478,8 @@ const columnOf = (
  * one in the footer, or the line that says to join the team to read them; or, in place of both, that the group is not
  * available or could not be read; and the settings' modal.
  */
-export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, { now, workspaceName, viewport }, h) => {
+export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, inputs, h) => {
+  const { now, workspaceName, viewport, openTriggerId } = inputs
   const name = nameOf(model)
   const availability = availabilityOf(model)
   // Until the group is read, and when it could not be, its threads list as they would for a member.
@@ -481,6 +490,7 @@ export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, { n
     isTeam: Option.isSome(teamName(model)),
     memberNames: welcomeNames(model),
     openThreadId: Option.map(model.thread, ({ threadId }) => threadId),
+    openTriggerId,
     present: model.present,
     now,
     commands: slashCommandsOf(model)
@@ -560,7 +570,7 @@ export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, { n
  * tasks are what the group lists, and to the group otherwise; or, while the person follows the log of one of its
  * turns, that log in its place, where it is. Nothing while no thread is open.
  */
-export const threadView = GroupComposition.makeView.withInputs<ThreadViewInputs>((model, { now }, h) =>
+export const threadView = GroupComposition.makeView.withInputs<ThreadViewInputs>((model, { now, openTriggerId }, h) =>
   Option.match(model.thread, {
     onNone: () => h.empty,
     onSome: ({ threadId, model: open }) => {
@@ -587,7 +597,12 @@ export const threadView = GroupComposition.makeView.withInputs<ThreadViewInputs>
               ThreadBinding.embedView({ key: threadId, slotId: "thread-follow", model: open, view: followView })
             ),
             body: h.block(
-              ThreadBinding.embedView({ key: threadId, slotId: "thread", model: open, viewInputs: { now } })
+              ThreadBinding.embedView({
+                key: threadId,
+                slotId: "thread",
+                model: open,
+                viewInputs: { now, openTriggerId }
+              })
             ),
             reply: h.block(
               ThreadBinding.embedView({ key: threadId, slotId: "thread-reply", model: open, view: replyView })

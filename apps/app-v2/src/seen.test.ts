@@ -18,6 +18,7 @@ import {
 } from "../test/fixtures.ts"
 import {
   ageLabel,
+  authorMemberId,
   calendarDate,
   connectionNameIn,
   dayLabel,
@@ -441,6 +442,13 @@ describe("isAuthorAgent", () => {
     expect(isAuthorAgent(ThreadMessage.Author.cases.Contact.make({ contactId: "contact-1" as never }), members)).toBe(
       false
     )
+  })
+})
+
+describe("authorMemberId", () => {
+  it("is the member who wrote it, and none for a contact of a channel, who has no card to open", () => {
+    expect(authorMemberId(ThreadMessage.Author.cases.Member.make({ memberId: bob.id }))).toBe(bob.id)
+    expect(authorMemberId(ThreadMessage.Author.cases.Contact.make({ contactId: "contact-1" as never }))).toBeUndefined()
   })
 })
 

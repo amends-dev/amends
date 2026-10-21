@@ -3,8 +3,9 @@
  * created, each with its opening message, who replied to it, the task it tracks, and how much of it is new; and the
  * ones that track a task, as a table the person narrows by status, by assignee, and by what they search for, and sorts
  * by latest activity or by when the thread was started. A composer starts a thread, or on the Tasks tab a thread that
- * tracks a task, which the Tasks tab's New task moves the focus to. It reports the thread the person picks, and the
- * slash command they run in the composer.
+ * tracks a task, which the Tasks tab's New task moves the focus to. It reports the thread the person picks, the
+ * slash command they run in the composer, and the member whose card they open from the name or mark of a thread's
+ * author or a mention in its opening.
  */
 
 import { GroupId } from "@amends-dev/core/group"
@@ -104,6 +105,7 @@ export const Message = defineMessageUnion({
   CompletedFocusComposer: {},
   CompletedScrollThreadsToEnd: {},
   ClickedThread: { threadId: ThreadId.ThreadId },
+  OpenedProfile: { memberId: Schema.String, triggerId: Schema.String },
   WroteAction: {},
   FailedWriteAction: { error: Schema.String }
 })
@@ -111,7 +113,8 @@ export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
   SelectedThread: { threadId: ThreadId.ThreadId },
-  RanSlashCommand: { command: SlashCommand }
+  RanSlashCommand: { command: SlashCommand },
+  OpenedProfile: { memberId: Schema.String, triggerId: Schema.String }
 })
 export type OutMessage = typeof OutMessage.Type
 

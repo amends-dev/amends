@@ -4,8 +4,9 @@
  * it comes from, and what the message says, as far as the store holds them. They open a
  * notification's thread beside the inbox, which marks that notification seen, and the row stays
  * selected, in its place, while the thread is open; or they mark every notification seen at once. The
- * list shows the newest few and the person asks for older ones a page at a time. It reports when the
- * thread opens and when the person closes it, and closes the thread when its parent asks.
+ * list shows the newest few and the person asks for older ones a page at a time. A notification's author opens their
+ * card. It reports when the thread opens and when the person closes it, and the card the person opens, and closes the
+ * thread when its parent asks.
  */
 
 import { Contact } from "@amends-dev/core/channel"
@@ -22,7 +23,7 @@ import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
-import { authorMark, authorName, type Day, groupByDay, messageText, placeName } from "../../seen.ts"
+import { authorMark, authorMemberId, authorName, type Day, groupByDay, messageText, placeName } from "../../seen.ts"
 import { ThreadBlock } from "../thread/block.ts"
 
 /**
@@ -90,6 +91,7 @@ export const Message = defineMessageUnion({
   ClickedShowOlder: {},
   ClickedOpen: { notificationId: Notification.NotificationId },
   ClickedClose: {},
+  OpenedProfile: { memberId: Schema.String, triggerId: Schema.String },
   ClickedMarkAllSeen: {},
   RequestedCloseThread: {},
   WroteAction: {},
@@ -102,7 +104,8 @@ export type Message = typeof Message.Type
 export const OutMessage = defineMessageUnion({
   OpenedThread: {},
   ClosedThread: {},
-  OpenedAgent: { agentId: Identity.AgentId }
+  OpenedAgent: { agentId: Identity.AgentId },
+  OpenedProfile: { memberId: Schema.String, triggerId: Schema.String }
 })
 export type OutMessage = typeof OutMessage.Type
 
@@ -234,28 +237,37 @@ export const selectedReasonWords = (model: Model): Option.Option<string> =>
     )
   )
 
-/** Who wrote the message a notification's activity is about, with their mark, while the store holds it. */
+/**
+ * Who wrote the message a notification's activity is about, with their mark, and who they are when they are a member,
+ * while the store holds it.
+ */
 const notificationAuthor = (
   item: InboxItem,
   model: Model
-): Option.Option<Readonly<{ name: string; mark: MarkContent }>> =>
+): Option.Option<Readonly<{ name: string; mark: MarkContent; memberId: MemberId.MemberId | undefined }>> =>
   Option.map(item.message, ({ author }) => ({
     name: authorName(author, model.members, model.contacts),
-    mark: authorMark(author, model.members, model.contacts)
+    mark: authorMark(author, model.members, model.contacts),
+    memberId: authorMemberId(author)
   }))
 
 /**
- * A notification's first line: the mark and name of who wrote the message its activity is about and what they did,
- * with the mark on the author's tone, or, while the store lacks the message, that there was activity, with the message
- * icon for a mark.
+ * A notification's first line: the mark and name of who wrote the message its activity is about, and who they are when
+ * they are a member, whose card they open, and what they did, with the mark on the author's tone, or, while the store
+ * lacks the message, that there was activity, with the message icon for a mark.
  */
 export const notificationHeadline = (
   item: InboxItem,
   model: Model
-): Readonly<{ mark: MarkContent; author: string; activity: string }> =>
+): Readonly<{ mark: MarkContent; author: string; authorId: MemberId.MemberId | undefined; activity: string }> =>
   Option.match(Option.all([notificationAuthor(item, model), notificationReason(item, model.memberId)]), {
-    onNone: () => ({ mark: { icon: "message" }, author: "Activity", activity: "in a thread" }),
-    onSome: ([{ name, mark }, reason]) => ({ mark, author: name, activity: doneForReason[reason] })
+    onNone: () => ({ mark: { icon: "message" }, author: "Activity", authorId: undefined, activity: "in a thread" }),
+    onSome: ([{ name, mark, memberId }, reason]) => ({
+      mark,
+      author: name,
+      authorId: memberId,
+      activity: doneForReason[reason]
+    })
   })
 
 /**

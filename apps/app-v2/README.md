@@ -285,7 +285,11 @@ below it counted at each level above.
   one, is the body of a side pane, which takes the time now as its view input, and, optionally, the
   id of a message to highlight (`highlightedMessageId`), which it draws as the current row and scrolls to the middle
   of the pane when the row is drawn (the `RevealHighlightedMessage` mount, on the row alone), so the person sees what a
-  notification was about, and the group gives none. For a thread that tracks no
+  notification was about, and the group gives none. It is also given the trigger whose member's card is open
+  (`openTriggerId`), which it says is expanded, and reports `OpenedProfile({ memberId, triggerId })` when the person
+  presses the name or the mark of a message's author, or a mention in a message or in the task's description; their
+  ids begin `thread-` and the message's key, or `thread-description-`. The card itself is Home's. For a thread that
+  tracks no
   task it is a section named Thread: Rename, the form to rename it while the person does, the task
   (making it one, where they may), then its timeline as a list under a `divider` for each day it happened on by the
   person's own clock (`groupByDay`, named as `dayLabel` names it): the opening first, how many replies follow it,
@@ -439,12 +443,15 @@ below it counted at each level above.
 - `feature/threads`: a group's threads, each with its opening message, how many messages follow it and
   who wrote them, which agents are at work in it, when it was last active, its task, whether it is still being started,
   and how much is new, and a composer to
-  start one, which suggests the group's members as it is typed in. It reports the thread picked. It has
+  start one, which suggests the group's members as it is typed in. It reports the thread picked, and the card of a member to open, `OpenedProfile({ memberId, triggerId })`, when the
+  person presses the name or the mark of a thread's author or a mention in its opening: their ids begin `threads-` and
+  the thread's id, and the one whose id is the view input `openTriggerId` says it is expanded; an opening not read
+  yet and an author who is not a member have none. It has
   three views, and its tab, Threads or Tasks, Threads at first, says what `view` and `composerView` show.
   `tabsView` is the tabs, a `paneTabs` named for the group, as `apps/ui` names them: Threads, and Tasks, counted by the
   tasks that are neither done nor dismissed while there are any, for the group's header, which takes the group's
   name from its parent. The other two take the group's members, its name and whether it is a team, who belongs to
-  a team as its welcome names them, the thread open in it, who is present and in which thread each types, and the time
+  a team as its welcome names them, the thread open in it, who is present and in which thread each types, the trigger whose card is open, and the time
   now from their parent. `view`, its canonical one, shows the tab chosen. On the Threads
   tab it lists the
   threads as messages, oldest first by when each thread was created (core's `Thread.createdAt`, the
@@ -530,8 +537,9 @@ below it counted at each level above.
   open when its parent gives one, and reports nothing for it. It reports `OpenedThread` when the
   person picks a thread and `ClosedThread` when they close it, by Close thread, Close task, Back, or Close turn log, so its parent can
   hold the side pane in step, `OpenedAgent` when they ask, from a turn that failed in the thread, for the settings
-  of its agent, and `RequestedSearch` when they press the Search button its header has on a phone; its parent closes the
-  thread with the operation `requestCloseThread`,
+  of its agent, `OpenedProfile` for the card of a member that its threads or its thread opened, given the
+  trigger whose card is open as the threads and the thread are, and `RequestedSearch` when they press the Search button
+  its header has on a phone; its parent closes the thread with the operation `requestCloseThread`,
   which reports nothing, since it asked. They follow a group or stop, join a public team, and, in its
   settings, rename a team, leave one, and, where they manage its members, admit several at once and remove them. The
   composer of its threads offers the slash commands of a team the person belongs to (`slashCommandsOf`): `/follow`,
@@ -814,7 +822,10 @@ below it counted at each level above.
   markdown, one run of words with each mention a chip (`notificationText`, by the inbox's members); and how long ago it came (`ageLabel`), with a dot while it waits. While the store lacks the message, the
   first line says "Activity in a thread" beside the design's `message` icon in place of letters, and the text says
   what it can. The time
-  now is its view input, as the page gives it, so the days and ages follow the clock. A notification's
+  now is its view input, as the page gives it, so the days and ages follow the clock, and so is the trigger whose
+  member's card is open (`openTriggerId`). The name and the mark of who wrote the message a notification is about open
+  that member's card, which the inbox reports as `OpenedProfile({ memberId, triggerId })`, with an id that begins
+  `inbox-` and the notification's; one whose message the store lacks, or whose author is a contact, has none. A notification's
   text opens its thread beside the inbox, which marks it seen at once, if it waits, and selects it:
   the row stays selected, in its place, with `aria-current` and the design's current look, while its
   thread is open, even on Unread, where a seen notification would otherwise leave, and selecting
@@ -837,8 +848,8 @@ below it counted at each level above.
   the reply composer in the footer, or, while the person follows the log of one of its turns, that log in its place,
   and nothing while none is selected. It reports `OpenedThread`
   when a thread opens and `ClosedThread` when the person closes it, or its turn's log, and `OpenedAgent` when they ask, from a turn that
-  failed in the thread, for the settings of its agent, so its parent can hold the side
-  pane in step; its parent closes the thread with the operation `requestCloseThread`, which reports
+  failed in the thread, for the settings of its agent, and `OpenedProfile` for the card of a member that its thread's
+  messages open, so its parent can hold the side pane in step; its parent closes the thread with the operation `requestCloseThread`, which reports
   nothing, since it asked. The Block offers a count of what waits for its parent to show. The workspace's name, which
   Home gives its view as it gives the group's, is the line under the title on phones.
   Until the store has answered (`isLoaded`) the list is a line, "Loading your inbox…", and when the first read failed
@@ -929,7 +940,8 @@ below it counted at each level above.
   Cancel is disabled while the name is being saved (`isCancelDisabled`). It opens from the person's account at the foot of the rail, which the Block draws (`accountView`, given the
   address the person signed in with and their Appearance) as a Foldkit `Menu` Block it binds (`AccountBinding`, a menu
   of `AccountEntry`, id `account`): choosing "Change your name…" opens the dialog once the replica holds the person, and
-  every other entry is reported as `ChoseAccountEntry`.
+  every other entry is reported as `ChoseAccountEntry`. Its parent can ask for the same dialog (`requestNameChange`), as
+  Change name on the person's own card does.
   Each says "Creating…", "Revoking…", "Transferring…", "Removing…", or "Saving…" while its request is on its way, and
   closing the dialog then is ignored: it opens again to show how the request ends. A request that ends well closes the dialog; one that does not stays open under the failure.
   Revoking from the invitations replaces them in the same dialog, so Cancel and the end of the request close it
@@ -1116,12 +1128,15 @@ below it counted at each level above.
   the connections feature's `connectionsGiving`; the person then asks again, and the Block asks the
   page, by its out message `RequestedIntegrations`. A form about a channel that is gone closes.
 - `feature/profileCard`: the card that a member's mark, name, or mention opens, as `apps/ui`'s `ProfileCard` draws it,
-  in the design's `profileCard`. A pane that shows people binds one and asks it to open (`requestOpen({ memberId,
-triggerId })`), `triggerId` being the id of the design's `profileTrigger` that was pressed; it gives its rows the
-  design's `ProfileOpener` that `profileOpener(scope, model, open)` makes, whose `scope` begins each trigger's id and
-  tells it from every other pane's. One card is open in a pane at a time: another trigger replaces it, and its own
-  trigger leaves it as it is. A mention names its member by whatever id its text was written with, so the Block takes
-  `memberId` as a string and shows "Profile unavailable" for one the workspace lacks, or whose read failed. While a
+  in the design's `profileCard`. Home binds one for the whole workspace, as `apps/ui` has one `Profiles.Root`, and
+  the panes that show people do not: the inbox, the group's threads, and the thread open in the group or beside the
+  inbox report `OpenedProfile({ memberId, triggerId })` when a trigger of the design's `profileTrigger` is pressed,
+  `triggerId` being its id, and Home asks the card to open (`requestOpen({ memberId, triggerId })`). A pane gives its
+  rows the design's `ProfileOpener`, whose `scope` begins each trigger's id and tells it from every other pane's and
+  whose `openTriggerId` is the trigger whose card is open (`openTriggerIdOf`), which Home gives its panes as a view
+  input so that the trigger says it is expanded and is underlined. One card is open in the workspace at a time:
+  another trigger replaces it, and its own trigger leaves it as it is. A mention names its member by whatever id its
+  text was written with, so the Block takes `memberId` as a string and shows "Profile unavailable" for one the workspace lacks, or whose read failed. While a
   card is open the Block reads the member (`ReadProfile`, which starts again for another trigger): the members, the
   agents, and the turns and groups that say what an agent is doing, as `readProfile` puts them together. The card says
   Person or Agent, "You" on the person's own, "Former member" with "No longer in this workspace." and no buttons for a
@@ -1129,11 +1144,15 @@ triggerId })`), `triggerId` being the id of the design's `profileTrigger` that w
   (`statusOfAgent`): "Needs setup" with why under the name, or where it is at work, "Working in #general", with its
   logo moving as its turn does; an agent with a change on its way stands as none. The buttons are Message, for anyone
   else, Open agent, for an agent, and Change name, on the person's own card. Choosing one closes the card and reports
-  `OpenedPerson({ memberId })`, `OpenedAgent({ agentId })`, or `RequestedNameChange`, which the page carries out. The
-  `AnchorProfileCard` mount places the card with `@foldkit/ui`'s `anchorSetup`, under its trigger 8px away, above it
+  `OpenedPerson({ memberId })`, `OpenedAgent({ agentId })`, or `RequestedNameChange`, which Home reports as they are for
+  the page to carry out: Message opens the conversation with the person as the search does, Open agent opens the
+  agent's page as picking the agent does, and Change name asks the settings for the dialog of the account menu's
+  "Change your name…". The `AnchorProfileCard` mount places the card with `@foldkit/ui`'s `anchorSetup`, under its trigger 8px away, above it
   where there is no room below, 16px inside the window's edges, and keeps it there as the page scrolls and resizes; the
   headless Popover is one button and one panel for each Block, where a pane has a trigger for each author and mention.
-  The mount moves the focus into the card once it is placed. Escape and Close close it and give the focus back to the
+  The mount moves the focus into the card once it is placed, and moves the card into the `<dialog>` that holds its
+  trigger, if one does (`moveIntoDialogOfTrigger`), since a modal dialog, such as the side pane below 80rem, leaves
+  only its own subtree interactive. Escape and Close close it and give the focus back to the
   trigger (`FocusTrigger`), and the card closes when the focus leaves it, taking it nowhere. The mark beside a name is
   not reached by Tab, only the name. Unlike `apps/ui`'s, a card does not open on hover or as keyboard focus reaches a
   name, only on a click, Enter, or Space; the focus goes into the card as it opens, where `apps/ui` leaves it on the
@@ -1304,7 +1323,13 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   inviting someone, reading the invitations, revoking one, handing the workspace over, or removing a member, and the
   search, which the page binds as `search` (`SearchBinding`). All are in the document after the drawer and the side
   pane's dialog, so the one opened last is over the rest. `ClickedSearch` and `RequestedSearch`, which the root
-  sends, ask the search to open. The search reports what was opened and the page opens it: a page as the rail goes to it (`goToDestination`: Inbox is
+  sends, ask the search to open. Home's card (`profileCardView`, the slot `home-profile-card`) is lent to the shell's `dialogs` too. Message on it
+  opens the conversation with the person (`requestConversationWith`), as the search's person does, and Open agent the
+  agent's page, as picking the agent does; Change name asks the settings (`requestNameChange`) for the dialog of the
+  account menu's "Change your name…" by a Command, `RequestNameChange`, which dispatches the page's own Message
+  `CompletedRequestNameChange` for the page's update to carry out, because a fold of Home's reports that called the
+  settings' operation tips TS2589 at the page's `makeUpdate`, which a branch of its update does not. The search reports
+  what was opened and the page opens it: a page as the rail goes to it (`goToDestination`: Inbox is
   Home, which opens on its inbox, and Settings is the Workspace page, as the account menu goes to it), and, in Home,
   as Home's own lists do, a group (`requestOpenGroup`), a thread in its group (`requestOpenThread`), as a task's is,
   and a person as a conversation with them (`requestConversationWith`), which Home's groups select, or open before it is
@@ -1376,7 +1401,7 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
 - `page/workspace/home`: Home, the first destination of the rail, a Block of the page's own that owns what the
   person reads from and starts in the workspace and the side pane for it, as every rail destination owns its sidebar,
   its main pane, and its side pane. It binds the groups (`GroupsBinding`), the inbox (`InboxBinding`), the tasks
-  (`TasksBinding`), the open group, a keyed occurrence (`GroupBinding`), and a `DialogBlock` for the thread's side
+  (`TasksBinding`), the open group, a keyed occurrence (`GroupBinding`), the member's card (`ProfileCardBinding`), and a `DialogBlock` for the thread's side
   pane (`AsideBinding`, id `home-aside`). Its main pane (`view`, given the time now) shows the
   inbox, which it opens on, the tasks in triage, every open task, the groups to browse, the open group, or a
   conversation the person has not started (`Open`: `Inbox`, `Triage`, `Tasks`, `Groups`, `Group`, `Unsent`); it has no
@@ -1423,7 +1448,12 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   following moves nowhere either. A group the
   person created, which the groups Block reports as `CreatedGroup`, Home opens without a thread, as picking it does, and
   reports as it is, for the page to confirm. The settings of an agent that a thread's turn asked for, which the open
-  group and the inbox report as `OpenedAgent`, Home reports as they are, for the page to open the agent's page. The search
+  group and the inbox report as `OpenedAgent`, Home reports as they are, for the page to open the agent's page. The card of a member, which the inbox, the open
+  group's threads, and the thread open in the group or beside the inbox ask for with `OpenedProfile`, Home opens
+  (`ProfileCardBinding.requestOpen`), and gives these panes the trigger whose card is open (`openTriggerIdOf`) as a view
+  input; `profileCardView` is the card, which the page puts in its frame. What the person chose on the card Home
+  reports as it is, for the page to carry out: `OpenedPerson` (Message), `OpenedAgent` (Open agent), and
+  `RequestedNameChange` (Change name). The search
   the open group's header asks for on a phone, which the group reports as `RequestedSearch`, Home reports as it is,
   and the page's Home binding forwards it to the app, which opens the workspace's search as it does for the search key.
   The page does not fold it itself: its step would be in the type of the fold of Home's report, whose search fold
@@ -1649,6 +1679,10 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   scrolled to the end it made only if they were near, which it says, and a message is revealed in the middle. They run live, since the
   effects wait for an animation frame. happy-dom lays nothing out, so a real scroll, the browser clamping `scrollTop`
   to the end, a short list resting against the composer, and `scrollIntoView` moving a real pane are not observed here.
+- `feature/profileCard/command.test.ts` reads where a profile card is in the tree: in the `<dialog>` that holds the
+  trigger it opened from, portaled by `anchorSetup` into that dialog's portal root and out again with its cleanup, and
+  where it was drawn for a trigger in no dialog. happy-dom has no top layer, so that a modal dialog leaves the card
+  interactive is not observed here.
 - Story tests drive a Block's update: the thread read through its latest activity, once, its title
   and messages changed from what was seen, following and unfollowing, typing said once while a reply
   is written and stopped once it is sent, and why a write could not be kept; a task made and changed
@@ -1798,7 +1832,8 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   list, showing Home with the group a person's conversation or a search result opens, or with the conversation not started when the search result is a person the member has none with, handing the settings and the channels what the person does in
   them, opening the navigation drawer, closing it as its dialog asks and by every navigation to an item of a sidebar, and not by a destination picked
   on the rail, which shows it, showing the connections, the agents, and the settings for what their sidebars ask, reporting to the root each entry of
-  the account menu it acts on, asking the settings for their name dialog, and no one, when the person chooses to change their name, showing the
+  the account menu it acts on, asking the settings for their name dialog, and no one, when the person chooses to change their name, from the account menu or from their own card, which Home
+  reports, drawing that card in its frame and carrying out Message and Open agent on any, showing the
   settings' Workspace page when the person chooses the workspace's settings in the account menu, which the root is told nothing of, and taking the window's width, closing the drawer once the sidebar is in place and informing Home of
   it, which moves the thread open between its dialog and the card; the member open beside the settings' Members and its dialog, which
   every navigation closes; and

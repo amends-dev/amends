@@ -8,6 +8,7 @@ import { threadView as groupThreadView } from "../../../feature/group/view.ts"
 import { browseView, dialogView as groupsDialogView } from "../../../feature/groups/view.ts"
 import { waitingCount } from "../../../feature/inbox/definition.ts"
 import { threadView as inboxThreadView } from "../../../feature/inbox/view.ts"
+import { openTriggerIdOf } from "../../../feature/profileCard/definition.ts"
 import { triageCount } from "../../../feature/tasks/definition.ts"
 import { tasksView, triageView } from "../../../feature/tasks/view.ts"
 import {
@@ -16,6 +17,7 @@ import {
   GroupsBinding,
   HomeComposition,
   InboxBinding,
+  ProfileCardBinding,
   TasksBinding,
   UnsentBinding
 } from "./composition.ts"
@@ -30,12 +32,20 @@ export type ViewInputs = Readonly<{ now: DateTime.Utc; workspaceName: string }>
 /**
  * The main pane: what the person opened, the inbox at first. The inbox, the tasks, and the open group are given the
  * time now, and the inbox, the group, and the conversation not started the workspace's name too, and the group the
- * width of the window Home holds.
+ * width of the window Home holds. The inbox and the group are also given the trigger whose member's card is open.
  */
-export const view = HomeComposition.makeView.withInputs<ViewInputs>((model, { now, workspaceName }, h) =>
-  Open.match(model.open, {
+export const view = HomeComposition.makeView.withInputs<ViewInputs>((model, { now, workspaceName }, h) => {
+  const openTriggerId = openTriggerIdOf(model.profileCard)
+
+  return Open.match(model.open, {
     Inbox: () =>
-      h.block(InboxBinding.embedView({ slotId: "inbox", model: model.inbox, viewInputs: { now, workspaceName } })),
+      h.block(
+        InboxBinding.embedView({
+          slotId: "inbox",
+          model: model.inbox,
+          viewInputs: { now, workspaceName, openTriggerId }
+        })
+      ),
     Triage: () =>
       h.block(TasksBinding.embedView({ slotId: "triage", model: model.tasks, view: triageView, viewInputs: { now } })),
     Tasks: () =>
@@ -47,7 +57,7 @@ export const view = HomeComposition.makeView.withInputs<ViewInputs>((model, { no
           key: groupId,
           slotId: "group",
           model: open,
-          viewInputs: { now, workspaceName, viewport: model.viewport }
+          viewInputs: { now, workspaceName, viewport: model.viewport, openTriggerId }
         })
       ),
     Unsent: ({ model: unsent }) =>
@@ -60,7 +70,7 @@ export const view = HomeComposition.makeView.withInputs<ViewInputs>((model, { no
         })
       )
   })
-)
+})
 
 /** The sidebar's sections of Home: the inbox, the triage, the tasks, and the groups. */
 export const sidebarView = HomeComposition.makeView((model, h) => {
@@ -113,10 +123,13 @@ export const sidebarView = HomeComposition.makeView((model, h) => {
 export type ThreadInputs = Readonly<{ now: DateTime.Utc }>
 
 /**
- * The side pane: the thread open, in the group open or beside the inbox, while there is one, given the time now.
+ * The side pane: the thread open, in the group open or beside the inbox, while there is one, given the time now and the
+ * trigger whose member's card is open.
  */
-export const threadView = HomeComposition.makeView.withInputs<ThreadInputs>((model, { now }, h) =>
-  Open.matchOrElse(
+export const threadView = HomeComposition.makeView.withInputs<ThreadInputs>((model, { now }, h) => {
+  const openTriggerId = openTriggerIdOf(model.profileCard)
+
+  return Open.matchOrElse(
     model.open,
     {
       Inbox: () =>
@@ -124,7 +137,7 @@ export const threadView = HomeComposition.makeView.withInputs<ThreadInputs>((mod
           InboxBinding.embedView({
             slotId: "inbox-thread",
             model: model.inbox,
-            viewInputs: { now },
+            viewInputs: { now, openTriggerId },
             view: inboxThreadView
           })
         ),
@@ -135,12 +148,17 @@ export const threadView = HomeComposition.makeView.withInputs<ThreadInputs>((mod
             slotId: "group-thread",
             model: open,
             view: groupThreadView,
-            viewInputs: { now }
+            viewInputs: { now, openTriggerId }
           })
         )
     },
     () => h.empty
   )
+})
+
+/** The card of the member whose mark, name, or mention the person opened, which the shell keeps in the frame. */
+export const profileCardView = HomeComposition.makeView((model, h) =>
+  h.block(ProfileCardBinding.embedView({ slotId: "profile-card", model: model.profileCard }))
 )
 
 /** How the shell draws the side pane's dialog, which it lends. */

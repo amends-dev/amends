@@ -26,6 +26,7 @@ import { modifyFields } from "foldkit/struct"
 import {
   bob,
   conversationWithBob,
+  dana,
   deleted,
   general,
   membership,
@@ -57,8 +58,8 @@ import { threadView, view } from "./view.ts"
 const { workspace, member } = membership
 const asMember = { workspaceId: workspace.id, memberId: member.id }
 
-const sceneView = withViewInputs(view, { now, workspaceName: "Mercier & Co" })()
-const sceneThreadView = withViewInputs(threadView, { now })()
+const sceneView = withViewInputs(view, { now, workspaceName: "Mercier & Co", openTriggerId: undefined })()
+const sceneThreadView = withViewInputs(threadView, { now, openTriggerId: undefined })()
 
 /** The inbox with its side pane beside it, as the page puts them, which holds nothing while no thread is open. */
 const withSidePane = (model: Parameters<typeof sceneView>[0], h: Parameters<typeof sceneView>[1]) =>
@@ -933,6 +934,75 @@ describe("the inbox's side pane, while the log of a turn is followed", () => {
       click(role("button", { name: "Agent settings" })),
       expectOutMessage(OutMessage.OpenedAgent({ agentId: failedTurn.agentId })),
       expect(role("complementary", { name: "Turn log" })).toExist()
+    )
+  })
+})
+
+describe("the inbox opening the card of an author", () => {
+  const nameOfBob = role("button", { name: "Bob" })
+
+  it("opens it from the name of who wrote what a notification is about, which says it opens a dialog", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      expect(nameOfBob).toHaveAttr("id", "inbox-notification-1-name"),
+      expect(nameOfBob).toHaveAttr("aria-haspopup", "dialog"),
+      expect(nameOfBob).toHaveAttr("aria-expanded", "false"),
+      click(nameOfBob),
+      expectOutMessage(OutMessage.OpenedProfile({ memberId: bob.id, triggerId: "inbox-notification-1-name" }))
+    )
+  })
+
+  it("opens it from the author's mark, which is hidden from assistive technology", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      expect(selector("#inbox-notification-1-mark")).toHaveAttr("aria-hidden", "true"),
+      click(selector("#inbox-notification-1-mark")),
+      expectOutMessage(OutMessage.OpenedProfile({ memberId: bob.id, triggerId: "inbox-notification-1-mark" }))
+    )
+  })
+
+  it("says the trigger whose card is open is expanded", () => {
+    scene(
+      {
+        update,
+        view: withViewInputs(view, { now, workspaceName: "Mercier & Co", openTriggerId: "inbox-notification-1-name" })()
+      },
+      given(opened),
+      expect(nameOfBob).toHaveAttr("aria-expanded", "true")
+    )
+  })
+
+  it("opens none for a notification whose message the store lacks, or whose author is a contact", () => {
+    const byDana = {
+      ...bobsReply,
+      message: Option.some({
+        ...reply,
+        author: ThreadMessage.Author.cases.Contact.make({ contactId: dana.id })
+      })
+    }
+
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(opened, { items: () => [{ ...bobsReply, message: Option.none() }] })),
+      expectAll(all.selector('[aria-haspopup="dialog"]')).toHaveCount(0)
+    )
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(opened, { items: () => [byDana] })),
+      expectAll(all.selector('[aria-haspopup="dialog"]')).toHaveCount(0)
+    )
+  })
+
+  it("tells the page which card the person opened in the thread beside the inbox, and keeps the thread as it is", () => {
+    scene(
+      { update, view: sidePane },
+      given(openedThread),
+      revealed,
+      click(within(role("complementary", { name: "Thread" }), nameOfBob)),
+      expectOutMessage(OutMessage.OpenedProfile({ memberId: bob.id, triggerId: "thread-message-2-name" })),
+      expect(role("complementary", { name: "Thread" })).toExist()
     )
   })
 })

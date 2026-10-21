@@ -141,16 +141,19 @@ describe("the inbox", () => {
     expect(notificationHeadline(itemOf(older), known)).toEqual({
       mark: { text: "B", tone: "neutral" },
       author: "Bob",
+      authorId: bob.id,
       activity: "replied"
     })
     expect(notificationHeadline({ ...itemOf(older), message: Option.some(mention) }, known)).toEqual({
       mark: { text: "B", tone: "neutral" },
       author: "Bob",
+      authorId: bob.id,
       activity: "mentioned you"
     })
     expect(notificationHeadline({ ...itemOf(older), message: Option.some(opening) }, known)).toEqual({
       mark: { text: "A", tone: "neutral" },
       author: "Alice",
+      authorId: member.id,
       activity: "started a thread"
     })
     expect(notificationHeadline(withoutThread(older), known)).toEqual({
@@ -170,7 +173,7 @@ describe("the inbox", () => {
     expect(notificationHeadline(itemOf(older), people).mark).toEqual({ text: "B", tone: "neutral" })
     expect(
       notificationHeadline(writtenBy(ThreadMessage.Author.cases.Member.make({ memberId: scout.id })), people)
-    ).toEqual({ mark: { text: "S", tone: "lilac" }, author: "Scout", activity: "replied" })
+    ).toEqual({ mark: { text: "S", tone: "lilac" }, author: "Scout", authorId: scout.id, activity: "replied" })
     expect(
       notificationHeadline(writtenBy(ThreadMessage.Author.cases.Contact.make({ contactId: dana.id })), people)
     ).toEqual({ mark: { text: "D" }, author: "Dana", activity: "replied" })

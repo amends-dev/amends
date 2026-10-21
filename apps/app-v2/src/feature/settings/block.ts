@@ -1,6 +1,7 @@
 import * as Layer from "effect/Layer"
 import { EffectsLayer } from "./command.ts"
 import { SettingsComposition } from "./composition.ts"
+import { Message } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
@@ -11,6 +12,7 @@ const SettingsBlockValue = SettingsComposition.assembleBlock({
   update,
   view,
   subscriptions,
+  operations: { requestNameChange: Message.RequestedNameChange },
   EffectsLayer: Layer.merge(EffectsLayer, subscriptions.layer)
 })
 type SettingsBlockType = typeof SettingsBlockValue

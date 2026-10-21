@@ -289,6 +289,29 @@ describe("the settings", () => {
     )
   })
 
+  it("opens the same dialog when its parent asks for it, as a card's Change name does, once the replica holds them", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.RequestedNameChange()),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.entering).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+      }),
+      message(received(alice.id)),
+      message(Message.RequestedNameChange()),
+      dialogShown,
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.entering).toEqual(
+          Option.some(Entering.ChangingName({ name: "Alice", isSending: false, failure: Option.none() }))
+        )
+        expect(model.dialog.isOpen).toBe(true)
+      })
+    )
+  })
+
   it("reports every other entry of the account menu, for the page and the app to act on, and opens no dialog", () => {
     for (const entry of ["System", "Light", "Dark", "SwitchWorkspace", "WorkspaceSettings", "SignOut"] as const) {
       story(

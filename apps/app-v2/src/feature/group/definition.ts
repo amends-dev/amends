@@ -141,6 +141,7 @@ export const OutMessage = defineMessageUnion({
   OpenedThread: {},
   ClosedThread: {},
   OpenedAgent: { agentId: Identity.AgentId },
+  OpenedProfile: { memberId: Schema.String, triggerId: Schema.String },
   FollowedGroup: { place: Schema.String },
   UnfollowedGroup: { place: Schema.String },
   RequestedSearch: {}

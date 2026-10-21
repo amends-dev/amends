@@ -81,9 +81,19 @@ import * as GroupView from "./view.ts"
 
 const { workspace, member } = membership
 
-const view = withViewInputs(GroupView.view, { now, workspaceName: "Studio", viewport: "Desktop" })()
-const phoneView = withViewInputs(GroupView.view, { now, workspaceName: "Studio", viewport: "Phone" })()
-const threadView = withViewInputs(GroupView.threadView, { now })()
+const view = withViewInputs(GroupView.view, {
+  now,
+  workspaceName: "Studio",
+  viewport: "Desktop",
+  openTriggerId: undefined
+})()
+const phoneView = withViewInputs(GroupView.view, {
+  now,
+  workspaceName: "Studio",
+  viewport: "Phone",
+  openTriggerId: undefined
+})()
+const threadView = withViewInputs(GroupView.threadView, { now, openTriggerId: undefined })()
 const threadId = ThreadId.ThreadId.make("thread-1")
 
 /** A public team the person does not belong to. */
@@ -646,8 +656,8 @@ describe("a group's header on a phone", () => {
   it("leaves it to the rail on any wider window, where the rail has the Search", () => {
     for (const wideView of [
       view,
-      withViewInputs(GroupView.view, { now, workspaceName: "Studio", viewport: "Tablet" })(),
-      withViewInputs(GroupView.view, { now, workspaceName: "Studio", viewport: "Split" })()
+      withViewInputs(GroupView.view, { now, workspaceName: "Studio", viewport: "Tablet", openTriggerId: undefined })(),
+      withViewInputs(GroupView.view, { now, workspaceName: "Studio", viewport: "Split", openTriggerId: undefined })()
     ]) {
       scene({ update, view: wideView }, given(opened), expect(role("button", { name: "Search" })).toBeAbsent())
     }
@@ -1645,6 +1655,46 @@ describe("a group's side pane, while the log of a turn is followed", () => {
       click(role("button", { name: "Agent settings" })),
       expectOutMessage(OutMessage.OpenedAgent({ agentId: failedTurn.agentId })),
       expect(role("complementary", { name: "Turn log" })).toExist()
+    )
+  })
+})
+
+describe("a group's side pane opening the card of a member", () => {
+  const withMessages = modifyFields(withThread, {
+    thread: Option.map((open) => ({
+      ...open,
+      model: modifyFields(open.model, {
+        messages: () => [
+          { message: opening, pending: false },
+          { message: reply, pending: false }
+        ],
+        members: () => [member, bob]
+      })
+    }))
+  })
+
+  it("tells the page which card the person opened in the thread, and keeps the thread as it is", () => {
+    scene(
+      { update, view: sidePane },
+      given(withMessages),
+      click(within(role("complementary", { name: "Thread" }), role("button", { name: "Bob" }))),
+      expectOutMessage(OutMessage.OpenedProfile({ memberId: bob.id, triggerId: "thread-message-2-name" })),
+      expect(role("complementary", { name: "Thread" })).toExist()
+    )
+  })
+
+  it("says the trigger whose card is open is expanded", () => {
+    scene(
+      {
+        update,
+        view: (model, h) =>
+          h.div([], [withViewInputs(GroupView.threadView, { now, openTriggerId: "thread-message-2-name" })()(model, h)])
+      },
+      given(withMessages),
+      expect(within(role("complementary", { name: "Thread" }), role("button", { name: "Bob" }))).toHaveAttr(
+        "aria-expanded",
+        "true"
+      )
     )
   })
 })

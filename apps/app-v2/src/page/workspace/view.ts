@@ -42,6 +42,7 @@ import { isThreadOpen } from "./home/definition.ts"
 import {
   asideDialogView as homeAsideDialogView,
   dialogView as homeDialogView,
+  profileCardView as homeProfileCardView,
   sidebarView as homeSidebarView,
   threadView as homeThreadView,
   view as homeView
@@ -355,6 +356,7 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
       dialog: (toView) => h.block(MenuBinding.embedView({ slotId: "menu", model: model.menu, viewInputs: { toView } }))
     },
     dialogs: [
+      h.block(HomeBinding.embedView({ slotId: "home-profile-card", model: model.home, view: homeProfileCardView })),
       h.block(HomeBinding.embedView({ slotId: "home-dialog", model: model.home, view: homeDialogView })),
       h.block(
         ConnectionsBinding.embedView({

@@ -37,6 +37,10 @@ export const update = ThreadsComposition.makeUpdate((model, message) =>
     ClickedNewTask: () => ({ model, commands: [FocusComposer({ groupId: model.groupId })] }),
     CompletedFocusComposer: () => ({ model }),
     ClickedThread: ({ threadId }) => ({ model, outMessage: OutMessage.SelectedThread({ threadId }) }),
+    OpenedProfile: ({ memberId, triggerId }) => ({
+      model,
+      outMessage: OutMessage.OpenedProfile({ memberId, triggerId })
+    }),
     WroteAction: () => ({ model: modifyFields(model, { notice: () => Option.none() }) }),
     FailedWriteAction: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) })
   })

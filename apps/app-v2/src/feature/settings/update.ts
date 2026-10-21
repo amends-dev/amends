@@ -15,7 +15,7 @@ import {
   RevokeInvitation,
   TransferOwnership
 } from "./command.ts"
-import { DialogBinding, leaveDialog, openDialog, SettingsComposition } from "./composition.ts"
+import { askToChangeName, DialogBinding, leaveDialog, openDialog, SettingsComposition } from "./composition.ts"
 import {
   Entering,
   type Failure,
@@ -612,6 +612,7 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
     ClickedViewHistory: () => askToViewHistory(),
     ClickedRevoke: ({ invitationId }) => askToRevoke(invitationId),
     ConfirmedRevocation: () => submitRevocation(model),
+    RequestedNameChange: () => Update.combine(model, [askToChangeName]),
     WroteAction: ({ written }) => keep(written),
     FailedWriteAction: ({ written, reason }) => ({ model: refuse(model, written, reason) })
   })

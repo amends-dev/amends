@@ -52,6 +52,10 @@ export const update = InboxComposition.makeUpdate((model, message) => {
           )
       }),
     ClickedClose: () => Update.withOutMessage(Update.combine(model, [closeThread]), OutMessage.ClosedThread()),
+    OpenedProfile: ({ memberId, triggerId }) => ({
+      model,
+      outMessage: OutMessage.OpenedProfile({ memberId, triggerId })
+    }),
     ClickedMarkAllSeen: () =>
       Option.match(newestWaiting(model), {
         onNone: () => ({ model }),

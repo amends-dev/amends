@@ -136,6 +136,7 @@ export const Message = defineMessageUnion({
   ClickedDelete: { messageId: ThreadMessageId.ThreadMessageId },
   ClickedFollow: {},
   ClickedUnfollow: {},
+  OpenedProfile: { memberId: Schema.String, triggerId: Schema.String },
   ToldTyping: {},
   CompletedScrollMessagesToEnd: {},
   CompletedRevealHighlightedMessage: {},
@@ -145,12 +146,14 @@ export const Message = defineMessageUnion({
 export type Message = typeof Message.Type
 
 /**
- * The thread reports that the person closed the log of a turn, which leaves the thread too, and that they asked for the
- * settings of the agent whose turn failed.
+ * The thread reports that the person closed the log of a turn, which leaves the thread too, that they asked for the
+ * settings of the agent whose turn failed, and that they opened the card of a member from the name or mark of a
+ * message's author or a mention in its text.
  */
 export const OutMessage = defineMessageUnion({
   ClosedTurnLog: {},
-  OpenedAgent: { agentId: Identity.AgentId }
+  OpenedAgent: { agentId: Identity.AgentId },
+  OpenedProfile: { memberId: Schema.String, triggerId: Schema.String }
 })
 export type OutMessage = typeof OutMessage.Type
 

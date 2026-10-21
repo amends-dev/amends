@@ -22,6 +22,7 @@ import * as Option from "effect/Option"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { workingLabel } from "../../agentActivity.ts"
 import {
+  authorMemberId,
   authorName,
   initials,
   isAuthorAgent,
@@ -65,9 +66,9 @@ import {
 
 /**
  * Who could have written the openings, what the group is called and whether it is a team, who belongs to a team as its
- * welcome names them, which of its threads is open, who is present and which thread each types in, the time now,
- * which the days the threads were created on are read from, and the slash commands the composer offers on the Threads
- * tab, none unless given.
+ * welcome names them, which of its threads is open, who is present and which thread each types in, the trigger whose
+ * member's card is open, the time now, which the days the threads were created on are read from, and the slash
+ * commands the composer offers on the Threads tab, none unless given.
  */
 export type ViewInputs = Readonly<{
   members: ReadonlyArray<Member.Member>
@@ -75,6 +76,7 @@ export type ViewInputs = Readonly<{
   isTeam: boolean
   memberNames: ReadonlyArray<string>
   openThreadId: Option.Option<ThreadId.ThreadId>
+  openTriggerId: string | undefined
   present: ReadonlyArray<Presence.Present>
   now: DateTime.Utc
   commands?: ReadonlyArray<OfferedSlashCommand>
@@ -133,7 +135,8 @@ const threadNotes = (
  * before it without a mark and a name when `openingStacksUnder` says so, the task it tracks as a chip, and under
  * them the button that opens it: how many replies it has and who wrote them, with a dot while any is unread, or "Reply
  * in thread" where it has none, and at its end the agents at work in it and who types in it. A hovered thread also
- * offers the reply as an action. Each of them opens the thread.
+ * offers the reply as an action. Each of them opens the thread, apart from the author's name and mark and the mentions
+ * in the opening, which open the member's card.
  */
 const threadRow = (
   item: ThreadItem,
@@ -144,10 +147,15 @@ const threadRow = (
 ): Html => {
   const { members, openThreadId } = inputs
   const author = Option.match(item.opening, {
-    onNone: () => ({ name: "A thread", mark: "?", isAgent: false }),
+    onNone: () => ({ name: "A thread", mark: "?", isAgent: false, id: undefined }),
     onSome: (opening) => {
       const name = authorName(opening.author, members, [])
-      return { name, mark: initials(name), isAgent: isAuthorAgent(opening.author, members) }
+      return {
+        name,
+        mark: initials(name),
+        isAgent: isAuthorAgent(opening.author, members),
+        id: authorMemberId(opening.author)
+      }
     }
   })
   const words = threadWords(item.thread, item.opening, members)
@@ -158,6 +166,12 @@ const threadRow = (
     key: item.thread.id,
     mark: author.mark,
     author: author.name,
+    authorId: author.id,
+    profiles: {
+      scope: "threads",
+      openTriggerId: inputs.openTriggerId,
+      open: (memberId: string, triggerId: string) => Message.OpenedProfile({ memberId, triggerId })
+    },
     isAgent: author.isAgent,
     time: timeOf(item.thread.createdAt),
     note: item.pending ? "Sending…" : undefined,

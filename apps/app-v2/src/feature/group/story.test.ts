@@ -104,6 +104,7 @@ const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
       isTeam: true,
       memberNames: [],
       openThreadId: Option.none(),
+      openTriggerId: undefined,
       present: [],
       now
     }
@@ -445,6 +446,20 @@ describe("a group", () => {
       expectOutMessage(OutMessage.ClosedThread()),
       model((model) => {
         expect(model.thread).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("reports the card its threads opened, and changes nothing else", () => {
+    story(
+      update,
+      given(opened),
+      message(
+        fromThreads(ThreadsBlock.Message.OpenedProfile({ memberId: "member-2", triggerId: "threads-thread-1-name" }))
+      ),
+      expectOutMessage(OutMessage.OpenedProfile({ memberId: "member-2", triggerId: "threads-thread-1-name" })),
+      model((model) => {
+        expect(model).toEqual(opened)
       })
     )
   })

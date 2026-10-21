@@ -12,22 +12,24 @@ export const closeThread = InboxDefinition.stepFields(() => ({ selected: () => O
 
 /**
  * The person closing the log of one of the open thread's turns leaves the thread too; asking for the settings of an
- * agent changes nothing in the inbox.
+ * agent, or opening a member's card, changes nothing in the inbox.
  */
 const foldThreadOutMessage = (_threadId: ThreadId.ThreadId, outMessage: typeof ThreadBlock.OutMessage.Type) =>
   ThreadBlock.OutMessage.match(outMessage, {
     ClosedTurnLog: () => closeThread,
-    OpenedAgent: () => InboxDefinition.stepNoop()
+    OpenedAgent: () => InboxDefinition.stepNoop(),
+    OpenedProfile: () => InboxDefinition.stepNoop()
   })
 
 /**
  * Closing the log of one of the open thread's turns is reported to the inbox's parent as the thread closing, and the
- * settings of an agent asked for as they are.
+ * settings of an agent asked for and the card opened as they are.
  */
 const forwardThreadOutMessage = (_threadId: ThreadId.ThreadId, outMessage: typeof ThreadBlock.OutMessage.Type) =>
   ThreadBlock.OutMessage.match(outMessage, {
     ClosedTurnLog: () => OutMessage.ClosedThread(),
-    OpenedAgent: ({ agentId }) => OutMessage.OpenedAgent({ agentId })
+    OpenedAgent: ({ agentId }) => OutMessage.OpenedAgent({ agentId }),
+    OpenedProfile: ({ memberId, triggerId }) => OutMessage.OpenedProfile({ memberId, triggerId })
   })
 
 /** The thread opened beside the inbox, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong one. */

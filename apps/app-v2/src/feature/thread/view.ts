@@ -18,10 +18,12 @@ import { property } from "@amends-dev/design/details"
 import { form } from "@amends-dev/design/form"
 import { description, divider, event, message, messageList, note } from "@amends-dev/design/message"
 import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneStack } from "@amends-dev/design/pane"
+import type { ProfileOpener } from "@amends-dev/design/profile"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import {
+  authorMemberId,
   authorName,
   fullTimeOf,
   groupByDay,
@@ -53,11 +55,13 @@ import {
 import { Entry, timelineOf, turnPostingReply, whenOf } from "./timeline.ts"
 
 /**
- * The time now, which the days the messages were published on are read from, and, when a notification opened the
- * thread, the message it is about, drawn current so that the person sees what it was about.
+ * The time now, which the days the messages were published on are read from, the trigger whose member's card is open,
+ * and, when a notification opened the thread, the message it is about, drawn current so that the person sees what it
+ * was about.
  */
 export type ViewInputs = Readonly<{
   now: DateTime.Utc
+  openTriggerId: string | undefined
   highlightedMessageId?: Option.Option<ThreadMessageId.ThreadMessageId>
 }>
 
@@ -147,20 +151,29 @@ const editControls = (
   }
 }
 
+/** How the messages' authors and the mentions in their texts open the member's card. */
+const profilesOf = ({ openTriggerId }: ViewInputs): ProfileOpener<Message> => ({
+  scope: "thread",
+  openTriggerId,
+  open: (memberId, triggerId) => Message.OpenedProfile({ memberId, triggerId })
+})
+
 /** How a time in the timeline reads: its time of day under a day's divider, or by its day where no divider says it. */
 type TimeLabel = (at: DateTime.Utc) => string
 
 /**
  * A message, with editing and deleting for the person's own, and the form to change it while they edit it, drawn
- * current while it is the one highlighted, and, when it is the reply of an agent's turn, View turn log.
+ * current while it is the one highlighted, and, when it is the reply of an agent's turn, View turn log. Its author's
+ * name and mark and the mentions in its text open the member's card.
  */
 const messageView = (
   item: MessageItem,
   model: Model,
-  { highlightedMessageId = Option.none() }: ViewInputs,
+  inputs: ViewInputs,
   timeLabel: TimeLabel,
   h: ThreadViewBuilder
 ): Html => {
+  const { highlightedMessageId = Option.none() } = inputs
   const edited = ThreadMessage.Content.matchOrElse(
     item.message.content,
     { Text: ({ editedAt }) => editedAt !== null },
@@ -187,6 +200,8 @@ const messageView = (
     key: item.message.id,
     mark: initials(author),
     author,
+    authorId: authorMemberId(item.message.author),
+    profiles: profilesOf(inputs),
     isAgent: isAuthorAgent(item.message.author, model.members),
     time: timeLabel(item.message.publishedAt),
     note: item.pending ? "Sending…" : undefined,
@@ -265,11 +280,8 @@ const typingView = (names: ReadonlyArray<string>, h: ThreadViewBuilder): Html =>
  * Edit and Delete for the person's own, and the form to change it while they edit it. Nothing before the opening is
  * read.
  */
-const descriptionView = (
-  model: Model,
-  { highlightedMessageId = Option.none() }: ViewInputs,
-  h: ThreadViewBuilder
-): Html => {
+const descriptionView = (model: Model, inputs: ViewInputs, h: ThreadViewBuilder): Html => {
+  const { highlightedMessageId = Option.none() } = inputs
   const [opening] = model.messages
 
   if (opening === undefined) {
@@ -284,6 +296,7 @@ const descriptionView = (
     children: [
       description(h, {
         text: messageText(opening.message, model.members),
+        profiles: profilesOf(inputs),
         body,
         actions,
         isCurrent,

@@ -6,10 +6,12 @@
  * the inbox, which stays, and the Block lays the pane out by the window's width, which its parent informs it of: below
  * 80rem the pane is in a dialog of its own, which follows the thread opening and closing. It reports when the person
  * moved within Home from its sidebar or its lists, when they joined a group, with where it is as a line says it, when
- * they created one, when they asked, from a turn that failed in a thread, for the settings of its agent, when they
- * asked, from a group's header on a phone, for the search, and its parent asks it to open a group, a thread in its
- * group, or a conversation with a member, which is the one they have or one not started, and to show the inbox again,
- * as leaving Home does. Home opens on the inbox.
+ * they created one, and when they chose on a member's card, which opens from the name and mark of an author and from a
+ * mention in the inbox, the group's threads, and the thread open, one at a time across them, to message them, to open
+ * their agent's settings, or, on their own, to change their name; it also reports when they asked, from a turn that
+ * failed in a thread, for the settings of its agent, and when they asked, from a group's header on a phone, for the
+ * search. Its parent asks it to open a group, a thread in its group, or a conversation with a member, which is the one
+ * they have or one not started, and to show the inbox again, as leaving Home does. Home opens on the inbox.
  */
 
 import { GroupId } from "@amends-dev/core/group"
@@ -27,6 +29,7 @@ import { defineTaggedUnion } from "foldkit/schema"
 import { GroupBlock } from "../../../feature/group/block.ts"
 import { GroupsBlock } from "../../../feature/groups/block.ts"
 import { InboxBlock } from "../../../feature/inbox/block.ts"
+import { ProfileCardBlock } from "../../../feature/profileCard/block.ts"
 import { TasksBlock } from "../../../feature/tasks/block.ts"
 import { type Model as ThreadModel, titleOf } from "../../../feature/thread/definition.ts"
 import { UnsentConversationBlock } from "../../../feature/unsentConversation/block.ts"
@@ -54,6 +57,7 @@ export const Model = Schema.Struct({
   groups: GroupsBlock.Model,
   inbox: InboxBlock.Model,
   tasks: TasksBlock.Model,
+  profileCard: ProfileCardBlock.Model,
   open: Open,
   /** The thread's side pane, a dialog, which the shell shows only below 80rem. */
   aside: DialogBlock.Model
@@ -96,7 +100,7 @@ export const unsentMemberId = (model: Model): Option.Option<MemberId.MemberId> =
 /** Whether a thread is open, in the group open or beside the inbox, which shows the side pane. */
 export const isThreadOpen = (model: Model): boolean => Option.isSome(openThreadTitle(model))
 
-/** What the groups, the inbox, and the tasks are made from: the workspace, as the member. */
+/** What the groups, the inbox, the tasks, and the card are made from: the workspace, as the member. */
 export const ChildInitContext = Schema.Struct({ workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId })
 
 export const Message = defineMessageUnion({
@@ -116,6 +120,8 @@ export const OutMessage = defineMessageUnion({
   JoinedGroup: { groupId: GroupId.GroupId, place: Schema.String },
   CreatedGroup: { groupId: GroupId.GroupId },
   OpenedAgent: { agentId: Identity.AgentId },
+  OpenedPerson: { memberId: MemberId.MemberId },
+  RequestedNameChange: {},
   FollowedGroup: { place: Schema.String },
   UnfollowedGroup: { place: Schema.String },
   RequestedSearch: {}

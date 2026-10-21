@@ -283,6 +283,18 @@ describe("a group's threads", () => {
       expectOutMessage(OutMessage.SelectedThread({ threadId: ThreadId.ThreadId.make("thread-1") }))
     )
   })
+
+  it("reports the member whose card an author's name or mark opened, with the trigger, and changes nothing", () => {
+    story(
+      update,
+      given(listing),
+      message(Message.OpenedProfile({ memberId: "member-2", triggerId: "threads-thread-1-name" })),
+      expectOutMessage(OutMessage.OpenedProfile({ memberId: "member-2", triggerId: "threads-thread-1-name" })),
+      model((model) => {
+        expect(model).toEqual(listing)
+      })
+    )
+  })
 })
 
 describe("the tasks of a group's threads", () => {

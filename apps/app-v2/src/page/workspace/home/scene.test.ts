@@ -14,6 +14,7 @@ import {
   expectOutMessage,
   given,
   inside,
+  keydown,
   label,
   role,
   scene,
@@ -39,6 +40,7 @@ import {
   reply,
   saying,
   scout,
+  scoutAgent,
   task,
   thread,
   turnOf
@@ -51,6 +53,9 @@ import { GroupsBlock } from "../../../feature/groups/block.ts"
 import { CreateTeam } from "../../../feature/groups/command.ts"
 import { InboxBlock } from "../../../feature/inbox/block.ts"
 import { MarkNotificationSeen } from "../../../feature/inbox/command.ts"
+import { ProfileCardBlock } from "../../../feature/profileCard/block.ts"
+import { AnchorProfileCard, FocusTrigger } from "../../../feature/profileCard/command.ts"
+import type { MemberProfile } from "../../../feature/profileCard/definition.ts"
 import { init as initThread } from "../../../feature/thread/init.ts"
 import { LogState } from "../../../feature/turns/definition.ts"
 import { init as initUnsent } from "../../../feature/unsentConversation/init.ts"
@@ -59,7 +64,7 @@ import { HomeBlock } from "./block.ts"
 import { Open, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { dialogView, sidebarView, threadView, view } from "./view.ts"
+import { dialogView, profileCardView, sidebarView, threadView, view } from "./view.ts"
 
 const { workspace, member } = membership
 
@@ -77,7 +82,7 @@ const sideView = withViewInputs(threadView, { now })()
 
 /**
  * Home's sidebar in a navigation named for the workspace, its main pane, its thread beside the main pane while one is
- * open, and the dialogs of its groups, as the page lends them to the shell.
+ * open, the dialogs of its groups, and the card of a member, as the page lends them to the shell.
  */
 const sceneView: typeof mainView = (model, h) =>
   h.div(
@@ -86,7 +91,8 @@ const sceneView: typeof mainView = (model, h) =>
       h.nav([h.AriaLabel("Studio")], [sidebarView(model, h)]),
       mainView(model, h),
       sideView(model, h),
-      dialogView(model, h)
+      dialogView(model, h),
+      profileCardView(model, h)
     ]
   )
 
@@ -904,6 +910,217 @@ describe("Home, with a conversation the person has not started", () => {
       expect(label("Message Bob, Scout")).toExist(),
       expect(sidebarButton("Bob")).not.toHaveAttr("aria-current"),
       expect(sidebarButton("Scout")).not.toHaveAttr("aria-current")
+    )
+  })
+})
+
+describe("Home, with the card of a member", () => {
+  const profileRead = homeSubscriptions["profileCard/profile"]
+
+  const person: MemberProfile = {
+    memberId: bob.id,
+    name: "Bob",
+    kind: "Person",
+    isYou: false,
+    isFormer: false,
+    agentId: Option.none(),
+    standing: Option.none(),
+    motion: Option.none()
+  }
+
+  const agent: MemberProfile = {
+    ...person,
+    memberId: scout.id,
+    name: "Scout",
+    kind: "Agent",
+    agentId: Option.some(scoutAgent.id)
+  }
+
+  /** The inbox read, on All, with the notification of a message written by `author`, who the workspace's members include. */
+  const notifiedOf = (author: ThreadMessage.ThreadMessage["author"]) =>
+    modifyFields(opened, {
+      inbox: (inbox) =>
+        modifyFields(inbox, {
+          isLoaded: () => true,
+          tab: () => "All" as const,
+          items: () => [
+            {
+              notification: notificationOf("notification-1", 2, 5),
+              thread: Option.some(thread),
+              opening: Option.some(opening),
+              message: Option.some({ ...reply, author })
+            }
+          ],
+          groups: () => [general],
+          members: () => [member, bob, scout]
+        })
+    })
+
+  const bobAuthor = ThreadMessage.Author.cases.Member.make({ memberId: bob.id })
+  const notifiedOfBob = notifiedOf(bobAuthor)
+  const nameOfBob = within(role("main", { name: "Inbox" }), role("button", { name: "Bob" }))
+  const triggerId = "inbox-notification-1-name"
+
+  /** The card opened from the name in the notification's row and its member read, as it shows. */
+  const cardOpenedFrom = (profile: MemberProfile) =>
+    [
+      click(selector(`#${triggerId}`)),
+      Subscription.emit(profileRead, ProfileCardBlock.Message.ReceivedProfile({ profile: Option.some(profile) })),
+      Mount.resolve(AnchorProfileCard, ProfileCardBlock.Message.CompletedAnchorProfileCard())
+    ] as const
+
+  it("opens from the name of who wrote what a notification is about, and marks the name expanded while it is open", () => {
+    scene(
+      { update, view: sceneView, subscriptions: homeSubscriptions },
+      given(notifiedOfBob),
+      expect(role("dialog", { name: "Bob" })).toBeAbsent(),
+      expect(nameOfBob).toHaveAttr("aria-expanded", "false"),
+      ...cardOpenedFrom(person),
+      expect(role("dialog", { name: "Bob" })).toExist(),
+      expect(nameOfBob).toHaveAttr("aria-expanded", "true")
+    )
+  })
+
+  it("closes on Escape, gives the focus back to the name that opened it, and marks the name not expanded", () => {
+    scene(
+      { update, view: sceneView, subscriptions: homeSubscriptions },
+      given(notifiedOfBob),
+      ...cardOpenedFrom(person),
+      keydown(role("dialog", { name: "Bob" }), "Escape"),
+      Command.expectExact(FocusTrigger({ triggerId })),
+      Command.resolve(FocusTrigger, ProfileCardBlock.Message.CompletedFocusTrigger()),
+      Mount.expectEnded(AnchorProfileCard),
+      expect(role("dialog", { name: "Bob" })).toBeAbsent(),
+      expect(nameOfBob).toHaveAttr("aria-expanded", "false")
+    )
+  })
+
+  it("opens from the mark as it does from the name, and shows one card at a time across the panes", () => {
+    scene(
+      { update, view: sceneView, subscriptions: homeSubscriptions },
+      given(notifiedOfBob),
+      ...cardOpenedFrom(person),
+      click(selector("#inbox-notification-1-mark")),
+      Mount.expectEnded(AnchorProfileCard),
+      expect(role("dialog", { name: "Bob" })).toBeAbsent(),
+      expect(nameOfBob).toHaveAttr("aria-expanded", "false"),
+      Subscription.emit(profileRead, ProfileCardBlock.Message.ReceivedProfile({ profile: Option.some(person) })),
+      Mount.resolve(AnchorProfileCard, ProfileCardBlock.Message.CompletedAnchorProfileCard()),
+      expect(role("dialog", { name: "Bob" })).toExist()
+    )
+  })
+
+  it("opens from the author of a message in the thread beside the inbox, and marks that name expanded", () => {
+    const threadName = within(role("complementary", { name: "Thread" }), role("button", { name: "Bob" }))
+    const besideInbox = modifyFields(notifiedOfBob, {
+      inbox: (inbox) =>
+        modifyFields(inbox, {
+          selected: () =>
+            Option.some({
+              notificationId: notificationOf("notification-1", 2, 5).id,
+              threadId: thread.id,
+              groupId: general.id,
+              messageId: Option.none(),
+              model: modifyFields(initThread(workspace.id, member.id, thread.id).model, {
+                isLoaded: () => true,
+                hasThread: () => true,
+                title: () => Option.some("Composer paste crash"),
+                messages: () => [
+                  { message: opening, pending: false },
+                  { message: reply, pending: false }
+                ],
+                members: () => [member, bob]
+              })
+            })
+        })
+    })
+
+    scene(
+      { update, view: sceneView, subscriptions: homeSubscriptions },
+      given(besideInbox),
+      click(threadName),
+      Subscription.emit(profileRead, ProfileCardBlock.Message.ReceivedProfile({ profile: Option.some(person) })),
+      Mount.resolve(AnchorProfileCard, ProfileCardBlock.Message.CompletedAnchorProfileCard()),
+      expect(role("dialog", { name: "Bob" })).toExist(),
+      expect(threadName).toHaveAttr("aria-expanded", "true"),
+      expect(nameOfBob).toHaveAttr("aria-expanded", "false")
+    )
+  })
+
+  it("opens from the author of a message in the thread open in a group", () => {
+    const inGroupWithMessages = modifyFields(withThread, {
+      open: (open) =>
+        Open.matchOrElse(
+          open,
+          {
+            Group: ({ groupId, model: group }) =>
+              Open.Group({
+                groupId,
+                model: {
+                  ...group,
+                  thread: Option.map(group.thread, (openThread) => ({
+                    ...openThread,
+                    model: {
+                      ...openThread.model,
+                      isLoaded: true,
+                      hasThread: true,
+                      messages: [
+                        { message: opening, pending: false },
+                        { message: reply, pending: false }
+                      ],
+                      members: [member, bob]
+                    }
+                  }))
+                }
+              })
+          },
+          () => open
+        )
+    })
+    const threadName = within(role("complementary", { name: "Thread" }), role("button", { name: "Bob" }))
+
+    scene(
+      { update, view: sceneView, subscriptions: homeSubscriptions },
+      given(inGroupWithMessages),
+      click(threadName),
+      Subscription.emit(profileRead, ProfileCardBlock.Message.ReceivedProfile({ profile: Option.some(person) })),
+      Mount.resolve(AnchorProfileCard, ProfileCardBlock.Message.CompletedAnchorProfileCard()),
+      expect(role("dialog", { name: "Bob" })).toExist(),
+      expect(threadName).toHaveAttr("aria-expanded", "true")
+    )
+  })
+
+  it("reports the person to message from Message on a person's card, which the page opens the conversation for", () => {
+    scene(
+      { update, view: sceneView, subscriptions: homeSubscriptions },
+      given(notifiedOfBob),
+      ...cardOpenedFrom(person),
+      click(within(role("dialog", { name: "Bob" }), role("button", { name: "Message" }))),
+      expectOutMessage(OutMessage.OpenedPerson({ memberId: bob.id })),
+      Mount.expectEnded(AnchorProfileCard),
+      expect(role("dialog", { name: "Bob" })).toBeAbsent()
+    )
+  })
+
+  it("reports the agent whose page to open from Open agent on an agent's card", () => {
+    scene(
+      { update, view: sceneView, subscriptions: homeSubscriptions },
+      given(notifiedOf(ThreadMessage.Author.cases.Member.make({ memberId: scout.id }))),
+      ...cardOpenedFrom(agent),
+      click(within(role("dialog", { name: "Scout" }), role("button", { name: "Open agent" }))),
+      expectOutMessage(OutMessage.OpenedAgent({ agentId: scoutAgent.id })),
+      Mount.expectEnded(AnchorProfileCard)
+    )
+  })
+
+  it("reports that the person asked to change their name from Change name on their own card", () => {
+    scene(
+      { update, view: sceneView, subscriptions: homeSubscriptions },
+      given(notifiedOf(ThreadMessage.Author.cases.Member.make({ memberId: member.id }))),
+      ...cardOpenedFrom({ ...person, memberId: member.id, name: "Alice", isYou: true }),
+      click(within(role("dialog", { name: "Alice" }), role("button", { name: "Change name" }))),
+      expectOutMessage(OutMessage.RequestedNameChange()),
+      Mount.expectEnded(AnchorProfileCard)
     )
   })
 })

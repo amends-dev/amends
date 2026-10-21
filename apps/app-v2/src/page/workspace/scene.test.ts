@@ -93,6 +93,9 @@ import { GroupsBlock } from "../../feature/groups/block.ts"
 import { CreateTeam, JoinGroup } from "../../feature/groups/command.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { MarkNotificationSeen } from "../../feature/inbox/command.ts"
+import { ProfileCardBlock } from "../../feature/profileCard/block.ts"
+import { AnchorProfileCard } from "../../feature/profileCard/command.ts"
+import type { MemberProfile } from "../../feature/profileCard/definition.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { RenameSelf, SelectOnFocus } from "../../feature/settings/command.ts"
@@ -100,7 +103,7 @@ import { AccountMenu, Written as SettingsWritten } from "../../feature/settings/
 import { TasksBlock } from "../../feature/tasks/block.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { WorkspaceBlock } from "./block.ts"
-import { LoadIntegrations } from "./command.ts"
+import { LoadIntegrations, RequestNameChange } from "./command.ts"
 import { Message, Open, OutMessage } from "./definition.ts"
 import { Open as HomeOpen } from "./home/definition.ts"
 import { init } from "./init.ts"
@@ -2226,6 +2229,79 @@ describe("a conversation the person has not started, in the workspace", () => {
       click(sidebarButton("Inbox")),
       expect(role("main", { name: "Bob" })).toBeAbsent(),
       expect(sidebarButton("Bob")).not.toHaveAttr("aria-current")
+    )
+  })
+})
+
+describe("a workspace, with the card of a member", () => {
+  const profileRead = workspaceSubscriptions["home/profileCard/profile"]
+
+  const alicesName = (author: ThreadMessage.ThreadMessage["author"]) =>
+    atHome(withSettings, (home) =>
+      modifyFields(home, {
+        inbox: (inbox) =>
+          modifyFields(inbox, {
+            isLoaded: () => true,
+            items: () => [
+              {
+                notification: notificationOf("notification-1", 2, 5),
+                thread: Option.some(thread),
+                opening: Option.some(opening),
+                message: Option.some({ ...reply, author })
+              }
+            ],
+            groups: () => [general],
+            members: () => [member, bob]
+          })
+      })
+    )
+
+  const profileOf = (memberName: string, isYou: boolean): MemberProfile => ({
+    memberId: isYou ? member.id : bob.id,
+    name: memberName,
+    kind: "Person",
+    isYou,
+    isFormer: false,
+    agentId: Option.none(),
+    standing: Option.none(),
+    motion: Option.none()
+  })
+
+  it("is drawn in the page's frame when a name in the inbox opens it, and the name says it is expanded", () => {
+    scene(
+      { update, view: sceneView, subscriptions: workspaceSubscriptions },
+      given(withNotification),
+      expect(role("dialog", { name: "Bob" })).toBeAbsent(),
+      click(selector("#inbox-notification-1-name")),
+      Subscription.emit(
+        profileRead,
+        ProfileCardBlock.Message.ReceivedProfile({ profile: Option.some(profileOf("Bob", false)) })
+      ),
+      Mount.resolve(AnchorProfileCard, ProfileCardBlock.Message.CompletedAnchorProfileCard()),
+      expect(role("dialog", { name: "Bob" })).toExist(),
+      expect(selector("#inbox-notification-1-name")).toHaveAttr("aria-expanded", "true")
+    )
+  })
+
+  it("opens the dialog that changes the person's name from Change name on their own card", () => {
+    scene(
+      { update, view: sceneView, subscriptions: workspaceSubscriptions },
+      given(alicesName(ThreadMessage.Author.cases.Member.make({ memberId: member.id }))),
+      click(selector("#inbox-notification-1-name")),
+      Subscription.emit(
+        profileRead,
+        ProfileCardBlock.Message.ReceivedProfile({ profile: Option.some(profileOf("Alice", true)) })
+      ),
+      Mount.resolve(AnchorProfileCard, ProfileCardBlock.Message.CompletedAnchorProfileCard()),
+      click(within(role("dialog", { name: "Alice" }), role("button", { name: "Change name" }))),
+      Mount.expectEnded(AnchorProfileCard),
+      expect(role("dialog", { name: "Alice" })).toBeAbsent(),
+      Command.expectExact(RequestNameChange({})),
+      Command.resolve(RequestNameChange, Message.CompletedRequestNameChange()),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      Mount.resolve(SelectOnFocus, SettingsBlock.Message.CompletedSelectOnFocus()),
+      inside(role("dialog", { name: "Your name" }), expect(role("textbox", { name: "Name" })).toHaveValue("Alice"))
     )
   })
 })

@@ -105,7 +105,7 @@ const reply = Schema.decodeSync(ThreadMessage.ThreadMessage)({
 const savingDraft = (text: string) =>
   SaveDraft({ workspaceId, memberId, place: Drafts.Place.cases.Reply.make({ threadId }), text })
 
-const sceneView = withViewInputs(view, { now })()
+const sceneView = withViewInputs(view, { now, openTriggerId: undefined })()
 
 /** The side pane's bell, body and footer, as the group's side pane puts them. */
 const sidePane = (model: Parameters<typeof sceneView>[0], h: Parameters<typeof sceneView>[1]) =>
@@ -952,7 +952,7 @@ describe("a thread", () => {
 
   it("reveals the highlighted message once it is drawn, by a mount on its row alone", () => {
     const highlighted = (messageId: ThreadMessageId.ThreadMessageId) =>
-      withViewInputs(view, { now, highlightedMessageId: Option.some(messageId) })()
+      withViewInputs(view, { now, openTriggerId: undefined, highlightedMessageId: Option.some(messageId) })()
 
     scene(
       { update, view: highlighted(reply.id), subscriptions: ThreadBlock.subscriptions },
@@ -982,7 +982,7 @@ describe("a thread", () => {
     scene(
       {
         update,
-        view: withViewInputs(view, { now, highlightedMessageId: Option.some(opening.id) })(),
+        view: withViewInputs(view, { now, openTriggerId: undefined, highlightedMessageId: Option.some(opening.id) })(),
         subscriptions: ThreadBlock.subscriptions
       },
       given(trackingTask),
@@ -1002,7 +1002,7 @@ describe("a thread", () => {
 
   it("draws the highlighted message current, and no other, as the notification's thread opens at it", () => {
     const highlighted = (messageId: ThreadMessageId.ThreadMessageId) =>
-      withViewInputs(view, { now, highlightedMessageId: Option.some(messageId) })()
+      withViewInputs(view, { now, openTriggerId: undefined, highlightedMessageId: Option.some(messageId) })()
 
     scene(
       { update, view: highlighted(reply.id), subscriptions: ThreadBlock.subscriptions },
@@ -1027,6 +1027,7 @@ describe("a thread", () => {
         update,
         view: withViewInputs(view, {
           now,
+          openTriggerId: undefined,
           highlightedMessageId: Option.some(ThreadMessageId.ThreadMessageId.make("message-9"))
         })(),
         subscriptions: ThreadBlock.subscriptions
@@ -1034,6 +1035,87 @@ describe("a thread", () => {
       given(opened),
       ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
       expect(selector("[aria-current]")).toBeAbsent()
+    )
+  })
+})
+
+describe("a thread opening the card of a member", () => {
+  const mentioningBob = saying(
+    reply,
+    `Over to ${ThreadMessage.mentionText(bob.id, "Bob")}, then ${ThreadMessage.mentionText(alice.id, "Alice")}`
+  )
+  const nameOfBob = role("button", { name: "Bob" })
+
+  it("opens it from the name of a message's author, which says it opens a dialog and is not expanded", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
+      expect(nameOfBob).toHaveAttr("id", "thread-message-2-name"),
+      expect(nameOfBob).toHaveAttr("aria-haspopup", "dialog"),
+      expect(nameOfBob).toHaveAttr("aria-expanded", "false"),
+      click(nameOfBob),
+      expectOutMessage(OutMessage.OpenedProfile({ memberId: bob.id, triggerId: "thread-message-2-name" }))
+    )
+  })
+
+  it("opens it from the mark of a message's author, which is hidden from assistive technology", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
+      expect(selector("#thread-message-2-mark")).toHaveAttr("aria-hidden", "true"),
+      click(selector("#thread-message-2-mark")),
+      expectOutMessage(OutMessage.OpenedProfile({ memberId: bob.id, triggerId: "thread-message-2-mark" }))
+    )
+  })
+
+  it("opens it from a mention in a message, numbered in the order the text has them", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: opening, pending: false }, { message: mentioningBob, pending: false }),
+      click(role("button", { name: "@Alice" })),
+      expectOutMessage(OutMessage.OpenedProfile({ memberId: alice.id, triggerId: "thread-message-2-mention-1" })),
+      click(role("button", { name: "@Bob" })),
+      expectOutMessage(OutMessage.OpenedProfile({ memberId: bob.id, triggerId: "thread-message-2-mention-0" }))
+    )
+  })
+
+  it("opens it from a mention in a task's description", () => {
+    const described = saying(opening, `Ask ${ThreadMessage.mentionText(bob.id, "Bob")} about it`)
+
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(trackingTask),
+      ...readWith({ message: described, pending: false }, { message: reply, pending: false }),
+      click(within(role("region", { name: "Task" }), role("button", { name: "@Bob" }))),
+      expectOutMessage(OutMessage.OpenedProfile({ memberId: bob.id, triggerId: "thread-description-mention-0" }))
+    )
+  })
+
+  it("says the trigger whose card is open is expanded, and no other", () => {
+    scene(
+      {
+        update,
+        view: withViewInputs(view, { now, openTriggerId: "thread-message-2-name" })(),
+        subscriptions: ThreadBlock.subscriptions
+      },
+      given(opened),
+      ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
+      expect(nameOfBob).toHaveAttr("aria-expanded", "true")
+    )
+    scene(
+      {
+        update,
+        view: withViewInputs(view, { now, openTriggerId: "thread-message-2-mention-0" })(),
+        subscriptions: ThreadBlock.subscriptions
+      },
+      given(opened),
+      ...readWith({ message: opening, pending: false }, { message: mentioningBob, pending: false }),
+      expect(role("button", { name: "@Bob" })).toHaveAttr("aria-expanded", "true"),
+      expect(role("button", { name: "@Alice" })).toHaveAttr("aria-expanded", "false"),
+      expect(nameOfBob).toHaveAttr("aria-expanded", "false")
     )
   })
 })

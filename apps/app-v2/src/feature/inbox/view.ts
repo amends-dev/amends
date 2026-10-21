@@ -27,13 +27,16 @@ import {
 } from "./definition.ts"
 
 /**
- * The time now, which the days the notifications came on and how long ago they came are read from, and the workspace's
- * name, which a phone shows under the inbox's title.
+ * The time now, which the days the notifications came on and how long ago they came are read from, the workspace's
+ * name, which a phone shows under the inbox's title, and the trigger whose member's card is open.
  */
-export type ViewInputs = Readonly<{ now: DateTime.Utc; workspaceName: string }>
+export type ViewInputs = Readonly<{ now: DateTime.Utc; workspaceName: string; openTriggerId: string | undefined }>
 
-/** The time now, which the days the thread's messages were published on are read from. */
-export type ThreadViewInputs = Readonly<{ now: DateTime.Utc }>
+/**
+ * The time now, which the days the thread's messages were published on are read from, and the trigger whose member's
+ * card is open.
+ */
+export type ThreadViewInputs = Readonly<{ now: DateTime.Utc; openTriggerId: string | undefined }>
 
 /** What the body says when a tab has nothing to list; on Unread, with the way to see what was seen. */
 const nothingToList = (tab: Tab, h: InboxViewBuilder): Html =>
@@ -78,16 +81,26 @@ const tabs = (model: Model, h: InboxViewBuilder): Html =>
   })
 
 /**
- * A notification as the design's row: the author of what its activity is about and what they did, where it
- * comes from, and what it says, which opens its thread, if it has one, how long ago it came, and, while it
- * waits, unread, and current while it is the one whose thread is open.
+ * A notification as the design's row: the author of what its activity is about, whose name and mark open their
+ * card, and what they did, where it comes from, and what it says, which opens its thread, if it has one, how long ago
+ * it came, and, while it waits, unread, and current while it is the one whose thread is open.
  */
-const notificationRow = (item: InboxItem, model: Model, now: DateTime.Utc, h: InboxViewBuilder): Html => {
+const notificationRow = (
+  item: InboxItem,
+  model: Model,
+  { now, openTriggerId }: Pick<ViewInputs, "now" | "openTriggerId">,
+  h: InboxViewBuilder
+): Html => {
   const { id, recordedAt, thread } = item.notification
 
   return notification(h, {
     key: id,
     ...notificationHeadline(item, model),
+    profiles: {
+      scope: "inbox",
+      openTriggerId,
+      open: (memberId, triggerId) => Message.OpenedProfile({ memberId, triggerId })
+    },
     place: Option.getOrUndefined(notificationPlace(item, model)),
     text: notificationText(item, model),
     age: ageLabel(recordedAt, now),
@@ -101,7 +114,7 @@ const notificationRow = (item: InboxItem, model: Model, now: DateTime.Utc, h: In
  * The notifications the tab lists, newest first, under the days they came, or what the body says in their place:
  * that they are being read, why they could not be, or that the tab has none.
  */
-const notifications = (model: Model, now: DateTime.Utc, h: InboxViewBuilder): Html => {
+const notifications = (model: Model, inputs: Pick<ViewInputs, "now" | "openTriggerId">, h: InboxViewBuilder): Html => {
   if (isUnread(model)) {
     return unreadInbox(model, h)
   }
@@ -116,9 +129,9 @@ const notifications = (model: Model, now: DateTime.Utc, h: InboxViewBuilder): Ht
     ? nothingToList(model.tab, h)
     : messageList(h, {
         label: "Notifications",
-        children: byDay(items, now).flatMap((day) => [
+        children: byDay(items, inputs.now).flatMap((day) => [
           divider(h, day.label, { align: "start" }),
-          ...day.items.map((item) => notificationRow(item, model, now, h))
+          ...day.items.map((item) => notificationRow(item, model, inputs, h))
         ])
       })
 }
@@ -130,14 +143,14 @@ const notifications = (model: Model, now: DateTime.Utc, h: InboxViewBuilder): Ht
  * workspace's name is under the title on phones. Mark all seen is in the header while any notification waits, dimmed
  * while the write that marks them is on its way.
  */
-export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { now, workspaceName }, h) =>
+export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, inputs, h) =>
   pane(h, {
     variant: "main",
     label: "Inbox",
     header: {
       title: "Inbox",
       icon: "mark-mail",
-      phoneContext: workspaceName,
+      phoneContext: inputs.workspaceName,
       tabs: tabs(model, h),
       actions:
         waitingCount(model) === 0
@@ -149,7 +162,7 @@ export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { n
         h,
         [
           isUnread(model) ? h.empty : notice(h, model.notice),
-          notifications(model, now, h),
+          notifications(model, inputs, h),
           ...(hasOlderItems(model)
             ? [
                 buttonRow(h, [button(h, "Show older", Message.ClickedShowOlder(), { variant: "quiet" })], {
@@ -171,7 +184,7 @@ export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { n
  * Back, named for the Inbox, before it on a phone; or, while the person follows the log of one of its turns, that log
  * in its place, beside the inbox; and nothing while no thread is open.
  */
-export const threadView = InboxComposition.makeView.withInputs<ThreadViewInputs>((model, { now }, h) =>
+export const threadView = InboxComposition.makeView.withInputs<ThreadViewInputs>((model, { now, openTriggerId }, h) =>
   Option.match(model.selected, {
     onNone: () => h.empty,
     onSome: (selected) => {
@@ -214,7 +227,7 @@ export const threadView = InboxComposition.makeView.withInputs<ThreadViewInputs>
             key: selected.threadId,
             slotId: "thread",
             model: selected.model,
-            viewInputs: { now, highlightedMessageId: selected.messageId }
+            viewInputs: { now, openTriggerId, highlightedMessageId: selected.messageId }
           })
         ),
         reply: h.block(

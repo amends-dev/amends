@@ -255,6 +255,7 @@ export const Message = defineMessageUnion({
   ClickedViewHistory: {},
   ClickedRevoke: { invitationId: Invitation.InvitationId },
   ConfirmedRevocation: {},
+  RequestedNameChange: {},
   WroteAction: { written: Written },
   FailedWriteAction: { written: Written, reason: Reason }
 })
