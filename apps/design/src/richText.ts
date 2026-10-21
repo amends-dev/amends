@@ -10,6 +10,7 @@ import * as Option from "effect/Option"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { Marked, type MarkedToken, type Token, type Tokens } from "marked"
 import { icon } from "./icon.ts"
+import { type ProfileOpener, profileTrigger } from "./profile.ts"
 
 const blocksLook = "flex min-w-0 flex-col gap-2 wrap-anywhere"
 
@@ -68,10 +69,12 @@ export type Markdown = Readonly<{
 /** A member a text may mention, by the id its mention links to. */
 export type RichTextMention = Readonly<{ id: string; name: string }>
 
-export type RichTextConfig = Markdown &
+export type RichTextConfig<Message> = Markdown &
   Readonly<{
     /** One run of words and mentions without layout or formatting, such as a preview's, in place of blocks. */
     isInline?: boolean | undefined
+    /** How a mention opens the card of the member it names; a mention opens nothing without it, or in a preview. */
+    profiles?: ProfileOpener<Message> | undefined
   }>
 
 // A newline breaks the line, as people expect of a chat message.
@@ -298,10 +301,25 @@ const previewRuns = ({ text, mentions = [] }: Markdown): ReadonlyArray<Run> =>
  */
 export const richTextWords = (markdown: Markdown): string => joinRuns(previewRuns(markdown))
 
-type Renderer<Message, Requirements> = Readonly<{ h: HtmlBuilder<Message, Requirements>; nameOf: NameOf }>
+type Renderer<Message, Requirements> = Readonly<{
+  h: HtmlBuilder<Message, Requirements>
+  nameOf: NameOf
+  profiles: ProfileOpener<Message> | undefined
+  nextMentionPart: () => string
+}>
 
-const renderMention = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, label: string): Html =>
+const renderMentionChip = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, label: string): Html =>
   h.span([h.Class(mentionLook)], [label])
+
+/** A mention as a chip, a button that opens the member's card when the text has somewhere to open it. */
+const renderMention = <Message, Requirements>(
+  { h, profiles, nextMentionPart }: Renderer<Message, Requirements>,
+  memberId: string,
+  label: string
+): Html =>
+  profiles === undefined
+    ? renderMentionChip(h, label)
+    : profileTrigger(h, profiles, { memberId, part: nextMentionPart(), look: mentionLook, children: [label] })
 
 /** A link to a web page or an email address, opening in a new tab, in place of the image or link it shows. */
 const renderLink = <Message, Requirements>(
@@ -351,7 +369,9 @@ const renderInlineToken = <Message, Requirements>(
       br: () => [h.br([])],
       link: (link) =>
         Option.match(mentionedMemberId(link.href), {
-          onSome: (memberId) => [renderMention(h, mentionLabel(nameOf, memberId, recordedLabelOf(nameOf, link)))],
+          onSome: (memberId) => [
+            renderMention(renderer, memberId, mentionLabel(nameOf, memberId, recordedLabelOf(nameOf, link)))
+          ],
           onNone: () =>
             Option.match(linkableHref(link.href), {
               onNone: () => renderInlines(renderer, link.tokens),
@@ -490,16 +510,29 @@ const renderBlockToken = <Message, Requirements>(
  * mentions. A mention, a link to `member:<id>`, is a chip with "@" and the member's current name among `mentions`, or
  * the name the text recorded for anyone else. Only web and email addresses link, in a new tab; any other link shows
  * its text. Images are not loaded: they show as links to them. Raw HTML shows as written, and entity references as the
- * characters they name, except in code. With `isInline` it is one run of words and mentions, a `span` without layout or
- * formatting, for a preview.
+ * characters they name, except in code. With `profiles` each mention is a button that opens the card of the member it
+ * names, with an id made of the scope, "mention", and the mention's number in the text. With `isInline` it is one run
+ * of words and mentions, a `span` without layout or formatting, for a preview, whose mentions open nothing.
  */
-export const richText = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, config: RichTextConfig): Html =>
-  config.isInline === true
-    ? h.span(
-        [h.Class(inlineLook)],
-        previewRuns(config).map((run) => (run.isMention ? renderMention(h, run.text) : run.text))
-      )
-    : h.div(
-        [h.Class(blocksLook)],
-        renderBlocks({ h, nameOf: nameLookup(config.mentions ?? []) }, marked.lexer(config.text))
-      )
+export const richText = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: RichTextConfig<Message>
+): Html => {
+  if (config.isInline === true) {
+    return h.span(
+      [h.Class(inlineLook)],
+      previewRuns(config).map((run) => (run.isMention ? renderMentionChip(h, run.text) : run.text))
+    )
+  }
+
+  let mentionCount = 0
+  const nextMentionPart = () => `mention-${mentionCount++}`
+
+  return h.div(
+    [h.Class(blocksLook)],
+    renderBlocks(
+      { h, nameOf: nameLookup(config.mentions ?? []), profiles: config.profiles, nextMentionPart },
+      marked.lexer(config.text)
+    )
+  )
+}

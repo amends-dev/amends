@@ -134,14 +134,19 @@ export const statusTooltip = <Message, Requirements>(
  * is cut from the surface behind it, in the color of `status-knockout`, which a row that is hovered or current sets to
  * its own. The patch is 8px on `sm`, 9px on `account` and `md`, 10px on `lg`, and 7px on `xs` and `choice`, the least
  * the design draws. The status is a tooltip over the mark on hover (`statusTooltip`), above it unless
- * `statusPlacement` says below, for a mark with no room above. A mark is hidden from assistive technology, since the
- * name it abbreviates is always beside it, and the row that holds it adds the status to its own name, "Atlas, Needs
- * setup".
+ * `statusPlacement` says below, for a mark with no room above, and none with `isTooltipHidden`, for a mark beside the
+ * words that say the status, such as a profile card's. A mark is hidden from assistive technology, since the name it
+ * abbreviates is always beside it, and the row that holds it adds the status to its own name, "Atlas, Needs setup".
  */
 export const mark = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: MarkContent &
-    Readonly<{ size?: MarkSize; status?: MarkStatus | undefined; statusPlacement?: TooltipPlacement | undefined }>
+    Readonly<{
+      size?: MarkSize
+      status?: MarkStatus | undefined
+      statusPlacement?: TooltipPlacement | undefined
+      isTooltipHidden?: boolean
+    }>
 ): Html => {
   const size = config.size ?? "sm"
   const { status } = config
@@ -156,7 +161,9 @@ export const mark = <Message, Requirements>(
     ]
   )
 
-  return status === undefined ? square : statusTooltip(h, status, [square], config.statusPlacement)
+  return status === undefined || config.isTooltipHidden === true
+    ? square
+    : statusTooltip(h, status, [square], config.statusPlacement)
 }
 
 /**

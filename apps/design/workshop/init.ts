@@ -25,6 +25,7 @@ export const init = ApplicationComposition.makeInit(() => ({
     paletteQuery: "",
     paletteActive: 0,
     openThread: "composer-paste-crash",
+    openProfile: { memberId: "", triggerId: "" },
     destination: "home",
     paneTab: "threads",
     isNotificationsOn: true,

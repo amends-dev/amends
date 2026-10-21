@@ -23,6 +23,7 @@
     "./modal": "./src/modal.ts",
     "./palette": "./src/palette.ts",
     "./pane": "./src/pane.ts",
+    "./profile": "./src/profile.ts",
     "./rail": "./src/rail.ts",
     "./richText": "./src/richText.ts",
     "./shell": "./src/shell.ts",

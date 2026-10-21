@@ -76,7 +76,7 @@ pane's section that is one form; a
 conversation's messages as the threads of a group under their day, with the time of day after each author, a person's mark on the slate ground and an agent's on the lilac with its name in the agent's color, the task a thread tracks as a chip, the button that opens each thread, and a reply as the action the pointer brings up, the open thread's row filled and following a click; a person's messages within five minutes stacked under the one before; the button of a thread with replies, with one reply, three people, more people than it shows, replies not read yet, and while an agent works and someone types; a thread with no replies yet, with Reply in thread and what is going on beside it; the chip of a task in each drawing a status has; and, as a list, with a note,
 an edited mark after the text, a deleted message, actions, and meta, with a mention in the text as a chip, in a message and in
 the current row, with markdown in the text as blocks in a message and as a preview in a notification, with a form in place of the text, and set apart by dividers, centered and at the
-start, with notes of who took part, an agent's turn in each of its states with the actions it offers and what it says under its line, a stop that did not go through, a turn that replied with View turn log among its message's actions, a failed turn's detail with Agent settings at its end, and a turn's row in a column 20rem wide, where the actions drop under the name and Agent settings under the failure, and notifications under the days Today and Yesterday, unread with a dot and read, an agent's on the lilac tone and one whose thread is unavailable with the message icon in place of letters, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; a turn's log as the side pane, each in a frame of its own: a turn that works, with Stop in the header, what it runs on, its activity with a response it recorded and did not post, and the footer that follows it live; one that is stopping, with Stop dimmed and named Stopping; one that waits, with the Queued card and the footer that waits for activity; one that replied, with its reply recorded and posted and the footer that opens it in its thread; one that was interrupted and ran again and finished with no reply; one that failed before it started, with the caution card that points to the agent's setup, an alert, and Retry turn in the footer; activity that arrived while the reader was scrolled up, whose footer is one wide button; and the pane while its log is being read, not available, and could not be read; rich text as a message's text with every form markdown has and a mention of a member the workshop knows and one it does not, as the inline form of the same text for a preview, and in a narrow column, where a long word wraps and a wide table scrolls; a pane's empty state with a title
+start, with notes of who took part, an agent's turn in each of its states with the actions it offers and what it says under its line, a stop that did not go through, a turn that replied with View turn log among its message's actions, a failed turn's detail with Agent settings at its end, and a turn's row in a column 20rem wide, where the actions drop under the name and Agent settings under the failure, and notifications under the days Today and Yesterday, unread with a dot and read, an agent's on the lilac tone and one whose thread is unavailable with the message icon in place of letters, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; profile cards: a conversation whose authors' names and marks and a mention open the member's card below it, the trigger of the open card underlined and following a click, and the card alone for a person, the reader, an agent that needs setup, one at work, one that is blocked, a member who left, and one who cannot be shown; a turn's log as the side pane, each in a frame of its own: a turn that works, with Stop in the header, what it runs on, its activity with a response it recorded and did not post, and the footer that follows it live; one that is stopping, with Stop dimmed and named Stopping; one that waits, with the Queued card and the footer that waits for activity; one that replied, with its reply recorded and posted and the footer that opens it in its thread; one that was interrupted and ran again and finished with no reply; one that failed before it started, with the caution card that points to the agent's setup, an alert, and Retry turn in the footer; activity that arrived while the reader was scrolled up, whose footer is one wide button; and the pane while its log is being read, not available, and could not be read; rich text as a message's text with every form markdown has and a mention of a member the workshop knows and one it does not, as the inline form of the same text for a preview, and in a narrow column, where a long word wraps and a wide table scrolls; a pane's empty state with a title
 and a line of copy under a header with an action, with two lines of copy, with an action of its own under the copy, with a title alone, with its mark working, and for a failure with Try again, each in a frame of its
 own; a pane's column keeping its measure around a form and, wide, spanning the pane around a table of
 groups, each in a frame wider than the measure; the composer empty, whose Send waits for words, filled, with only spaces, with its list of people to mention open on the second, an agent among them in its tone, with its toolbar of formatting over the box and the buttons beside Send that hide it and start a mention, the first of which hides it, again with the toolbar hidden as it starts on a phone, and with its list of commands open, as wide as the box; the sidebar's rows as three columns, each in a frame the sidebar's width: groups read, unread, with a count read as 2 for you, an agent at work with the logo working, queued, and stopping, and one still sending, the open thread under its group with the drawing of its task in each of its six statuses, the message icon, and a thread that is a button, and direct messages as people on the slate mark with a count and with the dot, several people by the people icon, an agent on the lilac mark at work and needing setup, and the teammates with no conversation yet; the shell twice, with and without its side pane, each in a
@@ -400,6 +400,8 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
     other two. It is above the mark, or below it with `statusPlacement: "below"`, as a pane's header mark is, since the
     window has no room above it. A mark stays hidden from assistive technology, since it knows only the letters, and
     so is the tooltip: the row that holds it is named by the name and then the status's label, "Atlas, Needs setup".
+    With `isTooltipHidden` the patch has no tooltip, for a mark beside the words that say the status, as a
+    profile card's is.
 - `statusTooltip(h, status, children, placement?)` is that tooltip for `children`, which a row uses for what it draws
   of a status beside the mark, such as `statusMark`.
 - `statusMark(h, kind)` is a status's shape alone, 9px, for the end of a row whose item has no mark of its own, such as
@@ -923,7 +925,11 @@ What a conversation is made of.
   `message`s, `notification`s, `divider`s, `event`s, `note`s, and `turnRow`s. Given an `id`, a Command can find
   the list to keep the pane that scrolls around it at its end.
 - `message(h, config)` is one row of it, keyed by `config.key`: the author's `mark` letters at 32px,
-  then a column of the author line, the text, and what lies under it. The mark is on the `slate` ground of a person,
+  then a column of the author line, the text, and what lies under it. Given the `authorId` of the member who wrote it
+  and `profiles`, a `ProfileOpener` (see `profile`), the author is a button that opens their card and the mark opens it
+  too, as `apps/ui`'s message does, and each mention in its text is a button that opens the card of the member it names;
+  a row given only one of them opens none, and a stacked message has no mark or author line to open one from, though
+  its mentions open cards. The mark is on the `slate` ground of a person,
   or the `lilac` of an agent when `isAgent`, whose name is then in the agent's color (`text-agent`), as `apps/ui` draws
   both. The author line is the
   `author` at item size in medium weight, the `time` after it at `meta` size in `ink-muted`, already
@@ -967,7 +973,10 @@ What a conversation is made of.
   an `aria-label`, with the text's words as its `aria-description`: the first line is where the row says
   what it is, and the text is what it says. The row has `message`'s spacing and reach into the pane's
   gutter. `isCurrent`, for the notification whose thread is open, fills it with `selected`, draws the
-  `indicator-bar` at its start, and makes it `aria-current="true"`, as `message`'s current row is.
+  `indicator-bar` at its start, and makes it `aria-current="true"`, as `message`'s current row is. Given the
+  `authorId` of the member who wrote it and `profiles`, the author in its first line is a button that opens their card
+  and the mark opens it too; the mentions in its preview stay chips, since the button that opens the thread holds no
+  other.
 - `MessageText` is what the `text` of a `message`, a `notification`, and a `description` takes: a string,
   markdown, or `{ deleted }`. A string is words as written, whatever characters it holds, such as a thread's title, which its author
   wrote as plain text. Markdown, `{ text, mentions? }` as `richText` takes it (below), is a message's text with the
@@ -1030,13 +1039,46 @@ What a conversation is made of.
   such as Agent settings, at its end, 12px from it, or under it below 48rem, and with no effect when there is no
   `detail` to hold it; and the `problem` says why a stop or retry
   did not go through, at `control` size in the caution color, as an alert.
-- `description(h, { text, body?, actions?, isCurrent? })` is the text that describes the thing a pane is about, such as
+- `description(h, { text, body?, actions?, profiles?, isCurrent? })` is the text that describes the thing a pane is about, such as
   a task: `text` at item size in `ink`, a `MessageText`, markdown as the blocks of `richText`, its line breaks kept and
   a mention in it a chip, as `apps/ui`'s task pane sets it, 11px under the `property` caption above it. `body` takes the text's place, such as
   the form that changes it, and `actions` are quiet buttons under it, 8px down and level with its words, such as Edit
   and Delete. `isCurrent` fills it with `selected`, draws the `indicator-bar` at its start, and makes it
-  `aria-current="true"`, reaching 12px into the pane's gutter as a message's row does. `attributes` go onto it as
-  they go onto a message's row.
+  `aria-current="true"`, reaching 12px into the pane's gutter as a message's row does. With `profiles` each mention
+  in it is a button that opens the card of the member it names. `attributes` go onto it as they go onto a message's
+  row.
+
+### `@amends-dev/design/profile`
+
+The card that a member's mark, name, or mention opens, as `apps/ui`'s `ProfileCard` draws it. This module is the
+surface and the triggers; the Block that holds the card places it against the trigger that opened it, closes it, and
+returns the focus to the trigger.
+
+- `ProfileOpener<Message>` is how a list of rows opens cards, given to `message`, `notification`, `description`, and
+  `richText` as `profiles`: its `scope`, which begins the id of each of its triggers, so that the triggers of one list
+  are told from every other's; its `openTriggerId`, the trigger whose card is open, which `aria-expanded` and the
+  underline say; and `open(memberId, triggerId)`, the message a trigger sends. `profileTriggerId(opener, part)` is the
+  id a trigger has, the scope, "-", and the part, such as `thread-message-1-name`, so that the Block that places the
+  card finds the trigger by id.
+- `profileTrigger(h, opener, { memberId, part, look, isFocusable?, children })` is the element that opens a member's
+  card, with `look` for the classes of what it stands in for, such as the author line's. By default it is a button that
+  Tab reaches, named by `children`, with `aria-haspopup="dialog"` and `aria-expanded` while its card is open, and
+  underlined while it is. It has no border or fill of its own, and shows keyboard focus with the focus ring. With
+  `isFocusable: false` it is a `span` hidden from assistive technology, the mark beside a name, which a pointer
+  reaches and Tab does not, since the name beside it meets it.
+- `Profile` is a member as the card shows them: `name`, `mark` (a `MarkContent`), `kind` (`"Person"` or `"Agent"`),
+  `isYou`, `isFormer`, a `status` (a `MarkStatus`, as `mark` takes it, whose `label` the card says and whose `detail`
+  is why), and for an agent at work a `motion`.
+- `profileCard(h, { profile, actions, onClose, attributes? })` is the card, a `dialog` named by the member's name,
+  320px wide (358px at most on a phone, where it keeps 16px from the window's edges) on the `popover` ground with the
+  `outline` border and the `popover` shadow, square: the mark at 40px with the patch of how they stand but no tooltip,
+  cut from the popover; the name at body size in medium weight; under it what they are, such as "Agent", "Person ·
+  You" for the reader, "Person · Former member" for someone who left, or "Agent · Needs setup" with the status's label,
+  in the caution or danger color for a status that needs attention, and the logo moving before it for an agent at work;
+  and under that `status.detail`, or "No longer in this workspace." for a member who left. A Close icon button ends the
+  first line. `actions`, each a `{ label, onClick }`, are buttons that share the card's width, 8px apart. With no
+  `profile` it says "Profile unavailable", with Close, for a member who cannot be shown. The card does not place
+  itself: `attributes` go onto it, such as its id, its keys, and the mount that anchors it to its trigger.
 
 ### `@amends-dev/design/turnLog`
 
@@ -1096,11 +1138,13 @@ caller's builder, and no HTML string is ever set on the page.
   such as `&amp;`, `&copy;`, and `&#169;`, show as the characters they name, except in code, where text is as written.
 - A mention is a link to `member:<id>`, as core writes it, `[@Ada](member:<id>)`. It is a chip, a `span` on `mention`
   with 3px of space each side and semibold weight, with "@" and the name the member has now among `config.mentions`,
-  each `{ id, name }`, or the name the text recorded for anyone else. It is not a link, since nothing opens a member
-  yet.
+  each `{ id, name }`, or the name the text recorded for anyone else. It is not a link. With `config.profiles`, a
+  `ProfileOpener` (see `profile`), it is a button, named by the chip's words, that opens the card of the member it
+  names; it is a `profileTrigger` whose part is "mention-" and its number among the text's mentions, counting each
+  one, so that a member mentioned twice has two triggers. Without it a mention is only the chip.
 - `config.isInline` is the form for a preview, one `span` of words and mentions with no layout or formatting: blocks
   and line breaks are single spaces, a link is its words, an image its description, code its text, and each mention
-  is a chip. It holds nothing a button may not hold.
+  is a chip, and none opens a card. It holds nothing a button may not hold.
 - `richTextWords(markdown)` is the words of that form as one string, for the caller that needs them, such as a
   button's description or a search: `{ text, mentions? }` as the text a reader hears, a mention as "@" and the name the
   member has now.
@@ -1487,7 +1531,7 @@ and its description after it, and the list of commands, as wide as the box where
 formatting by its role and name, a compact button for each of its buttons, their `aria-keyshortcuts`, the rules between
 groups hidden from assistive technology, the toolbar `hidden` and without the flex that would show it while it is not
 shown, the switch beside Send as `aria-pressed` and `aria-controls` the toolbar, the mention button, and the keys with
-a modifier that `onShortcut` answers, handled, and the others, ignored; a mark as `aria-hidden`, with the patch of every status at every size, its sizes, shape, and color, and its hover text, and with a drawing in place of letters, fitted to its square; a row's status in its name and on its mark, and its two-line cells; a mark stack by its label as a button that sends its message, with every mark it is given at 22px in its tone, hidden from assistive technology, its overlap, its height, and the width below which it is not shown; and the shell's landmarks by role and name: `navigation` for
+a modifier that `onShortcut` answers, handled, and the others, ignored; a profile card as a dialog named by the member, with the words of what they are for a person, the reader, a member who left, and an agent in each status, the caution color of a status that needs attention, the logo before an agent at work, the mark at 40px with its patch and no tooltip, Close and the actions it is given sending their messages, and "Profile unavailable"; a trigger as a button that sends the member and its own id, with `aria-expanded` while its card is open and an id of its scope and its part, and as a mark that Tab does not reach; the author line and the mark of a message and a notification, and the mentions of a message, a description, and rich text, each opening a card, and none in a preview, a stacked message, or a row that does not say whose it is; a mark as `aria-hidden`, with the patch of every status at every size, its sizes, shape, and color, and its hover text, and with a drawing in place of letters, fitted to its square; a row's status in its name and on its mark, and its two-line cells; a mark stack by its label as a button that sends its message, with every mark it is given at 22px in its tone, hidden from assistive technology, its overlap, its height, and the width below which it is not shown; and the shell's landmarks by role and name: `navigation` for
 the rail and the sidebar, `main`, and `complementary`, with its notices, and by viewport: the sidebar
 in place at `Desktop` and `Split` with no navigation button, and at `Tablet` and `Phone` a button named Open navigation,
 with its `aria-expanded` and `aria-controls`, the sidebar, and at `Phone` the rail, and Close navigation, inside the

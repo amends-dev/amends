@@ -119,6 +119,7 @@ import {
   paneTabs,
   paneToolbar
 } from "../src/pane.ts"
+import { type Profile, type ProfileAction, type ProfileOpener, profileCard } from "../src/profile.ts"
 import { rail, railAccount } from "../src/rail.ts"
 import { richText } from "../src/richText.ts"
 import { shell } from "../src/shell.ts"
@@ -2660,6 +2661,139 @@ const turnLogPane = (
       })
     ]
   )
+}
+
+/** The members of the workshop's conversation, as their cards show them. */
+const profileSamples: Readonly<Record<string, Profile>> = {
+  ada: { name: "Ada Lovelace", mark: { text: "AL", tone: "slate" }, kind: "Person", isYou: true },
+  alex: { name: "Alex Morgan", mark: { text: "AM", tone: "slate" }, kind: "Person" },
+  yumi: {
+    name: "Yumi",
+    mark: { text: "Y", tone: "lilac" },
+    kind: "Agent",
+    status: { kind: "available", label: "Working" },
+    motion: "working"
+  }
+}
+
+const profileMentions = [
+  { id: "ada", name: "Ada Lovelace" },
+  { id: "yumi", name: "Yumi" }
+]
+
+/** What a card offers about `profile`, each of which closes it in the workshop. */
+const profileActionsOf = (profile: Profile | undefined): ReadonlyArray<ProfileAction<Message>> => {
+  const close = Message.ClosedProfile()
+
+  if (profile === undefined || profile.isFormer === true) {
+    return []
+  }
+
+  return profile.isYou === true
+    ? [{ label: "Change name", onClick: close }]
+    : [
+        { label: "Message", onClick: close },
+        ...(profile.kind === "Agent" ? [{ label: "Open agent", onClick: close }] : [])
+      ]
+}
+
+const profileCardSamples: ReadonlyArray<Readonly<{ caption: string; profile: Profile | undefined }>> = [
+  { caption: "A person", profile: profileSamples["alex"] },
+  { caption: "The reader", profile: profileSamples["ada"] },
+  {
+    caption: "An agent that needs setup, with why under its name",
+    profile: {
+      name: "Atlas",
+      mark: { text: "A", tone: "lilac" },
+      kind: "Agent",
+      status: { kind: "attention", label: "Needs setup", detail: "Its model connection needs an API key." }
+    }
+  },
+  { caption: "An agent at work, its logo moving", profile: profileSamples["yumi"] },
+  {
+    caption: "An agent that is blocked",
+    profile: {
+      name: "Rhea",
+      mark: { text: "R", tone: "lilac" },
+      kind: "Agent",
+      status: { kind: "blocked", label: "Blocked", detail: "It is waiting for a person to approve a command." }
+    }
+  },
+  {
+    caption: "A member who left, with no buttons",
+    profile: { name: "Jordan Lee", mark: { text: "JL", tone: "slate" }, kind: "Person", isFormer: true }
+  },
+  { caption: "A member who cannot be shown", profile: undefined }
+]
+
+const profileCardGroup = (h: ApplicationViewBuilder, openProfile: Model["openProfile"]): Html => {
+  const openCard = profileSamples[openProfile.memberId]
+  const profiles: ProfileOpener<Message> = {
+    scope: "profile-workshop",
+    openTriggerId: openProfile.triggerId === "" ? undefined : openProfile.triggerId,
+    open: (memberId, triggerId) => Message.OpenedProfile({ memberId, triggerId })
+  }
+
+  return group(h, "Profile cards", [
+    sample(
+      h,
+      "The name and the mark of a message's author, and a mention in its text, each open the member's card, which the app places against what opened it and the workshop shows below the messages; the trigger of the open card is underlined, and follows a click; Close closes it, and so does each of its buttons",
+      [
+        messageList(h, {
+          label: "Conversation",
+          children: [
+            message(h, {
+              key: "alex",
+              mark: "AM",
+              authorId: "alex",
+              author: "Alex Morgan",
+              profiles,
+              time: "9:41 AM",
+              text: {
+                text: "Can [@Yumi](member:yumi) take the preview? [@Ada Lovelace](member:ada) has the notes.",
+                mentions: profileMentions
+              }
+            }),
+            message(h, {
+              key: "yumi",
+              mark: "Y",
+              authorId: "yumi",
+              author: "Yumi",
+              isAgent: true,
+              profiles,
+              time: "9:42 AM",
+              text: "On it."
+            }),
+            message(h, {
+              key: "ada",
+              mark: "AL",
+              authorId: "ada",
+              author: "Ada Lovelace",
+              profiles,
+              time: "9:44 AM",
+              text: "Thanks."
+            })
+          ]
+        }),
+        openCard === undefined
+          ? h.empty
+          : profileCard(h, {
+              profile: openCard,
+              actions: profileActionsOf(openCard),
+              onClose: Message.ClosedProfile()
+            })
+      ],
+      conversationColumn
+    ),
+    ...profileCardSamples.map(({ caption, profile }) =>
+      sample(
+        h,
+        caption,
+        [profileCard(h, { profile, actions: profileActionsOf(profile), onClose: Message.ClosedProfile() })],
+        "flex flex-col"
+      )
+    )
+  ])
 }
 
 const turnLogGroup = (h: ApplicationViewBuilder): Html => {
@@ -6226,6 +6360,7 @@ export const view = ApplicationComposition.makeView((model, h) => ({
           tooltipGroup(h),
           detailsGroup(h, model),
           messageGroup(h, model.openThread, model.editText),
+          profileCardGroup(h, model.openProfile),
           turnLogGroup(h),
           richTextGroup(h),
           paneEmptyGroup(h),

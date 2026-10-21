@@ -52,6 +52,10 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
     TypedGroupName: ({ value }) => ({ model: modifyFields(model, { groupName: () => value }) }),
     TypedNewGroupName: ({ value }) => ({ model: modifyFields(model, { newGroupName: () => value }) }),
     OpenedThread: ({ key }) => ({ model: modifyFields(model, { openThread: () => key }) }),
+    OpenedProfile: ({ memberId, triggerId }) => ({
+      model: modifyFields(model, { openProfile: () => ({ memberId, triggerId }) })
+    }),
+    ClosedProfile: () => ({ model: modifyFields(model, { openProfile: () => ({ memberId: "", triggerId: "" }) }) }),
     ChangedDestination: ({ destination }) => ({ model: modifyFields(model, { destination: () => destination }) }),
     ChangedPaneTab: ({ tab }) => ({ model: modifyFields(model, { paneTab: () => tab }) }),
     ToggledNotifications: ({ isOn }) => ({ model: modifyFields(model, { isNotificationsOn: () => isOn }) }),

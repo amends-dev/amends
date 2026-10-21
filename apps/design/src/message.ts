@@ -12,6 +12,7 @@ import { iconButtonWith } from "./control.ts"
 import { type TurnState, turnActivity } from "./details.ts"
 import { type IconName, icon } from "./icon.ts"
 import { type MarkContent, mark, type TaskStatusShape, taskStatus } from "./mark.ts"
+import { type ProfileOpener, profileTrigger } from "./profile.ts"
 import { type Markdown, richText, richTextWords } from "./richText.ts"
 import { tooltip } from "./tooltip.ts"
 
@@ -188,19 +189,22 @@ export const messageTextWords = (text: MessageText): string => {
 }
 
 /**
- * The elements that show `text`: words as written, or its markdown, as the blocks of `richText`, or, when `isInline`,
- * as its preview, which a button may hold, or the words that say it was deleted.
+ * The elements that show `text`: words as written, or its markdown, as the blocks of `richText`, whose mentions open
+ * the cards of `profiles`, or, when `isInline`, as its preview, which a button may hold and whose mentions open
+ * nothing, or the words that say it was deleted.
  */
 const renderWords = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   text: MessageText,
-  isInline: boolean
+  config: Readonly<{ isInline: boolean; profiles?: ProfileOpener<Message> | undefined }>
 ): Html | string => {
   if (typeof text === "string") {
     return text
   }
 
-  return "deleted" in text ? h.span([h.Class(deletedLook)], [text.deleted]) : richText(h, { ...text, isInline })
+  return "deleted" in text
+    ? h.span([h.Class(deletedLook)], [text.deleted])
+    : richText(h, { ...text, isInline: config.isInline, profiles: config.isInline ? undefined : config.profiles })
 }
 
 /** What follows the text of a message that was changed after it was sent, in its own words. */
@@ -218,6 +222,7 @@ const renderText = <Message, Requirements>(
     text: MessageText
     ink: Ink
     isInline: boolean
+    profiles?: ProfileOpener<Message> | undefined
     isEdited?: boolean
     onOpen?: Message
     name?: string
@@ -227,7 +232,13 @@ const renderText = <Message, Requirements>(
   const isEdited = config.isEdited === true
 
   return onOpen === undefined
-    ? h.div([h.Class(textLook(config.ink))], [renderWords(h, config.text, config.isInline), renderEdited(h, isEdited)])
+    ? h.div(
+        [h.Class(textLook(config.ink))],
+        [
+          renderWords(h, config.text, { isInline: config.isInline, profiles: config.profiles }),
+          renderEdited(h, isEdited)
+        ]
+      )
     : Button.view(
         {
           onClick: onOpen,
@@ -238,7 +249,7 @@ const renderText = <Message, Requirements>(
                 ...(name === undefined ? [] : [h.AriaLabel(name), h.AriaDescription(messageTextWords(config.text))]),
                 h.Class(textButton(config.ink))
               ],
-              [renderWords(h, config.text, true), renderEdited(h, isEdited)]
+              [renderWords(h, config.text, { isInline: true }), renderEdited(h, isEdited)]
             )
         },
         h
@@ -297,6 +308,8 @@ type MessageContent<Message, Requirements> = Readonly<{
   key: string
   mark: string
   author: string
+  authorId?: string | undefined
+  profiles?: ProfileOpener<Message> | undefined
   isAgent?: boolean
   time?: string | undefined
   note?: string | undefined
@@ -308,6 +321,50 @@ type MessageContent<Message, Requirements> = Readonly<{
   isCurrent?: boolean
   attributes?: ReadonlyArray<Attribute<Message, Requirements>>
 }>
+
+/**
+ * The member who wrote a row and how the row opens their card: its mark and its author line open the card of
+ * `authorId` through `profiles`, and a row with only one of them opens none.
+ */
+type Authorship<Message> = Readonly<{ authorId?: string | undefined; profiles?: ProfileOpener<Message> | undefined }>
+
+/** The author's name in `look`, a button that opens their card when the row says whose card it is. */
+const renderAuthor = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Authorship<Message> & Readonly<{ key: string; author: string }>,
+  look: string
+): Html =>
+  config.authorId === undefined || config.profiles === undefined
+    ? h.span([h.Class(look)], [config.author])
+    : profileTrigger(h, config.profiles, {
+        memberId: config.authorId,
+        part: `${config.key}-name`,
+        look,
+        children: [config.author]
+      })
+
+/** The author's mark, which opens their card when the row says whose card it is, but is not reached by Tab. */
+const renderAuthorMark = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Authorship<Message> & Readonly<{ key: string }>,
+  authorMark: Html
+): Html =>
+  config.authorId === undefined || config.profiles === undefined
+    ? authorMark
+    : profileTrigger(h, config.profiles, {
+        memberId: config.authorId,
+        part: `${config.key}-mark`,
+        look: "",
+        isFocusable: false,
+        children: [authorMark]
+      })
+
+/** `profiles` with its scope narrowed to the row `key`, so that the triggers in the row's text are its own. */
+const scopedTo = <Message>(
+  profiles: ProfileOpener<Message> | undefined,
+  key: string
+): ProfileOpener<Message> | undefined =>
+  profiles === undefined ? undefined : { ...profiles, scope: `${profiles.scope}-${key}` }
 
 /**
  * A message either stands on its own, with `actions` at the end of its author line, or stacks under the message of
@@ -344,8 +401,9 @@ export const message = <Message, Requirements>(
   const actions = config.actions ?? []
   const meta = config.meta ?? []
   const isStacked = config.isStacked === true
+  const authorLook = `${authorName} ${config.isAgent === true ? "text-agent" : "text-ink"}`
   const byline = [
-    h.span([h.Class(`${authorName} ${config.isAgent === true ? "text-agent" : "text-ink"}`)], [config.author]),
+    isStacked ? h.span([h.Class(authorLook)], [config.author]) : renderAuthor(h, config, authorLook),
     renderTime(h, config)
   ]
 
@@ -359,7 +417,11 @@ export const message = <Message, Requirements>(
     [
       isStacked
         ? h.span([h.AriaHidden(true), h.Class(gutterTime)], [config.shortTime ?? ""])
-        : mark(h, { text: config.mark, size: "md", tone: config.isAgent === true ? "lilac" : "slate" }),
+        : renderAuthorMark(
+            h,
+            config,
+            mark(h, { text: config.mark, size: "md", tone: config.isAgent === true ? "lilac" : "slate" })
+          ),
       h.div(
         [h.Class(rowColumn)],
         [
@@ -369,7 +431,13 @@ export const message = <Message, Requirements>(
                 [h.Class(authorLine)],
                 [...byline, actions.length === 0 ? h.empty : h.div([h.Class(actionsRow)], actions)]
               ),
-          config.body ?? renderText(h, { ...config, ink: "text-ink", isInline: false }),
+          config.body ??
+            renderText(h, {
+              ...config,
+              ink: "text-ink",
+              isInline: false,
+              profiles: scopedTo(config.profiles, config.key)
+            }),
           meta.length === 0 ? h.empty : h.div([h.Class(metaColumn)], meta),
           renderHoverActions(h, config.hoverActions ?? [])
         ]
@@ -566,28 +634,30 @@ const renderAge = <Message, Requirements>(
  * first line of the `author` in medium weight followed by the `activity` in the same size and `ink`, such
  * as "Sara" and "mentioned you", under it the `place` it comes from, at `meta` size in `ink-muted`, and the
  * `text`, words as written or markdown as the preview `richText` gives, one run of words and mentions in which a
- * mention is a chip. At the end of the first line is the `age`, already
- * formatted, such as "2m ago". While `isUnread`, a 6px dot of `ink` comes before the age, hidden from assistive
- * technology, which an `sr-only` "Unread" before the age replaces; a row that is not unread has its text in
- * `ink-secondary`, quieter than the first line. `onOpen` makes the text a button that sends it, named by the author
+ * mention is a chip. With `authorId` and `profiles`, the mark and the author open the author's card, as a message's
+ * do. At the end of the first line is the `age`, already formatted, such as "2m ago". While `isUnread`, a 6px dot of
+ * `ink` comes before the age, hidden from assistive technology, which an `sr-only` "Unread" before the age replaces;
+ * a row that is not unread has its text in `ink-secondary`, quieter than the first line. `onOpen` makes the text a
+ * button that sends it, named by the author
  * and the activity together, "Sara mentioned you", with the text's words as its description, by an `aria-label` and
  * an `aria-description`, since the first line is where the row says what it is. The current row, the notification
  * whose thread is open, is filled with the 2px bar and `aria-current="true"`, as a message's is.
  */
 export const notification = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{
-    key: string
-    mark: MarkContent
-    author: string
-    activity: string
-    place?: string | undefined
-    text: MessageText
-    age: string
-    isUnread?: boolean
-    onOpen?: Message
-    isCurrent?: boolean
-  }>
+  config: Authorship<Message> &
+    Readonly<{
+      key: string
+      mark: MarkContent
+      author: string
+      activity: string
+      place?: string | undefined
+      text: MessageText
+      age: string
+      isUnread?: boolean
+      onOpen?: Message
+      isCurrent?: boolean
+    }>
 ): Html => {
   const isUnread = config.isUnread === true
 
@@ -595,14 +665,14 @@ export const notification = <Message, Requirements>(
     config.key,
     [...(config.isCurrent === true ? [h.AriaCurrent("true")] : []), h.Class(rowLook)],
     [
-      mark(h, { ...config.mark, size: "md" }),
+      renderAuthorMark(h, config, mark(h, { ...config.mark, size: "md" })),
       h.div(
         [h.Class(rowColumn)],
         [
           h.div(
             [h.Class(authorLine)],
             [
-              h.span([h.Class(headline)], [h.span([h.Class(headlineAuthor)], [config.author]), ` ${config.activity}`]),
+              h.span([h.Class(headline)], [renderAuthor(h, config, headlineAuthor), ` ${config.activity}`]),
               renderAge(h, { age: config.age, isUnread })
             ]
           ),
@@ -738,8 +808,9 @@ export const turnRow = <Message, Requirements>(
  * The text that describes the thing a pane is about, such as a task, in the size of an item and in `ink`, words as
  * written or markdown as `richText` shows it, with its mentions as chips, 11px under the caption above it. `body` takes
  * the text's place, for the form that changes it, and `actions` are quiet buttons under it, such as Edit and Delete,
- * level with its words. While `isCurrent` it is filled with the 2px bar and `aria-current="true"`, reaching 12px into
- * the pane's gutter, as a message's row does. `attributes` go onto it, as they go onto a message's row.
+ * level with its words. With `profiles` its mentions open the cards of the members they name. While `isCurrent` it is
+ * filled with the 2px bar and `aria-current="true"`, reaching 12px into the pane's gutter, as a message's row does.
+ * `attributes` go onto it, as they go onto a message's row.
  */
 export const description = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -747,6 +818,7 @@ export const description = <Message, Requirements>(
     text: MessageText
     body?: Html | undefined
     actions?: ReadonlyArray<Html>
+    profiles?: ProfileOpener<Message> | undefined
     isCurrent?: boolean
     attributes?: ReadonlyArray<Attribute<Message, Requirements>>
   }>
@@ -760,7 +832,11 @@ export const description = <Message, Requirements>(
       h.Class(descriptionLook)
     ],
     [
-      config.body ?? h.div([h.Class(descriptionText)], [renderWords(h, config.text, false)]),
+      config.body ??
+        h.div(
+          [h.Class(descriptionText)],
+          [renderWords(h, config.text, { isInline: false, profiles: scopedTo(config.profiles, "description") })]
+        ),
       actions.length === 0 ? h.empty : h.div([h.Class(descriptionActions)], actions)
     ]
   )

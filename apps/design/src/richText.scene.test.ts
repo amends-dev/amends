@@ -1,8 +1,10 @@
 import { describe, expect as expectValue, it } from "@effect/vitest"
+import { Schema } from "effect"
 import type { Update } from "foldkit"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { all, expect, expectAll, given, role, scene, selector, text, within } from "foldkit/scene"
+import { all, click, expect, expectAll, given, nth, role, scene, selector, text, within } from "foldkit/scene"
+import type { ProfileOpener } from "./profile.ts"
 import { type RichTextConfig, richText, richTextWords } from "./richText.ts"
 
 const Message = defineMessageUnion({ Unused: {} })
@@ -11,7 +13,7 @@ type Message = typeof Message.Type
 const update = (model: null, _message: Message): Update.Return<null, Message> => ({ model })
 
 const richView =
-  (config: RichTextConfig) =>
+  (config: RichTextConfig<Message>) =>
   (_: null, h: HtmlBuilder<Message>): Html =>
     h.div([], [richText(h, config)])
 
@@ -328,5 +330,107 @@ describe("richTextWords", () => {
   it("is the text of the inline form, and nothing for empty text", () => {
     expectValue(richTextWords({ text: "" })).toBe("")
     expectValue(richTextWords({ text: "\n\n" })).toBe("")
+  })
+})
+
+describe("richText mentions that open cards", () => {
+  const OpenedProfile = defineMessageUnion({ OpenedProfile: { memberId: Schema.String, triggerId: Schema.String } })
+  type OpenedProfile = typeof OpenedProfile.Type
+
+  const profiles = (openTriggerId?: string): ProfileOpener<OpenedProfile> => ({
+    scope: "thread-message-1",
+    openTriggerId,
+    open: (memberId, triggerId) => OpenedProfile.OpenedProfile({ memberId, triggerId })
+  })
+
+  const opened = (_model: string, message: OpenedProfile): Update.Return<string, OpenedProfile> => ({
+    model: `${message.memberId} from ${message.triggerId}`
+  })
+
+  const openingView =
+    (config: RichTextConfig<OpenedProfile>) =>
+    (model: string, h: HtmlBuilder<OpenedProfile>): Html =>
+      h.div([], [h.p([h.Id("opened")], [model]), richText(h, config)])
+
+  it("makes each a button named by the chip, with an id of the scope, mention, and its number, that opens the member's card", () => {
+    scene(
+      {
+        update: opened,
+        view: openingView({
+          text: `${mention("member-1", "Ada")} and ${mention("member-2", "x")} and ${mention("member-1", "Ada")}`,
+          mentions: [ada, { id: "member-2", name: "Grace" }],
+          profiles: profiles()
+        })
+      },
+      given(""),
+      expect(nth(all.role("button", { name: "@Ada Lovelace" }), 0)).toHaveAttr("id", "thread-message-1-mention-0"),
+      expect(role("button", { name: "@Grace" })).toHaveAttr("id", "thread-message-1-mention-1"),
+      expect(nth(all.role("button", { name: "@Ada Lovelace" }), 1)).toHaveAttr("id", "thread-message-1-mention-2"),
+      expect(role("button", { name: "@Grace" })).toHaveClass("bg-mention"),
+      expect(role("button", { name: "@Grace" })).toHaveClass("font-semibold"),
+      click(role("button", { name: "@Grace" })),
+      expect(selector("#opened")).toHaveText("member-2 from thread-message-1-mention-1")
+    )
+  })
+
+  it("opens the card of a member it does not know, by the name the text recorded", () => {
+    scene(
+      {
+        update: opened,
+        view: openingView({ text: mention("gone", "Old name"), mentions: [], profiles: profiles() })
+      },
+      given(""),
+      click(role("button", { name: "@Old name" })),
+      expect(selector("#opened")).toHaveText("gone from thread-message-1-mention-0")
+    )
+  })
+
+  it("says which mention has its card open, and no other", () => {
+    scene(
+      {
+        update: opened,
+        view: openingView({
+          text: `${mention("member-1", "Ada")} ${mention("member-2", "Grace")}`,
+          mentions: [ada, { id: "member-2", name: "Grace" }],
+          profiles: profiles("thread-message-1-mention-1")
+        })
+      },
+      given(""),
+      expect(role("button", { name: "@Ada Lovelace" })).toHaveAttr("aria-expanded", "false"),
+      expect(role("button", { name: "@Grace" })).toHaveAttr("aria-expanded", "true")
+    )
+  })
+
+  it("opens one from a list, a quote, and strong text", () => {
+    scene(
+      {
+        update: opened,
+        view: openingView({
+          text: `- ${mention("member-1", "Ada")} first\n\n> **${mention("member-1", "Ada")}**`,
+          mentions: [ada],
+          profiles: profiles()
+        })
+      },
+      given(""),
+      expectAll(all.role("button", { name: "@Ada Lovelace" })).toHaveCount(2)
+    )
+  })
+
+  it("leaves a mention a chip that opens nothing without profiles, and in a preview", () => {
+    scene(
+      { update: opened, view: openingView({ text: mention("member-1", "Ada"), mentions: [ada] }) },
+      given(""),
+      expect(role("button")).toBeAbsent(),
+      expect(text("@Ada Lovelace")).toHaveClass("bg-mention")
+    )
+    scene(
+      {
+        update: opened,
+        view: openingView({ text: mention("member-1", "Ada"), mentions: [ada], isInline: true, profiles: profiles() })
+      },
+      given(""),
+      expect(role("button")).toBeAbsent(),
+      expect(text("@Ada Lovelace")).toHaveClass("bg-mention")
+    )
   })
 })

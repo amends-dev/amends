@@ -22,23 +22,28 @@ import {
   taskChip,
   turnRow
 } from "./message.ts"
+import type { ProfileOpener } from "./profile.ts"
 
 const Message = defineMessageUnion({
   OpenedThread: { key: Schema.String },
   ClickedEdit: { key: Schema.String },
-  ClickedDelete: { key: Schema.String }
+  ClickedDelete: { key: Schema.String },
+  OpenedProfile: { memberId: Schema.String, triggerId: Schema.String }
 })
 type Message = typeof Message.Type
 
-type Model = Readonly<{ current: string; edits: number; deletions: number }>
+type Model = Readonly<{ current: string; edits: number; deletions: number; profile: string }>
 
-const initial: Model = { current: "thread-2", edits: 0, deletions: 0 }
+const initial: Model = { current: "thread-2", edits: 0, deletions: 0, profile: "" }
 
 const update = (model: Model, message: Message) =>
   Message.match<Update.Return<Model, Message>>(message, {
     OpenedThread: ({ key }) => ({ model: modifyFields(model, { current: () => key }) }),
     ClickedEdit: () => ({ model: modifyFields(model, { edits: (edits) => edits + 1 }) }),
-    ClickedDelete: () => ({ model: modifyFields(model, { deletions: (deletions) => deletions + 1 }) })
+    ClickedDelete: () => ({ model: modifyFields(model, { deletions: (deletions) => deletions + 1 }) }),
+    OpenedProfile: ({ memberId, triggerId }) => ({
+      model: modifyFields(model, { profile: () => `${memberId} from ${triggerId}` })
+    })
   })
 
 const viewOf = (render: (model: Model, h: HtmlBuilder<Message>) => Html) => (model: Model, h: HtmlBuilder<Message>) =>
@@ -46,9 +51,17 @@ const viewOf = (render: (model: Model, h: HtmlBuilder<Message>) => Html) => (mod
     [],
     [
       h.p([h.Role("status")], [`Current ${model.current}, edits ${model.edits}, deletions ${model.deletions}`]),
+      h.p([h.Id("opened-profile")], [model.profile]),
       render(model, h)
     ]
   )
+
+/** How the rows of a list open cards: the scope "thread", and the card of the trigger `openTriggerId`, if any. */
+const profilesOf = (openTriggerId?: string): ProfileOpener<Message> => ({
+  scope: "thread",
+  openTriggerId,
+  open: (memberId, triggerId) => Message.OpenedProfile({ memberId, triggerId })
+})
 
 const mention = "@Jamie can you check the composer fix before we ship?"
 
@@ -1533,6 +1546,278 @@ describe("turnRow", () => {
       expect(role("alert")).toBeAbsent(),
       expect(role("button")).toBeAbsent(),
       expect(within(role("group", { name: "Atlas's turn" }), selector("p"))).toBeAbsent()
+    )
+  })
+})
+
+describe("the cards a message opens", () => {
+  const alexSays = (options: Readonly<{ openTriggerId?: string; hasAuthorId?: boolean; isStacked?: boolean }> = {}) =>
+    viewOf((_, h) =>
+      messageList(h, {
+        label: "Messages",
+        children: [
+          message(h, {
+            key: "message-1",
+            mark: "AM",
+            author: "Alex Morgan",
+            ...(options.hasAuthorId === false ? {} : { authorId: "member-2" }),
+            profiles: profilesOf(options.openTriggerId),
+            time: "9:41 AM",
+            text: mentionText,
+            ...(options.isStacked === true ? { isStacked: true as const, shortTime: "9:41" } : {})
+          })
+        ]
+      })
+    )
+
+  it("opens the author's card from the author line, a button named by the author, which sends their id and its own", () => {
+    scene(
+      { update, view: alexSays() },
+      given(initial),
+      expect(role("button", { name: "Alex Morgan" })).toHaveAttr("id", "thread-message-1-name"),
+      expect(role("button", { name: "Alex Morgan" })).toHaveAttr("aria-haspopup", "dialog"),
+      expect(role("button", { name: "Alex Morgan" })).toHaveClass("text-item"),
+      expect(role("button", { name: "Alex Morgan" })).toHaveClass("font-medium"),
+      expect(role("button", { name: "Alex Morgan" })).toHaveClass("text-ink"),
+      click(role("button", { name: "Alex Morgan" })),
+      expect(selector("#opened-profile")).toHaveText("member-2 from thread-message-1-name")
+    )
+  })
+
+  it("opens it from the mark too, which is hidden from assistive technology and is not a button", () => {
+    scene(
+      { update, view: alexSays() },
+      given(initial),
+      expect(selector("#thread-message-1-mark")).toHaveAttr("aria-hidden", "true"),
+      expect(selector("#thread-message-1-mark")).toHaveClass("cursor-pointer"),
+      expect(within(selector("#thread-message-1-mark"), text("AM"))).toHaveClass("bg-avatar-slate-bg"),
+      expect(role("button", { name: "AM" })).toBeAbsent(),
+      click(selector("#thread-message-1-mark")),
+      expect(selector("#opened-profile")).toHaveText("member-2 from thread-message-1-mark")
+    )
+  })
+
+  it("keeps an agent's name in the agent's color when it opens their card", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) =>
+          message(h, {
+            key: "message-2",
+            mark: "A",
+            author: "Atlas",
+            authorId: "member-3",
+            isAgent: true,
+            profiles: profilesOf(),
+            text: "On it."
+          })
+        )
+      },
+      given(initial),
+      expect(role("button", { name: "Atlas" })).toHaveClass("text-agent"),
+      expect(role("button", { name: "Atlas" })).not.toHaveClass("text-ink")
+    )
+  })
+
+  it("says which of its triggers has its card open, and no other", () => {
+    scene(
+      { update, view: alexSays({ openTriggerId: "thread-message-1-name" }) },
+      given(initial),
+      expect(role("button", { name: "Alex Morgan" })).toHaveAttr("aria-expanded", "true"),
+      expect(role("button", { name: "@Jamie" })).toHaveAttr("aria-expanded", "false")
+    )
+    scene(
+      { update, view: alexSays({ openTriggerId: "thread-message-1-mention-0" }) },
+      given(initial),
+      expect(role("button", { name: "Alex Morgan" })).toHaveAttr("aria-expanded", "false"),
+      expect(role("button", { name: "@Jamie" })).toHaveAttr("aria-expanded", "true")
+    )
+  })
+
+  it("opens the card of a member its text mentions, from a chip that is a button with an id of its own", () => {
+    scene(
+      { update, view: alexSays() },
+      given(initial),
+      expect(role("button", { name: "@Jamie" })).toHaveAttr("id", "thread-message-1-mention-0"),
+      expect(role("button", { name: "@Jamie" })).toHaveClass("bg-mention"),
+      expect(role("button", { name: "@Jamie" })).toHaveClass("font-semibold"),
+      click(role("button", { name: "@Jamie" })),
+      expect(selector("#opened-profile")).toHaveText("jamie from thread-message-1-mention-0")
+    )
+  })
+
+  it("opens no card from a row that does not say whose it is, or has nowhere to open one", () => {
+    scene(
+      { update, view: alexSays({ hasAuthorId: false }) },
+      given(initial),
+      expect(text("Alex Morgan")).toExist(),
+      expect(role("button", { name: "Alex Morgan" })).toBeAbsent(),
+      expect(selector("#thread-message-1-mark")).toBeAbsent(),
+      expect(role("button", { name: "@Jamie" })).toExist()
+    )
+    scene(
+      {
+        update,
+        view: viewOf((_, h) =>
+          message(h, { key: "message-1", mark: "A", author: "Alex", authorId: "member-2", text: mentionText })
+        )
+      },
+      given(initial),
+      expect(role("button", { name: "Alex" })).toBeAbsent(),
+      expect(role("button", { name: "@Jamie" })).toBeAbsent(),
+      expect(text("@Jamie")).toHaveClass("bg-mention")
+    )
+  })
+
+  it("leaves a stacked message's author and time to assistive technology, with no trigger for its author", () => {
+    scene(
+      { update, view: alexSays({ isStacked: true }) },
+      given(initial),
+      expect(role("button", { name: "Alex Morgan" })).toBeAbsent(),
+      expect(selector("#thread-message-1-mark")).toBeAbsent(),
+      expect(text("Alex Morgan")).toHaveClass("text-item"),
+      expect(role("button", { name: "@Jamie" })).toExist()
+    )
+  })
+
+  it("opens no card from words as written or from a deleted message", () => {
+    const saying = (words: MessageText) =>
+      viewOf((_, h) =>
+        message(h, {
+          key: "message-1",
+          mark: "A",
+          author: "Alex",
+          authorId: "member-2",
+          profiles: profilesOf(),
+          text: words
+        })
+      )
+
+    scene(
+      { update, view: saying("[@Jamie](member:jamie)") },
+      given(initial),
+      expect(text("[@Jamie](member:jamie)")).toExist(),
+      expect(role("button", { name: "@Jamie" })).toBeAbsent()
+    )
+    scene(
+      { update, view: saying({ deleted: "Message deleted" }) },
+      given(initial),
+      expect(role("button", { name: "@Jamie" })).toBeAbsent(),
+      expect(text("Message deleted")).toExist()
+    )
+  })
+
+  it("numbers the mentions of a message in the order they are written, a member mentioned twice once each", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) =>
+          message(h, {
+            key: "message-1",
+            mark: "S",
+            author: "Sara",
+            authorId: "member-4",
+            profiles: profilesOf(),
+            text: {
+              text: "[@Jamie](member:jamie) and [@Casey](member:casey) and [@Jamie](member:jamie) again",
+              mentions: [
+                { id: "jamie", name: "Jamie" },
+                { id: "casey", name: "Casey" }
+              ]
+            }
+          })
+        )
+      },
+      given(initial),
+      expectAll(all.role("button", { name: "@Jamie" })).toHaveCount(2),
+      expect(nth(all.role("button", { name: "@Jamie" }), 0)).toHaveAttr("id", "thread-message-1-mention-0"),
+      expect(role("button", { name: "@Casey" })).toHaveAttr("id", "thread-message-1-mention-1"),
+      expect(nth(all.role("button", { name: "@Jamie" }), 1)).toHaveAttr("id", "thread-message-1-mention-2")
+    )
+  })
+})
+
+describe("the cards a notification opens", () => {
+  const sara = (options: Readonly<{ authorId?: string; openTriggerId?: string }> = {}) =>
+    viewOf((_, h) =>
+      messageList(h, {
+        label: "Notifications",
+        children: [
+          notification(h, {
+            key: "notification-1",
+            mark: { text: "S" },
+            author: "Sara",
+            activity: "mentioned you",
+            text: mentionText,
+            age: "2m ago",
+            onOpen: Message.OpenedThread({ key: "notification-1" }),
+            ...(options.authorId === undefined ? {} : { authorId: options.authorId }),
+            profiles: { ...profilesOf(options.openTriggerId), scope: "inbox" }
+          })
+        ]
+      })
+    )
+
+  it("opens the author's card from the author in the first line and from the mark, and nothing else of the row", () => {
+    scene(
+      { update, view: sara({ authorId: "member-4" }) },
+      given(initial),
+      expect(role("button", { name: "Sara" })).toHaveAttr("id", "inbox-notification-1-name"),
+      expect(role("button", { name: "Sara" })).toHaveClass("font-medium"),
+      expect(selector("#inbox-notification-1-mark")).toHaveAttr("aria-hidden", "true"),
+      click(role("button", { name: "Sara" })),
+      expect(selector("#opened-profile")).toHaveText("member-4 from inbox-notification-1-name"),
+      click(selector("#inbox-notification-1-mark")),
+      expect(selector("#opened-profile")).toHaveText("member-4 from inbox-notification-1-mark"),
+      click(role("button", { name: "Sara mentioned you" })),
+      expect(role("status")).toHaveText("Current notification-1, edits 0, deletions 0")
+    )
+  })
+
+  it("says whether the author's card is open", () => {
+    scene(
+      { update, view: sara({ authorId: "member-4", openTriggerId: "inbox-notification-1-name" }) },
+      given(initial),
+      expect(role("button", { name: "Sara" })).toHaveAttr("aria-expanded", "true")
+    )
+  })
+
+  it("keeps the mentions in its preview as chips, since the button that opens the thread holds no other", () => {
+    scene(
+      { update, view: sara({ authorId: "member-4" }) },
+      given(initial),
+      expect(text("@Jamie")).toHaveClass("bg-mention"),
+      expect(role("button", { name: "@Jamie" })).toBeAbsent()
+    )
+  })
+
+  it("opens no card from a notification that does not say whose author it shows", () => {
+    scene(
+      { update, view: sara() },
+      given(initial),
+      expect(role("button", { name: "Sara" })).toBeAbsent(),
+      expect(selector("#inbox-notification-1-mark")).toBeAbsent(),
+      expect(text("Sara")).toExist()
+    )
+  })
+})
+
+describe("the cards a description opens", () => {
+  const described = (openTriggerId?: string) =>
+    viewOf((_, h) => description(h, { text: mentionText, profiles: { ...profilesOf(openTriggerId), scope: "task" } }))
+
+  it("opens the card of a member its text mentions, with an id of the description's own", () => {
+    scene(
+      { update, view: described() },
+      given(initial),
+      expect(role("button", { name: "@Jamie" })).toHaveAttr("id", "task-description-mention-0"),
+      click(role("button", { name: "@Jamie" })),
+      expect(selector("#opened-profile")).toHaveText("jamie from task-description-mention-0")
+    )
+    scene(
+      { update, view: described("task-description-mention-0") },
+      given(initial),
+      expect(role("button", { name: "@Jamie" })).toHaveAttr("aria-expanded", "true")
     )
   })
 })
