@@ -2,6 +2,7 @@ import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Schema from "effect/Schema"
 import type { Block } from "foldkit"
 import * as Update from "foldkit/update"
+import { currentSidebarRowSelector } from "../src/sidebar.ts"
 import {
   AccountMenu,
   Appearance,
@@ -74,6 +75,12 @@ export const CompactModalBinding = ApplicationDefinition.bindChild(DialogBlock, 
 export const AddViewModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
   field: "addViewModal",
   init: { contextToArgs: () => [{ id: "workshop-add-view-modal" }] },
+  outMessage: { fold: foldDialogOutMessage }
+})
+
+export const NavigationDrawerBinding = ApplicationDefinition.bindChild(DialogBlock, {
+  field: "navigationDrawer",
+  init: { contextToArgs: () => [{ id: "workshop-navigation-drawer", focusSelector: currentSidebarRowSelector }] },
   outMessage: { fold: foldDialogOutMessage }
 })
 
@@ -346,6 +353,7 @@ export const ApplicationComposition = ApplicationDefinition.makeComposition({
     CreateModalBinding,
     NewMessageModalBinding,
     AddViewModalBinding,
+    NavigationDrawerBinding,
     EmptyPickerBinding,
     ChosenPickerBinding,
     CreatePickerBinding,

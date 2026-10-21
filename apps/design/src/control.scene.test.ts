@@ -1254,6 +1254,33 @@ describe("iconButton", () => {
     )
   })
 
+  it("says whether what it shows is shown, when it is told, and nothing when it is not", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          iconButton(
+            h,
+            { icon: "menu", label: "Open navigation", onClick: Message.ClickedSave() },
+            { isExpanded: false, controls: "drawer" }
+          ),
+          iconButton(
+            h,
+            { icon: "menu", label: "Hide navigation", onClick: Message.ClickedSave() },
+            { isExpanded: true }
+          ),
+          iconButton(h, { icon: "bell", label: "Notifications", onClick: Message.ClickedSave() })
+        ])
+      },
+      given(initial),
+      expect(role("button", { name: "Open navigation" })).toHaveAttr("aria-expanded", "false"),
+      expect(role("button", { name: "Open navigation" })).toHaveAttr("aria-controls", "drawer"),
+      expect(role("button", { name: "Hide navigation" })).toHaveAttr("aria-expanded", "true"),
+      expect(role("button", { name: "Notifications" })).not.toHaveAttr("aria-expanded"),
+      expect(role("button", { name: "Open navigation" })).not.toHaveAttr("aria-pressed")
+    )
+  })
+
   it("says what it controls and the keys that do the same, when it is given them, and nothing when it is not", () => {
     scene(
       {

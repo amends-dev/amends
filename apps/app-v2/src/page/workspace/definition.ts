@@ -111,7 +111,7 @@ export const AppAccountEntry = ReportedAccountEntry.pick(["System", "Light", "Da
 export type AppAccountEntry = typeof AppAccountEntry.Type
 
 export const Message = defineMessageUnion({
-  ClickedAllWorkspaces: {},
+  ClickedWorkspaceSwitcher: {},
   ClickedHome: {},
   ClickedConnections: {},
   ClickedAgents: {},

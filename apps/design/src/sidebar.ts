@@ -18,7 +18,7 @@ import {
   taskStatus
 } from "./mark.ts"
 
-const sidebarColumn = "flex w-66 flex-none flex-col overflow-hidden bg-panel"
+const sidebarColumn = "flex w-66 max-w-[calc(100vw-7.25rem)] flex-none flex-col overflow-hidden bg-panel"
 
 const sidebarBody = "flex min-h-0 flex-1 flex-col gap-5.5 overflow-y-auto overscroll-contain px-3 pt-3.75 pb-4"
 
@@ -27,11 +27,12 @@ const sectionsColumn = "flex flex-none flex-col gap-5.5"
 const headerColumn =
   "flex min-h-24 flex-none flex-col gap-3.5 border-b border-divider px-4.5 pt-4.25 pb-1.75 max-desktop:min-h-26"
 
-const headerRow = "flex h-7 items-center gap-2.5 max-desktop:h-11"
+const workspaceButton =
+  "group flex h-7 w-full cursor-pointer items-center gap-2.5 bg-transparent p-0 text-start focus-ring max-desktop:h-11"
 
 const workspaceName = "min-w-0 flex-1 truncate text-body font-medium text-ink"
 
-const headerActions = "flex flex-none items-center gap-1"
+const workspaceChevron = "ms-auto flex size-3.5 flex-none text-ink-secondary group-hover:text-ink [&>svg]:size-full"
 
 const searchButton =
   "flex h-7.5 w-full cursor-pointer items-center gap-2 bg-search px-2.5 text-start text-control text-ink-muted focus-ring hover:text-ink-secondary max-desktop:h-11"
@@ -246,31 +247,37 @@ const itemDescription = (
 }
 
 /**
+ * Selects the row of the sidebar that is current, a button, within a dialog that holds the sidebar, for the dialog to
+ * focus when it opens.
+ */
+export const currentSidebarRowSelector = '[data-sidebar] button[aria-current="page"]'
+
+/**
  * The sidebar, a `nav` named by `label`: the `header` above the `children` that scroll, and the `footer`
  * below them when there is one. `header` is a `sidebarHeader`, `children` are `sidebarSection`s, and
- * `footer` is a `sidebarFooter`.
+ * `footer` is a `sidebarFooter`. It says `data-sidebar`, which `currentSidebarRowSelector` goes by.
  */
 export const sidebar = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{ label: string; header: Html; children: ReadonlyArray<Html>; footer?: Html }>
 ): Html =>
   h.nav(
-    [h.AriaLabel(config.label), h.Class(sidebarColumn)],
+    [h.AriaLabel(config.label), h.DataAttribute("sidebar", ""), h.Class(sidebarColumn)],
     [config.header, h.div([h.Class(sidebarBody)], config.children), config.footer ?? h.empty]
   )
 
 /**
- * The 96px band at the top of the sidebar, as tall as the main pane's header beside it: the workspace's
- * `mark` letter and `name`, `actions` at the right, such as the menu that switches workspace, and under
- * them the `search` that opens a search, with the `shortcut` that does too, when given. A line runs
- * under the band.
+ * The 96px band at the top of the sidebar, as tall as the main pane's header beside it: the workspace as one button
+ * that sends `onClick`, such as the way to the person's other workspaces, made of its `mark` letter on a 28px square,
+ * its `name`, and a chevron at the end, and under it the `search` that opens a search, with the `shortcut` that does
+ * too, when given. A line runs under the band. The button is named by the workspace's `name`.
  */
 export const sidebarHeader = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{
     mark: string
     name: string
-    actions?: ReadonlyArray<Html>
+    onClick: Message
     search?: Readonly<{ label: string; shortcut?: string; onClick: Message }>
   }>
 ): Html => {
@@ -279,13 +286,20 @@ export const sidebarHeader = <Message, Requirements>(
   return h.div(
     [h.Class(headerColumn)],
     [
-      h.div(
-        [h.Class(headerRow)],
-        [
-          mark(h, { text: config.mark }),
-          h.span([h.Class(workspaceName)], [config.name]),
-          h.div([h.Class(headerActions)], config.actions ?? [])
-        ]
+      Button.view(
+        {
+          onClick: config.onClick,
+          toView: (attributes) =>
+            h.button(
+              [...attributes.button, h.Class(workspaceButton)],
+              [
+                mark(h, { text: config.mark, size: "account" }),
+                h.span([h.Class(workspaceName)], [config.name]),
+                h.span([h.AriaHidden(true), h.Class(workspaceChevron)], [icon(h, "chevron-down", { size: "sm" })])
+              ]
+            )
+        },
+        h
       ),
       search === undefined
         ? h.empty

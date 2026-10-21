@@ -130,7 +130,7 @@ describe("the app", () => {
           Option.map(openedIn(model), ({ workspaceId, model }) => ({ workspaceId, memberId: model.memberId }))
         ).toEqual(Option.some({ workspaceId: membership.workspace.id, memberId: membership.member.id }))
       }),
-      message(fromWorkspace(WorkspaceBlock.Message.ClickedAllWorkspaces())),
+      message(fromWorkspace(WorkspaceBlock.Message.ClickedWorkspaceSwitcher())),
       model((model) => {
         expect(openedIn(model)).toEqual(Option.none())
       }),

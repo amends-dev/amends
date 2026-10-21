@@ -10,6 +10,7 @@ import {
   NewMessageModalBinding,
   ModalBinding,
   FormModalBinding,
+  NavigationDrawerBinding,
   PaletteModalBinding,
   SettingsModalBinding,
   WideModalBinding
@@ -69,6 +70,7 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
     ClickedOpenNewMessageModal: () => NewMessageModalBinding.requestOpen()(model),
     ClickedOpenAddViewModal: () => AddViewModalBinding.requestOpen()(model),
     ClickedCloseAddViewModal: () => AddViewModalBinding.requestClose()(model),
+    ClickedOpenNavigation: () => NavigationDrawerBinding.requestOpen()(model),
     TypedMemberListQuery: ({ value }) => ({ model: modifyFields(model, { listQuery: () => value }) }),
     PickedListMember: ({ id }) => ({
       model: modifyFields(model, { listMembers: (members) => [...members, id], listQuery: () => "" })

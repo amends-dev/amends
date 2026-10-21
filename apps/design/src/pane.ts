@@ -15,6 +15,8 @@ import { type StateArtKind, stateArt } from "./stateArt.ts"
 
 const paneRoot = "flex min-h-0 min-w-0 flex-1 flex-col"
 
+const mainPaneLook = `${paneRoot} focus:outline-none`
+
 const headerBand =
   "flex min-h-24 flex-none flex-col px-6 shadow-[inset_0_-1px_0_var(--amends-divider)] max-desktop:min-h-26"
 
@@ -104,6 +106,9 @@ const sectionStitch = "h-0 min-w-6 flex-1 border-t border-dashed border-stitch"
 const sectionTitle = "m-0 text-item font-medium text-ink"
 
 export type PaneVariant = "main" | "side"
+
+/** The `id` of the main pane, which the shell's skip link goes to. */
+export const mainPaneId = "main-pane"
 
 export type PaneHeader = Readonly<{
   title: string
@@ -225,7 +230,9 @@ const renderHeader = <Message, Requirements>(
  * `header` (96px, 104px below 64rem, so the two line up and the sidebar's header beside them; the main
  * pane's title starts after the shell's menu button there), the `toolbar` over a list, if it has one, the `body`
  * that scrolls, and the `footer`, such as the composer, that stays in place under it. The main title is an `h1` at
- * title size, the side title an `h2` at body size; a `label` also names the main landmark.
+ * title size, the side title an `h2` at body size; a `label` also names the main landmark. The main pane is the
+ * `mainPaneId` and has `tabindex="-1"`, so that the shell's skip link can send focus to it without making it a stop
+ * in the tab order; it draws no outline while it has focus.
  *
  * The `toolbar` is what stays under the header while the list scrolls: a `paneToolbar` of the search, the filters,
  * and the actions, then, if the list has them, the line that says what it holds and its `columns`. The body then
@@ -250,7 +257,11 @@ export const pane = <Message, Requirements>(
     footer?: ReadonlyArray<Html>
   }>
 ): Html => {
-  const attributes = [...(config.label === undefined ? [] : [h.AriaLabel(config.label)]), h.Class(paneRoot)]
+  const label = config.label === undefined ? [] : [h.AriaLabel(config.label)]
+  const attributes =
+    config.variant === "main"
+      ? [...label, h.Id(mainPaneId), h.Tabindex(-1), h.Class(mainPaneLook)]
+      : [...label, h.Class(paneRoot)]
   const scroll = config.toolbar === undefined ? bodyScroll : bodyScrollUnderToolbar
   const children = [
     renderHeader(h, config.variant, config.header),

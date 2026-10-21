@@ -265,17 +265,17 @@ describe("the app", () => {
     )
   })
 
-  it("lays the open workspace out for the window's width as it changes, with the Menu button where the sidebar leaves", () => {
+  it("lays the open workspace out for the window's width as it changes, with the Open navigation button where the sidebar leaves", () => {
     scene(
       { update, view, subscriptions },
       given(inWorkspace),
-      expect(role("button", { name: "Menu" })).toBeAbsent(),
+      expect(role("button", { name: "Open navigation" })).toBeAbsent(),
       expect(role("navigation", { name: "Studio" })).toExist(),
       Subscription.emit(subscriptions.viewport, Message.ChangedViewport({ viewport: "Phone" })),
-      expect(role("button", { name: "Menu" })).toExist(),
+      expect(role("button", { name: "Open navigation" })).toExist(),
       expect(role("navigation", { name: "Studio" })).toBeAbsent(),
       Subscription.emit(subscriptions.viewport, Message.ChangedViewport({ viewport: "Desktop" })),
-      expect(role("button", { name: "Menu" })).toBeAbsent(),
+      expect(role("button", { name: "Open navigation" })).toBeAbsent(),
       expect(role("navigation", { name: "Studio" })).toExist()
     )
   })

@@ -5,7 +5,7 @@ import { defineMessageUnion } from "foldkit/message"
 import { all, click, expect, expectAll, given, last, nth, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { button } from "./control.ts"
-import { pane, paneBack, paneClose } from "./pane.ts"
+import { mainPaneId, pane, paneBack, paneClose } from "./pane.ts"
 import { rail } from "./rail.ts"
 import { isAsideInDialog, shell } from "./shell.ts"
 import { sidebar, sidebarHeader, sidebarItem, sidebarSection } from "./sidebar.ts"
@@ -14,6 +14,7 @@ import type { Viewport } from "./viewport.ts"
 
 const Message = defineMessageUnion({
   ClickedHome: {},
+  ClickedWorkspaces: {},
   ClosedSearch: {},
   ClosedThread: {},
   DismissedRefusal: {},
@@ -31,6 +32,7 @@ type Model = Readonly<{
   isMenuOpen: boolean
   isSearchOpen: boolean
   homes: number
+  workspaces: number
 }>
 
 const initial: Model = {
@@ -40,12 +42,16 @@ const initial: Model = {
   isRefused: false,
   isMenuOpen: false,
   isSearchOpen: false,
-  homes: 0
+  homes: 0,
+  workspaces: 0
 }
+
+const menuId = "workspace-menu"
 
 const update = (model: Model, message: Message) =>
   Message.match<Update.Return<Model, Message>>(message, {
     ClickedHome: () => ({ model: modifyFields(model, { homes: (homes) => homes + 1 }) }),
+    ClickedWorkspaces: () => ({ model: modifyFields(model, { workspaces: (workspaces) => workspaces + 1 }) }),
     ClosedSearch: () => ({ model: modifyFields(model, { isSearchOpen: () => false }) }),
     ClosedThread: () => ({ model: modifyFields(model, { isThreadOpen: () => false, isAsideOpen: () => false }) }),
     DismissedRefusal: () => ({ model: modifyFields(model, { isRefused: () => false }) }),
@@ -66,7 +72,7 @@ const viewWith =
       }),
       sidebar: sidebar(h, {
         label: "Workspace",
-        header: sidebarHeader(h, { mark: "M", name: "Mercier & Co" }),
+        header: sidebarHeader(h, { mark: "M", name: "Mercier & Co", onClick: Message.ClickedWorkspaces() }),
         children: [
           sidebarSection(h, {
             children: [
@@ -128,12 +134,13 @@ const viewWith =
       ...(lent.hasMenu
         ? {
             menu: {
+              id: menuId,
               onOpen: Message.OpenedMenu(),
               isOpen: model.isMenuOpen,
               // What a dialog publishes, with no attribute but those that show it and name it while it is open.
               dialog: (toView) =>
                 toView({
-                  dialog: model.isMenuOpen ? [h.Open(true), h.AriaLabel("Navigation")] : [],
+                  dialog: model.isMenuOpen ? [h.Id(menuId), h.Open(true), h.AriaLabel("Navigation")] : [h.Id(menuId)],
                   backdrop: [],
                   panel: [],
                   title: [],
@@ -175,6 +182,27 @@ describe("shell", () => {
       expect(role("navigation", { name: "Workspace" })).toExist(),
       expect(role("main")).toExist(),
       expect(role("complementary", { name: "Composer paste crash" })).toExist()
+    )
+  })
+
+  it("starts the frame with a link named Skip to content, before the rail and whatever else it holds, at every viewport", () => {
+    for (const viewport of ["Phone", "Tablet", "Desktop", "Split"] as const) {
+      scene(
+        { update, view },
+        given(inWindow(viewport)),
+        expect(role("link", { name: "Skip to content" })).toExist(),
+        expect(nth(all.selector(":not(template)"), 1)).toHaveText("Skip to content")
+      )
+    }
+  })
+
+  it("sends the skip link to the main pane, which can be given focus without being in the tab order", () => {
+    scene(
+      { update, view },
+      given(initial),
+      expect(role("link", { name: "Skip to content" })).toHaveAttr("href", `#${mainPaneId}`),
+      expect(role("main")).toHaveAttr("id", mainPaneId),
+      expect(role("main")).toHaveAttr("tabIndex", "-1")
     )
   })
 
@@ -255,28 +283,28 @@ describe("shell", () => {
     }
   })
 
-  it("keeps the rail and the sidebar in place from Desktop, with no Menu button and no dialog", () => {
+  it("keeps the rail and the sidebar in place from Desktop, with no navigation button and no dialog", () => {
     for (const viewport of ["Desktop", "Split"] as const) {
       scene(
         { update, view },
         given(inWindow(viewport)),
         expect(role("navigation", { name: "Destinations" })).toExist(),
         expect(role("navigation", { name: "Workspace" })).toExist(),
-        expect(role("button", { name: "Menu" })).toBeAbsent(),
+        expect(role("button", { name: "Open navigation" })).toBeAbsent(),
         expect(role("dialog", { name: "Navigation" })).toBeAbsent()
       )
     }
   })
 
-  it("keeps the rail at Tablet and leaves the sidebar to a dialog that the Menu button opens", () => {
+  it("keeps the rail at Tablet and leaves the sidebar to a dialog that the Open navigation button opens", () => {
     scene(
       { update, view },
       given(inWindow("Tablet")),
       expect(role("navigation", { name: "Destinations" })).toExist(),
       expect(role("navigation", { name: "Workspace" })).toBeAbsent(),
-      expect(role("button", { name: "Menu" })).toExist(),
+      expect(role("button", { name: "Open navigation" })).toExist(),
       expect(role("dialog", { name: "Navigation" })).toBeAbsent(),
-      click(role("button", { name: "Menu" })),
+      click(role("button", { name: "Open navigation" })),
       expect(within(role("dialog", { name: "Navigation" }), role("navigation", { name: "Workspace" }))).toExist(),
       expect(within(role("dialog", { name: "Navigation" }), role("navigation", { name: "Destinations" }))).toBeAbsent(),
       expect(role("navigation", { name: "Destinations" })).toExist()
@@ -289,9 +317,9 @@ describe("shell", () => {
       given(inWindow("Phone")),
       expect(role("navigation", { name: "Destinations" })).toBeAbsent(),
       expect(role("navigation", { name: "Workspace" })).toBeAbsent(),
-      expect(role("button", { name: "Menu" })).toExist(),
+      expect(role("button", { name: "Open navigation" })).toExist(),
       expect(role("main")).toExist(),
-      click(role("button", { name: "Menu" })),
+      click(role("button", { name: "Open navigation" })),
       expect(
         within(role("dialog", { name: "Navigation" }), role("heading", { name: "Navigation", level: 2 }))
       ).toExist(),
@@ -311,12 +339,27 @@ describe("shell", () => {
     )
   })
 
-  it("has no Menu button or dialog when it is given no menu, and no sidebar below Desktop", () => {
+  it("names the navigation button Open navigation, and says whether the drawer is open and which dialog it controls", () => {
+    for (const viewport of ["Phone", "Tablet"] as const) {
+      scene(
+        { update, view },
+        given(inWindow(viewport)),
+        expect(role("button", { name: "Open navigation" })).toHaveAttr("aria-expanded", "false"),
+        expect(role("button", { name: "Open navigation" })).toHaveAttr("aria-controls", menuId),
+        expect(role("dialog", { name: "Navigation" })).toBeAbsent(),
+        click(role("button", { name: "Open navigation" })),
+        expect(role("button", { name: "Open navigation" })).toHaveAttr("aria-expanded", "true"),
+        expect(role("dialog", { name: "Navigation" })).toHaveAttr("id", menuId)
+      )
+    }
+  })
+
+  it("has no navigation button or dialog when it is given no menu, and no sidebar below Desktop", () => {
     for (const viewport of ["Phone", "Tablet"] as const) {
       scene(
         { update, view: viewWith({ hasMenu: false, hasSearch: false, asideLabel: "Thread" }) },
         given(inWindow(viewport, { isMenuOpen: true })),
-        expect(role("button", { name: "Menu" })).toBeAbsent(),
+        expect(role("button", { name: "Open navigation" })).toBeAbsent(),
         expect(role("dialog", { name: "Navigation" })).toBeAbsent(),
         expect(role("navigation", { name: "Workspace" })).toBeAbsent(),
         expect(role("main")).toExist()

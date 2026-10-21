@@ -24,6 +24,7 @@ import { button, field, iconButton, searchField, sending, submit as submitButton
 import { turnStatus } from "./details.ts"
 import { columns } from "./directory.ts"
 import {
+  mainPaneId,
   pane,
   paneBack,
   paneClose,
@@ -127,6 +128,21 @@ describe("pane", () => {
       expect(role("main")).toExist(),
       expect(within(role("main"), role("heading", { name: "general", level: 1 }))).toExist(),
       expect(within(role("main"), text("Mercier & Co"))).toExist()
+    )
+  })
+
+  it("is what the skip link goes to: the main landmark alone has an id and can be given focus, out of the tab order", () => {
+    scene(
+      { update, view: paneView(mainPane) },
+      given(initial),
+      expect(role("main")).toHaveAttr("id", mainPaneId),
+      expect(role("main")).toHaveAttr("tabIndex", "-1")
+    )
+    scene(
+      { update, view: paneView(sidePane) },
+      given(initial),
+      expect(role("complementary")).not.toHaveAttr("id"),
+      expect(role("complementary")).not.toHaveAttr("tabIndex")
     )
   })
 

@@ -206,6 +206,11 @@ export type IconButtonOptions = Readonly<{
   isDisabled?: boolean
   /** For a button that shows or hides something else on the page: the `id` of what it controls, as `aria-controls`. */
   controls?: string
+  /**
+   * For a button that shows or hides something else on the page: whether it is shown now, which the button says as
+   * `aria-expanded`. A button without it says nothing of the kind.
+   */
+  isExpanded?: boolean
   /** The keys that do what the button does, as `aria-keyshortcuts` names them, such as "Control+B Meta+B". */
   shortcuts?: string
 }>
@@ -403,6 +408,7 @@ export const iconButtonWith = <Message, Requirements>(
     [
       ...attributes,
       ...(options.isPressed === undefined ? [] : [h.AriaPressed(options.isPressed ? "true" : "false")]),
+      ...(options.isExpanded === undefined ? [] : [h.AriaExpanded(options.isExpanded)]),
       ...(options.controls === undefined ? [] : [h.AriaControls(options.controls)]),
       ...(options.shortcuts === undefined ? [] : [h.AriaKeyshortcuts(options.shortcuts)]),
       h.Class(joinClasses(iconButtonBase, iconButtonSizes[options.size ?? "regular"]))

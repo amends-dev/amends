@@ -7,6 +7,7 @@ import { click, expect, given, role, scene, selector, text, within } from "foldk
 import { modifyFields } from "foldkit/struct"
 import { iconButton } from "./control.ts"
 import {
+  currentSidebarRowSelector,
   sidebar,
   sidebarEmpty,
   sidebarFooter,
@@ -53,7 +54,7 @@ const workspaceSidebar = (model: Model, h: HtmlBuilder<Message>) =>
     header: sidebarHeader(h, {
       mark: "M",
       name: "Mercier & Co",
-      actions: [iconButton(h, { icon: "mark-menu", label: "Switch workspace", onClick: open("Switch") })],
+      onClick: open("Switch"),
       search: { label: "Find anything…", shortcut: "⌘ K", onClick: Message.OpenedSearch() }
     }),
     children: [
@@ -121,13 +122,26 @@ describe("sidebar", () => {
     )
   })
 
-  it("opens a search from the header and keeps its action buttons by name", () => {
+  it("opens a search from the header", () => {
     scene(
       { update, view: sidebarView(workspaceSidebar) },
       given(initial),
       click(role("button", { name: "Find anything…" })),
-      expect(role("status")).toHaveText("Current Inbox, searches 1, creations 0"),
-      expect(role("button", { name: "Switch workspace" })).toExist()
+      expect(role("status")).toHaveText("Current Inbox, searches 1, creations 0")
+    )
+  })
+
+  it("shows the workspace as one button named by it, a 28px mark, its name, and a chevron, that sends its message", () => {
+    scene(
+      { update, view: sidebarView(workspaceSidebar) },
+      given(initial),
+      expect(within(role("navigation", { name: "Workspace" }), role("button", { name: "Mercier & Co" }))).toExist(),
+      expect(within(role("button", { name: "Mercier & Co" }), text("M"))).toHaveClass("size-7"),
+      expect(within(role("button", { name: "Mercier & Co" }), text("M"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(role("button", { name: "Mercier & Co" }), text("Mercier & Co"))).toExist(),
+      expect(within(role("button", { name: "Mercier & Co" }), selector('[aria-hidden="true"] svg'))).toExist(),
+      click(role("button", { name: "Mercier & Co" })),
+      expect(role("status")).toHaveText("Current Switch, searches 0, creations 0")
     )
   })
 
@@ -326,7 +340,7 @@ describe("sidebar", () => {
         view: sidebarView((_, h) =>
           sidebar(h, {
             label: "Settings",
-            header: sidebarHeader(h, { mark: "M", name: "Mercier & Co" }),
+            header: sidebarHeader(h, { mark: "M", name: "Mercier & Co", onClick: open("Switch") }),
             children: [
               sidebarSection(h, {
                 children: [
@@ -350,7 +364,7 @@ describe("sidebar", () => {
         view: sidebarView((_, h) =>
           sidebar(h, {
             label: "Workspace",
-            header: sidebarHeader(h, { mark: "M", name: "Mercier & Co" }),
+            header: sidebarHeader(h, { mark: "M", name: "Mercier & Co", onClick: open("Switch") }),
             children: [
               sidebarSection(h, {
                 label: "Groups",
@@ -405,7 +419,7 @@ describe("sidebarSections", () => {
         view: sidebarView((model, h) =>
           sidebar(h, {
             label: "Workspace",
-            header: sidebarHeader(h, { mark: "M", name: "Mercier & Co" }),
+            header: sidebarHeader(h, { mark: "M", name: "Mercier & Co", onClick: open("Switch") }),
             children: [
               sidebarSection(h, {
                 children: [
@@ -902,6 +916,66 @@ describe("sidebarSection's title", () => {
       expect(role("heading", { name: "Channels", level: 2 })).toExist(),
       expect(role("button", { name: "Channels" })).toBeAbsent(),
       expect(role("list")).toBeAbsent()
+    )
+  })
+})
+
+describe("sidebar's current row", () => {
+  const withTitle = (isTitleCurrent: boolean) => (_: Model, h: HtmlBuilder<Message>) =>
+    sidebar(h, {
+      label: "Workspace",
+      header: sidebarHeader(h, { mark: "M", name: "Mercier & Co", onClick: open("Switch") }),
+      children: [sidebarSection(h, { label: "Agents", onTitleClick: open("Agents"), isTitleCurrent, children: [] })]
+    })
+
+  const withPlainSubItem = (_: Model, h: HtmlBuilder<Message>) =>
+    sidebar(h, {
+      label: "Workspace",
+      header: sidebarHeader(h, { mark: "M", name: "Mercier & Co", onClick: open("Switch") }),
+      children: [
+        sidebarSection(h, {
+          children: [
+            sidebarItem(h, {
+              icon: "mark-channel",
+              label: "general",
+              isCurrent: false,
+              onClick: open("general"),
+              children: [{ icon: "circle-frame", label: "Composer paste crash", isCurrent: true }]
+            })
+          ]
+        })
+      ]
+    })
+
+  it("is found by the button of whichever item is current, for a dialog that holds the sidebar to focus", () => {
+    scene(
+      { update, view: sidebarView(workspaceSidebar) },
+      given(initial),
+      expect(selector(currentSidebarRowSelector)).toHaveAttr("aria-label", "Inbox"),
+      click(role("button", { name: "Triage" })),
+      expect(selector(currentSidebarRowSelector)).toHaveAttr("aria-label", "Triage")
+    )
+  })
+
+  it("is found by the title of a section whose list shows, and by nothing while no row is current", () => {
+    scene(
+      { update, view: sidebarView(withTitle(true)) },
+      given(initial),
+      expect(selector(currentSidebarRowSelector)).toHaveText("Agents")
+    )
+    scene(
+      { update, view: sidebarView(withTitle(false)) },
+      given(initial),
+      expect(selector(currentSidebarRowSelector)).toBeAbsent()
+    )
+  })
+
+  it("is not found in a row that only says where the person is, which cannot be focused", () => {
+    scene(
+      { update, view: sidebarView(withPlainSubItem) },
+      given(initial),
+      expect(selector("[data-sidebar] [aria-current='page']")).toHaveText("Composer paste crash"),
+      expect(selector(currentSidebarRowSelector)).toBeAbsent()
     )
   })
 })

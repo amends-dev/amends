@@ -1,13 +1,14 @@
 /**
  * The shell that frames a workspace: the rail on the canvas, then one card holding the sidebar, the
  * main pane, and, while a thread or details are open, the side pane. Below 64rem the sidebar, and
- * below 48rem the rail with it, leave the frame for a drawer that a menu button opens; below 80rem the
+ * below 48rem the rail with it, leave the frame for a drawer that a navigation button opens; below 80rem the
  * side pane leaves the card for a dialog of its own.
  */
 
 import type { Html, HtmlBuilder } from "foldkit/html"
-import { iconButton } from "./control.ts"
+import { iconButton, iconButtonWith } from "./control.ts"
 import type { ModalRender } from "./modal.ts"
+import { mainPaneId } from "./pane.ts"
 import type { Viewport } from "./viewport.ts"
 
 const shellFrame =
@@ -16,6 +17,9 @@ const shellFrame =
 const shellCard = "relative flex min-h-0 min-w-0 flex-1 bg-panel"
 
 const shellDivider = "w-px flex-none self-stretch bg-divider"
+
+const skipLinkLook =
+  "fixed start-2 top-2 z-40 -translate-y-[200%] bg-panel px-3 py-2 text-item text-ink focus-ring focus-visible:translate-y-0"
 
 const menuSlot = "absolute start-2 top-2 z-10"
 
@@ -33,6 +37,8 @@ const drawerAtEdge = "start-0"
 const drawerBesideRail = "start-13"
 
 const drawerRailLook = "flex flex-none bg-canvas"
+
+const drawerCloseSlot = "absolute start-full top-[calc(env(safe-area-inset-top)+0.375rem)] ms-3 flex bg-panel"
 
 const sidePaneLooks = {
   Floating: {
@@ -80,7 +86,11 @@ export type ShellDialog<Message, Requirements> = Readonly<{
 
 export type ShellMenu<Message, Requirements> = ShellDialog<Message, Requirements> &
   Readonly<{
-    /** Sent by the menu button, which opens the drawer. */
+    /**
+     * The `id` of the dialog, from the `id` of the `DialogBlock`'s model, which the navigation button says it controls.
+     */
+    id: string
+    /** Sent by the navigation button, which opens the drawer. */
     onOpen: Message
   }>
 
@@ -110,8 +120,9 @@ const placeNotices = (dialogs: Readonly<{ isMenuOpen: boolean; isAsideOpen: bool
 /**
  * The dialog `render` describes, as a panel at the start of the window over a scrim while it is visible, and
  * nothing while it is not: an `sr-only` heading named Navigation, the `rail` when the frame does not hold it,
- * then the `sidebar`, and the `notices` after the panel. The panel sits beside the rail when the frame holds
- * it. It slides in; closing is instant, since the dialog is not animated.
+ * then the `sidebar`, a button named Close navigation just past the panel's end edge, and the `notices` after the
+ * panel. The panel sits beside the rail when the frame holds it. It slides in; closing is instant, since the dialog is
+ * not animated.
  */
 const drawer = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -131,7 +142,11 @@ const drawer = <Message, Requirements>(
             [
               h.h2([...render.title, h.Class(dialogTitleLook)], ["Navigation"]),
               parts.rail === undefined ? h.empty : h.div([h.Class(drawerRailLook)], [parts.rail]),
-              parts.sidebar
+              parts.sidebar,
+              h.span(
+                [h.Class(drawerCloseSlot)],
+                [iconButtonWith(h, render.closeButton, { icon: "mark-close", label: "Close navigation" })]
+              )
             ]
           ),
           parts.notices
@@ -180,10 +195,14 @@ const sidePaneDialog = <Message, Requirements>(
  *   for the screen's safe areas, and the aside fills the window over the main pane, which keeps its state
  *   under it; the aside's own Back, `paneBack`, is the way out.
  *
- * The `menu` is the drawer. Where the frame lacks the sidebar the shell draws a button named Menu at the top
- * start of the card over the main pane's header, which sends `onOpen`, and the drawer in `menu.dialog`. Where
- * the frame holds the sidebar the `menu` is not used, and without a `menu` there is no button and no drawer
- * at any viewport, so where the frame lacks the sidebar it is simply absent.
+ * Before the rail comes a link named Skip to content, the first thing the Tab key reaches, out of sight until it has
+ * focus, which goes to the main pane (see `mainPaneId`) and so moves focus there.
+ *
+ * The `menu` is the drawer. Where the frame lacks the sidebar the shell draws a button named Open navigation at the
+ * top start of the card over the main pane's header, which sends `onOpen`, says whether the drawer is open as
+ * `aria-expanded`, and controls the dialog `menu.id`, and the drawer in `menu.dialog`. Where the frame holds the
+ * sidebar the `menu` is not used, and without a `menu` there is no button and no drawer at any viewport, so where the
+ * frame lacks the sidebar it is simply absent.
  *
  * Whenever the `aside` is not beside the main pane it is in `aside.dialog`. Each of the two is a native dialog
  * that the framework opens: it traps focus, makes the rest of the window inert, closes on Escape and on a
@@ -223,6 +242,7 @@ export const shell = <Message, Requirements>(
   return h.div(
     [h.Class(shellFrame)],
     [
+      h.a([h.Href(`#${mainPaneId}`), h.Class(skipLinkLook)], ["Skip to content"]),
       hasRail ? config.rail : h.empty,
       h.div(
         [h.Class(shellCard)],
@@ -231,7 +251,16 @@ export const shell = <Message, Requirements>(
           hasSidebar ? h.div([h.AriaHidden(true), h.Class(shellDivider)]) : h.empty,
           menu === undefined
             ? h.empty
-            : h.div([h.Class(menuSlot)], [iconButton(h, { icon: "menu", label: "Menu", onClick: menu.onOpen })]),
+            : h.div(
+                [h.Class(menuSlot)],
+                [
+                  iconButton(
+                    h,
+                    { icon: "menu", label: "Open navigation", onClick: menu.onOpen },
+                    { isExpanded: menu.isOpen, controls: menu.id }
+                  )
+                ]
+              ),
           config.main,
           asideBeside === undefined ? h.empty : h.div([h.Class(asideColumn)], [asideBeside.view])
         ]

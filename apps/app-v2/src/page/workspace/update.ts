@@ -44,7 +44,7 @@ const hasSidebarInPlace = (viewport: Viewport): boolean => viewport === "Desktop
 
 export const update = WorkspaceComposition.makeUpdate((model, message) =>
   Message.match(message, {
-    ClickedAllWorkspaces: () => ({ model, outMessage: OutMessage.ClosedWorkspace() }),
+    ClickedWorkspaceSwitcher: () => ({ model, outMessage: OutMessage.ClosedWorkspace() }),
     ClickedHome: () => Update.combine(model, [switchTo(showHome)]),
     ClickedConnections: () => Update.combine(model, [switchTo(showConnections)]),
     ClickedAgents: () => Update.combine(model, [switchTo(showAgents)]),

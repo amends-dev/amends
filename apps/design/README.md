@@ -19,7 +19,7 @@ bun run --filter @amends-dev/design workshop   # http://127.0.0.1:4420/
 ```
 
 A small Foldkit app in `workshop/` that shows every renderer in every state under a heading each:
-buttons by variant, disabled, large, and wide, with the link in a sentence, and the button that reads as part of a line, quiet until it is hovered, and a link to another page, and a link in the look of a button to the page's own address, and with an icon before the label, and icon buttons, regular and compact, and as a switch, off and pressed, and disabled, also as a switch; a field empty, with a
+buttons by variant, disabled, large, and wide, with the link in a sentence, and the button that reads as part of a line, quiet until it is hovered, and a link to another page, and a link in the look of a button to the page's own address, and with an icon before the label, and icon buttons, regular and compact, and as a switch, off and pressed, and one that shows something else, collapsed and expanded, and disabled, also as a switch; a field empty, with a
 placeholder, filled, invalid, disabled, and with a hint under it; a hint; a textarea, and with a hint, refused, and
 disabled; a grid of selects, side
 by side and wrapping in a narrow column; a select with its label hidden, in a row beside a name; a
@@ -83,7 +83,7 @@ groups, each in a frame wider than the measure; the composer empty, whose Send w
 frame of fixed height, its inbox, triage, and a group with their counts read aloud with what they count, its groups, one of them still on its way, and direct messages through
 `sidebarSections`, its threads,
 replies, and composers made of `message`, `divider`, and `composer`, the first with the open thread
-as a plain row under its group and its group's threads resting against the composer, one of them filled, with its task chip, the button of its replies, an agent at work, and, under the last, someone typing, and the second with its notices; the shell once more with a task open on the Tasks tab in the side pane, whose header has the task's status before the title, a Close task button, and the subtitle "Task in #general", with the status, assignee, and priority as quiet menus under their captions that open and keep what is chosen, the description, and the activity over the replies, and the first shell's thread pane with the bell that follows it and Close thread; the shell four more times with the rail on a destination of its own: Agents, with the sidebar's title current, each agent's status and the logo at those at work, and the list in the main pane, again with an agent open, whose page is the main pane: its mark and status in the header, a boxed note of why it can't run, a name form, and its setup, details, and removal set apart by a stitch, Connections, with a section for each capability, and Settings, on Members: a search and a menu of Active or Removed members in a toolbar over a table of members, with the pending invitations under it, and a member's details as the side pane, whose Back is named for where it goes back to; and the icons by size, as the shell
+as a plain row under its group and its group's threads resting against the composer, one of them filled, with its task chip, the button of its replies, an agent at work, and, under the last, someone typing, and the second with its notices; the shell once more at `Tablet`, with the sidebar in a drawer over a real dialog that the navigation button opens, which focuses the current row and has Close navigation past its end, the Skip to content link coming first, and the shell once more with a task open on the Tasks tab in the side pane, whose header has the task's status before the title, a Close task button, and the subtitle "Task in #general", with the status, assignee, and priority as quiet menus under their captions that open and keep what is chosen, the description, and the activity over the replies, and the first shell's thread pane with the bell that follows it and Close thread; the shell four more times with the rail on a destination of its own: Agents, with the sidebar's title current, each agent's status and the logo at those at work, and the list in the main pane, again with an agent open, whose page is the main pane: its mark and status in the header, a boxed note of why it can't run, a name form, and its setup, details, and removal set apart by a stitch, Connections, with a section for each capability, and Settings, on Members: a search and a menu of Active or Removed members in a toolbar over a table of members, with the pending invitations under it, and a member's details as the side pane, whose Back is named for where it goes back to; and the icons by size, as the shell
 draws them, and with a label. The toggles, fields, composers, and select take input, and the modals
 open and close, as do the menus, whose choices are kept. The first shell's rail has the account menu that opens, and the other shells draw its button closed, since a menu's Block owns the ids of its button and its list. So do the shell's rail and tabs, whose current item follows a click, and the list of
 threads, whose current row follows a click. The frames pass the shell the viewport `Split`, whatever
@@ -274,7 +274,9 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   says `aria-pressed`, and shows it as `ink` while it is on. The caller draws the icon for the state, such
   as `bell` and `bell-filled`, and a button given no `isPressed` says nothing of the kind. `options.isDisabled`
   marks it `aria-disabled`, in the quiet color of a disabled control with no hover, and it sends nothing; it stays in
-  the tab order, and a switch that is disabled keeps saying whether it is pressed. `options.controls` is the `id` of
+  the tab order, and a switch that is disabled keeps saying whether it is pressed. `options.isExpanded` is for a button
+  that shows or hides something else, such as the shell's navigation button: whether it is shown now, as
+  `aria-expanded`, and a button given none says nothing of the kind. `options.controls` is the `id` of
   what the button shows or hides elsewhere on the page, as `aria-controls`, and `options.shortcuts` the keys that do
   what it does, as `aria-keyshortcuts` names them, such as "Control+B Meta+B".
 - `iconSubmit(h, { icon, label }, options?)` is that button as a `type="submit"` that sends its form,
@@ -379,8 +381,9 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   a connection: the `text` letters in capitals, or, for a thing that has no name to abbreviate, an `icon` drawn at the
   size that fits the square (`xs`, `xs`, `sm`, `sm`, `sm`, and `md` for the sizes below), on the ground of its `tone`, `"neutral"`
   (the default, `avatar-neutral`), `"slate"` (`avatar-slate`, which is the person who wrote a message, as `apps/ui` draws them), or `"lilac"` (`avatar-lilac`, which is an agent's). `size` is `"xs"` (20px, 9px text, the smallest),
-  `"choice"` (22px, 10px text, as `@amends-dev/ui` draws a person beside a choice, in a menu of people, and the people who replied under a thread), `"sm"` (the default, 24px, `meta` text, as the sidebar's header and a sidebar row show it, and a pane's title),
-  `"account"` (28px, 13px text, as `@amends-dev/ui` draws the signed-in address in a centered screen's header),
+  `"choice"` (22px, 10px text, as `@amends-dev/ui` draws a person beside a choice, in a menu of people, and the people who replied under a thread), `"sm"` (the default, 24px, `meta` text, as a sidebar row shows it, and a pane's title),
+  `"account"` (28px, 13px text, as `@amends-dev/ui` draws the signed-in address in a centered screen's header, and the
+  workspace in the sidebar's header),
   `"md"` (32px, `hint` text, as a message shows its author and an agent's row in a list), or `"lg"` (40px, `item` text, as a
   directory row shows it). A mark is `aria-hidden`: the name it abbreviates is always beside it. `sidebarHeader`,
   `sidebarItem`, `row`, `pane`, `message`, and `repliesButton` draw their marks with it.
@@ -606,12 +609,12 @@ The frame of the first four layout patterns, which the modules below fill.
   the card. The `viewport` is the window's width, a `Viewport` that the app keeps in its model (see
   [the viewport](#the-viewport)), and the layout follows it:
 
-  | Viewport  | Width       | Navigation                                                      | Side pane                                                                            |
-  | --------- | ----------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-  | `Split`   | 80rem+      | Rail and sidebar in place                                       | Beside the main pane, a divider between them                                         |
-  | `Desktop` | 64 to 80rem | Rail and sidebar in place                                       | In a dialog, floating at the end of the window, over a scrim                         |
-  | `Tablet`  | 48 to 64rem | The rail stays; the menu button opens the sidebar in a dialog   | In a dialog, floating, as above                                                      |
-  | `Phone`   | below 48rem | The menu button opens the rail and sidebar together in a dialog | In a dialog that fills the window over the main pane, which keeps its state under it |
+  | Viewport  | Width       | Navigation                                                            | Side pane                                                                            |
+  | --------- | ----------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+  | `Split`   | 80rem+      | Rail and sidebar in place                                             | Beside the main pane, a divider between them                                         |
+  | `Desktop` | 64 to 80rem | Rail and sidebar in place                                             | In a dialog, floating at the end of the window, over a scrim                         |
+  | `Tablet`  | 48 to 64rem | The rail stays; the navigation button opens the sidebar in a dialog   | In a dialog, floating, as above                                                      |
+  | `Phone`   | below 48rem | The navigation button opens the rail and sidebar together in a dialog | In a dialog that fills the window over the main pane, which keeps its state under it |
 
   The floating pane is inset from the window's top, bottom, and end by the frame's 8px gutter, 27.5rem
   wide at most, with `shadow-popover`, over a `scrim` that covers the window. Below 48rem the frame
@@ -628,21 +631,34 @@ The frame of the first four layout patterns, which the modules below fill.
   in its dialog at every other viewport, never in both. `isAsideInDialog(viewport)` is that decision
   for a page that opens the dialog and closes what it shows when the dialog closes: true everywhere
   but `Split`. The controls, rows, and headers keep their touch sizes in CSS, from `max-desktop:`, and
-  so does the room a pane's header leaves for the menu button.
+  so does the room a pane's header leaves for the navigation button.
 
-  The `menu` is `{ onOpen, isOpen, dialog }`. Where the frame lacks the sidebar, the shell draws the
-  menu button, an `iconButton` named Menu that sends `onOpen`, at the top start of the card over the
-  main pane's header, and the drawer by `menu.dialog`: the page lends the shell its bound dialog's
+  The frame begins with a link named Skip to content, the first thing the Tab key reaches at every viewport. It is
+  out of sight until it has focus, when it shows at the window's top start on `panel`. It goes to `#main-pane`, the `id`
+  `pane` gives the main pane, which has `tabindex="-1"` and draws no outline when it has focus: following the link moves
+  focus there. It is a link to a fragment, so the address gains `#main-pane`.
+
+  The `menu` is `{ id, onOpen, isOpen, dialog }`. Where the frame lacks the sidebar, the shell draws the
+  navigation button, an `iconButton` named Open navigation that sends `onOpen`, at the top start of the card where the
+  main pane's header leaves room for it. It says `aria-expanded` as `isOpen` does and `aria-controls` the dialog's `id`,
+  and the shell draws the drawer by `menu.dialog`: the page lends the shell its bound dialog's
   view, `(toView) => h.block(MenuBinding.embedView({ slotId, model, viewInputs: { toView } }))`, and
-  the shell decides what the dialog holds, `isOpen` being the dialog's. That is a `ModalRender`, the
+  the shell decides what the dialog holds, `isOpen` and `id` being the dialog's. That is a `ModalRender`, the
   `RenderInfo` of `@foldkit/ui`'s headless dialog, from `modal.ts`, which the shell imports from
   there. While the dialog is visible it is a `dialog` element, transparent and unpadded, with a
   backdrop over the whole window in `scrim` and a panel at the start of the window, `shadow-modal` on
   `panel`: an `sr-only` `h2` named Navigation, which names the dialog, then the rail at `Phone`, then
-  the sidebar, which keeps its own 264px. At `Tablet` the panel sits beside the rail, which stays in
+  the sidebar, which keeps its own 264px, then a button named Close navigation, 12px past the panel's end edge and 6px
+  below the window's top (its safe-area inset beneath), on `panel`, which spreads the dialog's `closeButton` and so
+  closes it. At `Tablet` the panel sits beside the rail, which stays in
   the frame. Below 48rem its padding is the screen's safe-area insets. It slides in from the start, a
   150ms transition of `translate` from `starting:` styles, mirrored in right-to-left and off for
   reduced motion; closing is instant, since the dialog is not animated.
+
+  Focus follows the dialog's configuration and the framework. The page gives the dialog's model a `focusSelector`,
+  `currentSidebarRowSelector` from `sidebar.ts`, so opening the drawer focuses the sidebar's current row, and the first
+  focusable element in the drawer when no row is current. Closing it, by Close navigation, the backdrop, or Escape,
+  returns focus to the element that had it when the drawer opened, the navigation button when that opened it.
 
   The `aside` is `{ label, view, isOpen, dialog }`, lent the same way from the page's own bound dialog. At
   `Split` the shell puts `aside.view` in the card and never calls `aside.dialog`. At every other
@@ -656,7 +672,7 @@ The frame of the first four layout patterns, which the modules below fill.
   so does a click on the backdrop. The page closes the drawer itself when a destination is picked, and
   when the window grows to `Desktop`; it opens and closes the side pane's dialog as the thread opens
   and closes, and as the window crosses 80rem. Without a `menu` there is no button and no drawer at
-  any viewport, as in the workshop's frames, and below `Desktop` the sidebar is simply absent.
+  any viewport, and below `Desktop` the sidebar is simply absent.
 
   The rest of the window is inert while a dialog is open, so a toast could not be read or dismissed
   behind it. The `notices` are inside whichever dialog is open, after its panel, above the backdrop
@@ -676,7 +692,9 @@ The frame of the first four layout patterns, which the modules below fill.
 
   The workshop's frames pass `viewport: "Split"` and a side pane whose `dialog` renders nothing, so
   they show the rail, the sidebar, and the side pane in place, and no dialog: both are window-level
-  overlays, so look at them in the app, resizing the browser window.
+  overlays, so look at them in the app, resizing the browser window. One frame is the exception: it is at `Tablet`
+  and lends the shell a drawer over a real dialog, which opens inside the frame, since the frame contains its layout.
+  It shows the navigation button and its `aria-expanded`, the drawer focusing the current row, and Close navigation.
 
 ### `@amends-dev/design/rail`
 
@@ -696,15 +714,20 @@ The frame of the first four layout patterns, which the modules below fill.
 
 ### `@amends-dev/design/sidebar`
 
-- `sidebar(h, { label, header, children, footer? })` is a `nav` named by `label`, 264px on `panel`:
-  the `header` above the `children`, which scroll, and the `footer` below them.
-- `sidebarHeader(h, { mark, name, actions?, search? })` is the 96px header, 104px on touch, as tall as
+- `sidebar(h, { label, header, children, footer? })` is a `nav` named by `label`, 264px on `panel`, and no wider than
+  the window less 7.25rem, so that the drawer at a narrow phone leaves room for its Close navigation button past its
+  end: the `header` above the `children`, which scroll, and the `footer` below them. It says `data-sidebar`, which
+  `currentSidebarRowSelector`, exported beside it, goes by: it selects the button of the sidebar's current row, the item
+  or the title of a section whose list shows, for a dialog that holds the sidebar to focus when it opens, as the page
+  gives the drawer's dialog. A plain row that only says where the person is cannot be focused and is not selected.
+- `sidebarHeader(h, { mark, name, onClick, search? })` is the 96px header, 104px on touch, as tall as
   a pane's, with
-  a line under it: a 24px `mark` holding the `mark` letters, the workspace's `name`
-  at body size in medium weight, `actions` at the right such as an `iconButton` that opens the
-  workspace menu, and, when there is a `search`, `{ label, shortcut?, onClick }`, a full-width button
-  in `search` under them, named by `label`, with the `shortcut` shown at its end and hidden from
-  assistive technology.
+  a line under it: the workspace as one button that sends `onClick`, such as the way to the person's other workspaces,
+  across the header's width and named by the workspace's `name`. It holds a 28px `mark` of the `mark` letters, the `name`
+  at body size in medium weight, and a 14px chevron at the end in `ink-secondary`, which turns `ink` while the button is
+  hovered. The mark and the chevron are hidden from assistive technology. When there is a `search`,
+  `{ label, shortcut?, onClick }`, a full-width button in `search` under the workspace's, named by `label`, with the
+  `shortcut` shown at its end and hidden from assistive technology.
 - `sidebarSection(h, { label?, onTitleClick?, isTitleCurrent?, actions?, children })` is a group of items. A `label` is an `h2` in
   `meta` size, uppercase, in `ink-muted`, with icon-only `actions` at its right, such as compact
   `iconButton`s; on touch the heading is 44px tall, as they are. With an `onTitleClick` the title is a button, inside the
@@ -756,7 +779,9 @@ The third and fourth layout patterns share one structure.
   scrolls: a `paneToolbar`, then, over a list, the `summary` line and the `columns`. The body then starts flush under it,
   with no padding above, so the first row is the one under the column labels. The `"main"` variant is the page's `main` landmark,
   its title an `h1` at title size; the `"side"` variant is an `aside` named by `label`, its title an
-  `h2` at body size, in medium weight. A `label` names the main landmark too. The body's first element rests against
+  `h2` at body size, in medium weight. A `label` names the main landmark too. The main pane has the `id` that
+  `mainPaneId` exports, `main-pane`, and `tabindex="-1"`, which is where the shell's Skip to content link goes: it can be
+  given focus without being a stop in the tab order, and it draws no outline when it has focus. The body's first element rests against
   the header, unless the `anchor` is `"bottom"`: a conversation takes that, so that where it is shorter than the
   body it rests against the footer's composer, as `apps/ui`'s timeline does, and where it is taller the body
   scrolls as any other does, because the element's top margin is automatic (`mt-auto`), which is no space once there is
@@ -775,7 +800,7 @@ The third and fourth layout patterns share one structure.
   header is at the window's top, and which an `sr-only` word after the title says too. The `phoneContext` is a quiet line under the title below 48rem only, such as the
   workspace's name, which a phone's row has no room for beside the title; from 48rem it is not shown, and a
   title with one stacks over it there. The main pane's row starts 40px
-  further in below 64rem, for the shell's menu button over it; its tabs and subtitle keep the pane's
+  further in below 64rem, for the shell's navigation button over it; its tabs and subtitle keep the pane's
   gutter, and the side pane's row is not moved. The line under the header is drawn inside it, so the
   current tab's bar sits over the line. A `subtitle` shows only when there are no `tabs`: words, or an array of pieces,
   such as an agent's name and its `turnStatus`, laid side by side 10px apart and level with each other.
@@ -1464,9 +1489,13 @@ groups hidden from assistive technology, the toolbar `hidden` and without the fl
 shown, the switch beside Send as `aria-pressed` and `aria-controls` the toolbar, the mention button, and the keys with
 a modifier that `onShortcut` answers, handled, and the others, ignored; a mark as `aria-hidden`, with the patch of every status at every size, its sizes, shape, and color, and its hover text, and with a drawing in place of letters, fitted to its square; a row's status in its name and on its mark, and its two-line cells; a mark stack by its label as a button that sends its message, with every mark it is given at 22px in its tone, hidden from assistive technology, its overlap, its height, and the width below which it is not shown; and the shell's landmarks by role and name: `navigation` for
 the rail and the sidebar, `main`, and `complementary`, with its notices, and by viewport: the sidebar
-in place at `Desktop` and `Split` with no Menu button, and at `Tablet` and `Phone` a Menu button, the
-sidebar, and at `Phone` the rail, inside the dialog named Navigation once it is visible and nowhere
-before; the side pane in place at `Split` and otherwise inside the dialog named Thread, or by the label it is given, once it is
+in place at `Desktop` and `Split` with no navigation button, and at `Tablet` and `Phone` a button named Open navigation,
+with its `aria-expanded` and `aria-controls`, the sidebar, and at `Phone` the rail, and Close navigation, inside the
+dialog named Navigation once it is visible and nowhere before; the Skip to content link first in the frame at every
+viewport, to the main pane's `id`, which `tabindex` makes a place to put focus; the sidebar's workspace as one button
+named by it, with a 28px mark and a chevron hidden from assistive technology, and `currentSidebarRowSelector` finding the
+button of the current row; a drawer over a real dialog, opening with the focus on that row and closing by Close
+navigation; the side pane in place at `Split` and otherwise inside the dialog named Thread, or by the label it is given, once it is
 visible and nowhere before, which `isAsideInDialog` agrees with at every viewport; the notices' live region once, inside the dialog that is visible and
 in the frame otherwise; and the dialogs it is lent, in the frame at every viewport and last, after the
 drawer's and the side pane's, empty while closed, with the notices left in the frame while one is

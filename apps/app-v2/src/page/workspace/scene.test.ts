@@ -1439,25 +1439,25 @@ describe("a workspace", () => {
     )
   })
 
-  it("keeps the sidebar in place from Desktop, with no Menu button and no navigation dialog", () => {
+  it("keeps the sidebar in place from Desktop, with no navigation button and no navigation dialog", () => {
     scene(
       { update, view: sceneView },
       given(opened),
       expect(role("navigation", { name: "Studio" })).toExist(),
       expect(role("navigation", { name: "Destinations" })).toExist(),
-      expect(role("button", { name: "Menu" })).toBeAbsent(),
+      expect(role("button", { name: "Open navigation" })).toBeAbsent(),
       expect(role("dialog", { name: "Navigation" })).toBeAbsent()
     )
   })
 
-  it("opens the navigation drawer from the menu button as a dialog, and closes it from the scrim", () => {
+  it("opens the navigation drawer from the Open navigation button as a dialog, and closes it from the scrim", () => {
     scene(
       { update, view: sceneView },
       given(onPhone),
-      expect(role("button", { name: "Menu" })).toExist(),
+      expect(role("button", { name: "Open navigation" })).toExist(),
       expect(role("navigation", { name: "Studio" })).toBeAbsent(),
       expect(role("navigation", { name: "Destinations" })).toBeAbsent(),
-      click(role("button", { name: "Menu" })),
+      click(role("button", { name: "Open navigation" })),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
       inside(
@@ -1478,7 +1478,7 @@ describe("a workspace", () => {
     scene(
       { update, view: sceneView },
       given(onPhone),
-      click(role("button", { name: "Menu" })),
+      click(role("button", { name: "Open navigation" })),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
       click(sidebarButton("Inbox")),
@@ -1494,7 +1494,7 @@ describe("a workspace", () => {
     scene(
       { update, view: sceneView },
       given(onPhone),
-      click(role("button", { name: "Menu" })),
+      click(role("button", { name: "Open navigation" })),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
       expect(within(role("dialog", { name: "Navigation" }), text("Inbox"))).toExist(),
@@ -1527,7 +1527,7 @@ describe("a workspace", () => {
           })
         )
       ),
-      click(role("button", { name: "Menu" })),
+      click(role("button", { name: "Open navigation" })),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
       expect(role("dialog", { name: "Navigation" })).toExist(),
@@ -1552,8 +1552,8 @@ describe("a workspace", () => {
       click(role("button", { name: "Amends home" })),
       expect(role("main", { name: "Inbox" })).toExist(),
       expect(railButton("Home")).toHaveAttr("aria-current", "true"),
-      expect(within(role("navigation", { name: "Studio" }), role("button", { name: "All workspaces" }))).toExist(),
-      click(role("button", { name: "All workspaces" })),
+      expect(within(role("navigation", { name: "Studio" }), role("button", { name: "Studio" }))).toExist(),
+      click(role("button", { name: "Studio" })),
       expectOutMessage(OutMessage.ClosedWorkspace())
     )
   })
@@ -1888,7 +1888,7 @@ describe("a workspace", () => {
     scene(
       { update, view: sceneView },
       given(onPhone),
-      click(role("button", { name: "Menu" })),
+      click(role("button", { name: "Open navigation" })),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
       expect(role("dialog", { name: "Navigation" })).toExist(),
@@ -2047,7 +2047,7 @@ describe("a workspace", () => {
       { update, view: sceneView },
       given(onPhone),
       expect(role("navigation", { name: "Studio" })).toBeAbsent(),
-      click(role("button", { name: "Menu" })),
+      click(role("button", { name: "Open navigation" })),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
       click(within(role("dialog", { name: "Navigation" }), role("button", { name: "Find anything…" }))),

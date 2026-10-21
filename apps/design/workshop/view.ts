@@ -166,6 +166,7 @@ import {
   MemberFilterBinding,
   MembersPaneFilterBinding,
   ModalBinding,
+  NavigationDrawerBinding,
   NewMessageModalBinding,
   NewMessagePickerBinding,
   RailAccountBinding,
@@ -446,6 +447,18 @@ const buttonGroup = (h: ApplicationViewBuilder, pressCount: number): Html => {
     sample(h, "Icon buttons as a switch, off and pressed", [
       iconButton(h, { icon: "bell", label: "Follow", onClick: press }, { isPressed: false }),
       iconButton(h, { icon: "bell-filled", label: "Following", onClick: press }, { isPressed: true })
+    ]),
+    sample(h, "Icon buttons that show something else, collapsed and expanded, and the one it controls", [
+      iconButton(
+        h,
+        { icon: "menu", label: "Open navigation", onClick: press },
+        { isExpanded: false, controls: "navigation" }
+      ),
+      iconButton(
+        h,
+        { icon: "menu", label: "Open navigation", onClick: press },
+        { isExpanded: true, controls: "navigation" }
+      )
     ]),
     sample(h, "Icon buttons, disabled, as a switch off and pressed too", [
       iconButton(h, { icon: "mark-settings", label: "Settings", onClick: press }, { isDisabled: true }),
@@ -3935,7 +3948,7 @@ const workspaceHeader = (h: ApplicationViewBuilder): Html => {
   return sidebarHeader(h, {
     mark: "M",
     name: "Mercier & Co",
-    actions: [iconButton(h, { icon: "mark-menu", label: "Switch workspace", onClick: press })],
+    onClick: press,
     search: { label: "Find anything…", shortcut: "⌘ K", onClick: press }
   })
 }
@@ -6034,6 +6047,37 @@ const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
               sidebar: shellSidebar(h, true, false),
               main: groupPane(h, model.paneTab, model.composer),
               aside: { label: "Thread", view: threadPane(h, model.reply), isOpen: false, dialog: () => h.empty }
+            })
+          ]
+        )
+      ],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "Tablet, with the sidebar in a drawer: Open navigation, which says whether the drawer is open, opens it; the drawer focuses the current row, and has Close navigation past its end. Tab from the top of the frame reaches Skip to content, which goes to the main pane",
+      [
+        h.div(
+          [h.Class(shellFrame)],
+          [
+            shell(h, {
+              viewport: "Tablet",
+              rail: shellRail(h, model.destination),
+              sidebar: shellSidebar(h, false, false),
+              main: groupPane(h, model.paneTab, model.composer),
+              menu: {
+                id: model.navigationDrawer.id,
+                onOpen: Message.ClickedOpenNavigation(),
+                isOpen: model.navigationDrawer.isOpen,
+                dialog: (toView) =>
+                  h.block(
+                    NavigationDrawerBinding.embedView({
+                      slotId: "navigation-drawer",
+                      model: model.navigationDrawer,
+                      viewInputs: { toView }
+                    })
+                  )
+              }
             })
           ]
         )

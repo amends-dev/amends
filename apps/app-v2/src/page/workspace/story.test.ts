@@ -486,7 +486,7 @@ describe("a workspace", () => {
           ]
         ).toEqual([groupId, groupId, Option.none()])
       }),
-      message(Message.ClickedAllWorkspaces()),
+      message(Message.ClickedWorkspaceSwitcher()),
       expectOutMessage(OutMessage.ClosedWorkspace())
     )
   })

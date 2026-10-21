@@ -1244,8 +1244,9 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   Connections while the connections, one connection, or the channels are. Search is no destination: it is never
   marked, and it sends `ClickedSearch`, as the sidebar's Find anything… does. The rail picks a destination and the
   sidebar lists its items, so the sidebar changes with the rail. The
-  sidebar, named by the workspace, has the workspace's name over a button to all workspaces and, under them,
-  the destination's sections; it has no footer, since who is signed in and the way out are in the account menu on the rail.
+  sidebar, named by the workspace, has the workspace as one button, a 28px mark of its first letter, its name, and a
+  chevron, which goes to all workspaces (`ClickedWorkspaceSwitcher`, which the page reports as `ClosedWorkspace`), and,
+  under it, the destination's sections; it has no footer, since who is signed in and the way out are in the account menu on the rail.
   Home's are the Home Block's `sidebarView`, in the slot `home-sidebar`. The Agents destination's is the agents Block's
   `sidebarView`, in the slot `agents-sidebar`, and the Connections destination's, and the Channels',
   the connections Block's, in `connections-sidebar`, which is how the channels are reached, since the
@@ -1287,11 +1288,11 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   in the panes that name it is the settings' once they hold the workspace, so it follows a rename, and the one
   the workspace was opened with until then. The page's view takes the account's email, the Appearance the person chose, the time now, and whether the page runs on an Apple
   platform as view inputs, and gives Home and the settings' Members page the time now. The shell lays itself out by the window's width: below 64rem the sidebar is
-  not in the frame but in a navigation drawer, and below 48rem the rail with it, which the shell's Menu
-  button opens. The drawer is a `DialogBlock` the page binds as `menu` (`MenuBinding`, id
+  not in the frame but in a navigation drawer, and below 48rem the rail with it, which the shell's Open
+  navigation button opens. The drawer is a `DialogBlock` the page binds as `menu` (`MenuBinding`, id
   `workspace-menu`) and lends the shell, so the framework traps focus in it, makes the rest of the
   window inert, closes it on Escape and on a click on its scrim, and returns focus when it closes. The
-  Menu button asks it to open (`ClickedMenu`), and every navigation to an item of a sidebar, the
+  Open navigation button asks it to open (`ClickedMenu`), and every navigation to an item of a sidebar, the
   sidebar's Workspace and Members, what the agents and the
   connections Blocks ask to be shown by their titles, Browse, Add, and rows, and what the connections ask to be shown by a connection picked, asks it to close (a close of a closed
   dialog does nothing), which is `goTo`; so does Home's `Navigated`, which Home reports when the person moves within it,
@@ -2009,8 +2010,8 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   a group opened from its row, a group joined from its Join button confirmed with the offer to open it and the
   confirmation gone with the time, and a team started from Create group, also at `Phone` where the
   sidebar is in the shut drawer, the sidebar naming the workspace with
-  who is signed in and the way out in its footer, the sidebar in place with no Menu button from `Desktop`, the
-  Menu button at `Phone` opening the drawer as a dialog named Navigation that holds the rail and the
+  who is signed in and the way out in its footer, the sidebar in place with no Open navigation button from `Desktop`, the
+  Open navigation button at `Phone` opening the drawer as a dialog named Navigation that holds the rail and the
   sidebar, its scrim closing it, or an item of the sidebar, a group picked among them, closing it, and
   a destination picked on the rail leaving it open with that destination's sidebar in it, the thread picked opened below `Split` in
   a dialog named Thread that holds the pane, closed by the pane's Close, by its Back on a phone, or by
@@ -2031,7 +2032,7 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   main pane, a team started from the sidebar's heading and from Create group in the dialog the page keeps, and the groups to browse left to
   by an open group, whose thread's side pane goes with it. The root's own scenes show
   the open workspace with no header of its own, and no footer in its sidebar, signing out from the account menu on its rail,
-  an Appearance chosen there shown and kept and the one in use checked, switching workspace and opening the workspace's settings, its Menu button
+  an Appearance chosen there shown and kept and the one in use checked, switching workspace and opening the workspace's settings, its Open navigation button
   appearing and the sidebar leaving as the subscription reports a narrower window, and the reverse,
   and the thread open moving from its place beside the main pane into its dialog as the window narrows
   to `Desktop`, staying there at `Phone`, and back as it widens to `Split`, and the open inbox's

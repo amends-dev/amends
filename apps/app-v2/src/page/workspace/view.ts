@@ -1,4 +1,3 @@
-import { iconButton } from "@amends-dev/design/control"
 import { rail } from "@amends-dev/design/rail"
 import { shell } from "@amends-dev/design/shell"
 import { sidebar, sidebarHeader, sidebarItem, sidebarSection } from "@amends-dev/design/sidebar"
@@ -161,7 +160,8 @@ const destinationSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArr
   })
 
 /**
- * The sidebar: the workspace's name and the search, and the sections of the destination open.
+ * The sidebar: the workspace's name, as the button to the workspaces, and the search, and the sections of the destination
+ * open.
  */
 const sidebarView = (model: Model, { isApplePlatform }: ViewInputs, h: WorkspaceViewBuilder): Html => {
   const name = nameOf(model)
@@ -170,13 +170,7 @@ const sidebarView = (model: Model, { isApplePlatform }: ViewInputs, h: Workspace
     header: sidebarHeader(h, {
       mark: name.slice(0, 1),
       name,
-      actions: [
-        iconButton(
-          h,
-          { icon: "chevron-down", label: "All workspaces", onClick: Message.ClickedAllWorkspaces() },
-          { size: "compact" }
-        )
-      ],
+      onClick: Message.ClickedWorkspaceSwitcher(),
       search: {
         label: "Find anything…",
         shortcut: isApplePlatform ? "⌘K" : "Ctrl K",
@@ -346,6 +340,7 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
     ...(Option.isSome(aside) ? { aside: aside.value } : {}),
     notices: h.block(ActionsBinding.embedView({ slotId: "actions", model: model.actions })),
     menu: {
+      id: model.menu.id,
       onOpen: Message.ClickedMenu(),
       isOpen: model.menu.isOpen,
       dialog: (toView) => h.block(MenuBinding.embedView({ slotId: "menu", model: model.menu, viewInputs: { toView } }))
