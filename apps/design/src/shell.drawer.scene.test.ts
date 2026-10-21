@@ -95,7 +95,9 @@ const init = Composition.makeInit(() => ({ model: { viewport: "Tablet", homes: 0
 
 const inWindow = (viewport: Viewport) => modifyFields(init().model, { viewport: () => viewport })
 
-/** The dialog opens as the framework opens one: shown, focusing the current row of the sidebar, and its resources held. */
+/**
+ * The dialog opens as the framework opens one: shown, focusing the current row of the sidebar, and its resources held.
+ */
 const drawerOpened = () =>
   [
     Command.resolve(

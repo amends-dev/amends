@@ -224,8 +224,8 @@ export const TasksBinding = HomeDefinition.bindChild(TasksBlock, {
 
 /**
  * The open group's thread opening opens the side pane's dialog where the pane is one, and closing it closes it.
- * Following the group and stopping, the settings of an agent its thread's turn asked for, and the search a phone's header
- * asks for, change nothing in Home.
+ * Following the group and stopping, the settings of an agent its thread's turn asked for, and the search a phone's
+ * header asks for, change nothing in Home.
  */
 const foldGroupOutMessage = (_groupId: GroupId.GroupId, outMessage: typeof GroupBlock.OutMessage.Type) =>
   GroupBlock.OutMessage.match(outMessage, {
@@ -239,8 +239,8 @@ const foldGroupOutMessage = (_groupId: GroupId.GroupId, outMessage: typeof Group
 
 /**
  * What the open group reports for the page is reported as it is: the settings of an agent its thread's turn asked for,
- * which the page opens, the group being followed, or no longer, which the page confirms, and the search a phone's header
- * asks for, which the page opens.
+ * which the page opens, the group being followed, or no longer, which the page confirms, and the search a phone's
+ * header asks for, which the page opens.
  */
 const forwardGroupOutMessage = (_groupId: GroupId.GroupId, outMessage: typeof GroupBlock.OutMessage.Type) =>
   GroupBlock.OutMessage.match(outMessage, {

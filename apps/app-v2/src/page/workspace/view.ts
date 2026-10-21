@@ -161,8 +161,8 @@ const destinationSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArr
   })
 
 /**
- * The sidebar: the workspace's name, as the button to the workspaces, and the search, and the sections of the destination
- * open.
+ * The sidebar: the workspace's name, as the button to the workspaces, and the search, and the sections of the
+ * destination open.
  */
 const sidebarView = (model: Model, { isApplePlatform }: ViewInputs, h: WorkspaceViewBuilder): Html => {
   const name = nameOf(model)
