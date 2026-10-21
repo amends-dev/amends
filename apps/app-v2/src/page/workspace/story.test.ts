@@ -2,6 +2,7 @@ import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { GroupId } from "@amends-dev/core/group"
 import { TurnId } from "@amends-dev/core/turn"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import { currentSidebarRowSelector } from "@amends-dev/design/sidebar"
 import { describe, expect, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option } from "effect"
@@ -563,6 +564,21 @@ describe("a workspace", () => {
       dialogClosed,
       model((model) => {
         expect(model.menu.isOpen).toBe(false)
+      })
+    )
+  })
+
+  it("opens the navigation drawer on the sidebar's current row, so that focus lands there", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.ClickedMenu()),
+      Command.resolve(
+        Dialog.test.ShowDialog({ id: "workspace-menu", focusSelector: currentSidebarRowSelector }),
+        DialogBlock.Message.SucceededShowDialog()
+      ),
+      model((model) => {
+        expect(model.menu.isOpen).toBe(true)
       })
     )
   })

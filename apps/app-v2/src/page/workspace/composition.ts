@@ -3,6 +3,7 @@ import type { GroupId } from "@amends-dev/core/group"
 import type { Identity } from "@amends-dev/core/identity"
 import type { MemberId } from "@amends-dev/core/workspace"
 import { isAsideInDialog } from "@amends-dev/design/shell"
+import { currentSidebarRowSelector } from "@amends-dev/design/sidebar"
 import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Match from "effect/Match"
 import * as Option from "effect/Option"
@@ -207,7 +208,10 @@ const foldSettingsOutMessage = SettingsBlock.OutMessage.match({
     entry === "WorkspaceSettings" ? switchTo(showSettings("Workspace")) : WorkspaceDefinition.stepNoop()
 })
 
-/** The navigation drawer's dialog opening, closing, and finishing its close changes nothing else. */
+/**
+ * The navigation drawer's dialog opening, closing, and finishing its close changes nothing else. Opening it focuses the
+ * sidebar's current row, and closing it returns focus to the button that opened it.
+ */
 const foldMenuOutMessage = DialogBlock.OutMessage.match({
   Opened: () => WorkspaceDefinition.stepNoop(),
   Closed: () => WorkspaceDefinition.stepNoop(),
@@ -230,7 +234,7 @@ const foldAsideOutMessage = DialogBlock.OutMessage.match({
 
 export const MenuBinding = WorkspaceDefinition.bindChild(DialogBlock, {
   field: "menu",
-  init: { contextToArgs: () => [{ id: "workspace-menu" }] },
+  init: { contextToArgs: () => [{ id: "workspace-menu", focusSelector: currentSidebarRowSelector }] },
   outMessage: { fold: foldMenuOutMessage }
 })
 

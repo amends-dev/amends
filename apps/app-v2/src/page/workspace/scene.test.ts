@@ -2,6 +2,8 @@ import { BuiltinRoles, GrantResolver } from "@amends-dev/core/authorization"
 import { GroupId } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { ThreadId, ThreadMessage } from "@amends-dev/core/thread"
+import { mainPaneId } from "@amends-dev/design/pane"
+import { currentSidebarRowSelector } from "@amends-dev/design/sidebar"
 import { describe, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option } from "effect"
@@ -1474,6 +1476,73 @@ describe("a workspace", () => {
     )
   })
 
+  it("starts with a link to the main pane at every viewport, and every destination's main pane is what it goes to", () => {
+    for (const viewport of ["Phone", "Tablet", "Desktop", "Split"] as const) {
+      scene(
+        { update, view: sceneView },
+        given(inWindow(opened, viewport)),
+        expect(role("link", { name: "Skip to content" })).toHaveAttr("href", `#${mainPaneId}`),
+        expect(nth(all.selector(":not(template)"), 1)).toHaveText("Skip to content")
+      )
+    }
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      expect(role("main", { name: "Inbox" })).toHaveAttr("id", mainPaneId),
+      expect(role("main", { name: "Inbox" })).toHaveAttr("tabIndex", "-1"),
+      click(sidebarButton("Tasks")),
+      expect(role("main", { name: "Tasks" })).toHaveAttr("id", mainPaneId),
+      click(railButton("Agents")),
+      expect(role("main", { name: "Agents" })).toHaveAttr("id", mainPaneId),
+      click(railButton("Connections")),
+      expect(role("main", { name: "Connections" })).toHaveAttr("id", mainPaneId),
+      click(role("button", { name: "Settings" })),
+      expect(role("main", { name: "Workspace" })).toHaveAttr("id", mainPaneId)
+    )
+  })
+
+  it("names the button that opens the drawer, says whether it is open, and closes it with Close navigation", () => {
+    scene(
+      { update, view: sceneView },
+      given(onPhone),
+      expect(role("button", { name: "Open navigation" })).toHaveAttr("aria-expanded", "false"),
+      expect(role("button", { name: "Open navigation" })).toHaveAttr("aria-controls", "workspace-menu"),
+      expect(role("button", { name: "Close navigation" })).toBeAbsent(),
+      click(role("button", { name: "Open navigation" })),
+      Command.resolve(
+        Dialog.test.ShowDialog({ id: "workspace-menu", focusSelector: currentSidebarRowSelector }),
+        DialogBlock.Message.SucceededShowDialog()
+      ),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(role("button", { name: "Open navigation" })).toHaveAttr("aria-expanded", "true"),
+      click(within(role("dialog", { name: "Navigation" }), role("button", { name: "Close navigation" }))),
+      Command.resolve(Dialog.test.CloseDialog({ id: "workspace-menu" }), DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      expect(role("dialog", { name: "Navigation" })).toBeAbsent(),
+      expect(role("button", { name: "Open navigation" })).toHaveAttr("aria-expanded", "false")
+    )
+  })
+
+  it("opens the drawer on the sidebar's current row: the item for the page shown, or the title of a list that shows", () => {
+    scene(
+      { update, view: sceneView },
+      given(onPhone),
+      click(role("button", { name: "Open navigation" })),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(within(role("dialog", { name: "Navigation" }), selector(currentSidebarRowSelector))).toHaveAttr(
+        "aria-label",
+        "Inbox"
+      ),
+      click(railButton("Agents")),
+      expect(within(role("dialog", { name: "Navigation" }), selector(currentSidebarRowSelector))).toHaveText("Agents"),
+      click(railButton("Settings")),
+      expect(within(role("dialog", { name: "Navigation" }), selector(currentSidebarRowSelector))).toHaveText(
+        "Workspace"
+      )
+    )
+  })
+
   it("closes the navigation drawer when an item of the sidebar is followed", () => {
     scene(
       { update, view: sceneView },
@@ -1539,6 +1608,17 @@ describe("a workspace", () => {
       expect(role("main", { name: "A group" })).toExist()
     )
   })
+  it("has the workspace in the sidebar's header as one button: its first letter as a 28px mark, its name, and a chevron", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      expect(sidebarButton("Studio")).toExist(),
+      expect(within(sidebarButton("Studio"), text("S"))).toHaveClass("size-7"),
+      expect(within(sidebarButton("Studio"), text("Studio"))).toExist(),
+      expect(within(sidebarButton("Studio"), selector('[aria-hidden="true"] svg'))).toExist()
+    )
+  })
+
   it("draws the logo as the rail's brand, a button that goes Home, and the workspaces one click away from the sidebar's header", () => {
     scene(
       { update, view: sceneView },

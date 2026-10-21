@@ -1289,10 +1289,15 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   the workspace was opened with until then. The page's view takes the account's email, the Appearance the person chose, the time now, and whether the page runs on an Apple
   platform as view inputs, and gives Home and the settings' Members page the time now. The shell lays itself out by the window's width: below 64rem the sidebar is
   not in the frame but in a navigation drawer, and below 48rem the rail with it, which the shell's Open
-  navigation button opens. The drawer is a `DialogBlock` the page binds as `menu` (`MenuBinding`, id
-  `workspace-menu`) and lends the shell, so the framework traps focus in it, makes the rest of the
-  window inert, closes it on Escape and on a click on its scrim, and returns focus when it closes. The
-  Open navigation button asks it to open (`ClickedMenu`), and every navigation to an item of a sidebar, the
+  navigation button opens. The shell begins with a link named Skip to content, the first thing the Tab key reaches, which goes to
+  the main pane, so every destination's main pane is the design's `pane` with `variant: "main"`. The drawer is a
+  `DialogBlock` the page binds as `menu` (`MenuBinding`, id `workspace-menu`) and lends the shell, so the framework traps
+  focus in it, makes the rest of the window inert, closes it on Escape, on a click on its scrim, and by its Close
+  navigation button, and returns focus to the button that opened it when it closes. The binding gives the dialog the
+  design's `currentSidebarRowSelector`, so opening it focuses the sidebar's current row, and the first focusable element
+  in the drawer where no row is current, as on the list of connections. The
+  Open navigation button, which says `aria-expanded` as the drawer is open and `aria-controls` its id, asks it to open
+  (`ClickedMenu`), and every navigation to an item of a sidebar, the
   sidebar's Workspace and Members, what the agents and the
   connections Blocks ask to be shown by their titles, Browse, Add, and rows, and what the connections ask to be shown by a connection picked, asks it to close (a close of a closed
   dialog does nothing), which is `goTo`; so does Home's `Navigated`, which Home reports when the person moves within it,
@@ -2010,9 +2015,12 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   a group opened from its row, a group joined from its Join button confirmed with the offer to open it and the
   confirmation gone with the time, and a team started from Create group, also at `Phone` where the
   sidebar is in the shut drawer, the sidebar naming the workspace with
-  who is signed in and the way out in its footer, the sidebar in place with no Open navigation button from `Desktop`, the
-  Open navigation button at `Phone` opening the drawer as a dialog named Navigation that holds the rail and the
-  sidebar, its scrim closing it, or an item of the sidebar, a group picked among them, closing it, and
+  who is signed in and the way out in its footer, the sidebar's header with the workspace as one button of a 28px mark, its
+  name, and a chevron, the Skip to content link first at every width, going to the main pane of every destination, the
+  sidebar in place with no Open navigation button from `Desktop`, the
+  Open navigation button at `Phone`, saying it controls the drawer and whether it is open, opening the drawer as a dialog
+  named Navigation, on the sidebar's current row, that holds the rail and the
+  sidebar, its scrim or its Close navigation button closing it, or an item of the sidebar, a group picked among them, closing it, and
   a destination picked on the rail leaving it open with that destination's sidebar in it, the thread picked opened below `Split` in
   a dialog named Thread that holds the pane, closed by the pane's Close, by its Back on a phone, or by
   the scrim, which also closes the thread, a notification's thread opened the same way beside the inbox,
