@@ -287,6 +287,16 @@ Starts and replies read only the admissions and participations of those they nam
 `GroupMembershipStore.findActiveMany` and `ThreadParticipationStore.findActive`; a reply without
 mentions pages the thread's active participants, the people it notifies.
 
+A message's text is markdown as the person wrote it, and a mention in it is a link to the member,
+`[@Ada](member:<id>)`: `ThreadMessage.mentionText(memberId, name)` writes one, with the name escaped
+so it reads as itself, the label records the name the member had when mentioned, and readers show
+their current one. `ThreadMessage.mentionedIn(text)` gives the members a text mentions, each once.
+`ThreadMessage.parts(text)` gives the text as the runs it is made of, in order, so a reader can show
+each mention as its member's current name: a `Part`, which is `Text`, with `text`, or `Mention`, with
+`memberId` and the `label` the link recorded, without its "@" and unescaped. Adjacent text is one
+run, a link whose id does not decode is text, and an empty text has no runs. The text shows who was
+mentioned; a message's `mentions` are whom it addresses.
+
 ### Activity kinds
 
 An activity has one shape for every kind, `ThreadActivity.ThreadActivity`: its position, a dotted `kind`

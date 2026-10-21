@@ -3,9 +3,9 @@
 Read [README.md](README.md) before editing this package.
 
 - Edit canonical `drawings/*.icon.json`, then run `bun run --filter @amends-dev/icons generate`.
-  Do not hand-edit `src/generated`, `src/index.ts`, `src/catalog.ts`, or `svg`.
+  Do not hand-edit `src/generated`, `src/index.ts`, `src/catalog.ts`, `src/paths.ts`, or `svg`.
 - Keep runtime source independent of other Amends packages and of build tools. It may
-  import Solid. Put searchable metadata in the separate catalog entry point.
+  import Solid. Put searchable metadata in the separate catalog entry point and path data in `src/paths.ts`.
 - Add only needed drawings and reuse existing constructions. Unsupported language
   features must fail explicitly rather than be ignored.
 - Test compiler contract changes and generated-output drift. Verify Solid reactivity,

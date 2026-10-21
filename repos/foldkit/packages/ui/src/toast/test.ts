@@ -1,0 +1,96 @@
+import * as Story from 'foldkit/story'
+
+import { WaitForAnimationSettled, WaitForPaint } from '../animation/block.js'
+import { Message as AnimationMessage } from '../animation/schema.js'
+
+/** Input for {@link drainEntry}. `entryId` selects the entry whose lifecycle
+ *  to drain. `waitBeforeDismissal` pairs the Toast instance's timer Command
+ *  with its matching completion Message. */
+export type DrainEntryInput = Readonly<{
+  entryId: string
+  waitBeforeDismissal: Story.Resolver
+}>
+
+const ENTER_TRANSITION_GENERATION = 1
+const LEAVE_TRANSITION_GENERATION = 2
+
+/** Matches the placement-qualified Animation paint Command for one Toast entry. */
+export const matchWaitForPaint = (entryId: string, generation: number) => ({
+  ...WaitForPaint({ generation }),
+  name: `Animation[${entryId}]/WaitForPaint`,
+})
+
+/** Matches the placement-qualified Animation settle Command for one Toast entry. */
+export const matchWaitForAnimationSettled = (
+  entryId: string,
+  generation: number,
+) => ({
+  ...WaitForAnimationSettled({ id: entryId, generation }),
+  name: `Animation[${entryId}]/WaitForAnimationSettled`,
+})
+
+/** Builds a `Story.Command.resolveAll` step that drains a single toast
+ *  entry's full animation and dismiss lifecycle. Resolving these Commands in
+ *  order takes a freshly shown entry from its enter animation through
+ *  auto-dismiss and its exit animation, ending with the entry removed from the
+ *  stack and the `DismissedToast` OutMessage emitted.
+ *
+ *  Showing a toast via `Toast.operations.requestShow` emits a multi-step lifecycle that a Story
+ *  test must resolve in full or the story fails on leftover Commands. The
+ *  steps are:
+ *
+ *  - enter animation: `WaitForPaint` then `CompletedWaitForPaint`
+ *  - enter settle: `WaitForAnimationSettled` then `EndedAnimation`
+ *  - auto-dismiss: `WaitBeforeDismissal` then
+ *    `CompletedWaitBeforeDismissal`
+ *  - exit animation: `WaitForPaint` then `CompletedWaitForPaint`
+ *  - exit settle: `WaitForAnimationSettled` then `EndedAnimation`
+ *
+ *  The enter steps match animation transition generation `1`, which the
+ *  entry's `Showed` starts, and the exit steps match generation `2`, which its
+ *  `Hid` starts. Each step matches only its own generation, so the helper also
+ *  an entry whose enter the test has already resolved. These versions are
+ *  separate from the auto-dismiss timer `version`.
+ *
+ *  Each step resolves with the child's raw result Message. `resolveAll` replays
+ *  the matched Command's own recorded wrapping, so a parent that embeds the
+ *  toast Block drains the same way without restating its `Got*` lift.
+ *
+ *  @example
+ *  ```ts
+ *  Story.story(
+ *    update,
+ *    Story.given(model),
+ *    Story.message(ClickedSave()),
+ *    Toast.test.drainEntry({ entryId: 'toast-entry-0' }),
+ *  )
+ *  ```
+ */
+export const drainEntry = ({ entryId, waitBeforeDismissal }: DrainEntryInput) =>
+  Story.Command.resolveAll(
+    [
+      matchWaitForPaint(entryId, ENTER_TRANSITION_GENERATION),
+      AnimationMessage.CompletedWaitForPaint({
+        generation: ENTER_TRANSITION_GENERATION,
+      }),
+    ],
+    [
+      matchWaitForAnimationSettled(entryId, ENTER_TRANSITION_GENERATION),
+      AnimationMessage.EndedAnimation({
+        generation: ENTER_TRANSITION_GENERATION,
+      }),
+    ],
+    waitBeforeDismissal,
+    [
+      matchWaitForPaint(entryId, LEAVE_TRANSITION_GENERATION),
+      AnimationMessage.CompletedWaitForPaint({
+        generation: LEAVE_TRANSITION_GENERATION,
+      }),
+    ],
+    [
+      matchWaitForAnimationSettled(entryId, LEAVE_TRANSITION_GENERATION),
+      AnimationMessage.EndedAnimation({
+        generation: LEAVE_TRANSITION_GENERATION,
+      }),
+    ],
+  )

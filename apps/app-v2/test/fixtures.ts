@@ -1,6 +1,6 @@
 import { Integration } from "@amends-dev/connection"
 import { Core } from "@amends-dev/core"
-import { Assignment, BuiltinRoles, type Role, Scope } from "@amends-dev/core/authorization"
+import { Assignment, BuiltinRoles, GrantResolver, type Role, Scope } from "@amends-dev/core/authorization"
 import { Channel, Contact } from "@amends-dev/core/channel"
 import { Connection } from "@amends-dev/core/connection"
 import { Group, GroupMembership } from "@amends-dev/core/group"
@@ -10,13 +10,16 @@ import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Task } from "@amends-dev/core/task"
 import { Thread, ThreadMessage } from "@amends-dev/core/thread"
 import type { Turn } from "@amends-dev/core/turn"
-import { Member, WorkspaceId } from "@amends-dev/core/workspace"
+import { Invitation, Member, WorkspaceId } from "@amends-dev/core/workspace"
+import type { StateArtKind } from "@amends-dev/design/stateArt"
 import { Accounts, type SignIn, WorkspaceDirectory } from "@amends-dev/gateway"
-import { Effect, Option, Schema } from "effect"
-import type { Model } from "../src/model.ts"
-import { init } from "../src/update.ts"
+import { DateTime, Effect, Schema } from "effect"
+import { selector } from "foldkit/scene"
 
 export const apiUrl = "http://127.0.0.1:8787"
+
+/** The time now, half past noon on the day the records below were made. */
+export const now = DateTime.makeUnsafe("2026-10-18T12:30:00Z")
 
 export const session: SignIn.Session = {
   token: "alice",
@@ -35,11 +38,49 @@ export const membership = Schema.decodeSync(WorkspaceDirectory.Membership)({
   people: 1
 })
 
-/** Signed out, at an empty form. */
-export const signedOut: Model = init({ apiUrl, session: Option.none() }).model
+/** An invitation of alice to the workspace `workspaceId`, which closes at `expiresAt`, as the directory lists it. */
+const invitationOfAlice = (id: string, workspaceId: string, expiresAt: string, workspaceName?: string) =>
+  Schema.decodeSync(WorkspaceDirectory.PendingInvitation)({
+    details: {
+      id,
+      workspaceId,
+      recipientId: "alice",
+      recipientEmail: "alice@example.com",
+      roleId: BuiltinRoles.MemberId,
+      expiresAt,
+      inviterMemberId: "member-9",
+      issuedAt: "2026-10-18T12:00:00Z"
+    },
+    state: { _tag: "Pending" },
+    ...(workspaceName === undefined ? {} : { workspaceName })
+  })
 
-/** Signed in as alice, her workspaces not listed yet. */
-export const signedIn: Model = init({ apiUrl, session: Option.some(session) }).model
+/** Alice's invitation to Northstar Studio, which closes seven days after `now`. */
+export const northstarInvitation = invitationOfAlice(
+  "invitation-4",
+  "workspace-4",
+  "2026-10-25T12:30:00Z",
+  "Northstar Studio"
+)
+
+/** Alice's membership of Northstar Studio, as accepting her invitation to it makes her a member as Alex. */
+export const northstar = Schema.decodeSync(WorkspaceDirectory.Membership)({
+  workspace: { id: "workspace-4", name: "Northstar Studio", createdBy: "bob", ownerMemberId: "member-9" },
+  member: {
+    id: "member-30",
+    workspaceId: "workspace-4",
+    identity: { _tag: "Human", id: "alice" },
+    name: "Alex",
+    status: "active"
+  },
+  people: 3
+})
+
+/** Alice's invitation to Atlas Labs, which closes three days after `now`. */
+export const atlasInvitation = invitationOfAlice("invitation-5", "workspace-5", "2026-10-21T12:30:00Z", "Atlas Labs")
+
+/** Alice's invitation to a workspace the directory has no record of, which closes three hours after `now`. */
+export const unnamedInvitation = invitationOfAlice("invitation-6", "workspace-6", "2026-10-18T15:30:00Z")
 
 export const general = Schema.decodeSync(Group.Group)({
   id: "general",
@@ -71,7 +112,8 @@ export const design = Schema.decodeSync(Group.Group)({
   createdAt: "2026-10-18T12:00:00Z"
 })
 
-const admission = (id: string, groupId: string, memberId: string) =>
+/** The admission `id` of the member `memberId` to the team `groupId`. */
+export const admission = (id: string, groupId: string, memberId: string) =>
   Schema.decodeSync(GroupMembership.GroupMembership)({
     id,
     workspaceId: "workspace-1",
@@ -106,6 +148,25 @@ export const roleOf = (id: string, memberId: Member.Member["id"], roleId: Role.R
 export const aliceOwns = roleOf("assignment-1", membership.member.id, BuiltinRoles.OwnerId)
 export const bobIsMember = roleOf("assignment-2", bob.id, BuiltinRoles.MemberId)
 
+/** What `assignments` let their member do, by the workspace's roles. */
+export const grantsOf = (assignments: ReadonlyArray<Assignment.Assignment>) =>
+  GrantResolver.grantsOf(assignments, (roleId) => roles.find((role) => role.id === roleId))
+
+/** An invitation of carol@example.com as a member, which alice issued and carol has not accepted. */
+export const invitation = Schema.decodeSync(Invitation.Invitation)({
+  details: {
+    id: "invitation-1",
+    workspaceId: "workspace-1",
+    recipientId: "carol",
+    recipientEmail: "carol@example.com",
+    roleId: BuiltinRoles.MemberId,
+    expiresAt: "2026-10-25T12:00:00Z",
+    inviterMemberId: "member-1",
+    issuedAt: "2026-10-18T12:00:00Z"
+  },
+  state: { _tag: "Pending" }
+})
+
 export const thread = Schema.decodeSync(Thread.Thread)({
   id: "thread-1",
   workspaceId: "workspace-1",
@@ -135,6 +196,43 @@ export const reply = Schema.decodeSync(ThreadMessage.ThreadMessage)({
   via: null,
   publishedAt: "2026-10-18T12:05:00Z",
   content: { _tag: "Text", text: "Sounds good", mentions: [], revision: 1, editedAt: null }
+})
+
+/** Bob's message in the thread that addresses alice. */
+export const mention = Schema.decodeSync(ThreadMessage.ThreadMessage)({
+  id: "message-3",
+  workspaceId: "workspace-1",
+  threadId: "thread-1",
+  author: { _tag: "Member", memberId: "member-2" },
+  via: null,
+  publishedAt: "2026-10-18T12:06:00Z",
+  content: { _tag: "Text", text: "Can you take a look?", mentions: ["member-1"], revision: 1, editedAt: null }
+})
+
+/** `message` saying `text` instead, in which `ThreadMessage.mentionText` writes a mention, and addressing whom it did. */
+export const saying = (message: typeof opening, text: string): typeof opening => ({
+  ...message,
+  content: ThreadMessage.Content.matchOrElse(
+    message.content,
+    { Text: (content) => ({ ...content, text }) },
+    (content) => content
+  )
+})
+
+/** `message` after it was deleted, when it was published. */
+export const deleted = (message: typeof opening): typeof opening => ({
+  ...message,
+  content: ThreadMessage.Content.cases.Deleted.make({ deletedAt: message.publishedAt })
+})
+
+/** The conversation between alice and bob. */
+export const conversationWithBob = Schema.decodeSync(Group.Group)({
+  id: "alice-and-bob",
+  workspaceId: "workspace-1",
+  kind: "Direct",
+  memberIds: ["member-1", "member-2"],
+  createdBy: "member-1",
+  createdAt: "2026-10-18T12:00:00Z"
 })
 
 /** Alice's notification of activity in the thread at `sequence`, recorded at `minute` past noon. */
@@ -171,8 +269,12 @@ export const task = Schema.decodeSync(Task.Task)({
   createdAt: "2026-10-18T12:01:00Z"
 })
 
-/** Scout's turn `id` in the thread, in `status`. */
-export const turnOf = (id: string, status: Turn.Status) =>
+/** Scout's turn `id` in the thread, in `status`, with `changes` to what it records. */
+export const turnOf = (
+  id: string,
+  status: Turn.Status,
+  changes: Partial<(typeof ReplicaRecord.Turn)["Encoded"]> = {}
+) =>
   Schema.decodeSync(ReplicaRecord.Turn)({
     id,
     workspaceId: "workspace-1",
@@ -190,7 +292,8 @@ export const turnOf = (id: string, status: Turn.Status) =>
     cancelReason: null,
     createdAt: "2026-10-18T12:02:00Z",
     startedAt: status === "queued" ? null : "2026-10-18T12:02:01Z",
-    finishedAt: null
+    finishedAt: null,
+    ...changes
   })
 
 /** An integration the host installs, which takes a base URL and a key or none, as its readers see it. */
@@ -219,16 +322,75 @@ export const connectionOf = (id: string, name: string) =>
     readiness: { _tag: "Ready" }
   })
 
-/** An integration whose connections give `provides`, and take no settings or key, as its readers see it. */
-export const integrationGiving = (id: string, name: string, provides: Connection.IntegrationView["provides"]) =>
+/**
+ * An integration whose connections give `provides`, and take no settings, authenticating with `auth`, no key unless
+ * told, as its readers see it.
+ */
+export const integrationGiving = (
+  id: string,
+  name: string,
+  provides: Connection.IntegrationView["provides"],
+  auth: Connection.IntegrationView["auth"] = ["none"]
+) =>
   Schema.decodeSync(Connection.IntegrationView)({
     id,
     name,
-    auth: ["none"],
+    auth,
     provides,
     requiresSandbox: false,
     settings: { type: "object", properties: {} }
   })
+
+/**
+ * An integration that gives tools, takes a key or none, and asks for a server's address, a header its key goes in, a
+ * yes or no, and a region, of which only the address is required, as its readers see it.
+ */
+export const searchApi = Schema.decodeSync(Connection.IntegrationView)({
+  id: "search-api",
+  name: "MCP server",
+  docs: "https://modelcontextprotocol.io",
+  auth: ["apiKey", "none"],
+  provides: ["tools"],
+  requiresSandbox: false,
+  settings: {
+    type: "object",
+    properties: {
+      url: { type: "string", title: "Server URL", description: "Where the MCP server answers over Streamable HTTP." },
+      keyHeader: { type: "string", title: "Key header" },
+      verbose: { type: "boolean", title: "Verbose" },
+      region: { type: "string", title: "Region", enum: ["eu", "us"] }
+    },
+    required: ["url"]
+  }
+})
+
+/** A ready connection called `name` to the integration `integration`, which alice added, authenticating with `auth`. */
+export const connectionTo = (
+  id: string,
+  integration: string,
+  name: string,
+  auth: "apiKey" | "none" = "none",
+  settings: Connection.Settings = {}
+) =>
+  Schema.decodeSync(ReplicaRecord.Connection)({
+    id,
+    workspaceId: "workspace-1",
+    integration,
+    name,
+    settings,
+    auth,
+    status: "active",
+    createdBy: "member-1",
+    createdAt: "2026-10-18T12:00:00Z",
+    readiness: { _tag: "Ready" }
+  })
+
+/** `connection`, as the server reads it when it can't be used: not ready, because of `readiness`. */
+export const connectionReadAs = (
+  connection: ReplicaRecord.Connection,
+  readiness: (typeof ReplicaRecord.Connection.Encoded)["readiness"]
+) =>
+  Schema.decodeSync(ReplicaRecord.Connection)({ ...Schema.encodeSync(ReplicaRecord.Connection)(connection), readiness })
 
 /** A ready connection called `name` to the integration `integration`, which takes no key. */
 export const keylessConnection = (id: string, integration: string, name: string) =>
@@ -257,6 +419,22 @@ export const scoutAgent = Schema.decodeSync(ReplicaRecord.Agent)({
   createdBy: "member-1",
   createdAt: "2026-10-18T12:00:00Z",
   readiness: { _tag: "Ready" }
+})
+
+/** The agent alice adds after scout: a member of the workspace of the same setup as scout, called Reviewer. */
+export const reviewer = Schema.decodeSync(Member.Member)({
+  id: "member-6",
+  workspaceId: "workspace-1",
+  identity: { _tag: "Agent", id: "agent-4" },
+  name: "Reviewer",
+  status: "active"
+})
+
+/** Reviewer's setup, as the store lists it once alice has added it. */
+export const reviewerAgent = Schema.decodeSync(ReplicaRecord.Agent)({
+  ...Schema.encodeSync(ReplicaRecord.Agent)(scoutAgent),
+  id: "agent-4",
+  memberId: "member-6"
 })
 
 /** What the models connection offers: the test model, which reasons with a low or high effort, and any other. */
@@ -299,3 +477,19 @@ export const dana = Schema.decodeSync(Contact.Contact)({
   name: "Dana",
   createdAt: "2026-10-18T12:00:00Z"
 })
+
+/** The part of a state art that moves, by which one kind is told from the others. */
+const movingPart: Readonly<Record<StateArtKind, string>> = {
+  "sew-in": "g.art-sewing-in",
+  reach: "path.art-reaching",
+  fill: "rect.art-filling",
+  caret: "path.art-caret",
+  rest: "g.art-breathing",
+  "came-apart": "g.art-swinging",
+  "lost-thread": "path.art-recoiling-start",
+  "nothing-here": "path.art-scanning",
+  "held-back": "g.art-pulling"
+}
+
+/** The drawing of the state art of `kind`, which a view shows when it has nothing to list or something to say failed. */
+export const art = (kind: StateArtKind) => selector(`svg ${movingPart[kind]}`)

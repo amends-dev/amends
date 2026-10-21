@@ -1,68 +1,43 @@
 /**
- * What the person may do in the open workspace, as core decides it from the records their replica
- * holds: the grants their own active assignments confer through the workspace's roles, and the
- * delegation rule for whose roles they may change. The server decides again when an action
- * reaches it; these keep the app from offering what it would refuse.
+ * What the person may do in a workspace, as core decides it from the grants their store resolves.
+ * The server decides again when an action reaches it; these keep a Block from offering what it
+ * would refuse.
  */
 
-import {
-  Assignment,
-  BuiltinRoles,
-  Delegation,
-  Grant,
-  GrantResolver,
-  type Permission,
-  Requirement,
-  type Role,
-  type Target
-} from "@amends-dev/core/authorization"
-import type { Member } from "@amends-dev/core/workspace"
-import type { Opened } from "./model.ts"
+import type { Connection } from "@amends-dev/connection"
+import { Grant, type Permission, Requirement, Target } from "@amends-dev/core/authorization"
+import type { ChannelId } from "@amends-dev/core/channel"
+import type { GroupId } from "@amends-dev/core/group"
+import type { ThreadId } from "@amends-dev/core/thread"
+import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 
-/** The active assignments of `memberId` the replica holds. */
-const assignmentsOf = (opened: Opened, memberId: Member.Member["id"]) =>
-  opened.assignments
-    .filter(({ assignment }) => assignment.memberId === memberId && assignment.status === "active")
-    .map(({ assignment }) => assignment)
-
-/** Whether the person's grants cover `requirement`. */
-export const permits = (opened: Opened, requirement: Requirement.Requirement): boolean =>
-  Grant.anyCovers(
-    GrantResolver.grantsOf(assignmentsOf(opened, opened.memberId), (roleId) =>
-      opened.roles.find((role) => role.id === roleId)
-    ),
-    requirement
-  )
-
-/** Whether the person holds `permission` on `target`. */
+/** Whether `grants` hold `permission` on `target`. */
 export const may = <K extends Target.Kind>(
-  opened: Opened,
+  grants: ReadonlyArray<Grant.Grant>,
   permission: Permission.Definition<K>,
   target: Target.Of<NoInfer<K>>
-): boolean => permits(opened, Requirement.make(permission, target))
+): boolean => Grant.anyCovers(grants, Requirement.make(permission, target))
 
-/** Whether the person is the workspace's owner. */
-export const isOwner = (opened: Opened): boolean => opened.workspace.ownerMemberId === opened.memberId
+/** The workspace as a target of the permissions that act on it. */
+export const workspaceTarget = (workspaceId: WorkspaceId.WorkspaceId) =>
+  Target.Reference.cases.Workspace.make({ workspaceId })
 
-/** Whether the delegation rule lets the person change `memberId`'s roles or remove them. */
-export const mayActOn = (opened: Opened, memberId: Member.Member["id"]): boolean =>
-  Delegation.recipientDenial(
-    {
-      workspaceId: opened.workspace.id,
-      memberId,
-      ownerId: opened.workspace.ownerMemberId,
-      actorId: opened.memberId,
-      selfRemoval: false
-    },
-    assignmentsOf(opened, memberId)
-  ) === undefined
+/** The group `groupId` as a target of the permissions that act on it. */
+export const groupTarget = (workspaceId: WorkspaceId.WorkspaceId, groupId: GroupId.GroupId) =>
+  Target.Reference.cases.Group.make({ workspaceId, groupId })
 
-/** The roles the person may give: Member, and Administrator when they own the workspace; Owner only passes by transfer. */
-export const givableRoles = (opened: Opened): ReadonlyArray<Role.Role> =>
-  opened.roles.filter(
-    ({ id }) => id === BuiltinRoles.MemberId || (id === BuiltinRoles.AdministratorId && isOwner(opened))
-  )
+/** The channel `channelId` as a target of the permissions that act on it. */
+export const channelTarget = (workspaceId: WorkspaceId.WorkspaceId, channelId: ChannelId.ChannelId) =>
+  Target.Reference.cases.Channel.make({ workspaceId, channelId })
 
-/** The workspace-wide role assignments of `memberId`, as replacing their roles expects them. */
-export const workspaceRolesOf = (opened: Opened, memberId: Member.Member["id"]) =>
-  assignmentsOf(opened, memberId).filter(Assignment.isWorkspaceRole)
+/** The thread `threadId` as a target of the permissions that act on it. */
+export const threadTarget = (workspaceId: WorkspaceId.WorkspaceId, threadId: ThreadId.ThreadId) =>
+  Target.Reference.cases.Thread.make({ workspaceId, threadId })
+
+/** The member `memberId` as a target of the permissions that act on them. */
+export const memberTarget = (workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId) =>
+  Target.Reference.cases.Member.make({ workspaceId, memberId })
+
+/** The connection `connectionId` as a target of the permissions that act on it. */
+export const connectionTarget = (workspaceId: WorkspaceId.WorkspaceId, connectionId: Connection.ConnectionId) =>
+  Target.Reference.cases.Connection.make({ workspaceId, connectionId })

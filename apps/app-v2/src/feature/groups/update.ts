@@ -1,0 +1,262 @@
+import type { GroupId } from "@amends-dev/core/group"
+import type { MemberId } from "@amends-dev/core/workspace"
+import { pipe } from "effect/Function"
+import * as Option from "effect/Option"
+import { modifyFields } from "foldkit/struct"
+import * as Update from "foldkit/update"
+import { placeName } from "../../seen.ts"
+import { CreateTeam, FocusStartingMembers, JoinGroup, MarkGroupRead } from "./command.ts"
+import { DialogBinding, GroupsComposition, MembersBinding } from "./composition.ts"
+import {
+  type BrowseTab,
+  conversationIn,
+  conversationWith,
+  findCreatedTeam,
+  findGroup,
+  GroupsDefinition,
+  isTeamReady,
+  Message,
+  type Model,
+  OutMessage,
+  onMemberIds,
+  onTeam,
+  Starting,
+  teamIn,
+  type TeamForm,
+  unreadInOpenGroup,
+  withTeam
+} from "./definition.ts"
+
+/** Ask for a new team: unnamed, private, and with no one added besides the person. */
+const openTeamForm = GroupsDefinition.stepFields(() => ({
+  starting: () =>
+    Option.some(
+      Starting.Team({
+        name: "",
+        visibility: "Private",
+        memberIds: [],
+        creating: Option.none(),
+        failure: Option.none()
+      })
+    )
+}))
+
+/** Ask for a new conversation, with no one chosen. */
+const openConversationForm = GroupsDefinition.stepFields(() => ({
+  starting: () => Option.some(Starting.Conversation({ memberIds: [] }))
+}))
+
+/**
+ * Ask to mark the group open as read, as of its latest activity, while it has activity the person has not read, unless
+ * they asked already for the activity it has now. Asking is recorded, so that a store that still lists the group as
+ * unread until the server has the action does not ask again.
+ */
+const readOpenGroup = GroupsDefinition.step((model: Model) =>
+  Option.match(unreadInOpenGroup(model), {
+    onNone: () => ({ model }),
+    onSome: (unread) => ({
+      model: modifyFields(model, { readRequested: () => Option.some(unread) }),
+      commands: [MarkGroupRead({ workspaceId: model.workspaceId, memberId: model.memberId, groupId: unread.groupId })]
+    })
+  })
+)
+
+/** Mark the group `groupId` as the one open, and read it. */
+const selectGroup = (groupId: GroupId.GroupId) =>
+  Update.combine([GroupsDefinition.stepFields(() => ({ selected: () => Option.some(groupId) })), readOpenGroup])
+
+/**
+ * Picking the group already picked changes nothing; any other is marked and reported, as a click on its row does, and
+ * read.
+ */
+const pickGroup = (model: Model, groupId: GroupId.GroupId) =>
+  Option.contains(model.selected, groupId)
+    ? { model }
+    : Update.withOutMessage(Update.combine(model, [selectGroup(groupId)]), OutMessage.SelectedGroup({ groupId }))
+
+/** Ask to browse the groups, on the tab `tab`. */
+const browseOn = (model: Model, tab: BrowseTab) => ({
+  model: modifyFields(model, { browse: (browse) => modifyFields(browse, { tab: () => tab }) }),
+  outMessage: OutMessage.RequestedBrowse()
+})
+
+/** The model without `groupId` among the teams being joined, once the join is written or could not be. */
+const joined = (model: Model, groupId: GroupId.GroupId) =>
+  modifyFields(model, { joining: (joining) => joining.filter((id) => id !== groupId) })
+
+/** Join the public team `groupId`, which is being joined until the action is written, unless it already is. */
+const joinGroup = (model: Model, groupId: GroupId.GroupId) =>
+  model.joining.includes(groupId)
+    ? { model }
+    : {
+        model: modifyFields(model, { joining: (joining) => [...joining, groupId], notice: () => Option.none() }),
+        commands: [JoinGroup({ workspaceId: model.workspaceId, memberId: model.memberId, groupId })]
+      }
+
+/** Tell the parent the person joined `groupId`, where it is as a line says it, when the Block can still see it. */
+const reportJoined = (model: Model, groupId: GroupId.GroupId) => {
+  const next = joined(model, groupId)
+
+  return Option.match(findGroup(model, groupId), {
+    onNone: () => ({ model: next }),
+    onSome: ({ group }) => ({
+      model: next,
+      outMessage: OutMessage.JoinedGroup({ groupId, place: placeName(group, model.members, model.memberId) })
+    })
+  })
+}
+
+/**
+ * Write the team of `team` to the person's store, as the person's own first member with the people they added: until
+ * the team is listed, the form shows the attempt and cannot be sent again.
+ */
+const createTeam = (model: Model, team: TeamForm) => {
+  const name = team.name.trim()
+
+  return {
+    model: withTeam(model, (form) => ({
+      ...form,
+      failure: Option.none(),
+      creating: Option.some({ name, knownGroupIds: model.groups.map(({ group }) => group.id), isWritten: false })
+    })),
+    commands: [
+      CreateTeam({
+        workspaceId: model.workspaceId,
+        memberId: model.memberId,
+        name,
+        visibility: team.visibility,
+        memberIds: [model.memberId, ...team.memberIds]
+      })
+    ]
+  }
+}
+
+export const update = GroupsComposition.makeUpdate((model, message) => {
+  /**
+   * Finish creating a team once the store has kept the action and has listed the team it made: mark it in the sidebar,
+   * close the dialog, and report it, for the page to open and confirm.
+   */
+  const finishCreating = (current: typeof model) =>
+    Option.match(findCreatedTeam(current), {
+      onNone: () => ({ model: current }),
+      onSome: ({ group }) =>
+        pipe(
+          Update.combine(current, [
+            GroupsDefinition.stepFields(() => ({ selected: () => Option.some(group.id) })),
+            DialogBinding.requestClose()
+          ]),
+          Update.withOutMessage(OutMessage.CreatedGroup({ groupId: group.id }))
+        )
+    })
+
+  /**
+   * Close the dialog and show the conversation of the person with `memberIds`: the one they have, picked as a click on
+   * its row does, or, when they have none, the people for the parent to start one with.
+   */
+  const confirmConversation = (memberIds: ReadonlyArray<MemberId.MemberId>) =>
+    Option.match(conversationWith(model, memberIds), {
+      onSome: ({ id: groupId }) =>
+        Option.contains(model.selected, groupId)
+          ? Update.combine(model, [DialogBinding.requestClose()])
+          : Update.withOutMessage(
+              Update.combine(model, [selectGroup(groupId), DialogBinding.requestClose()]),
+              OutMessage.SelectedGroup({ groupId })
+            ),
+      onNone: () =>
+        Update.withOutMessage(
+          Update.combine(model, [DialogBinding.requestClose()]),
+          OutMessage.SelectedPeople({ memberIds })
+        )
+    })
+
+  /**
+   * Open the conversation of the person and `memberId` when there is one, and otherwise report the member for the
+   * parent to open the conversation with them as it will be, with no dialog to ask first.
+   */
+  const talkWith = (memberId: MemberId.MemberId) =>
+    Option.match(conversationWith(model, [memberId]), {
+      onSome: ({ id: groupId }) => pickGroup(model, groupId),
+      onNone: () => ({ model, outMessage: OutMessage.SelectedPeople({ memberIds: [memberId] }) })
+    })
+
+  return Message.match(message, {
+    ReceivedGroups: ({ groups, members, memberships, grants }) =>
+      finishCreating(
+        modifyFields(model, {
+          isLoaded: () => true,
+          groups: () => groups,
+          members: () => members,
+          memberships: () => memberships,
+          grants: () => grants
+        })
+      ),
+    ReceivedSignals: ({ newActivity, waiting, turns, agents }) =>
+      Update.combine(model, [
+        GroupsDefinition.stepFields(() => ({
+          newActivity: () => newActivity,
+          waiting: () => waiting,
+          turns: () => turns,
+          agents: () => agents
+        })),
+        readOpenGroup
+      ]),
+    FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
+    ClickedTryAgain: () => ({
+      model: modifyFields(model, { notice: () => Option.none(), reads: (reads) => reads + 1 })
+    }),
+    ClickedGroup: ({ groupId }) => pickGroup(model, groupId),
+    InformedOfOpenGroup: ({ groupId }) =>
+      Update.combine(model, [GroupsDefinition.stepFields(() => ({ selected: () => groupId })), readOpenGroup]),
+    ClickedGroupsTitle: () => browseOn(model, "Yours"),
+    ClickedBrowse: () => browseOn(model, "Discover"),
+    ChoseBrowseTab: ({ tab }) => ({
+      model: modifyFields(model, { browse: (browse) => modifyFields(browse, { tab: () => tab }) })
+    }),
+    TypedBrowseQuery: ({ query }) => ({
+      model: modifyFields(model, { browse: (browse) => modifyFields(browse, { query: () => query }) })
+    }),
+    ClickedJoin: ({ groupId }) => joinGroup(model, groupId),
+    SucceededJoinGroup: ({ groupId }) => reportJoined(model, groupId),
+    FailedJoinGroup: ({ groupId, error }) => ({
+      model: modifyFields(joined(model, groupId), { notice: () => Option.some(error) })
+    }),
+    ClickedNewTeam: () =>
+      Update.combine(model, [openTeamForm, MembersBinding.requestClose(), DialogBinding.requestOpen()]),
+    TypedTeamName: ({ name }) => ({ model: withTeam(model, (team) => ({ ...team, name })) }),
+    ClickedRemoveStartingMember: ({ memberId }) => ({
+      model: modifyFields(model, {
+        starting: onMemberIds((memberIds) => memberIds.filter((id) => id !== memberId))
+      }),
+      commands: [FocusStartingMembers({})]
+    }),
+    SubmittedTeam: () =>
+      Option.match(teamIn(model), {
+        onNone: () => ({ model }),
+        onSome: (team) => (isTeamReady(team) ? createTeam(model, team) : { model })
+      }),
+    SucceededCreateTeam: () =>
+      finishCreating(
+        modifyFields(model, {
+          starting: onTeam((team) => ({
+            ...team,
+            creating: Option.map(team.creating, (creating) => ({ ...creating, isWritten: true }))
+          }))
+        })
+      ),
+    FailedCreateTeam: ({ error }) => ({
+      model: withTeam(model, (team) => ({ ...team, creating: Option.none(), failure: Option.some(error) }))
+    }),
+    CompletedFocusStartingMembers: () => ({ model }),
+    ClickedNewConversation: () =>
+      Update.combine(model, [openConversationForm, MembersBinding.requestClose(), DialogBinding.requestOpen()]),
+    ClickedTeammate: ({ memberId }) => talkWith(memberId),
+    RequestedConversationWith: ({ memberId }) => talkWith(memberId),
+    SubmittedConversation: () =>
+      Option.match(conversationIn(model), {
+        onNone: () => ({ model }),
+        onSome: (memberIds) => (memberIds.length === 0 ? { model } : confirmConversation(memberIds))
+      }),
+    WroteAction: () => ({ model: modifyFields(model, { notice: () => Option.none() }) }),
+    FailedWriteAction: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) })
+  })
+})

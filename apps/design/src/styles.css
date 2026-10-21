@@ -1,0 +1,449 @@
+@import "tailwindcss";
+@import "@fontsource/figtree/latin-400.css";
+@import "@fontsource/figtree/latin-500.css";
+@import "@fontsource/figtree/latin-600.css";
+@import "@fontsource/geist-mono/latin-400.css";
+@import "@fontsource/geist-mono/latin-500.css";
+@import "@fontsource/geist-mono/latin-600.css";
+@import "./motion.css";
+
+@source "./**/*.ts";
+@source not "./**/*.test.ts";
+
+/*
+ * The theme of amends, from the Lunacy mocks. Every role is a custom property named `--amends-<role>`
+ * with its light value here and its dark value under `prefers-color-scheme`, and under `data-theme="dark"`
+ * for a page whose person chose it; the `@theme` block below gives each a Tailwind name, so `bg-panel`,
+ * `text-ink-secondary`, and `border-outline` exist for every role and nothing else does: the default
+ * palette, type scale, shadows, and radii are cleared.
+ */
+:root {
+  color-scheme: light;
+
+  --amends-canvas: #f7f7f8;
+  --amends-panel: #ffffff;
+  --amends-raised: #ffffff;
+  --amends-popover: #ffffff;
+  --amends-field: #ffffff;
+  --amends-search: #f6f6f7;
+  --amends-hover: #f8f8f9;
+  --amends-active: #f5f5f6;
+  --amends-selected: #f0f0f2;
+  --amends-rail-selected: #e9e9ec;
+  --amends-subtle: #f3f3f5;
+  --amends-mention: #eceef1;
+  /* What a status mark is cut out of, the surface behind it. A row that is hovered or current sets its own. */
+  --amends-status-knockout: var(--amends-panel);
+
+  --amends-ink: #242528;
+  --amends-ink-secondary: #73757b;
+  --amends-ink-muted: #9c9ea4;
+  --amends-ink-disabled: #9c9ea4;
+  --amends-agent: #8755dd;
+  --amends-on-action: #ffffff;
+
+  --amends-divider: #edeef0;
+  --amends-outline: #e5e6e9;
+  --amends-outline-strong: #73757b;
+  --amends-outline-selected: #9c9ea4;
+  --amends-outline-danger: #b32f28;
+  --amends-stitch: #bcb7ac;
+
+  --amends-action: #242528;
+  --amends-action-secondary: #ffffff;
+  --amends-indicator: #242528;
+
+  --amends-success-mark: #2e9e68;
+  --amends-success-text: #2a7550;
+  --amends-success-surface: #eff6f1;
+  --amends-success-border: #d2e7d9;
+  --amends-caution-mark: #d49a3a;
+  --amends-caution-text: #8a7251;
+  --amends-caution-surface: #f7f4ee;
+  --amends-caution-border: #e8e1d5;
+  --amends-danger-mark: #cf4336;
+  --amends-danger-text: #89221c;
+  --amends-danger-surface: #fbefee;
+  --amends-danger-border: #f1d3d0;
+
+  --amends-scrim: #24252833;
+  --amends-scrim-strong: #24252866;
+
+  --amends-avatar-neutral-bg: #eceef1;
+  --amends-avatar-neutral-fg: #575d66;
+  --amends-avatar-sand-bg: #eae2d7;
+  --amends-avatar-sand-fg: #8d6e42;
+  --amends-avatar-lilac-bg: #eee7f8;
+  --amends-avatar-lilac-fg: #8863b2;
+  --amends-avatar-clay-bg: #e8e2df;
+  --amends-avatar-clay-fg: #8c6d61;
+  --amends-avatar-olive-bg: #e6e9e1;
+  --amends-avatar-olive-fg: #61714e;
+  --amends-avatar-slate-bg: #e2e8ec;
+  --amends-avatar-slate-fg: #5c7485;
+  --amends-avatar-sage-bg: #e0e5de;
+  --amends-avatar-sage-fg: #56654f;
+  --amends-avatar-ink-bg: #28292d;
+  --amends-avatar-ink-fg: #ffffff;
+
+  --amends-shadow-modal: 0 12px 28px rgb(0 0 0 / 0.14);
+  --amends-shadow-popover: 0 6px 12px rgb(0 0 0 / 0.1);
+  --amends-shadow-toast: 0 4px 12px rgb(0 0 0 / 0.086);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --amends-canvas: #111215;
+    --amends-panel: #1b1d21;
+    --amends-raised: #24272d;
+    --amends-popover: #2b2f36;
+    --amends-field: #181a1e;
+    --amends-search: #181a1e;
+    --amends-hover: #22252b;
+    --amends-active: #24272d;
+    --amends-selected: #30343b;
+    --amends-rail-selected: #30353d;
+    --amends-subtle: #262a30;
+    --amends-mention: #353a44;
+
+    --amends-ink: #eceef2;
+    --amends-ink-secondary: #b3b8c2;
+    --amends-ink-muted: #959ca8;
+    --amends-ink-disabled: #777e8a;
+    --amends-agent: #c2a1fa;
+    --amends-on-action: #191b20;
+
+    --amends-divider: #343942;
+    --amends-outline: #4b515c;
+    --amends-outline-strong: #9ca5b5;
+    --amends-outline-selected: #727d8f;
+    --amends-outline-danger: #e58a80;
+    --amends-stitch: #626b79;
+
+    --amends-action: #eceef2;
+    --amends-action-secondary: #25292f;
+    --amends-indicator: #eceef2;
+
+    --amends-success-mark: #4cc38a;
+    --amends-success-text: #8fd6ae;
+    --amends-success-surface: #1d2a23;
+    --amends-success-border: #2d4638;
+    --amends-caution-mark: #e2b25e;
+    --amends-caution-text: #d5b68c;
+    --amends-caution-surface: #2b2720;
+    --amends-caution-border: #4d4336;
+    --amends-danger-mark: #f07065;
+    --amends-danger-text: #f0a8a0;
+    --amends-danger-surface: #2e1e1d;
+    --amends-danger-border: #553330;
+
+    --amends-scrim: #00000080;
+    --amends-scrim-strong: #000000a6;
+
+    --amends-avatar-neutral-bg: #353a44;
+    --amends-avatar-neutral-fg: #bec5d0;
+    --amends-avatar-sand-bg: #3b3329;
+    --amends-avatar-sand-fg: #d5b68c;
+    --amends-avatar-lilac-bg: #382d49;
+    --amends-avatar-lilac-fg: #c7aceb;
+    --amends-avatar-clay-bg: #3c3030;
+    --amends-avatar-clay-fg: #d4ada0;
+    --amends-avatar-olive-bg: #303a2c;
+    --amends-avatar-olive-fg: #b3c59d;
+    --amends-avatar-slate-bg: #2c3741;
+    --amends-avatar-slate-fg: #afc5d8;
+    --amends-avatar-sage-bg: #2e392f;
+    --amends-avatar-sage-fg: #aec0a5;
+    --amends-avatar-ink-bg: #383c45;
+    --amends-avatar-ink-fg: #eceef2;
+
+    --amends-shadow-modal: 0 12px 28px rgb(0 0 0 / 0.4);
+    --amends-shadow-popover: 0 6px 12px rgb(0 0 0 / 0.4);
+    --amends-shadow-toast: 0 4px 12px rgb(0 0 0 / 0.35);
+  }
+}
+
+/*
+ * A person's choice of Appearance, `data-theme` on the root element, over the browser's preference: dark here, and
+ * light by leaving the media query above.
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --amends-canvas: #111215;
+  --amends-panel: #1b1d21;
+  --amends-raised: #24272d;
+  --amends-popover: #2b2f36;
+  --amends-field: #181a1e;
+  --amends-search: #181a1e;
+  --amends-hover: #22252b;
+  --amends-active: #24272d;
+  --amends-selected: #30343b;
+  --amends-rail-selected: #30353d;
+  --amends-subtle: #262a30;
+  --amends-mention: #353a44;
+
+  --amends-ink: #eceef2;
+  --amends-ink-secondary: #b3b8c2;
+  --amends-ink-muted: #959ca8;
+  --amends-ink-disabled: #777e8a;
+  --amends-agent: #c2a1fa;
+  --amends-on-action: #191b20;
+
+  --amends-divider: #343942;
+  --amends-outline: #4b515c;
+  --amends-outline-strong: #9ca5b5;
+  --amends-outline-selected: #727d8f;
+  --amends-outline-danger: #e58a80;
+  --amends-stitch: #626b79;
+
+  --amends-action: #eceef2;
+  --amends-action-secondary: #25292f;
+  --amends-indicator: #eceef2;
+
+  --amends-success-mark: #4cc38a;
+  --amends-success-text: #8fd6ae;
+  --amends-success-surface: #1d2a23;
+  --amends-success-border: #2d4638;
+  --amends-caution-mark: #e2b25e;
+  --amends-caution-text: #d5b68c;
+  --amends-caution-surface: #2b2720;
+  --amends-caution-border: #4d4336;
+  --amends-danger-mark: #f07065;
+  --amends-danger-text: #f0a8a0;
+  --amends-danger-surface: #2e1e1d;
+  --amends-danger-border: #553330;
+
+  --amends-scrim: #00000080;
+  --amends-scrim-strong: #000000a6;
+
+  --amends-avatar-neutral-bg: #353a44;
+  --amends-avatar-neutral-fg: #bec5d0;
+  --amends-avatar-sand-bg: #3b3329;
+  --amends-avatar-sand-fg: #d5b68c;
+  --amends-avatar-lilac-bg: #382d49;
+  --amends-avatar-lilac-fg: #c7aceb;
+  --amends-avatar-clay-bg: #3c3030;
+  --amends-avatar-clay-fg: #d4ada0;
+  --amends-avatar-olive-bg: #303a2c;
+  --amends-avatar-olive-fg: #b3c59d;
+  --amends-avatar-slate-bg: #2c3741;
+  --amends-avatar-slate-fg: #afc5d8;
+  --amends-avatar-sage-bg: #2e392f;
+  --amends-avatar-sage-fg: #aec0a5;
+  --amends-avatar-ink-bg: #383c45;
+  --amends-avatar-ink-fg: #eceef2;
+
+  --amends-shadow-modal: 0 12px 28px rgb(0 0 0 / 0.4);
+  --amends-shadow-popover: 0 6px 12px rgb(0 0 0 / 0.4);
+  --amends-shadow-toast: 0 4px 12px rgb(0 0 0 / 0.35);
+}
+
+@theme inline {
+  --color-*: initial;
+  --font-*: initial;
+  --text-*: initial;
+  --shadow-*: initial;
+  --radius-*: initial;
+  --breakpoint-*: initial;
+
+  --color-canvas: var(--amends-canvas);
+  --color-panel: var(--amends-panel);
+  --color-raised: var(--amends-raised);
+  --color-popover: var(--amends-popover);
+  --color-field: var(--amends-field);
+  --color-search: var(--amends-search);
+  --color-hover: var(--amends-hover);
+  --color-active: var(--amends-active);
+  --color-selected: var(--amends-selected);
+  --color-rail-selected: var(--amends-rail-selected);
+  --color-subtle: var(--amends-subtle);
+  --color-mention: var(--amends-mention);
+  --color-status-knockout: var(--amends-status-knockout);
+
+  --color-ink: var(--amends-ink);
+  --color-ink-secondary: var(--amends-ink-secondary);
+  --color-ink-muted: var(--amends-ink-muted);
+  --color-ink-disabled: var(--amends-ink-disabled);
+  --color-agent: var(--amends-agent);
+  --color-on-action: var(--amends-on-action);
+
+  --color-divider: var(--amends-divider);
+  --color-outline: var(--amends-outline);
+  --color-outline-strong: var(--amends-outline-strong);
+  --color-outline-selected: var(--amends-outline-selected);
+  --color-outline-danger: var(--amends-outline-danger);
+  --color-stitch: var(--amends-stitch);
+
+  --color-action: var(--amends-action);
+  --color-action-secondary: var(--amends-action-secondary);
+  --color-indicator: var(--amends-indicator);
+
+  --color-success-mark: var(--amends-success-mark);
+  --color-success-text: var(--amends-success-text);
+  --color-success-surface: var(--amends-success-surface);
+  --color-success-border: var(--amends-success-border);
+  --color-caution-mark: var(--amends-caution-mark);
+  --color-caution-text: var(--amends-caution-text);
+  --color-caution-surface: var(--amends-caution-surface);
+  --color-caution-border: var(--amends-caution-border);
+  --color-danger-mark: var(--amends-danger-mark);
+  --color-danger-text: var(--amends-danger-text);
+  --color-danger-surface: var(--amends-danger-surface);
+  --color-danger-border: var(--amends-danger-border);
+
+  --color-scrim: var(--amends-scrim);
+  --color-scrim-strong: var(--amends-scrim-strong);
+
+  --color-avatar-neutral-bg: var(--amends-avatar-neutral-bg);
+  --color-avatar-neutral-fg: var(--amends-avatar-neutral-fg);
+  --color-avatar-sand-bg: var(--amends-avatar-sand-bg);
+  --color-avatar-sand-fg: var(--amends-avatar-sand-fg);
+  --color-avatar-lilac-bg: var(--amends-avatar-lilac-bg);
+  --color-avatar-lilac-fg: var(--amends-avatar-lilac-fg);
+  --color-avatar-clay-bg: var(--amends-avatar-clay-bg);
+  --color-avatar-clay-fg: var(--amends-avatar-clay-fg);
+  --color-avatar-olive-bg: var(--amends-avatar-olive-bg);
+  --color-avatar-olive-fg: var(--amends-avatar-olive-fg);
+  --color-avatar-slate-bg: var(--amends-avatar-slate-bg);
+  --color-avatar-slate-fg: var(--amends-avatar-slate-fg);
+  --color-avatar-sage-bg: var(--amends-avatar-sage-bg);
+  --color-avatar-sage-fg: var(--amends-avatar-sage-fg);
+  --color-avatar-ink-bg: var(--amends-avatar-ink-bg);
+  --color-avatar-ink-fg: var(--amends-avatar-ink-fg);
+
+  --shadow-modal: var(--amends-shadow-modal);
+  --shadow-popover: var(--amends-shadow-popover);
+  --shadow-toast: var(--amends-shadow-toast);
+
+  --font-sans: "Figtree", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  --text-meta: 0.6875rem;
+  --text-meta--line-height: 1rem;
+  --text-hint: 0.75rem;
+  --text-hint--line-height: 1.125rem;
+  --text-control: 0.8125rem;
+  --text-control--line-height: 1.25rem;
+  --text-item: 0.875rem;
+  --text-item--line-height: 1.3125rem;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.4375rem;
+  --text-body-touch: 1rem;
+  --text-body-touch--line-height: 1.5rem;
+  --text-title-touch: 1.0625rem;
+  --text-title-touch--line-height: 1.5rem;
+  --text-title: 1.125rem;
+  --text-title--line-height: 1.6875rem;
+  --text-heading: 1.25rem;
+  --text-heading--line-height: 1.75rem;
+  --text-display: 1.75rem;
+  --text-display--line-height: 2.25rem;
+
+  --breakpoint-tablet: 48rem;
+  --breakpoint-desktop: 64rem;
+  --breakpoint-split: 80rem;
+}
+
+@utility focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--amends-ink);
+    outline-offset: 2px;
+  }
+}
+
+@utility focus-ring-inset {
+  &:focus-visible {
+    outline: 2px solid var(--amends-ink);
+    outline-offset: -2px;
+  }
+}
+
+@utility indicator-bar {
+  &::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 0;
+    top: 50%;
+    width: 2px;
+    height: 1.25rem;
+    background-color: var(--amends-indicator);
+    transform: translateY(-50%);
+  }
+}
+
+@utility chevron-down {
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset-inline-end: 1rem;
+    top: 50%;
+    width: 0.4375rem;
+    height: 0.4375rem;
+    border-inline-end: 1.5px solid var(--amends-ink-secondary);
+    border-block-end: 1.5px solid var(--amends-ink-secondary);
+    transform: translateY(-75%) rotate(45deg);
+    pointer-events: none;
+  }
+}
+
+/* The anchor of a tooltip's popover, its trigger, named for itself alone so that tooltips do not share one. */
+@utility tooltip-anchor {
+  anchor-scope: --tooltip;
+  anchor-name: --tooltip;
+}
+
+/*
+ * The popover above its trigger, 6px from it, centered on it. Where the browser places by anchor it is fixed to the
+ * window, so nothing that scrolls or clips around the trigger cuts it off; elsewhere it sits in the flow.
+ */
+@utility tooltip-above {
+  position: absolute;
+  inset-block-end: 100%;
+  inset-inline-start: 50%;
+  margin-block-end: 0.375rem;
+  translate: -50% 0;
+
+  @supports (position-area: top) {
+    position: fixed;
+    position-anchor: --tooltip;
+    position-area: top;
+    justify-self: anchor-center;
+    inset: auto;
+    translate: none;
+  }
+}
+
+/* The popover below its trigger, for one that has no room above it, such as the mark in a pane's header. */
+@utility tooltip-below {
+  position: absolute;
+  inset-block-start: 100%;
+  inset-inline-start: 50%;
+  margin-block-start: 0.375rem;
+  translate: -50% 0;
+
+  @supports (position-area: bottom) {
+    position: fixed;
+    position-anchor: --tooltip;
+    position-area: bottom;
+    justify-self: anchor-center;
+    inset: auto;
+    translate: none;
+  }
+}
+
+/* The body text size sits on `body`: on `html` it would make every rem 15px instead of the 16px the scale is written in. */
+@layer base {
+  html {
+    @apply bg-canvas font-sans text-ink antialiased;
+  }
+
+  body {
+    @apply text-body;
+    margin: 0;
+  }
+}

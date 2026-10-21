@@ -110,11 +110,11 @@ runs them, and keeps `console` to tests and scripts.
   implements gateway contracts and serves protocol packages' handlers; its tests act as a
   client through the same package's contract.
 - `apps/*`: what people see and its building blocks. `icons` holds canonical drawings and
-  generated Solid icons, raw SVGs, and a separate metadata catalog; apps and UI packages may consume
-  it. `ui` is the pattern-based design system built from the Lunacy mocks in
-  `design-system/Amends Group Exploration.free`, which are its visual reference: foundations,
-  components, the six layout patterns, presentational screens, and the site's sections, with a
-  standalone Storybook workshop.
+  generated Solid icons, raw SVGs, path data for views without Solid, and a separate metadata
+  catalog; apps and UI packages may consume it. `ui` is the pattern-based design system built from
+  the Lunacy mocks in `design-system/Amends Group Exploration.free`, which are its visual reference:
+  foundations, components, the six layout patterns, presentational screens, and the site's
+  sections, with a standalone Storybook workshop.
   Introduce and verify one piece at a time. It is UI-only and must not depend on routing or API
   contracts. `site` is amends.dev on Astro and Starlight: static pages composed from UI's site
   sections, and docs whose package guides and API reference are generated from each published
@@ -122,7 +122,15 @@ runs them, and keeps `console` to tests and scripts.
   `alchemy.run.ts`; `stacks/` holds Alchemy stacks for the repository itself, such as its CI
   secrets. `app-v2` is the workspace app being built on Foldkit: a browser app that signs people in
   over the HTTP API and keeps each workspace they open in sync through `sync`, its replica in
-  IndexedDB. Apps may install UI dependencies and consume shared packages.
+  IndexedDB. It runs on the Foldkit Blocks preview, a canary the root manifest's `patchedDependencies`
+  patches from `patches/`; its README says what the patch fixes. `design` is where `app-v2`'s look
+  lives, built from the same Lunacy mocks and importing nothing of `ui`: the tokens as a Tailwind v4
+  theme, and renderers, such as `button` and `field`, that take the caller's `h` builder and a
+  config and return `Html` carrying the Tailwind classes. Block and page views call the renderers
+  and carry no class; `h.Class` appears in `design` alone, so a headless build of the Blocks is
+  `design` with its classes emptied. Its workshop shows every renderer in every state, and a piece
+  is verified there before a page composes it. Apps may install UI dependencies and consume shared
+  packages.
 
 Each workspace has its own manifest, source exports or entry point, `tsconfig.json`
 extending `tsconfig.base.json`, and `typecheck` script. Shared packages inherit no

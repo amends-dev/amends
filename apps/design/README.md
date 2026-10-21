@@ -1,0 +1,1548 @@
+# @amends-dev/design
+
+The look of [`app-v2`](../app-v2/README.md): the tokens as a Tailwind v4 theme, and renderers,
+functions that take the caller's `h` builder and a config and return `Html` carrying the Tailwind
+classes. Block and page views call the renderers and never carry a class themselves. `h.Class`
+appears in this package alone, so a headless build of the Blocks is this package with its classes
+emptied. The package is internal to this repository and not published to npm.
+
+It is built from the Lunacy mocks in
+[`design-system/Amends Group Exploration.free`](../../design-system/), as [`ui`](../ui/README.md)
+is, and imports nothing of `ui`. The design is flat and quiet: no rounded corners, 1px dividers
+between panel regions, shadows on floating layers only, one saturated color for status marks, and
+the rest shades of gray.
+
+## The workshop
+
+```sh
+bun run --filter @amends-dev/design workshop   # http://127.0.0.1:4420/
+```
+
+A small Foldkit app in `workshop/` that shows every renderer in every state under a heading each:
+buttons by variant, disabled, large, and wide, with the link in a sentence, and the button that reads as part of a line, quiet until it is hovered, and a link to another page, and a link in the look of a button to the page's own address, and with an icon before the label, and icon buttons, regular and compact, and as a switch, off and pressed, and one that shows something else, collapsed and expanded, and disabled, also as a switch; a field empty, with a
+placeholder, filled, invalid, disabled, and with a hint under it; a hint; a textarea, and with a hint, refused, and
+disabled; a grid of selects, side
+by side and wrapping in a narrow column; a select with its label hidden, in a row beside a name; a
+field with its label hidden, in a section that names it; the toggle on and off, and disabled; a select, and with
+descriptions and a choice that can't be chosen and a hint, refused, and disabled; the notice
+tones, a boxed note in each of its three tones, and a notice over a button in a column; `sending`; a form with its inline text and a value with its link, and setting rows with an
+action, with a select, with a label alone, and wrapping in a narrow column; the
+directory's section and rows, a row with cells and no action, a table of agents with their status patches and cells of two lines, a table of connections with a drawing on each mark and the authentication as a cell, a table of members with 32px marks in rows 56px tall, the second the member open beside the list, an agent's lilac mark, and the role and status as cells, a section with an action after its line over two rows with a quiet button, each on a drawing of a mail, the history of invitations as rows of an address over what it gives with the status in words and a quiet Revoke on the pending ones, and a section of two rows with a button
+named for their workspaces, with a footnote after them, and rows of public groups to join with a Join button over each row's end, one disabled, and one with no cells, and the quiet line of a list that holds no rows, while it is read, and when it could not be, with Try again, and a table of three groups' rows
+with cells, under the line that says what it holds and the labels of its columns, wide and beside it
+folded, in a frame 360px wide; the centered screen as the
+sign-in's two steps, the second again with the announcement of a new code, and as the workspace picker five times, each with its pieces in `screenContent` as the app's
+pages return them: with workspaces and invitations, whose heading has a Create workspace action on its line; with invitations only and the footnote after them; with nothing yet, whose empty state has the Create workspace button in place of the heading's; with a reload that failed, an alert and a quiet Try again over the list it kept; with the session being checked, whose working mark is the screen's `h1`; with the host not reached, whose message is the screen's `h1`; with nothing at the address, with something that went wrong, and with a workspace closed to the person, each a message that is the screen's `h1`, all with the person's address and a Sign out in the header but the one after something went wrong, which is outside the session, with the brand alone in the header and Reload a link to the page itself; the toast alone, with a detail, and as a stack of two refusals, and the confirmation alone, with an action, long, as a stack of two,
+and beside a refusal, each in a frame of its own; the modal, opened by a button, at each of its sizes: regular, as a
+form with a context, a field that takes the initial focus, a toggle, and a footer of a bordered Cancel and a primary
+button, as a form for a new group with a description, a name field with a placeholder, the visibility as a choice, and
+a members picker with the person locked, whose action waits for a name, as a view the modal moved to, with Back before
+the title in place of Close, the list of people always shown, and a wide action, as one with tabs, a description, and a
+Close settings button whose Members tab has the picker beside its Add button, the count of the people held over a
+dashed rule, their list, an action at the start of its footer, and Done at its end, and as a search over rows of
+integrations that run to the panel's edges; compact, as a confirmation with Cancel at the start of the footer and the
+primary button at its end, as New message, with a description, a members picker that takes the initial focus, the line
+that says the reader already talks to the person chosen, and an action that waits for someone, and as one with a
+context and a description whose Cancel and primary button are dimmed while a toggle says its request is on its way;
+form, with two fields, a hint, and a control at the start of the
+footer; and wide, with fields side by side over a taller box; the palette, opened by a button, with the places under
+the title of their section, the one reached filled, the arrow keys moving through them, Enter picking one, and a
+message for what matches nothing; and a regular modal and the palette each in a frame 360px wide, as a phone shows
+them, filling the window with the footer's buttons sharing its width; the members picker empty and with the person locked as You and two chosen under a hint that counts
+them, the same field with its list always shown under it for a phone, the count and list of a group's people with You
+and Agent beside names and a group of one, and the visibility choice, open to change and dimmed; the logo at five sizes,
+decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on
+the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in
+for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed
+into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status
+while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, the
+assignee filter whose choices are Anyone, Unassigned, and each person with a 22px mark before their name, and as groups
+behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a
+pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end,
+then the line that says what the list holds and the labels of the task list, and the same wrapped in a frame 360px wide;
+the task list, the labels over rows of every status, with an assignee and with none, a finished task's quiet title, the
+task open beside the list, a long title cut short, and a task still sending, alone and with the group after each title,
+and over the quiet line that says no task matches, and in frames 66rem, 52rem, and 360px wide; where a turn stands in
+each of its six states, the logo moving while it waits, works, and stops and a still mark once it is done, failed, or
+stopped; the marks by size, 20px to 40px with the 22px mark of a choice and the 28px mark of an account among them, each
+status at every size, each with its tooltip, the lilac tone, a drawing in place of letters, a status mark alone in its
+tooltip and the working logo, the logo's mark in each of its three motions for a turn, a task's status in each of its
+six drawings at 0.875rem and at 1rem, and the stack of two, three, and four with an agent among them in its tone; the
+tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls
+with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
+list, properties that are read under their captions, where an agent is at work as a line for each place and as a button for each, that opens the turn's thread, a person by their mark at two sizes and in the agent's tone, the four badge tones, entries with and without marks, with trailing badges, and with children,
+entries that are buttons, the second of them active, a pane's sections as a task to change, a task to read, and the turns, and a
+pane's section that is one form; a
+conversation's messages as the threads of a group under their day, with the time of day after each author, a person's mark on the slate ground and an agent's on the lilac with its name in the agent's color, the task a thread tracks as a chip, the button that opens each thread, and a reply as the action the pointer brings up, the open thread's row filled and following a click; a person's messages within five minutes stacked under the one before; the button of a thread with replies, with one reply, three people, more people than it shows, replies not read yet, and while an agent works and someone types; a thread with no replies yet, with Reply in thread and what is going on beside it; the chip of a task in each drawing a status has; and, as a list, with a note,
+an edited mark after the text, a deleted message, actions, and meta, with a mention in the text as a chip, in a message and in
+the current row, with markdown in the text as blocks in a message and as a preview in a notification, with a form in place of the text, and set apart by dividers, centered and at the
+start, with notes of who took part, an agent's turn in each of its states with the actions it offers and what it says under its line, a stop that did not go through, a turn that replied with View turn log among its message's actions, a failed turn's detail with Agent settings at its end, and a turn's row in a column 20rem wide, where the actions drop under the name and Agent settings under the failure, and notifications under the days Today and Yesterday, unread with a dot and read, an agent's on the lilac tone and one whose thread is unavailable with the message icon in place of letters, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; profile cards: a conversation whose authors' names and marks and a mention open the member's card below it, the trigger of the open card underlined and following a click, and the card alone for a person, the reader, an agent that needs setup, one at work, one that is blocked, a member who left, and one who cannot be shown; a turn's log as the side pane, each in a frame of its own: a turn that works, with Stop in the header, what it runs on, its activity with a response it recorded and did not post, and the footer that follows it live; one that is stopping, with Stop dimmed and named Stopping; one that waits, with the Queued card and the footer that waits for activity; one that replied, with its reply recorded and posted and the footer that opens it in its thread; one that was interrupted and ran again and finished with no reply; one that failed before it started, with the caution card that points to the agent's setup, an alert, and Retry turn in the footer; activity that arrived while the reader was scrolled up, whose footer is one wide button; and the pane while its log is being read, not available, and could not be read; rich text as a message's text with every form markdown has and a mention of a member the workshop knows and one it does not, as the inline form of the same text for a preview, and in a narrow column, where a long word wraps and a wide table scrolls; a pane's empty state with a title
+and a line of copy under a header with an action, with two lines of copy, with an action of its own under the copy, with a title alone, with its mark working, and for a failure with Try again, each in a frame of its
+own; a pane's column keeping its measure around a form and, wide, spanning the pane around a table of
+groups, each in a frame wider than the measure; the composer empty, whose Send waits for words, filled, with only spaces, with its list of people to mention open on the second, an agent among them in its tone, with its toolbar of formatting over the box and the buttons beside Send that hide it and start a mention, the first of which hides it, again with the toolbar hidden as it starts on a phone, and with its list of commands open, as wide as the box; the sidebar's rows as three columns, each in a frame the sidebar's width: groups read, unread, with a count read as 2 for you, an agent at work with the logo working, queued, and stopping, and one still sending, the open thread under its group with the drawing of its task in each of its six statuses, the message icon, and a thread that is a button, and direct messages as people on the slate mark with a count and with the dot, several people by the people icon, an agent on the lilac mark at work and needing setup, and the teammates with no conversation yet; the shell twice, with and without its side pane, each in a
+frame of fixed height, its inbox, triage, and a group with their counts read aloud with what they count, its groups, one of them still on its way, and direct messages through
+`sidebarSections`, its threads,
+replies, and composers made of `message`, `divider`, and `composer`, the first with the open thread
+as a plain row under its group and its group's threads resting against the composer, one of them filled, with its task chip, the button of its replies, an agent at work, and, under the last, someone typing, and the second with its notices; the shell once more at `Tablet`, with the sidebar in a drawer over a real dialog that the navigation button opens, which focuses the current row and has Close navigation past its end, the Skip to content link coming first, and the shell once more with a task open on the Tasks tab in the side pane, whose header has the task's status before the title, a Close task button, and the subtitle "Task in #general", with the status, assignee, and priority as quiet menus under their captions that open and keep what is chosen, the description, and the activity over the replies, and the first shell's thread pane with the bell that follows it and Close thread; the shell four more times with the rail on a destination of its own: Agents, with the sidebar's title current, each agent's status and the logo at those at work, and the list in the main pane, again with an agent open, whose page is the main pane: its mark and status in the header, a boxed note of why it can't run, a name form, and its setup, details, and removal set apart by a stitch, Connections, with a section for each capability, and Settings, on Members: a search and a menu of Active or Removed members in a toolbar over a table of members, with the pending invitations under it, and a member's details as the side pane, whose Back is named for where it goes back to; and the icons by size, as the shell
+draws them, and with a label. The toggles, fields, composers, and select take input, and the modals
+open and close, as do the menus, whose choices are kept. The first shell's rail has the account menu that opens, and the other shells draw its button closed, since a menu's Block owns the ids of its button and its list. So do the shell's rail and tabs, whose current item follows a click, and the list of
+threads, whose current row follows a click. The frames pass the shell the viewport `Split`, whatever
+the window's width, so the rail, the sidebar, and the side pane are always in place, and no menu and a
+side pane whose dialog shows nothing, since the navigation drawer and the side pane's dialog are over
+the whole window and are for the app to show. A frame makes itself the containing block of the
+notices, which are fixed to a window's corner, with `contain: layout`. Open it to look at a piece
+before a page composes it. It follows the browser's light or dark preference. A browser tab that is
+hidden never renders a frame, and Foldkit renders on frames, so look at it in a visible tab. The
+folded table's frame is an `iframe` of the workshop itself, opened with `?frame=directory-table` to
+show the table alone, since a table folds by the width of the window, which a `div` 360px wide does
+not change. The list pane's frames are `iframe`s the same way, opened with `?frame=list-pane`, since a toolbar wraps and the task list changes its columns by the width of the window: one 360px wide, one 52rem, and one 66rem. `bun run --filter @amends-dev/design build` bundles it, which CI builds too.
+
+## Using it in an app
+
+An app depends on `@amends-dev/design` with `workspace:*`, adds `tailwindcss` and
+`@tailwindcss/vite` to its dev dependencies, and puts `tailwindcss()` among its Vite plugins. Its
+stylesheet imports the theme, and its `index.html` links that stylesheet:
+
+```css
+@import "@amends-dev/design/styles.css";
+```
+
+The theme scans this package's sources for classes itself, so an app adds no `@source`. A view
+imports a renderer by module, such as `@amends-dev/design/control` or `@amends-dev/design/form`, and
+passes it the builder it was given.
+
+## Tokens
+
+`src/styles.css` holds the whole theme. Each role is a custom property `--amends-<role>` with its
+light value on `:root` and its dark value under `prefers-color-scheme: dark`, and an `@theme inline`
+block gives each a Tailwind name, so a utility exists for every role.
+
+The person's own choice of Appearance wins over the browser's: an app sets `data-theme` on the root element to
+`light` or `dark`, and removes it for System. The dark values are under `:root[data-theme="dark"]` as well, and the
+media query keeps them from `:root:not([data-theme="light"])`, so light needs no block of its own. `theme.test.ts`
+checks that the two dark blocks give the same values. The block clears Tailwind's
+defaults for colors, fonts, type sizes, shadows, radii, and breakpoints, so a class outside the
+design, such as `bg-red-500` or `rounded-md`, does not exist. Spacing is Tailwind's 4px grid.
+
+| Family      | Names                                                                                                                                                                      |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Surfaces    | `canvas`, `panel`, `raised`, `popover`, `field`, `search`, `hover`, `active`, `selected`, `rail-selected`, `subtle`, `mention`, as `bg-*`                                  |
+| Text        | `ink`, `ink-secondary`, `ink-muted`, `ink-disabled`, `agent`, `on-action`, as `text-*`                                                                                     |
+| Borders     | `divider`, `outline`, `outline-strong`, `outline-selected`, `outline-danger`, `stitch`, as `border-*`                                                                      |
+| Actions     | `action`, `action-secondary`, `indicator`                                                                                                                                  |
+| Status      | `success`, `caution`, and `danger`, each as `-mark`, `-text`, `-surface`, and `-border`; `status-knockout`; `scrim` and `scrim-strong`                                     |
+| Avatars     | `avatar-<tone>-bg` and `avatar-<tone>-fg` for `neutral`, `sand`, `lilac`, `clay`, `olive`, `slate`, `sage`, and `ink`                                                      |
+| Shadows     | `shadow-modal`, `shadow-popover`, `shadow-toast`                                                                                                                           |
+| Fonts       | `font-sans`, Figtree at 400, 500, and 600, and `font-mono`, Geist Mono, both from Fontsource                                                                               |
+| Text scale  | `text-meta` 11/16, `hint` 12/18, `control` 13/20, `item` 14/21, `body` 15/23, `body-touch` 16/24, `title-touch` 17/24, `title` 18/27, `heading` 20/28, and `display` 28/36 |
+| Breakpoints | `tablet` 48rem, `desktop` 64rem, `split` 80rem                                                                                                                             |
+
+The status tones hold the values of Lunacy's "Status colors", light and dark, as `@amends-dev/ui`'s tokens
+do, and a status mark is the only saturated color; the offline mark draws `ink-muted` as a ring. `status-knockout`
+is the surface a status mark is cut out of: it is the panel's by default, and a row that is hovered or current
+sets `--amends-status-knockout` to its own fill, so the notch matches the row.
+
+Motion is in `src/motion.css`, which `styles.css` imports. It holds the keyframes and the `@utility` blocks of the
+logo and the state art (`logo-*`, `art-*`) and of the loading rows (`loading-pulse`). Each utility that animates
+or transitions stills itself under `prefers-reduced-motion: reduce`, inside the utility, so that nothing can outrank
+it; a drawing that moves rests in a pose that still says what it is. `motion.test.ts` checks that every
+`logo-`, `art-`, and `loading-` class a renderer names has a utility, that every animation names a keyframes rule,
+and that every one of them is stilled under reduced motion.
+
+Below the desktop breakpoint is touch: controls and the rows of the sidebar grow to 44px, and
+headers to 104px, written `max-desktop:`. Below the
+tablet breakpoint is a phone, where inputs use 16px text so the browser does not zoom the page,
+written `max-tablet:`.
+
+Seven utilities are the theme's own. `focus-ring` draws a 2px outline in `ink`, offset 2px outside
+a control that has keyboard focus, and `focus-ring-inset` draws it inside, for full-width rows that
+would clip an outer one. `indicator-bar` draws the 2px, 20px-tall bar that marks the current rail
+destination and sidebar row, at the inline start of an element that is `relative`; a variant such as
+`aria-[current=page]:indicator-bar` shows it on the current one only. `chevron-down` draws the arrow
+of a select on the element it is on, which must hold the select. `tooltip-anchor`, `tooltip-above`, and
+`tooltip-below` are the tooltip's: the first names its trigger as the anchor of its own popover, so that
+tooltips do not borrow each other's, and the others put the popover 6px above or below it, centered on it. Where the
+browser places by anchor (`position-area`) the popover is `fixed` to the window, so a list that scrolls or clips around
+the trigger does not cut it off; elsewhere it is `absolute` against the trigger, and a clipping ancestor cuts it off.
+`theme.test.ts` checks that each is written. The base styles set `html` to the sans font, `ink`, and `canvas`, and `body`
+to the `body` size with no margin; the size is on `body` because on `html` it would make a rem 15px
+instead of the 16px the scale is written in.
+
+## The viewport
+
+CSS follows the window's width by itself, but a view that renders different markup at different
+widths, such as the shell holding the sidebar in place or in a dialog, has to know it, so an app
+keeps it in its model. `@amends-dev/design/viewport` is what both sides share, and the only module
+here that is not a renderer:
+
+- `Viewport` is `"Phone"` below 48rem, `"Tablet"` from 48rem, `"Desktop"` from 64rem, and `"Split"`
+  from 80rem, the cuts of the theme's breakpoints. It is a schema, so a model or a message holds it.
+- `viewportQueries` are the media queries that cut it, `tablet`, `desktop`, and `split`, as
+  `(min-width: 48rem)`, `(min-width: 64rem)`, and `(min-width: 80rem)`. They are the rems of the
+  `--breakpoint-*` properties in `styles.css`, and the two must agree: change one, change the other.
+  An app asks `window.matchMedia` each query at startup, for its flags, and follows them with
+  `Dom.streamFromMediaQuery`, for a subscription.
+- `viewportOf({ isTablet, isDesktop, isSplit })` is the decision: the widest breakpoint whose query
+  matches.
+
+## Renderers
+
+A renderer takes `h` first, then its config, then anything optional, and returns `Html`. Each is
+generic over the builder's `<Message, Requirements>`, so it renders in any Block's frame. A variant
+is an option with a default, never a second function. No amends domain type appears here: a choice
+is `readonly [value, label]`.
+
+Accessibility belongs to the headless components under them and survives the styling: every
+control keeps its label association, role, `aria-invalid`, and keyboard behavior.
+
+### `@amends-dev/design/control`
+
+- `button(h, label, onClick, options?)` sends `onClick`. `options.variant` is `"secondary"` (the
+  default, a bordered button), `"primary"` (filled, for the action a form exists for), `"quiet"`
+  (text only, for a row's actions such as Remove and Cancel), or `"link"` (underlined text in `ink`,
+  at the size of the line around it with no padding or border, for a link in a sentence such as
+  Change email). `options.size` is `"large"` for the 44px, item-size button of a centered screen; a
+  link ignores it. `options.wide` fills the container, and `options.isDisabled` marks it
+  `aria-disabled` and sends nothing. `options.icon` draws an icon before the label, at `sm`, 8px from
+  it, in the label's color; the label still names the button, and the icon is hidden from assistive
+  technology. `options.name` is what assistive technology calls the button when its label alone does not tell
+  it from the buttons around it, such as "Revoke invitation for casey@mercier.example" for "Revoke"; it begins
+  with the label. `options.isExpanded` is for a button that shows or hides what is under it:
+  whether it is shown now, which it says as `aria-expanded` and draws with the `subtle` fill of a quiet button. The actions that create something use `mark-new`, which the reference's buttons use,
+  not `plus`, which is smaller and lighter and has no mark's weight. `options.hasChevron` draws a chevron after the
+  label and tightens the padding, for a button that opens a menu. A button is 36px tall, a quiet
+  one 32px, and every one but a link 44px on touch. A secondary button with an open menu has a stronger border and a
+  quiet one the `subtle` fill, by `aria-expanded`.
+- `buttonClass(look?)` and `buttonContent(h, label, look?)` are what a button is made of, its classes and its
+  icon, label, and chevron, for a control that is a button element of its own, such as a menu's trigger, which
+  `buttonWith` draws from them too.
+- `submit(h, label, options?)` is a button of `type="submit"`, primary unless `options.variant`
+  says otherwise.
+- `buttonWith(h, attributes, label, options?)` is the look of `button` over `attributes` that already
+  give it its behavior, such as the `closeButton` group a headless dialog publishes, which is also
+  what says whether it is disabled, so it takes no `isDisabled`.
+- `field(h, config, error)` is a label over a 42px bordered input with the error, an
+  `Option<string>`, below it as a `notice` that describes the input. The `config` is
+  `{ id, label, type, value, onInput, placeholder?, maxLength?, hint?, isAutofocus?, isDisabled?, isLabelHidden?, attributes? }`.
+  A field with an error is `aria-invalid` with a danger border. A field that `isDisabled` shows its value
+  and takes none, for a page the person may read and may not change. The `placeholder` shows an example
+  of what to enter while it is empty. The `maxLength` is the most characters the input takes, such as the 80 of a
+  group's name, and the browser stops typing at it. The `hint` is a line of what to know about the input, in the
+  look of `hint`, 8px under it as the label is above it; it describes the input while there is no
+  error. It takes focus as it shows unless `isAutofocus` is `false`. With `isLabelHidden` the label
+  is not shown above the input and still names it, for a field in a section that already has that
+  name as its title, such as the one that renames the workspace. The `attributes` go onto the input:
+  a group a headless component publishes, `PublishedAttributes`, such as a dialog's `initialFocus`,
+  which a field in a dialog takes with `isAutofocus` off, and the caller's own, such as `answerKeys`
+  and an `aria-activedescendant`, for a field above a list its keys walk, or a mount its Block registers,
+  such as one that selects the field's text when it takes focus (`ControlAttributes`).
+- `searchField(h, { id, label, placeholder, value, onInput })` is the quiet search over a list, for a toolbar: a filled
+  box, 36px tall and 44px on touch, with a magnifier at its start, 20rem wide at most, giving way before it wraps, and on
+  a phone a line of its own. The `label` names it for assistive technology and is not shown, the `placeholder` says
+  what it finds, and it never takes focus as it shows. The bordered `field` of type `search` is for a form.
+- `answerKeys(h, onKeyDown, onShortcut?)` is the attribute for a text control above a list that its keys walk, such
+  as a search field above its results: `onKeyDown(key)` says what a key sends, or nothing to leave the
+  key to the browser, and a key it answers does not do what the browser does for it, such as moving the
+  caret or adding a line. A key pressed with Shift, Control, Alt, or Meta is left to the browser, unless `onShortcut`
+  is given: it is asked, with the modifiers, for those keys alone, and a message it answers is sent in the browser's
+  place, as for any other key. The composer's list of members and commands is answered the same way.
+- `hint(h, text)` is a line of quiet text, at hint size in `ink-muted`, for what to know about the
+  control next to it.
+- `textarea(h, { id, label, value, onInput, rows?, hint?, error?, isDisabled?, attributes? })` is the input's
+  look over `rows` lines, three unless given, with the `hint` under it, `error` (an `Option<string>`) as the
+  alert that describes it first, and the `attributes` on the box, as a field has them.
+- `codeInput(h, { id, label, value, hint?, onInput, onComplete?, isAutofocus?, isDisabled? }, error)` is a labelled
+  six-digit code in one native input, drawn as six cells of 56px, 12px apart (8px on phones) across the column. The
+  input lies over the cells, transparent, so typing, pasting, deleting, and the platform's one-time-code
+  autofill work as in a text field (`inputmode="numeric"`, `autocomplete="one-time-code"`). What `onInput` is given
+  is digits only, at most six; the caller keeps it and the field shows it. The cell the next digit goes into is
+  outlined while the input has focus, and an `error` (an `Option<string>`) outlines every cell in the danger
+  color and describes the input, as `field`'s does, with the `hint`. When the sixth digit is in, `onComplete`
+  is sent with the code in place of `onInput`, so the caller can verify at once. The cells are hidden from assistive
+  technology, which reads the input and its label.
+- `loadingLine(h, text)` is a quiet line of what a pane or a page is waiting for, such as "Loading your inbox…", in
+  a live region, a `status`, so that it is announced. A list that is being read shows `loadingRows` instead.
+- `announcement(h, text)` is a quiet line, at hint size in `ink-secondary`, of what just happened, such as "We sent
+  a new code. Use the latest one.", given as an `Option<string>`. It is a live region, a `status`, that is on the page
+  before it has anything to say, so that assistive technology announces the words as they arrive. With none it is
+  empty, has no height, and takes back the 16px gap of the form column it lies in (`empty:-mb-4`), so it takes no room.
+- `iconButton(h, { icon, label, onClick }, options?)` is a quiet square button of one icon, named by
+  `label`, which is all it says to assistive technology: the icon is hidden, and the label is text
+  that is not shown, not an `aria-label`, so a button named Reply does not answer a lookup of the
+  textarea labelled Reply. It is 32px, and 44px on touch; `options.size` is `"compact"` for the 24px
+  button along a list's heading, which is 44px on touch too. `options.isPressed` makes it a switch: it
+  says `aria-pressed`, and shows it as `ink` while it is on. The caller draws the icon for the state, such
+  as `bell` and `bell-filled`, and a button given no `isPressed` says nothing of the kind. `options.isDisabled`
+  marks it `aria-disabled`, in the quiet color of a disabled control with no hover, and it sends nothing; it stays in
+  the tab order, and a switch that is disabled keeps saying whether it is pressed. `options.isExpanded` is for a button
+  that shows or hides something else, such as the shell's navigation button: whether it is shown now, as
+  `aria-expanded`, and a button given none says nothing of the kind. `options.controls` is the `id` of
+  what the button shows or hides elsewhere on the page, as `aria-controls`, and `options.shortcuts` the keys that do
+  what it does, as `aria-keyshortcuts` names them, such as "Control+B Meta+B".
+- `iconSubmit(h, { icon, label }, options?)` is that button as a `type="submit"` that sends its form,
+  such as the composer's send button, with the same options.
+- `iconButtonWith(h, attributes, { icon, label }, options?)` is that button over `attributes` that
+  already give it its behavior, as `buttonWith` is for `button`.
+- `link(h, { label, href })` is a link to a page elsewhere, such as an integration's documentation: underlined text in
+  `ink` at the size of the line around it, the look of a `link` button, that opens in a new tab and sends the page it was
+  opened from nothing (`rel="noreferrer"`). A button that does something in the app is a `button`; this goes to another
+  address.
+- `linkButton(h, { label, href }, look?)` is a link in the look of a button, `look` being the `variant`, `size`, `wide`,
+  `icon`, and `hasChevron` of `buttonClass`, for a control that goes to a page and sends no message. The address of the
+  page itself, `href: ""`, loads it again, which is how a screen that has no messages left reloads: the crash screen's
+  Reload is `linkButton(h, { label: "Reload", href: "" }, { variant: "primary" })`. It opens in the same tab and is a
+  link to assistive technology, which Enter follows.
+- `lineButton(h, label, onClick)` is a button that reads as part of a line of text, as `apps/ui` draws the link beside a
+  turn's failure: `label` at `control` size in medium weight and `ink-secondary`, with no box and no padding, that
+  darkens to `ink` and is underlined only while it is hovered. It is a button, since it does something on the page and
+  goes nowhere; a `turnRow` holds one at the end of its `detail`.
+- `buttonRow(h, children, options?)` is a row of controls with an 8px gap, wrapping onto a new line when
+  they do not fit, such as a thread's Follow and Rename or a form's Save and Cancel. With `isCentered`
+  the controls are in the middle of the row's width, for the quiet button that ends a list, such as
+  Show older under the inbox.
+- `column(h, children)` is a few pieces that belong together inside a section, one under another and
+  12px apart, such as a notice over the button that answers it, or over a Try again row.
+- `fieldGrid(h, children)` is fields side by side in columns at least 9rem wide, 12px apart, wrapping
+  onto new rows when they do not fit, such as a task's Status, Priority, and Assignee.
+- `toggle(h, { id, label, isOn, onToggle, isDisabled? })` is a switch with its label after it. The switch is
+  named by its label. On touch the switch and its label are each a 44px target. A switch that `isDisabled` shows how
+  it is set, in half strength with its label quiet, and takes no click or key, for a page the person may read and may
+  not change; it is `aria-disabled` and stays in the tab order.
+- `choiceGroup(h, { id, label, choices, value, hint?, isDisabled?, embed })` is one choice among a few boxed options,
+  such as a group's visibility, Public or Private: the `label` shown over them in `ink` and naming the radio group for
+  assistive technology, a box for each of `choices`, a value and how the person reads it, 144px wide in a row 8px apart
+  (two columns across the width on a phone), and the `hint` under them saying what the chosen one means, which
+  describes the group. The chosen box is filled `subtle`, outlined, and has a check at its end. It is the look of
+  `@foldkit/ui`'s headless radio group, so the framework keeps the arrow keys, Space, the roving focus, and the
+  labels. A Block creates `RadioGroup.create<Value>()` once from `@foldkit/ui/radioGroup`, binds it as a child with an
+  `id` for the group through `init`, folds its `Selected({ value })` out message into the value it holds, and renders
+  with `embed: (viewInputs) => h.block(Binding.embedView({ slotId, model: model.group, viewInputs }))`. A group that
+  `isDisabled` shows how it is set with its text dimmed and takes no click or key, for a page the person may read
+  and may not change.
+- `choiceSelect(h, { id, label, choices, value, onChange, hint?, error?, isDisabled?, attributes? }, options?)`
+  is a select over `choices`, each a value and how the person reads it, in the input's look, with the
+  `hint` under it, `error` as the alert that describes it first, and the `attributes` on the select, as a
+  field has them. A choice may have a third part, `{ description?, isDisabled? }`: a native select shows
+  only text, so the description reads after the label as "Auto · amends chooses a harness as the agent
+  works", and a choice that `isDisabled` is listed and can't be chosen, for the one an agent names that is
+  gone. With `options.isLabelHidden` the label is not shown above the select and still names it, for a
+  select in a row that says what it is for, such as a member's role beside their name.
+- `notice(h, message, options?)` renders an `Option<string>` as an alert in a tone, `"danger"` by
+  default, `"caution"`, or `"success"`, and nothing when there is none.
+- `noticeBox(h, { title, lines, tone? })` is a note boxed in its tone, `"caution"` (the default), `"danger"`, or
+  `"success"`, for a page or a form as a whole and not for a field: the tone's status shape (a triangle, a square
+  with a bar, or a filled square), the `title` in medium weight, and a quiet line under it for each of `lines`, why. It
+  is a `note` named by its title and not an alert, since it is there when the page opens, such as the reasons an
+  agent can't run; a caller puts one it adds after the page opened, such as what a check found, in a `status` region
+  of its own.
+- `sending(h, pending)` is " · Sending…" while an action is on its way, and nothing otherwise.
+
+### `@amends-dev/design/logo`
+
+- `logo(h, { size?, label?, motion? })` is the amends mark: a square, a patch over its corner, and four stitches
+  across the seam, drawn on a 64-unit grid in the color of the text around it, with the patch and the stitches
+  cut out of the surface behind it, `status-knockout`. `size` is a CSS length, `1.25rem` unless given, which
+  scales with the reader's text size. The mark is decorative and `aria-hidden`; a `label` makes it an image
+  named by that label, for one that stands alone, such as the rail's brand when it is not a button. Inside a link
+  or a button its patch lifts a little when hovered, and a stitch grows. A `motion` loops: `"sew-on"` drops the
+  patch on and pops the stitches in, for a launch; `"thread"` draws each stitch through in turn, quiet enough to
+  idle, for what waits; `"tug"` wobbles the patch from its corner, for what is stopping; and `"working"` lights
+  the stitches while the patch breathes, for what is waited on. A motion is still when the reader prefers less
+  motion, and the mark is then the mark.
+- `stitchPaths` are the four stitches, which the state art draws too, and `logoMotions` and `LogoMotion` the motions.
+
+### `@amends-dev/design/stateArt`
+
+- `stateArt(h, kind)` draws what a list, a page, or a screen says when it has nothing to show or something went
+  wrong, as an `svg` 4.5rem tall that is `aria-hidden`, since the words beside it say it. The drawings are made of the
+  logo's pieces, empty states as outlines waiting to be filled and errors as stitches that came undone, and each
+  moves in its own way, still under reduced motion. `kind` is a `StateArtKind`, listed in `stateArtKinds`:
+  `"sew-in"` a new piece sewn in beside empty outlines, for a first thing to make; `"reach"` a thread reaching for an empty
+  outline, for nothing connected yet; `"fill"` an outline filling in, for a place waiting for its first thing;
+  `"caret"` a stitch blinking on a seam, for nothing said yet; `"rest"` the mark breathing, for nothing left to do;
+  `"came-apart"` the patch swinging loose, for something that failed; `"lost-thread"` the thread between two
+  pieces snapping back, for something out of reach; `"nothing-here"` a scan across an empty hole, for something
+  that isn't there; and `"held-back"` the patch straining at its stitches, for access the reader lacks. It is
+  the `art` of `paneEmpty`, which a view uses rather than calling this itself.
+
+### `@amends-dev/design/icon`
+
+- `icon(h, name, options?)` draws one of [`icons`](../icons/README.md)'s drawings by name, an
+  `IconName`, as an `svg` from its path data under that package's rendering contract: a 24-unit
+  viewBox, strokes of width 2 with round caps and joins in `currentColor`, so the icon takes the
+  color of the text around it, and a fill too for `bell-filled`. `options.size` is `"xs"`, `"sm"`,
+  `"md"` (the default), or `"lg"`, at 0.75, 1, 1.25, and 1.5rem, which scale with the reader's text
+  size. An icon is decorative and `aria-hidden`; an `options.label` makes it an image named by that
+  label, with a `title`, for one that stands alone with no text beside it.
+
+### `@amends-dev/design/mark`
+
+- `mark(h, { text | icon, size?, tone?, status? })` is the square that stands for a person, a workspace, an agent, or
+  a connection: the `text` letters in capitals, or, for a thing that has no name to abbreviate, an `icon` drawn at the
+  size that fits the square (`xs`, `xs`, `sm`, `sm`, `sm`, and `md` for the sizes below), on the ground of its `tone`, `"neutral"`
+  (the default, `avatar-neutral`), `"slate"` (`avatar-slate`, which is the person who wrote a message, as `apps/ui` draws them), or `"lilac"` (`avatar-lilac`, which is an agent's). `size` is `"xs"` (20px, 9px text, the smallest),
+  `"choice"` (22px, 10px text, as `@amends-dev/ui` draws a person beside a choice, in a menu of people, and the people who replied under a thread), `"sm"` (the default, 24px, `meta` text, as a sidebar row shows it, and a pane's title),
+  `"account"` (28px, 13px text, as `@amends-dev/ui` draws the signed-in address in a centered screen's header, and the
+  workspace in the sidebar's header),
+  `"md"` (32px, `hint` text, as a message shows its author and an agent's row in a list), or `"lg"` (40px, `item` text, as a
+  directory row shows it). A mark is `aria-hidden`: the name it abbreviates is always beside it. `sidebarHeader`,
+  `sidebarItem`, `row`, `pane`, `message`, and `repliesButton` draw their marks with it.
+  - A mark with a `status`, `{ kind, label, detail? }`, has a patch over its bottom end corner. The patch overhangs the
+    corner by 2px, in a notch 2px wider all round that is cut from the surface behind it, `status-knockout`. Its
+    shape carries the state, so it reads without color: `"available"` (online, or at work) a filled square in
+    `success-mark`; `"offline"` a square drawn as a 1.5px ring in `ink-muted` over the knockout; `"attention"` (needs
+    setup) a triangle in `caution-mark`, as `@amends-dev/ui` draws it, a little wider than tall; `"blocked"` (can't run,
+    unavailable) a square in `danger-mark` with a 1.5px bar of the knockout across its middle, inset 20% each side. The
+    patch is 8px on a 24px mark, 9px on 28 and 32, and 10px on 40, as the mocks and `@amends-dev/ui` size it, and 7px on
+    20px and 22px, the least `@amends-dev/ui` draws. A mark with a status is wrapped in a `tooltip` that says it, as
+    `@amends-dev/ui` wraps its avatars: the status's `label` as the title, why under it when there is a `detail`, and
+    the title in the tone of the shape, `caution` for the triangle and `danger` for the barred square, none for the
+    other two. It is above the mark, or below it with `statusPlacement: "below"`, as a pane's header mark is, since the
+    window has no room above it. A mark stays hidden from assistive technology, since it knows only the letters, and
+    so is the tooltip: the row that holds it is named by the name and then the status's label, "Atlas, Needs setup".
+    With `isTooltipHidden` the patch has no tooltip, for a mark beside the words that say the status, as a
+    profile card's is.
+- `statusTooltip(h, status, children, placement?)` is that tooltip for `children`, which a row uses for what it draws
+  of a status beside the mark, such as `statusMark`.
+- `statusMark(h, kind)` is a status's shape alone, 9px, for the end of a row whose item has no mark of its own, such as
+  a connection, and hidden from assistive technology. It says nothing on hover; the sidebar wraps it in
+  `statusTooltip`, and the boxed note's mark is this shape with none.
+- `activityMark(h, motion?)` is the logo at 0.875rem, as `@amends-dev/ui` draws a turn's mark, in the `motion` of what
+  is under way, `working` unless given: `thread` while it waits, `working` while it runs, `tug` while it stops. A row
+  shows it at its end while the thing it stands for is at work, in the color of the text around it and hidden from
+  assistive technology.
+- `taskStatus(h, shape, { size? })` is where a task stands, drawn as `apps/ui`'s `TaskStatus` draws it: a circle on a
+  16-unit grid, 0.875rem wide unless the `size` says (a pane's title has it at 1rem), with the `shape` in it, one of
+  `taskStatusShapes`. `triage` is an exclamation mark, `open` a bare circle, `progress` a circle half filled, and `done`
+  a circle filled and checked, in the color of an action's text; `apps/ui` draws those four. `paused` is a circle with
+  two bars, and `dismissed` a circle crossed out, which the app's statuses Held and Dismissed need and `apps/ui` does
+  not draw. Every shape is gray, `ink-secondary`, and `ink` once it is `done`. It is hidden from assistive technology,
+  since the word for the status is always beside it. A `pane`'s `header.taskStatus`, a `menu` choice's `taskStatus`, and
+  `propertyMenu` draw it.
+- `markStack(h, { marks, label, onClick })` is a button of a few `marks`, each a `MarkContent` (`{ text, tone? }`, or a
+  drawing), at 22px (`choice`) in its tone, each overlapping the one before it by 5px with the later on top, as
+  `@amends-dev/ui`'s `AvatarStack` lies in a group's header. It shows every mark it is given, so the caller keeps to a
+  few, and no count: the `label`, such as "7 members", names the button and says how many people it stands for, since
+  the marks are hidden from assistive technology. It has no border, is 32px tall and 44px on touch, with `subtle` on
+  hover, and is not shown below 48rem, where the header is narrow.
+
+### `@amends-dev/design/centered`
+
+The sixth layout pattern, for screens outside a workspace such as sign-in and the workspace picker.
+
+- `centered(h, { actions?, width, children })` frames one card on the canvas, `100dvh` tall
+  with an 8px gutter, and edge to edge on phones. Its header holds the brand on the left, the logo at 40px
+  beside "amends", and `actions` on the right. The body is a column: `width: "form"` centers a 420px column vertically,
+  and `"directory"` starts an 800px column near the top. An ancestor that sets
+  `--amends-screen-height` shows the card at that height instead of the viewport's, as the
+  workshop does to show both widths on one page.
+- `centeredAccount(h, identity)` is who is signed in, for the header's `actions` beside a Sign out button: the first
+  letter of the `identity`, such as the address they signed in with, in a 28px mark, then the identity in
+  quiet text, which gives way to the mark below 48rem. The mark is hidden from assistive technology, since the
+  identity is beside it.
+- `heading(h, text, options?)` is the screen's `h1`, at display size, with 12px below it for what
+  follows. An `options.action`, such as a `button` that creates what the screen lists, shares the
+  title's line: the title takes the line's width and the action lies at its end, in line with the
+  middle of the title and 16px from it, and the 12px below belong to the line. A title wraps within
+  the room the action leaves it.
+- `copy(h, text)` is a line of secondary text under the heading.
+- `screenContent(h, children)` is the pieces of a screen's body as one node, for a view that must return
+  one, such as a page. It is `display: contents`, so they lie in the card's column as if it were not
+  there, each spacing itself as `heading` and `copy` do. Use it, not `column`, whose gap would add to
+  theirs.
+- What a screen says when it has nothing to show is the pane module's `paneEmpty`: a state art, a title, a
+  line, and an action under it, 64px under what is above it. Under the screen's `heading` it is an `h2`,
+  as a list that is empty says; when the message is all the screen has, such as the host not being
+  reached, it takes `level: 1` and is the screen's `h1`, with no `heading` of its own. The screen after an unexpected
+  error is outside the session, so it has no `actions` in its header, and its Reload is a `linkButton` to the page's own
+  address, since the framework's crash view has no messages to send.
+
+### `@amends-dev/design/form`
+
+What a form screen is made of beside its controls.
+
+- `form(h, { onSubmit, label?, variant? }, children)` is the `form` element sending `onSubmit`, its
+  children in a column with a 16px gap. A `label` becomes its `aria-label`, which makes it a form
+  landmark. `variant` is `"screen"` (the default), 36px below the text above it, or `"pane"`, with no
+  space above it, for a form inside a pane or a message, such as renaming a thread.
+- `inline(h, children)` is a row of text and links with a 4px gap, at hint size in `ink-secondary`,
+  such as "Need a new code?" beside its Send again link. A child is an `Html` or a string.
+- `valueWithAction(h, value, action)` is what the person entered, in `ink`, with the link that
+  changes it at the right, such as an email and Change email.
+- `settingRow(h, { label, copy?, action? })` is one setting as a row, as the group settings mock shows
+  its membership: the `label` at item size in medium weight in `ink` over the `copy` at hint size in
+  `ink-secondary`, and the `action`, any control, at the right. When they do not fit side by side,
+  because the text would be narrower than 12rem, the action wraps to a line of its own, at the start.
+
+### `@amends-dev/design/directory`
+
+What a directory screen lists.
+
+- `loadingRows(h, { label, count?, markSize? })` is what a list shows while it is read for the first time: `count` rows,
+  three unless given, in the shape of a `row` of the same `markSize` (`"lg"` unless given, or `"md"` for a list of
+  agents), a square of `subtle` where the mark goes and two bars where the title and the meta go, slowly dimming and
+  brightening, and still under reduced motion. The rows are hidden from assistive technology; the `label`, such as
+  "Loading agents…", is a `status` that only it can read. The caller shows them in place of the list, and the heading and
+  the tabs stay where they are.
+- `section(h, { label, count?, action? })` is the label as an `h2`, the count in a 20px `subtle` badge, and a
+  dashed line in `stitch` running to the right edge, 36px below what is above it. An `action`, such as a quiet
+  View history, comes after the line, at the end.
+- `summary(h, { copy, count })` is a line at hint size in `ink-muted` that says what a list holds,
+  the `copy`, with the `count`, such as "4 groups", at its end.
+- `columns(h, { label, cells })` is the labels of a table's columns over its rows, hidden from
+  assistive technology, since each row describes itself: the `label` over the mark and the title,
+  filling the width, then one of the `cells` over each cell column, 8rem wide, at meta size in
+  `ink-muted` and upper case, over a dashed `stitch` rule. Its end leaves 6rem bare, where a row with
+  cells keeps its action, so the labels stay over their cells. From 48rem to 64rem the columns are
+  6rem wide and the bare end 5rem, as a row's are. Below 48rem the labels are not shown, since a
+  row's cells fold under its title and no column is left to label.
+- `footnote(h, text)` is a quiet line after a list, 24px under it, at control size in `ink-secondary`, that
+  says what else the person can do, such as "Accept an invitation above, or create your own workspace."
+- `row(h, { id?, mark, markSize?, isCompact?, status?, title, meta?, cells?, cellsText?, action?, button?, isCurrent?, onClick })` is
+  one button the width of its container, at least 76px tall: a square mark holding the `mark` letters, `{ text, tone? }`,
+  or its drawing, `{ icon, tone? }`, as a connection's is, 40px (`markSize` `"lg"`, the default), 32px (`"md"`, as a
+  list of agents draws it), or 24px (`"sm"`, which makes the row 56px tall), on `avatar-neutral` unless given the `lilac`
+  tone, the `title` at body size over the `meta` at hint size in `ink-secondary`, and the `action` at the right in
+  `ink-secondary`. A row that `isCompact` is 56px tall whatever its mark's size, as a table of people is with a 32px
+  mark; the folded cells still start under the title of the mark's size. The row is `hover` on hover. A `status` is the patch on the mark, cut
+  out of the row's own fill, which a hovered row gives `status-knockout`. The button is named by the title and, with a
+  status, its label after it, "Atlas, Needs setup", and described by the meta through `aria-description`, and the mark
+  and the action are hidden from assistive technology. The `cells`, such as a `badge` and a count, each lie in an 8rem column
+  between the title and the action, at hint size in `ink-secondary`, under the labels `columns`
+  gives them, and are hidden like the mark; `cellsText`, what they say in words, such as "Public ·
+  12 members", describes the button after the meta. A row with cells keeps 6rem at its end for its
+  action, right-aligned, whether it has one or not. An `id` is the button's own, for the app to move focus to
+  a row, such as the one for a workspace the person has just joined. A row that `isCurrent` is the one whose details are open beside the list: it is filled `selected` with the
+  2px bar at its start, and the button is `aria-current="true"`. A page lists rows as `li` items of a `ul`.
+  - From 48rem to 64rem (`max-desktop:`) the cell columns are 6rem wide and the room for the action
+    5rem, so a title keeps its room beside three cells, and `columns` follows with the same widths.
+  - Below 48rem (`max-tablet:`) a row with cells folds, in CSS alone and from the same markup: the
+    mark, the title, and the meta stay the first line, and the cells wrap under them as a line of
+    their own, 8px apart, in their order, each only as wide as it is, or as the line if it is wider,
+    with an ellipsis, starting under the title. The action is not shown, and neither are the labels
+    of `columns`. The cells lie in one element that is `display: contents` from 48rem, so each is a
+    column of the row there, and below it takes the whole width of its line (`basis-full`), which is
+    what breaks the row after the title. A row without cells does not fold and keeps its action.
+    `cellsText` is unchanged, so the folded row is described as it is wide. The folded cells start under a 24px
+    mark's title, 40px in, as under a 32px mark's, 48px in, and a 40px one's, 56px in.
+- A row the person can answer as well as open, such as a public group they may join, has a `button`,
+  `{ label, name, isDisabled?, onClick }`: a `secondary` button at the row's end, 16px in from its edge and level with
+  its middle, named by `name`, which begins with the label, such as "Join #launches", so that the buttons of several rows
+  are told apart, and disabled while `isDisabled`. It sends its own `onClick` and not the row's, and lies over the row,
+  beside the row's button and inside neither, in a frame the row then has. A row with cells keeps its action's room for
+  it, and one without keeps 5rem at its end; below 48rem, where the cells fold, the title keeps 5rem as well. A row has
+  an `action` or a `button`, not both.
+- `emptyLine(h, text)` is a quiet line in the place of a list that holds no rows, at control size in `ink-secondary`,
+  32px above and below and 12px in from the rows' edge, as `apps/ui` says "No groups match this search."; the
+  labels of `columns` stay over it. `statusLine(h, { text, action? })` is the same line in a live region, a `status`,
+  for a list that is being read or could not be, such as "Loading groups…" or "Can't load the groups.", with an
+  `action` after the words, 12px from them, such as a quiet Try again.
+- `cellWithDetail(h, { value, detail? })` is a cell of two lines for a row: the `value` at control size in `ink`
+  over the `detail` at hint size in `ink-secondary`, such as an agent's harness over its sandbox. Both end in an
+  ellipsis. Below 48rem, where the cells fold under the title, the detail is not shown, so the folded line reads
+  as the values alone.
+- `activityCell(h, { state, motion, place? })` is a cell of the same two lines for what is at work: the logo's mark,
+  0.875rem and moving as the `motion` says (`thread` while it waits, `working` while it runs, `tug` while it stops, as
+  `@amends-dev/ui` moves a turn's mark), and the `state`, "Working", over the `place`, "#design". Below 48rem, where
+  the cells fold under the title, the place follows the state on its line, "Working · #design", as `@amends-dev/ui`
+  puts them under an agent's name. A row that is idle leaves its cell empty and the column keeps its place.
+- `rowWithButton(h, { mark, markSize?, title, meta?, action, actionName, variant?, isDisabled?, onClick })` is a row for a thing the
+  person answers and does not open, such as an invitation, so it is not a button itself: the same
+  height, mark (letters or an icon, at the sizes `row` has), and title over meta as `row`, and at the end a
+  `secondary` `button` labelled `action`, or a `quiet` one with `variant`, as a pending invitation's Revoke is,
+  that sends `onClick`, which is disabled with `isDisabled`, as a pending invitation's Revoke is while the
+  invitation is itself on its way. The row has no `hover` and no pointer, since it is not what is pressed. The
+  button is named by `actionName`, which begins with the `action`, such as "Accept invite to
+  Northstar Studio", so that the buttons of several rows are told apart; the mark is hidden from
+  assistive technology, and the title and meta are read as text. It is a renderer beside `row`, and
+  not an option of it, because the two are not the same element: a `row` is one button whose parts
+  describe it, and this is a line of text with one control. A page lists these as `li` items of a `ul`.
+- `historyRow(h, { title, detail, status, action? })` is a row of a history, which is read and not opened, such as an
+  invitation among every one there has been, and has no mark: a grid of the `title` at item size in medium weight, over
+  the `detail` at hint size in `ink-secondary`, a 5.5rem column for the `status` in words, and a 4.75rem one for the
+  `action`, `{ label, name, isDisabled?, onClick }`, a `quiet` button level with the detail and at the end of the row,
+  named by `name`, which begins with the label, such as "Revoke invitation for casey@mercier.example", so that the
+  buttons of several rows are told apart. Below 48rem the action moves under the status. A row with no `action` leaves
+  its column bare. A page lists these as `li` items of a `ul`.
+
+### `@amends-dev/design/taskList`
+
+Tasks as `apps/ui`'s group Tasks tab lists them, which `app-v2` draws for a group's Tasks tab and the workspace's Triage and
+Tasks. A task here has no key, so the column `apps/ui` has for it is left out.
+
+- `taskHeadings(h)` is the labels of the list's columns, Task, Status, Assignee, and Activity, at `meta` size in capitals
+  in medium weight and `ink-secondary`, 40px tall with a 3px top padding, over a dashed `stitch` rule along their foot, in
+  the columns of the rows, hidden from assistive technology since each row describes itself. Task is over the
+  drawing and the title. It belongs in a pane's `toolbar`, under the search, where it stays while the rows scroll. From
+  48rem to 64rem the Status label goes with the status words, and below 48rem the labels are not shown.
+- `taskList(h, rows)` is the list named Tasks, an `li` for each of the `rows`, each
+  `{ key, title, status: { shape, label }, isFinished?, place?, assignee?: { name, mark }, activity, isCurrent?, onClick }`,
+  in `grid` columns of `1rem`, the title, `7rem` for the status word, `9.25rem` for the assignee, and `5.5rem` for the
+  activity, 12px apart, as `apps/ui` sets them. A row is one button the width of the list, 56px tall, `ink-secondary`
+  by default and `hover` on hover, with the focus ring inside it; it sends `onClick`. It holds, in order, the status
+  drawn by `taskStatus` at 1rem (the `shape`); the `title` at item size in medium weight, in `ink`, or in `ink-secondary`
+  once the task `isFinished`, cut short with an ellipsis, and, when the list holds the tasks of several groups, the
+  `place`, "#general", after it in quiet hint text, which keeps its room while the title gives way; the `label` of
+  the status at hint size; the assignee, as a 24px `mark` and the name at control size in `ink`, or the people
+  icon (`propertyIcon`, 15px) in a 24px box and "Unassigned" in `ink-secondary`; and the `activity` at control
+  size, at the end of its column. A row that `isCurrent` is the one whose task is open beside the list: it is filled
+  `selected`, with the 2px bar at its start, and is `aria-current="true"`. The button is named by the title, and
+  described by all the rest it says, "#general · To do · Alex Morgan · 2m ago", or "Unassigned", whatever the width
+  leaves out; the drawing and the mark are hidden from assistive technology.
+  - From 48rem to 64rem (`max-desktop:`) the status words are not shown, since the drawing says it, and the columns
+    are the drawing, the title, `9.25rem`, and `4.5rem`.
+  - Below 48rem (`max-tablet:`) the assignee's name is not shown and the mark stands for it, the columns are the
+    drawing, the title, `1.5rem`, and `3.5rem`, a row is 60px tall, and the title wraps in place of an ellipsis,
+    with the place under it.
+- `taskListEmpty(h, text)` is a quiet line in the place of the list, in `ink-secondary` at control size, 32px above and
+  below and 12px in from the rows' edge, as `apps/ui` says "No tasks match these filters." where the filters hide every
+  task. The labels stay over it.
+
+### `@amends-dev/design/shell`
+
+The frame of the first four layout patterns, which the modules below fill.
+
+- `shell(h, { viewport, rail, sidebar, main, aside?, notices?, menu?, dialogs? })` puts the `rail` on the
+  canvas, then one `panel` card holding the `sidebar`, a divider, the `main` pane, and, when there is
+  an `aside`, its `view`, the side pane, at 440px at `Split`. Each is what its module renders. The
+  `notices`, a `toastStack` pinned to the window's bottom end corner and a `confirmationStack` centered at
+  its bottom, are last in the frame or, while a dialog is open, inside it. The frame is as tall as the viewport (`100dvh`, or
+  `--amends-screen-height` where an ancestor sets it, as the workshop does), with an 8px gutter around
+  the card. The `viewport` is the window's width, a `Viewport` that the app keeps in its model (see
+  [the viewport](#the-viewport)), and the layout follows it:
+
+  | Viewport  | Width       | Navigation                                                            | Side pane                                                                            |
+  | --------- | ----------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+  | `Split`   | 80rem+      | Rail and sidebar in place                                             | Beside the main pane, a divider between them                                         |
+  | `Desktop` | 64 to 80rem | Rail and sidebar in place                                             | In a dialog, floating at the end of the window, over a scrim                         |
+  | `Tablet`  | 48 to 64rem | The rail stays; the navigation button opens the sidebar in a dialog   | In a dialog, floating, as above                                                      |
+  | `Phone`   | below 48rem | The navigation button opens the rail and sidebar together in a dialog | In a dialog that fills the window over the main pane, which keeps its state under it |
+
+  The floating pane is inset from the window's top, bottom, and end by the frame's 8px gutter, 27.5rem
+  wide at most, with `shadow-popover`, over a `scrim` that covers the window. Below 48rem the frame
+  has no gutter and no gap, so the card is edge to edge, and its padding is the screen's safe-area
+  insets (an app gets them with `viewport-fit=cover` in its viewport meta); the side pane's dialog
+  fills the window with the same insets as its padding, with no shadow and a backdrop that shows
+  nothing, and `paneBack` shows in the pane's header in place of `paneClose`. Those two are CSS from
+  48rem (`pane.ts`), since a view of the pane does not know the viewport. Below 64rem the controls and
+  pane headers have their touch sizes (44px, and 104px for a header).
+
+  The viewport decides what is rendered, not what CSS hides: at `Desktop` and `Split` the sidebar is
+  in the card, and below them it is in the drawer instead, never in both; at `Phone` the rail is in
+  the drawer too, and the frame holds neither. The side pane is beside the main pane at `Split` and
+  in its dialog at every other viewport, never in both. `isAsideInDialog(viewport)` is that decision
+  for a page that opens the dialog and closes what it shows when the dialog closes: true everywhere
+  but `Split`. The controls, rows, and headers keep their touch sizes in CSS, from `max-desktop:`, and
+  so does the room a pane's header leaves for the navigation button.
+
+  The frame begins with a link named Skip to content, the first thing the Tab key reaches at every viewport. It is
+  out of sight until it has focus, when it shows at the window's top start on `panel`. It goes to `#main-pane`, the `id`
+  `pane` gives the main pane, which has `tabindex="-1"` and draws no outline when it has focus: following the link moves
+  focus there. It is a link to a fragment, so the address gains `#main-pane`.
+
+  The `menu` is `{ id, onOpen, isOpen, dialog }`. Where the frame lacks the sidebar, the shell draws the
+  navigation button, an `iconButton` named Open navigation that sends `onOpen`, at the top start of the card where the
+  main pane's header leaves room for it. It says `aria-expanded` as `isOpen` does and `aria-controls` the dialog's `id`,
+  and the shell draws the drawer by `menu.dialog`: the page lends the shell its bound dialog's
+  view, `(toView) => h.block(MenuBinding.embedView({ slotId, model, viewInputs: { toView } }))`, and
+  the shell decides what the dialog holds, `isOpen` and `id` being the dialog's. That is a `ModalRender`, the
+  `RenderInfo` of `@foldkit/ui`'s headless dialog, from `modal.ts`, which the shell imports from
+  there. While the dialog is visible it is a `dialog` element, transparent and unpadded, with a
+  backdrop over the whole window in `scrim` and a panel at the start of the window, `shadow-modal` on
+  `panel`: an `sr-only` `h2` named Navigation, which names the dialog, then the rail at `Phone`, then
+  the sidebar, which keeps its own 264px, then a button named Close navigation, 12px past the panel's end edge and 6px
+  below the window's top (its safe-area inset beneath), on `panel`, which spreads the dialog's `closeButton` and so
+  closes it. At `Tablet` the panel sits beside the rail, which stays in
+  the frame. Below 48rem its padding is the screen's safe-area insets. It slides in from the start, a
+  150ms transition of `translate` from `starting:` styles, mirrored in right-to-left and off for
+  reduced motion; closing is instant, since the dialog is not animated.
+
+  Focus follows the dialog's configuration and the framework. The page gives the dialog's model a `focusSelector`,
+  `currentSidebarRowSelector` from `sidebar.ts`, so opening the drawer focuses the sidebar's current row, and the first
+  focusable element in the drawer when no row is current. Closing it, by Close navigation, the backdrop, or Escape,
+  returns focus to the element that had it when the drawer opened, the navigation button when that opened it.
+
+  The `aside` is `{ label, view, isOpen, dialog }`, lent the same way from the page's own bound dialog. At
+  `Split` the shell puts `aside.view` in the card and never calls `aside.dialog`. At every other
+  viewport it calls it, and while the dialog is visible it is a `dialog` element like the drawer's,
+  with a backdrop, and a panel holding an `sr-only` `h2` named by the `label`, "Thread" or "Member details",
+  which names the dialog, then `aside.view`. The look is by viewport: floating at `Desktop` and `Tablet`, filling the window at
+  `Phone`.
+
+  The dialogs are the framework's, so each gets what a dialog gets: focus is trapped in it and
+  returns to where it was when it closes, the rest of the window is inert, Escape closes it, and
+  so does a click on the backdrop. The page closes the drawer itself when a destination is picked, and
+  when the window grows to `Desktop`; it opens and closes the side pane's dialog as the thread opens
+  and closes, and as the window crosses 80rem. Without a `menu` there is no button and no drawer at
+  any viewport, and below `Desktop` the sidebar is simply absent.
+
+  The rest of the window is inert while a dialog is open, so a toast could not be read or dismissed
+  behind it. The `notices` are inside whichever dialog is open, after its panel, above the backdrop
+  and in the focus trap, and last in the frame when neither is. Nothing else about the notices
+  differs: the stack is fixed, so it is in the same corner of the window in both places. The shell
+  decides from the `isOpen` of the two dialogs, which it reads from the page and not from the
+  render it hands the dialog's view, because it builds the frame outside that render.
+
+  The `dialogs` are dialogs of the page's own that are not the shell's, such as a search or a form
+  in a modal: each is the view of a `DialogBlock` the page binds, embedded with its own `toView`,
+  which renders its `dialog` element with nothing in it while it is closed. The shell renders them
+  last in the frame, after the notices and so over the drawer and the side pane, at every viewport.
+  A dialog the framework opens has to be in the document, and a page that embedded one in the
+  sidebar or in a main pane would have none to open whenever the sidebar is in the drawer and shut,
+  or the pane is not the one shown. The notices do not move into these dialogs: the rest of the
+  window is inert while one is open, so a toast that arrives waits in the frame until it closes.
+
+  The workshop's frames pass `viewport: "Split"` and a side pane whose `dialog` renders nothing, so
+  they show the rail, the sidebar, and the side pane in place, and no dialog: both are window-level
+  overlays, so look at them in the app, resizing the browser window. One frame is the exception: it is at `Tablet`
+  and lends the shell a drawer over a real dialog, which opens inside the frame, since the frame contains its layout.
+  It shows the navigation button and its `aria-expanded`, the drawer focusing the current row, and Close navigation.
+
+### `@amends-dev/design/rail`
+
+- `rail(h, { brand, items, search?, footer, account? })` is the column of global destinations, a `nav` named
+  Destinations, 52px wide. The `brand` is `{ label, onClick? }`, the logo over the seam, cut out of the canvas the
+  rail lies on, that is a button named by `label` when it has an `onClick`, whose patch lifts when hovered, and an
+  image of that name otherwise. Each
+  of `items` and `footer`, the second at the bottom, is `{ icon, label, isCurrent, onClick }`: a
+  40px button of the icon alone, named by `label`. The current one is `aria-current="true"`, filled
+  `rail-selected`, with the `indicator-bar` at its left edge. The optional `search`, `{ label, onClick }`, is
+  the way to search, which is not a destination: a `mark-search` button last among the `items`, at the same
+  spacing as they are, as the mock draws it, and never current. The optional `account`, last of all
+  under the `footer`, is a `railAccount`.
+- `railAccount(h, { name, initials, header?, groups, embed })` is the person at the foot of the rail: their `initials` in a
+  `mark`, in a 40px target like the destinations, on a button named "Account: {name}", which opens a `menu` of the
+  `header` and `groups` to the right of the rail, with its end at the button's (`right-end`).
+
+### `@amends-dev/design/sidebar`
+
+- `sidebar(h, { label, header, children, footer? })` is a `nav` named by `label`, 264px on `panel`, and no wider than
+  the window less 7.25rem, so that the drawer at a narrow phone leaves room for its Close navigation button past its
+  end: the `header` above the `children`, which scroll, and the `footer` below them. It says `data-sidebar`, which
+  `currentSidebarRowSelector`, exported beside it, goes by: it selects the button of the sidebar's current row, the item
+  or the title of a section whose list shows, for a dialog that holds the sidebar to focus when it opens, as the page
+  gives the drawer's dialog. A plain row that only says where the person is cannot be focused and is not selected.
+- `sidebarHeader(h, { mark, name, onClick, search? })` is the 96px header, 104px on touch, as tall as
+  a pane's, with
+  a line under it: the workspace as one button that sends `onClick`, such as the way to the person's other workspaces,
+  across the header's width and named by the workspace's `name`. It holds a 28px `mark` of the `mark` letters, the `name`
+  at body size in medium weight, and a 14px chevron at the end in `ink-secondary`, which turns `ink` while the button is
+  hovered. The mark and the chevron are hidden from assistive technology. When there is a `search`,
+  `{ label, shortcut?, onClick }`, a full-width button in `search` under the workspace's, named by `label`, with the
+  `shortcut` shown at its end and hidden from assistive technology.
+- `sidebarSection(h, { label?, onTitleClick?, isTitleCurrent?, actions?, children })` is a group of items. A `label` is an `h2` in
+  `meta` size, uppercase, in `ink-muted`, with icon-only `actions` at its right, such as compact
+  `iconButton`s; on touch the heading is 44px tall, as they are. With an `onTitleClick` the title is a button, inside the
+  heading, that opens the full list of what the section holds, and it covers the whole heading but the actions; while that
+  list shows, `isTitleCurrent`, the button is `aria-current="page"` in `ink` and the heading is filled `selected` with the
+  `indicator-bar`, as a current row is. A group without a label is the list alone, as a sidebar's first is. Sections sit 22px
+  apart. `children` are `sidebarItem`s or a `sidebarEmpty`; a section with none at all, as one still loading has, is its
+  heading and actions alone, with no list.
+- `sidebarItem(h, { icon?, mark?, status?, label, count?, countName?, activity?, activityMotion?, isPending?, isUnread?, isCurrent, onClick, children? })` is a
+  38px row, 44px on touch, one button: an `icon`, or a `mark`, `{ text, tone? }`, on a 24px square for a
+  person or an agent, then the `label` in `ink-secondary` and a `count` in a badge at the end. A `status` is how the item
+  stands: the patch on its mark, cut out of the row's own fill, so that `status-knockout` is `hover`'s while the row is hovered
+  and `selected`'s while it is current, or, for an item with an `icon` or no mark, the status's shape alone, 9px, at the
+  row's end before the count. An `activity`, such as "Working in #design", is what an agent at work is doing: the row shows
+  the logo's mark (`activityMark`, 0.875rem) at its end, in `ink-secondary`, moving as `activityMotion` says (`working`
+  unless given, `thread` while the turn waits, `tug` while it stops), and the words only name it. A row that
+  says it by a `status` of kind `available` has the filled square on its mark instead, with the words in its tooltip. A row that
+  `isPending`, as a group still being created is, says "Sending…" at its end at `meta` size in
+  `ink-muted` in place of those and the count; a pending row has no count, activity, or status shape. A row that
+  `isUnread`, for what has activity the person has not seen, reads its label in `ink` and medium weight and ends in a 7px
+  round dot of `indicator`, hidden from assistive technology, in the count's place: a row with a count shows the count and
+  no dot, and a pending row neither. The button is named by
+  the label and then the status's label, "Atlas, Needs setup", or, with no status, the activity's words, "Atlas, Working in
+  #design", and described by the count, "Sending…", or "new activity" for the dot. A count is a bare number to the eye, so `countName` says what it
+  counts, as `apps/ui` does, and the row is described by the number and the name, "5 unread" for the inbox, "5 to
+  triage" for Triage, and "2 for you" for a group; a row that gives none is described by the number alone. The current row is `aria-current="page"`, filled `selected`, in `ink`
+  and medium weight, with the `indicator-bar`. `children` are `{ icon?, taskStatus?, label, isCurrent, onClick? }`
+  rows under it at hint size, 32px, 44px on touch, indented and joined to it by a dashed connector in `stitch`,
+  such as a group's open thread. A thread that tracks a task gives its `taskStatus`, `{ shape, label }`: the drawing of
+  `taskStatus` at 0.875rem, hidden from assistive technology, in place of the `icon`, with the status's `label` and a
+  comma before the row's own label, in an `sr-only` span, so that a reader hears "Doing, Composer paste crash"; a row
+  with an `icon` and no `taskStatus` draws the icon, as a thread with no task draws the message icon. A row with an
+  `onClick` is a button; one without is a plain row, a
+  `span` with the same look and no hover, pointer, or focus ring, that says where the person is, and
+  is `aria-current="page"` while it is current.
+- `sidebarSections(h, children)` is the column of `sidebarSection`s a Block renders for the sidebar,
+  with 22px between them, the gap the sidebar's own body puts between its sections, so a Block's
+  sections lie among the sidebar's own. `children` may also hold what comes with them, such as a
+  notice above them or a form below.
+- `sidebarEmpty(h, text)` is a quiet line for a section with no items, in the items' place.
+- `sidebarFooter(h, children)` is the strip at the bottom of the sidebar, under a line.
+
+### `@amends-dev/design/pane`
+
+The third and fourth layout patterns share one structure.
+
+- `pane(h, { variant, label?, header, toolbar?, body, anchor?, followsEnd?, footer? })` is a column of a header, a `body` that
+  scrolls, and a `footer` that stays in place. The `toolbar`, for a list, is what stays under the header while the body
+  scrolls: a `paneToolbar`, then, over a list, the `summary` line and the `columns`. The body then starts flush under it,
+  with no padding above, so the first row is the one under the column labels. The `"main"` variant is the page's `main` landmark,
+  its title an `h1` at title size; the `"side"` variant is an `aside` named by `label`, its title an
+  `h2` at body size, in medium weight. A `label` names the main landmark too. The main pane has the `id` that
+  `mainPaneId` exports, `main-pane`, and `tabindex="-1"`, which is where the shell's Skip to content link goes: it can be
+  given focus without being a stop in the tab order, and it draws no outline when it has focus. The body's first element rests against
+  the header, unless the `anchor` is `"bottom"`: a conversation takes that, so that where it is shorter than the
+  body it rests against the footer's composer, as `apps/ui`'s timeline does, and where it is taller the body
+  scrolls as any other does, because the element's top margin is automatic (`mt-auto`), which is no space once there is
+  none to spare. The body is then a column whose children keep their own height, and says `data-anchor="bottom"`, so
+  that a program that keeps a conversation at its end finds the body that scrolls it from a message list in it. A body
+  that begins at its start but whose content a program keeps at its end as it grows, such as a turn's log, says
+  `followsEnd`, which draws it as any body is and says `data-follows-end`, so that the program finds it the same way.
+- The `header` is `{ title, icon?, taskStatus?, mark?, status?, context?, phoneContext?, leading?, actions?, tabs?, subtitle? }`,
+  96px tall, and 104px below 64rem, so the main pane's, the side pane's, and the sidebar's line up: a 60px
+  row, then the `tabs` or a `subtitle`. In the row, `leading` is a control that brings its own
+  spacing, such as `paneBack`, then the title with an `icon`, a `taskStatus`, or a `mark` before it and
+  `context` after it in `ink-secondary`, and `actions` at the right. The `taskStatus` is a task's status drawn at 1rem
+  as `apps/ui`'s task pane draws it (see `mark`), and an `icon` takes its place if both are given. The `mark` is a `mark`'s letters and
+  tone, `{ text, tone? }`, the 24px square for a person or an agent that a page about one shows in place of
+  an icon, and its `status` is the patch on it, as a sidebar row's is, with its tooltip below the mark, since the
+  header is at the window's top, and which an `sr-only` word after the title says too. The `phoneContext` is a quiet line under the title below 48rem only, such as the
+  workspace's name, which a phone's row has no room for beside the title; from 48rem it is not shown, and a
+  title with one stacks over it there. The main pane's row starts 40px
+  further in below 64rem, for the shell's navigation button over it; its tabs and subtitle keep the pane's
+  gutter, and the side pane's row is not moved. The line under the header is drawn inside it, so the
+  current tab's bar sits over the line. A `subtitle` shows only when there are no `tabs`: words, or an array of pieces,
+  such as an agent's name and its `turnStatus`, laid side by side 10px apart and level with each other.
+- `paneToolbar(h, { start, end? })` is the row at the top of a `toolbar`: the `start` controls, a `searchField` and the
+  menus that narrow the list, then, at the end, the actions on it, such as a sort and a `button` that adds to it. It is one
+  row where the search gives way first; below 48rem it wraps, the search a line of its own and the actions at the start
+  of the line under the filters.
+- `paneToolbarStack(h, children)` holds the pieces of a `toolbar` as one element, 12px apart as the toolbar keeps them,
+  for a Block whose view is given one element to return and draws the toolbar of a pane that another draws.
+- `paneTabs(h, { label, tabs })` is a `tablist` named by `label` of `{ label, count?, isCurrent,
+onClick }` tabs: buttons that are `aria-selected`, the current one in `ink` and medium weight with
+  a 2px `indicator` bar under it. The tab is named by its label and described by its `count`, which
+  shows in a badge after it. Tabs are all in the tab order; arrow keys do not move between them.
+- `paneEmpty(h, { art, title, copy?, action?, level? })` is what a pane's body says when it has nothing to
+  list, a centered column 64px under the header and 20rem wide at most: the `art`, a `StateArtKind` drawn by
+  `stateArt` in `ink`, or `"working"`, the logo at 3.5rem in its working motion, for what is waited on, then the
+  `title` as an `h2` at item size in medium weight, under the
+  pane's `h1`, and the `copy` under it at hint size in `ink-muted`, a string or several, each a line of its own, then
+  the `action`, such as the `button` that does what the copy says, 12px below. The art is hidden from assistive technology; the column of a working one is
+  a live region, a `status`, so that its title is announced. A centered screen uses it
+  too, for what it has nothing to show of (see `centered`); with `level: 1` the title is an `h1`, for a screen
+  whose message is all it has.
+- `paneColumn(h, children, options?)` is the one column of a pane's body, its sections 40px apart, with
+  nothing beside it. By default it keeps a measure of 42.5rem (`max-w-170`), the right width for what
+  is read and filled in: a page about one item, such as the settings, and a connection's form.
+  `options.isWide` drops the measure, so the column spans the pane, which is right for a list or a
+  table: the group's threads, the groups to browse, the inbox's rows, and the tasks' table, whose
+  three cells would be squeezed inside the measure until their titles truncate. The side panes keep
+  the measure.
+- `paneSection(h, { title, trailing?, hasStitch?, children })` is a section of that column, a `section` named by
+  its title: the title as an `h3` at item size in medium weight, with the `trailing` pieces after it on
+  the same line, such as `sending` or a `badge`, then the `children` in a column 12px apart. With
+  `hasStitch` the heading is a line of its own, 32px tall, with a dashed `stitch` rule running from the
+  title to the pane's edge, hidden from assistive technology, as the sections of a page about one item
+  are set apart.
+- `paneForm(h, { title, onSubmit, hasStitch? }, children)` is a section of that column that is one form, named
+  and titled alike: a `paneSection` of the `title` holding a `pane` `form` of the same name that
+  sends `onSubmit`, with the `children`, its fields and buttons, in the form's column. The section
+  is a region and the form a landmark, both found by the `title`. It takes the section's `hasStitch`.
+- `paneStack(h, children)` is the body of a side pane that is about one thing, such as a task: its properties, its
+  description, and its activity, one under the other, 28px apart as `apps/ui`'s task pane sets them, with nothing beside
+  them and no measure, since the side pane is narrow.
+- `paneClose(h, onClick, label?)` is the side pane's close button, an `iconButton` named Close, or by `label` for what
+  it closes, such as "Close task" or "Close thread", for the header's `actions`. It shows from 48rem; below that the
+  side pane is full screen and has `paneBack`.
+- `paneBack(h, onClick, label?, options?)` is the side pane's Back button, an `iconButton` named Back, or by `label` for where
+  it goes back to, such as "Back to Members", for the header's `leading`, pulled to the pane's edge. It shows below 48rem only. Page code gives the two the same
+  message, so each way out of the side pane does the same. With `options.isAlways` it shows on every layout, as
+  `apps/ui`'s `Pane.Back always` does for the way from a turn's log back to its thread, which is not the way
+  `paneClose` leaves the pane by; it then sends its own message.
+
+### `@amends-dev/design/details`
+
+What a pane says about one thing.
+
+- `detailList(h, items)` is a definition list of `{ label, value }` items, the `value` text or any
+  `Html`: two columns, each `label` at hint size in `ink-muted` at least 5rem wide before its value at
+  item size in `ink`, rows 8px apart.
+- `properties(h, { label, children })` is the properties of one thing, such as a task's status, assignee, and priority, in
+  two columns of equal width 24px apart and rows 4px apart, a `group` named by `label`, as `apps/ui`'s task pane sets
+  them; a third lies under the first. Each of the `children` is a `property`.
+- `property(h, { caption, isCaptionHidden?, children })` is one of them: its `caption` at `meta` size in capitals, in
+  medium weight and `ink-secondary`, 5px above its `children`, such as a `propertyValue`, a `propertyMenu`, or a
+  `description`. The caption is read to assistive technology, unless the control under it names itself by it, as a
+  `propertyMenu` does: `isCaptionHidden` hides it there, which would otherwise say it twice.
+- `propertyValue(h, { before?, text })` is the value of a property that is read and not changed, in the look of the
+  quiet button of a `propertyMenu`: `hint` size in `ink-secondary`, 32px tall (44px on touch) and level with the words
+  of that button, 3px in as they are, with what comes `before` the `text` (a `taskStatus`, a `mark`, a `propertyIcon`)
+  8px from it.
+- `propertyIcon(h, name)` is an icon before a property's words at 15px, as `apps/ui` draws the people icon for an
+  assignee that is no one, hidden from assistive technology. A `propertyMenu` draws its `buttonIcon` with it.
+- `activityList(h, { label, lines })` is where an agent is at work, a `ul` named by `label`, a line for each of the
+  `lines`, `{ key, state, motion, place?, action? }`, as `apps/ui`'s agent page lists the turns in progress: the logo at
+  0.875rem moving as its `motion` says, hidden from assistive technology, and the `state` after it, "Working", at
+  `hint` size in `ink-secondary`, then the `place`, "#general", in medium weight at item size, 10px on, unless the line
+  has none, as a turn has until its group is read. A line with an `action`, `{ name, onClick }`, is one button, as
+  `apps/ui` makes each line a link that opens the turn's log: 6px wider than its words on each side (`-mx-1.5 px-1.5`),
+  2px taller (`py-0.5`), filled `hover` while it is hovered, with the focus ring inside it, and named by `name`, such as
+  "Working in #general: open its log", which replaces the words inside it. A line with no action is text.
+- `person(h, { mark, markSize?, name, detail? })` is one person or agent alone, not in a list: their `mark`, 40px
+  unless `markSize` says otherwise, beside the `name` at item size in medium weight over the `detail` at hint
+  size in `ink-secondary`, such as "Workspace owner" or "Person · Active". The mark is hidden from assistive
+  technology; the name and the detail are read as text.
+- `badge(h, { label, tone? })` is a small inline mark of how something stands, 20px tall, at `meta`
+  size in medium weight. `tone` is `"neutral"` (the default) on `subtle`, or `"success"`, `"caution"`,
+  or `"danger"` on its own surface and text with a 1px border.
+- `turnStatus(h, state)` is where an agent's turn stands, as `apps/ui`'s `TurnStatus` draws it: a quiet tile 22px
+  tall on `subtle`, at `hint` size in medium weight, with the state's mark at 0.875rem and its word 5px after it. A
+  `TurnState` is `"queued"`, "Queued", with the logo drawing its thread through; `"working"`, "Working", with the
+  stitches lit; `"stopping"`, "Stopping…", with the patch tugged; `"done"`, "Completed", with a check; `"failed"`,
+  "Failed", with a warning, in the caution colors, outlined and not filled so that its text keeps its contrast; and
+  `"stopped"`, "Stopped", with a dash. The logo is cut out of the tile's own surface, and the marks are hidden from
+  assistive technology, since the word says it. The tile is a live region (`role="status"`), so that a state that
+  changes is announced.
+- `turnActivity(h, { state, label })` is where an agent is at work, quietly, as `apps/ui`'s `TurnActivity` draws it
+  under a message: the state's mark at 0.875rem, the same as `turnStatus`'s, then the `label`, such as "Yumi working", 5px
+  after it at `hint` size in `ink-secondary`, with no tile behind it and no live region. The logo is cut out of the
+  surface behind it, `status-knockout`, which a message that is current sets to its own fill.
+- `entryList(h, { label, children })` is a `ul` named by `label`, a column with no list style, of
+  `entry`s. It is for lists of people and of what stands for them, such as a workspace's members, the invitations
+  waiting, a group's members, and the channels a workspace brings conversations in from.
+- `entry(h, { key, mark?, title, trailing?, children? })` is one item of it, keyed by `key`: the `mark`
+  letters, the `sm` mark, at the start when it has them, then a column of the `title` at item size in
+  medium weight with the `trailing` pieces after it, wrapping onto a new line when they do not fit,
+  such as a `badge`, a `hint`, or `sending`, and under it the `children`, 8px apart, such as a failure
+  and a `buttonRow`. A row has 8px above and below. Given `onClick`, the whole entry is one
+  button that sends it, with `key` as its id so that a field can name it as its active descendant,
+  filled `hover` on hover and 12px in from the list's edge, and it has no `children`, since a button
+  holds no buttons. The button is named by what is in it, its title and its trailing pieces. With
+  `isActive` it is filled `selected` and is `aria-current="true"`: the entry the person has reached with
+  the arrow keys of the field above the list, whose focus stays in the field, and would open with Enter.
+  (`aria-selected` is not for a button, so the entry says it is current, as the sidebar's and a
+  message's current rows do.)
+
+### `@amends-dev/design/message`
+
+What a conversation is made of.
+
+- `messageList(h, { label, id?, children })` is an `ol` named by `label`, a column with no list style, of
+  `message`s, `notification`s, `divider`s, `event`s, `note`s, and `turnRow`s. Given an `id`, a Command can find
+  the list to keep the pane that scrolls around it at its end.
+- `message(h, config)` is one row of it, keyed by `config.key`: the author's `mark` letters at 32px,
+  then a column of the author line, the text, and what lies under it. Given the `authorId` of the member who wrote it
+  and `profiles`, a `ProfileOpener` (see `profile`), the author is a button that opens their card and the mark opens it
+  too, as `apps/ui`'s message does, and each mention in its text is a button that opens the card of the member it names;
+  a row given only one of them opens none, and a stacked message has no mark or author line to open one from, though
+  its mentions open cards. The mark is on the `slate` ground of a person,
+  or the `lilac` of an agent when `isAgent`, whose name is then in the agent's color (`text-agent`), as `apps/ui` draws
+  both. The author line is the
+  `author` at item size in medium weight, the `time` after it at `meta` size in `ink-muted`, already
+  formatted, and a `note` after that as ` · ${note}`, such as "Sending…"; `actions` are
+  quiet buttons at its end, such as Edit and Delete. The `text` is at body size, a `MessageText` (below), and `body` takes
+  its place, such as the form that edits it. While `isEdited`, " (edited)"
+  follows the text at `meta` size in `ink-muted`, as `apps/ui`'s timeline has it: after the last block of markdown, on
+  a line of its own. `meta` is a column of what belongs to the message, 4px apart and 2px under the text,
+  each at the column's start: a `taskChip`, then the `repliesButton` or the `replyInThreadButton` that opens its thread.
+  `isCurrent` fills the row
+  with `selected`, draws the `indicator-bar` at its start as the sidebar's current row has, and makes it
+  `aria-current="true"`; a logo drawn in the row is cut out of that fill. A row has 10px of space above and below and
+  reaches 12px into the pane's gutter, so the fill of the current row reaches past the text. `attributes` go onto the
+  row, such as the mount that brings the current message into view when its thread opens.
+  - `hoverActions` are `{ icon, label, onClick, description?, isExpanded? }` buttons that float over the end of the message's column,
+    at its top edge, in a `group` named "Message actions", as `apps/ui`'s message actions do: out of sight and out of
+    reach (`opacity-0`, `pointer-events-none`) until the pointer is on the message or the keyboard is in it, so that a
+    pointer finds the reply to a message where it is, and Tab reaches it, since the button is there for it. Each is a
+    compact icon button named by its `label`, described by its `description`, such as the words of the thread it opens,
+    with a tooltip that says the label, and `aria-expanded` when `isExpanded` is given.
+  - A message with `isStacked` follows its author's message just before it, as `apps/ui`'s timeline stacks them
+    (see [`app-v2`](../app-v2/README.md) for when). It has no mark and no author line: the author and the `time` are there for
+    assistive technology only (`sr-only`), and the `shortTime`, such as "10:02", shows in the mark's place, 32px wide
+    and right-aligned, hidden from assistive technology, while the pointer is on the message or the keyboard is in it. Its
+    text sits 6px under the text above it, where the text of a message that stands on its own sits 20px under it, and it
+    has no `actions`.
+- `notification(h, config)` is a row of the same list for a notification, keyed by `config.key` and set
+  like `message`: the `mark` at 32px, which is a `MarkContent` (see `mark`): the author's letters on the ground of
+  their tone, `neutral` unless given and `lilac` for an agent, or, for a notification that has no author to show, an
+  icon such as `message`; then a column of a first line, the place, and the text.
+  The first line is the `author` at item size in medium weight, then the `activity` after it in the
+  same size, weight, and `ink`, such as "Sara" and "mentioned you", and at its end the `age`, already
+  formatted, such as "2m ago" or "Yesterday", at `meta` size in `ink-muted`. While `isUnread`, a round 6px dot of `ink`, hidden from assistive
+  technology, comes before the age, and an `sr-only` "Unread" takes its place for it, so the row is
+  read as unread;
+  a row that is not unread has its `text` in `ink-secondary`, quieter than the first line. The
+  `place` is a line under it at `meta` size in `ink-muted`, saying where the notification comes from,
+  such as "#general" or "Caleb · Direct message", and shows only when given. The `text` is at body size,
+  a `MessageText` (below), always as the preview of its markdown; with `onOpen` it is a button that sends `onOpen`, aligned to the start,
+  underlined on hover, and it is named by the author and the activity together, "Sara mentioned you", by
+  an `aria-label`, with the text's words as its `aria-description`: the first line is where the row says
+  what it is, and the text is what it says. The row has `message`'s spacing and reach into the pane's
+  gutter. `isCurrent`, for the notification whose thread is open, fills it with `selected`, draws the
+  `indicator-bar` at its start, and makes it `aria-current="true"`, as `message`'s current row is. Given the
+  `authorId` of the member who wrote it and `profiles`, the author in its first line is a button that opens their card
+  and the mark opens it too; the mentions in its preview stay chips, since the button that opens the thread holds no
+  other.
+- `MessageText` is what the `text` of a `message`, a `notification`, and a `description` takes: a string,
+  markdown, or `{ deleted }`. A string is words as written, whatever characters it holds, such as a thread's title, which its author
+  wrote as plain text. Markdown, `{ text, mentions? }` as `richText` takes it (below), is a message's text with the
+  members its mentions may name: it shows as `richText`'s blocks, with a mention a chip with the member's current name,
+  in a `message` and in a `description`. A button may hold no block, link, or other button, so a
+  `notification`, a row of previews with a button for its text, shows its markdown as `richText`'s preview, one run
+  of words and mentions. What a text says as words, "@Jamie can you check the composer fix"
+  or "Release notes Shipped it, see the docs", is `messageTextWords`: a button's name when it has no other, and a
+  notification's `aria-description`; it is also what a caller searches or titles by, and what the buttons that open a
+  thread are described by. `{ deleted }` is the words that say
+  a message was deleted, such as "Message deleted", which show in `ink-muted` and in italics wherever the text is.
+- `repliesButton(h, { marks, label, isUnread?, onClick, description?, isExpanded?, working?, typing? })` is what the first message of
+  a thread with replies shows in its `meta`, as `apps/ui`'s replies button does: one button that sends `onClick`, which
+  opens the thread. A dashed `stitch` elbow, drawn as an SVG 18px by 23px with a hairline stroke, hangs from the row's mark
+  to it; then the `marks` of those who replied, each a `MarkContent` on the `slate` ground unless it has a tone of its own
+  (an agent's is `lilac`), at 22px (`choice`) overlapping by 5px, the later on top, up to three and then "+N" for the rest,
+  6px after the last; then the `label`, such as "4 replies", on a tile of `subtle` in medium weight at `control` size
+  (plain text at item size below 48rem), on one line, turning `ink` when the button is hovered, with a 7px dot of `indicator` before it while the replies
+  are unread. After the label come what goes on in the thread, as the button's own words: the `working` agents, each a
+  `{ state, label }` drawn as a `turnActivity`, such as "Yumi working", and who is `typing`, such as "Yumi is typing…",
+  at `meta` size in `ink-muted`. The button is 36px tall with the elbow's end level with its contents, and 44px
+  below 48rem. It is named by its label, with ", unread" after it while the dot shows, and described by `description`,
+  such as the words of the thread, and carries `aria-expanded` when `isExpanded` is given, for the thread being open;
+  the elbow, the marks, and the dot are hidden from assistive technology.
+- `replyInThreadButton(h, { onClick, description?, isExpanded?, working?, typing? })` is what a thread without replies shows in a
+  message's `meta`: a button named "Reply in thread" that sends `onClick`. Where there is no pointer to hover, it shows
+  always, as the words "Reply in thread" in medium weight at `control` size in `ink-muted`. Where there is, the message's
+  `hoverActions` offer the reply and the button is not shown, unless something is going on there: while agents are at
+  `working` or someone is `typing`, as `repliesButton` says them, the button shows them alone, without its words, and
+  carries `data-noted`. It is named "Reply in thread" and described by `description` either way, and carries
+  `aria-expanded` when `isExpanded` is given.
+- `taskChip(h, { shape, status, title, onClick })` is the task a thread tracks, for a message's `meta`, as `apps/ui`'s
+  task reference draws it without its key, which the app's tasks lack: a button that sends `onClick`, 32px tall (44px
+  below 64rem), with a 1px `outline` border on the `panel`, 12px above it, holding where the task stands drawn as
+  `shape` (`taskStatus`, 0.9375rem) 8px before its `title`, which is cut short where there is no room, at `hint` size in
+  `ink-secondary`. It is named by the title and the `status` in words, "Composer paste crash, Doing", since the drawing
+  is hidden from assistive technology.
+- `divider(h, label, options?)` is an item of the list with a dashed `stitch` rule and the `label` in
+  capitals at `meta` size in `ink-muted`: `options.align` is `"center"` (the default), the label between
+  two rules, as a day sets apart the messages after it, or `"start"`, the label before one rule that
+  runs on, as "4 replies" sets apart the replies to the opening message, and "Activity" the activity of a task. The
+  rules are hidden from assistive technology; the label is read as an item of the list.
+- `event(h, { key, text })` is an item of the list that says what happened to the thing the conversation is about, such
+  as "Alex created this task · 10:06 AM": `control` size in `ink-secondary`, the drawing of something new (`mark-new`)
+  before it at 0.875rem, 10px from the words and hidden from assistive technology, as `apps/ui`'s timeline draws its
+  events.
+- `note(h, { key, text, time, dateTime?, title? })` is a quiet line of who took part in the conversation or stopped,
+  such as "Sara followed this thread" or "You stopped following", an item of the list among its messages, as
+  `apps/ui`'s timeline draws its notes: `control` size in `ink-secondary` with the `time`, already formatted, 10px after
+  it at `meta` size in `ink-muted`, in a `time` element that is given the moment it was (`dateTime`) and a longer
+  `title` for a tooltip, when the caller has them. It has 10px above and below, as a message's row does, and draws nothing before its words, which sets it apart from
+  an `event`.
+- `turnRow(h, { key, label, mark, name, status, actions, detail?, detailAction?, problem? })` is an agent's turn where it
+  took on the work, an item of the list among its messages and notes, a `group` named `label` for assistive technology,
+  such as "Atlas's turn", as `apps/ui`'s `TurnRow` draws it: the agent's `mark` at 24px in its lilac tone, the `name` at
+  item size in medium weight in the agent's color (`text-agent`), the `status` after it (a `turnStatus`), and the
+  `actions` at the end, buttons 4px apart. The row has 10px above and below, and is a container: where it is narrower than 22.5rem the actions drop to
+  a line of their own under the name. Under the first line, in line with the name, 4px down, the `detail` says how the
+  turn ended, such as "No reply posted.", at `control` size in `ink-secondary`, with the `detailAction`, a `lineButton`
+  such as Agent settings, at its end, 12px from it, or under it below 48rem, and with no effect when there is no
+  `detail` to hold it; and the `problem` says why a stop or retry
+  did not go through, at `control` size in the caution color, as an alert.
+- `description(h, { text, body?, actions?, profiles?, isCurrent? })` is the text that describes the thing a pane is about, such as
+  a task: `text` at item size in `ink`, a `MessageText`, markdown as the blocks of `richText`, its line breaks kept and
+  a mention in it a chip, as `apps/ui`'s task pane sets it, 11px under the `property` caption above it. `body` takes the text's place, such as
+  the form that changes it, and `actions` are quiet buttons under it, 8px down and level with its words, such as Edit
+  and Delete. `isCurrent` fills it with `selected`, draws the `indicator-bar` at its start, and makes it
+  `aria-current="true"`, reaching 12px into the pane's gutter as a message's row does. With `profiles` each mention
+  in it is a button that opens the card of the member it names. `attributes` go onto it as they go onto a message's
+  row.
+
+### `@amends-dev/design/profile`
+
+The card that a member's mark, name, or mention opens, as `apps/ui`'s `ProfileCard` draws it. This module is the
+surface and the triggers; the Block that holds the card places it against the trigger that opened it, closes it, and
+returns the focus to the trigger.
+
+- `ProfileOpener<Message>` is how a list of rows opens cards, given to `message`, `notification`, `description`, and
+  `richText` as `profiles`: its `scope`, which begins the id of each of its triggers, so that the triggers of one list
+  are told from every other's; its `openTriggerId`, the trigger whose card is open, which `aria-expanded` and the
+  underline say; and `open(memberId, triggerId)`, the message a trigger sends. `profileTriggerId(opener, part)` is the
+  id a trigger has, the scope, "-", and the part, such as `thread-message-1-name`, so that the Block that places the
+  card finds the trigger by id.
+- `profileTrigger(h, opener, { memberId, part, look, isFocusable?, children })` is the element that opens a member's
+  card, with `look` for the classes of what it stands in for, such as the author line's. By default it is a button that
+  Tab reaches, named by `children`, with `aria-haspopup="dialog"` and `aria-expanded` while its card is open, and
+  underlined while it is. It has no border or fill of its own, and shows keyboard focus with the focus ring. With
+  `isFocusable: false` it is a `span` hidden from assistive technology, the mark beside a name, which a pointer
+  reaches and Tab does not, since the name beside it meets it.
+- `Profile` is a member as the card shows them: `name`, `mark` (a `MarkContent`), `kind` (`"Person"` or `"Agent"`),
+  `isYou`, `isFormer`, a `status` (a `MarkStatus`, as `mark` takes it, whose `label` the card says and whose `detail`
+  is why), and for an agent at work a `motion`.
+- `profileCard(h, { profile, actions, onClose, attributes? })` is the card, a `dialog` named by the member's name,
+  320px wide (358px at most on a phone, where it keeps 16px from the window's edges) on the `popover` ground with the
+  `outline` border and the `popover` shadow, square: the mark at 40px with the patch of how they stand but no tooltip,
+  cut from the popover; the name at body size in medium weight; under it what they are, such as "Agent", "Person ·
+  You" for the reader, "Person · Former member" for someone who left, or "Agent · Needs setup" with the status's label,
+  in the caution or danger color for a status that needs attention, and the logo moving before it for an agent at work;
+  and under that `status.detail`, or "No longer in this workspace." for a member who left. A Close icon button ends the
+  first line. `actions`, each a `{ label, onClick }`, are buttons that share the card's width, 8px apart. With no
+  `profile` it says "Profile unavailable", with Close, for a member who cannot be shown. The card does not place
+  itself: `attributes` go onto it, such as its id, its keys, and the mount that anchors it to its trigger.
+
+### `@amends-dev/design/turnLog`
+
+What an agent's turn log is made of in the side pane, as `apps/ui`'s `TurnLogPane` draws it. The pane itself is a `pane`
+of the `"side"` variant titled "Turn log", with a `paneBack` that is `isAlways`, a Stop and a `paneClose` among its
+`actions`, and a `subtitle` of the agent's name and its `turnStatus`; its body says `followsEnd` and holds a
+`turnLogColumn`, and its footer a `turnLogFooter`.
+
+- `turnLogColumn(h, children)` is the column that holds a log's summary, activity, and cards, 20px apart.
+- `turnLogSummary(h, lines)` is what the turn runs on, a box on `subtle` with 12px above and below and 14px at the sides,
+  a line each (`{ text, isCode? }`), 8px apart, at `control` size in `ink-secondary`: where it works, the model, the
+  harness, and the sandbox. A line that is an identifier, such as the model's, says `isCode` and shows in mono.
+- `turnLogActivity(h, { id?, label, children })` is an ordered list named `label` that begins with a `divider` of the
+  same words at the start, as the task pane's activity does, its items 18px apart, oldest first: `turnLogEntry`s and
+  `turnLogResponse`s. Given an `id`, a Command finds the pane body that scrolls it from the list, to keep it at its
+  end.
+- `turnLogEntry(h, { key, title, time, dateTime, timeTitle?, text? })` is one thing that happened, an item of the
+  activity, as a grid of a 5px dot, hidden from assistive technology, the `title` at `control` size in medium weight and
+  `ink`, and the `time`, already formatted, at the end of the line at `meta` size in `ink-secondary`, in a `time`
+  element given the moment (`dateTime`) and a longer `timeTitle` for a tooltip when the caller has one; the `text`
+  is under the title, at `control` size in `ink-secondary`, and breaks anywhere so that a long reason wraps.
+- `turnLogCard(h, { title, mark?, label?, tone?, text?, note, action? })` is a bordered box on `panel` with 12px above
+  and below and 14px at the sides, its pieces 10px apart: the `title` at `control` size in medium weight with a `mark`
+  before it, such as the logo moving while the turn waits, and a `label` at the end of its line at `meta` size, the
+  `text` an agent wrote, as markdown (`richText`) at `body` size, the `note` at `hint` size in `ink-secondary`, and the
+  `action`. With `tone: "caution"` it is on the caution surface and border for what needs fixing, and its note is in
+  `ink`, since `ink-secondary` falls short of contrast there.
+- `turnLogResponse(h, { key, title, label, text, note })` is a response the agent recorded, an item of the activity: a
+  `turnLogCard` of that title, label, text, and note, such as "Reply recorded", "Complete", the markdown, and "This
+  response was posted to the thread."
+- `turnLogProblem(h, text)` is why a stop or retry did not go through, under the rest of the log, at `control` size in
+  the caution color, as an alert, as a `turnRow`'s `problem` is.
+- `turnLogFooter(h, { mark?, action?, text? })` is the line at a log's foot, at least 36px tall, its pieces 12px apart
+  at `control` size in `ink-secondary`: a `mark` of how following stands, `"following"`, the logo working, or
+  `"waiting"`, a clock, each 0.875rem and hidden from assistive technology; the `action` to take, such as a `button`
+  that is `wide` for the one that jumps to the latest or opens the reply; and the `text`.
+
+### `@amends-dev/design/richText`
+
+A message's markdown as elements, as `apps/ui`'s `RichText` shows it. It is the one module here that depends on a
+library, `marked`, at the version `apps/ui` uses, which lexes the text; every token it lexes becomes an element of the
+caller's builder, and no HTML string is ever set on the page.
+
+- `richText(h, config)` renders `config.text`, markdown such as a message's text, in the type around it, as a column of
+  blocks 8px apart with `gfm` and a line break wherever the text has a newline. Its parts: paragraphs; emphasis, strong
+  text, and strikethrough; inline code, in the mono font on `subtle` with a border; code blocks, kept as written in a
+  box that scrolls sideways, with the language as `data-language`; block quotes, a 2px `outline` rule at the start and
+  `ink-secondary` text, holding blocks of their own; bulleted and numbered lists, the numbered from the number the text
+  starts at; task items, a read-only box where the bullet would be, a `checkbox` that is `aria-disabled` and named
+  Done or Not done, with a check drawn in the box when the text says it is done; headings, which keep the text's size
+  and only weigh more, as paragraphs rather than headings of the page; tables, which scroll sideways inside the
+  message when wide, their columns aligned as the text aligns them; rules; links; images; and mentions.
+- Only `http`, `https`, and `mailto` addresses link, in a new tab (`rel="noopener noreferrer"`) with the link's title
+  when it has one; any other link, such as `javascript:` or a relative address, shows its text. An image is never loaded,
+  which would tell its host who read the message: it shows as a link to it, named by its description, or by its
+  address when it has none, and as that name alone when it may not link. Raw HTML shows as written. Entity references,
+  such as `&amp;`, `&copy;`, and `&#169;`, show as the characters they name, except in code, where text is as written.
+- A mention is a link to `member:<id>`, as core writes it, `[@Ada](member:<id>)`. It is a chip, a `span` on `mention`
+  with 3px of space each side and semibold weight, with "@" and the name the member has now among `config.mentions`,
+  each `{ id, name }`, or the name the text recorded for anyone else. It is not a link. With `config.profiles`, a
+  `ProfileOpener` (see `profile`), it is a button, named by the chip's words, that opens the card of the member it
+  names; it is a `profileTrigger` whose part is "mention-" and its number among the text's mentions, counting each
+  one, so that a member mentioned twice has two triggers. Without it a mention is only the chip.
+- `config.isInline` is the form for a preview, one `span` of words and mentions with no layout or formatting: blocks
+  and line breaks are single spaces, a link is its words, an image its description, code its text, and each mention
+  is a chip, and none opens a card. It holds nothing a button may not hold.
+- `richTextWords(markdown)` is the words of that form as one string, for the caller that needs them, such as a
+  button's description or a search: `{ text, mentions? }` as the text a reader hears, a mention as "@" and the name the
+  member has now.
+- `apps/ui`'s `streaming` and `caret`, which close formatting left open at the end of text still arriving and mark
+  where it continues, are not here, since no text in the app arrives that way.
+
+### `@amends-dev/design/composer`
+
+- `composer(h, { id, label, placeholder, value, onInput, onSubmit, submitLabel, formatting?, mention?, onShortcut?,
+suggestions?, attributes? })` is where
+  the person writes a message: a form named by `label` (through `aria-labelledby`, so a lookup by `label` finds
+  the textarea and not the form), a box with a border that darkens while the person writes in it,
+  holding a textarea for `id` and, under it, the send button at the end. The textarea has the
+  `label` for assistive technology and does not show it, shows the `placeholder` while it is empty, has
+  no border of its own, and grows with what is typed between 2.5rem and 15rem. The button is an
+  `iconSubmit` named `submitLabel` showing the `mark-send` icon; it submits the form, which sends
+  `onSubmit`, and it is `aria-disabled` while the `value` holds nothing but spaces. Enter in the textarea sends
+  `onSubmit` too, and the browser does not add a line for it; Shift+Enter adds one, as every key pressed with Shift,
+  Control, Alt, or Meta is left to the browser. The `attributes` go onto the textarea, such as a mount its Block
+  registers. The design does not tell a key pressed while an input method composes text from any other, since
+  Foldkit's key handler gives a key and its modifiers and not the event: a Block that wants those keys left to the
+  input method registers a mount that stops them before the textarea's handler, and passes it here.
+- `formatting`, `{ id, label, isShown, groups, onToggle }`, draws the toolbar of formatting over the textarea and
+  the button that shows and hides it. The toolbar is a `toolbar` named `label` with the `id` given, holding a compact
+  `iconButton` (24px, and 44px on touch) for each button of each of `groups`, in order, each a `{ icon, label, keys?,
+onClick }` named by its `label`, saying its `keys` as `aria-keyshortcuts` (such as "Control+B Meta+B") when it has
+  some, and sending its `onClick`; between one group and the next is a rule 1px wide and 16px tall, hidden from
+  assistive technology. The buttons are not switches: nothing in the toolbar says what applies at the caret. Over the
+  textarea it takes 6px above its buttons and at their sides, and scrolls sideways, without a scrollbar, where the box
+  is too narrow for it. While it is not `isShown` it is `hidden` and takes no room, but stays in the page for the
+  button to control. That button is an `iconButton` named `label` too, with the `type` icon, at the start of the row
+  that ends in Send: a switch, `aria-pressed` while the toolbar is shown, with `aria-controls` the toolbar's `id`, and
+  sending `onToggle`.
+- `mention`, `{ label, onClick }`, adds an `iconButton` named `label` with the `mark-mention` icon after that switch
+  (or at the start of the row, without `formatting`). Both buttons are 32px, and 44px on touch, like Send, which is
+  at the far end of the row.
+- `onShortcut(key, modifiers)` is asked for a key pressed in the textarea with Shift, Control, Alt, or Meta, which the
+  builder otherwise leaves to the browser: a message it answers is sent, and the browser's action for the key does not
+  happen. It is asked for those keys alone; the keys without a modifier are the suggestions' and Enter's. The design
+  does not know which keys mean what: the caller does, and says their names to assistive technology in each button's
+  `keys`.
+- `suggestions`, `{ id, label, items, onKeyDown }`, opens a list of people to mention, or of commands to run, over the
+  box while the caller gives it. The list is a `listbox` named `label` ("People to mention", "Commands") with the `id`
+  given, above the box (the form is `relative`; the list is `absolute`, 4px over it, on `raised` with `shadow-popover`
+  and a border), 16rem wide at most, or as wide as the box when any of its rows has a `description`, and holds a row for
+  each of `items`, in order, as many as the caller gives: an `option` of the person's `mark` (a `MarkContent`, drawn at
+  22px in its tone, so an agent's is lilac) when the row has one and its `name` at the control text size, which is in
+  medium weight and does not shrink when the row has a `description`, a command such as "/follow", after which the
+  `description` is in `ink-secondary` and gives way, with an ellipsis, before the name does. A row is `aria-selected`
+  and on `selected` when its `isActive`, and sends its `onPick`
+  when it is clicked, after which the textarea has the focus again. The textarea says that it completes from the
+  list, with `aria-autocomplete="list"`, `aria-controls` the list's `id`, `aria-expanded="true"`, and
+  `aria-activedescendant` the active option's id (the list's `id`, a hyphen, and the item's `id`). The
+  box keeps the focus while the list is open, and a key pressed in it asks `onKeyDown(key)`: a
+  message it answers is sent, and the browser's action for that key, adding a line or moving the
+  focus on, does not happen. The caller is asked first, so a list that picks on Enter does not send the form; a key it
+  answers nothing for is left to the browser, or sends the form if it is Enter, as is any key pressed with Shift,
+  Control, Alt, or Meta left to the browser. The caller decides what the keys do, such as moving the active row,
+  picking it, or dismissing the list. Without `suggestions` none of this is drawn, and the textarea carries none of
+  those attributes. The builder has no handler that prevents the
+  default action of a mouse press, so a click keeps the focus by returning it to the textarea after
+  the row took it, not by never taking it.
+
+### `@amends-dev/design/toast`
+
+What floats over a window: a refusal in its bottom end corner, for something that went wrong, and a confirmation
+centered at its bottom, for something the person did.
+
+- `toastStack(h, children)` is the column of refusals pinned to the bottom end corner of the window,
+  16px from each edge and 25rem wide at most, with 8px between them, above the panes and the scrim.
+  It is `fixed`, so it stays in that corner wherever it renders, in the shell's frame or inside an
+  open dialog, as the shell places it, or in a centered screen, which has no shell. A frame that shows it apart from a window, as the workshop's
+  do, contains it with `contain: layout`. It is an `aria-live="polite"` region, there before the
+  first toast so each is announced as it arrives. `children` are `toast`s, or a `notice`.
+- `toast(h, { text, detail?, action: { label, onClick } })` is a `role="alert"` card for a refusal, `raised` with
+  a border and `shadow-toast`: the `text` at body size, the `detail` under it at hint size in
+  `ink-secondary`, clamped to three lines, such as the words an action carried, and at the right the
+  `action` as a quiet `button`, such as Dismiss. The person has to read a refusal, so it stays until the app takes
+  it away, when the person dismisses it; the card has no timer of its own.
+- `confirmationStack(h, children)` is the list of confirmations centered at the bottom of the window, as `apps/ui`'s
+  toast region is: `fixed` from edge to edge, 24px above the bottom edge and above any home indicator
+  (`bottom: calc(1.5rem + env(safe-area-inset-bottom))`, which the app's `viewport-fit=cover` gives a value), at the
+  same height over the panes and the scrim as the refusals, one under the other 8px apart with the newest at the
+  bottom, each centered. It is an `ol` named "Notifications" and an `aria-live="polite"` region, there before the
+  first confirmation so each is announced as it arrives, and it lets a click through to the window except where a
+  confirmation is. It is fixed, so the shell places it as it does the refusals, in the open dialog or last in the
+  frame. `children` are `confirmation`s.
+- `confirmation(h, { key, text, action?: { label, onClick } })` is an item of that list and a `role="status"`, not an
+  alert, so it is announced without interrupting the person: a 16px check before the `text`, in a card at least 44px
+  tall and 28rem wide at most (the text wraps within it), `popover` with a border and `shadow-toast`, at control size
+  in medium weight, in `ink`. The one `action`, such as Open, is quiet text after it, 16px from the words, with a
+  `subtle` hover and a focus ring. A confirmation has no Dismiss: the app takes it away when its action is taken and by
+  itself after five seconds, and the card has no timer of its own. The `key` keeps one confirmation's item from
+  another's across renders. Refusals and confirmations are two stacks, so a refusal keeps its corner and its Dismiss
+  beside the confirmations; on a window so narrow that the two meet, the confirmation, which comes later in the
+  document, lies over the refusal until it goes.
+
+### `@amends-dev/design/modal`
+
+What takes the person's whole attention until they finish or cancel, such as a form to start a team
+or a group's settings. It is the look of `@foldkit/ui`'s headless dialog, so the framework keeps
+the `dialog` element, the focus inside it, Escape, the click on the scrim, and the labels.
+
+- `modal(h, render, config)` renders `render`, the `RenderInfo` the dialog's view publishes: nothing
+  but the `dialog` element while the dialog is not visible, and a panel over a scrim while it is.
+  The `config` is:
+  - `title`, which heads the panel and names the dialog, as an `h2` at title size in medium weight,
+    and the optional `context` after it in `ink-secondary`, such as `# general`. They sit in a header
+    60px tall under `px-6` with a line under it, and at its end is a Close button, an icon button of
+    `mark-close`. The optional `tabs`, a `paneTabs`, sit under that row inside the header, as a
+    pane's do.
+  - `closeLabel`, which is what assistive technology calls the Close button, "Close" unless given, such as "Close
+    settings" for a modal that is a group's settings.
+  - `back`, `{ label, onClick }`, for a view the modal moved to, such as the add members view a phone's group settings
+    open. It is a Back button, an icon button of `mark-back` named `label`, such as "Back to members", before the title,
+    and it takes the place of the Close button: the view ends by going back, so there is one way out of it.
+  - `body`, which scrolls, in a column 16px apart. The optional `description` is its first line, at
+    hint size in `ink-secondary`, and describes the dialog to assistive technology, so the Block
+    passes `hasDescription: true` to the dialog's view when it gives one.
+  - `footer`, `cancelLabel`, and `leading`, which are all optional, and make a footer under a line when any is
+    given. Its buttons sit at the end 8px apart: a Cancel that closes the dialog when there is a
+    `cancelLabel`, a secondary button, bordered as the other buttons are and as `@amends-dev/ui`'s is, then the `footer`'s controls, the one the modal exists for last, such as a `submit`. The `leading`
+    controls, such as Back to the step before or an action that opens another dialog, sit at the start, apart from the
+    rest, and `isCancelLeading` puts the Cancel there too, ahead of them, as a confirmation does with the primary
+    action alone at the end. With `isCancelDisabled` the Cancel is dimmed and closes nothing, for a form whose request
+    is on its way.
+  - `onSubmit`, which makes the panel a form that sends it, so a `submit` in the footer sends it.
+    Close and Cancel are `type="button"`, so they close without sending it. Without `onSubmit` the
+    panel is a `div`.
+  - `size`, as `@amends-dev/ui`'s modals have: `"regular"` (the default), 40rem wide and 37.5rem tall, for a dialog of
+    sections, such as a group's settings or the form that creates a group; `"compact"`, 35rem wide and as tall as its
+    content, for a short form or a confirmation, such as the one that changes a name; `"form"`, 40rem wide and as tall
+    as its content, for a form of a few sections, such as the one that sets a connection up; and `"wide"`, 45rem by
+    54rem, for a long form with fields side by side. A panel is never wider than the window less 2rem, nor taller than
+    the window less 4rem. It is `raised` with `shadow-modal` and no rounding, over a `scrim-strong` scrim. Below 48rem
+    every modal fills the window instead, with no shadow, its padding at the top the safe-area inset, and its footer's
+    buttons, at the start and the end, sharing its width, over the safe-area inset at the bottom.
+- `modalFrame(h, render, { size, onSubmit, children })` is the dialog's element, the scrim, and the panel of a `size`
+  around `children`, which `modal` and `palette` both draw with. A `palette` is the one size `modal` does not take.
+- `modalList(h, label, rows)` is for a modal that is a choice among things, such as the integrations
+  a connection can go through. It lists the `rows`, each a `row` of `directory` with no cells, as a
+  list named `label`, and it runs to the edges of the panel: it cancels the body's `px-6` on both
+  sides and its bottom padding, so a row's hover fills the panel's width and the list ends at the
+  footer's line, with a line over it. Whatever comes before it in the body, such as a search `field`,
+  keeps the body's padding and its 16px gap.
+
+A Block uses it in four steps:
+
+- It binds `DialogBlock` from `@foldkit/ui/dialog` as a child, with an `id` for the dialog through
+  `init`.
+- Its update opens and closes the dialog with the Binding's `requestOpen()` and `requestClose()`,
+  and folds the dialog's `Closed` out message into whatever the modal was for, such as dropping the
+  form's content.
+- Its view embeds the dialog after its other markup, with
+  `toView: (render) => modal(h, render, config)`.
+- The control that should take focus when the dialog opens gets `render.initialFocus` through its
+  `attributes`, and a `field` there is given `isAutofocus: false`, since the dialog moves the focus
+  itself.
+
+The groups Block's form for a new team does all four.
+
+### `@amends-dev/design/palette`
+
+A search that jumps anywhere in a workspace, as `@amends-dev/ui`'s Jump to is: a modal near the top of the window that
+has no title to read, only a field, the places that match what is typed, and the keys to use it by. A Block binds the
+dialog and embeds it as it does for a `modal`.
+
+- `palette(h, render, config)` renders `render` in a `modalFrame` of the `palette` size: 40rem wide and 30rem tall, so
+  that it keeps its place as what matches narrows, 12vh from the top of the window, and the whole window below 48rem. The
+  `config` is:
+  - `label`, which names the dialog and the field, as an `sr-only` `h2` of the dialog and the field's label, and `id`,
+    the prefix of the ids of the field's list, which the field controls.
+  - `placeholder`, `query`, and `onInput`, for the field: a combobox of `type="text"` at title size on no box, with a
+    magnifier before it and a Close button, an icon button of `mark-close` named `closeLabel` ("Close" unless given),
+    after it, in a row with a line under it. The `attributes` go onto the field: the dialog's `initialFocus`, the keys
+    its Block answers, which are `answerKeys` of `control` (the palette answers none itself), and the item reached as
+    `aria-activedescendant`.
+  - `sections`, `{ title, items }` each, which the palette draws in the order given as a `group` named by its title,
+    in capitals at meta size in `ink-muted`, over its items. An item is `{ id, label, detail, leading, isActive,
+onClick }`: a line of `min-h-9` (`min-h-11` below 64rem), as an `option` whose `id` the field names, with its
+    `leading` before the `label`, a drawing for a page or a group (`{ icon }`, 16px in `ink-secondary`) or a person's or
+    an agent's mark (`{ text, tone }`, a `mark` of the `choice` size), and its `detail`, a quiet note, at the end, such
+    as "Direct message". The item reached, `isActive`, is `aria-selected` and filled with `selected`; one hovered is
+    filled with `hover`. A click sends `onClick`. The list is a `listbox` named Places.
+  - `emptyText`, which the list says in place of its sections when there are none, as a `status`, such as that nothing
+    matches what is typed.
+  - Under the list, a line of the keys it is used by, `↑ ↓ to move`, `↵ to open`, and `esc to close`, each key in a
+    bordered `kbd`, hidden from assistive technology and from windows below 64rem, where there is no keyboard to press
+    them.
+
+### `@amends-dev/design/tooltip`
+
+The words over a mark whose meaning has no room beside it, as `@amends-dev/ui`'s Tooltip is, made of CSS with no
+Foldkit Block: the popover's showing is the pointer's or the focus's, not the app's state, and a Block bound under a page
+costs the app's types.
+
+- `tooltip(h, { title, detail?, tone?, placement?, children })` wraps `children` in a trigger and gives them a popover:
+  the `title`, such as "Needs setup", in medium weight, with the `detail`, why, in a sentence under it in `ink-secondary`,
+  on a `popover` card with a border and `shadow-popover`, 280px wide at most. A `tone`, `"success"`, `"caution"`, or
+  `"danger"`, colors the title as a status; without one it is `ink`. The popover shows after the pointer has rested on
+  the trigger for 300ms, and also at once while a control inside the trigger has keyboard focus (`:focus-visible`, so
+  a click does not show it), and it is gone at once when the pointer or the focus leaves. It sits above the trigger,
+  6px from it and centered on it, or with `placement: "below"` under it, for a trigger with no room above, such as the
+  mark in a pane's header at the top of the window. The popover takes no pointer events, as in `@amends-dev/ui`, so it
+  cannot be hovered or dismissed without moving away, and it flips to neither side by itself: the caller chooses.
+- The trigger is a `span`, `inline-flex` and `flex-none`, so it can sit inside a link and holds the layout of what it
+  wraps, and it is the `tooltip-anchor` of its popover (see the theme's utilities).
+- The popover is `aria-hidden`: hover reaches no one who is not using a pointer, so the words must reach assistive
+  technology another way, as they do for a mark, whose row is named by its name and then the status's label, and for a
+  control inside the trigger, which has its own label. No `title` attribute is set, which a browser would show a second
+  time.
+
+### `@amends-dev/design/menu`
+
+What opens from a button to choose among things: a filter above a list, a sort, the account at the foot of the rail. It
+is the look of `@foldkit/ui`'s headless menu, so the framework keeps the button's keys, the list's arrow keys, Home and
+End, typeahead by label, Enter, Escape, a click outside, and the focus that returns to the button.
+
+- `menu(h, { trigger, placement?, header?, groups, embed })` builds the headless menu's view inputs and hands them to
+  `embed`, which embeds the Block the page bound. The `trigger` is the button: by default a `choice`, `{ text, name? }`,
+  a secondary button of the current choice's `text` with a chevron, or `{ variant: "plain", name, content }`, a button
+  with no look of its own around its `content`, such as a mark, or `{ variant: "quiet", text, name, before? }`, a button
+  with no border that says its `text` and a chevron after what comes `before` them, which `propertyMenu` uses. The
+  `name` is what assistive technology calls the button when its text says too little, such as "Sort: Latest
+  activity", and a plain or quiet button must have one. The `placement` is
+  where the list opens from its button, `bottom-start` unless given, as `@foldkit/ui` names it: the rail's account is
+  `right-end`, and a filter at the end of a toolbar `bottom-end`. The `groups` are `{ label?, choices }`, each choice
+  `{ value, label, mark?, taskStatus?, isChecked? }`, separated by a line: a choice's `mark`, a `MarkContent`, is drawn
+  at 22px before its label, hidden from assistive technology, for a person, and its `taskStatus` (see `mark`) at 0.875rem
+  in its place, for a status; a group's `label` is a heading above it, a choice with an
+  `isChecked` is one of a group of which one is current, with a check mark while it is `true`, and a choice without one
+  is an action. The `header`, `{ title, detail? }`, is a title over a detail above the first group, with a line under it,
+  as the account's name is over its sign-in address. A choice's `value` is what the Block reports, and each choice of a
+  menu has one of its own.
+- `choiceMenu(h, { choices, value, text?, name?, placement?, embed })` is the toolbar's replacement for a select: a menu of
+  one group of `choices`, each `[value, label]` or `[value, label, mark]`, with `value` checked and its label on the
+  button, or `text` when given, such as "Status" while every status is chosen. A choice with a `mark` is a person: the
+  assignee filter lists Anyone and Unassigned, which have none, and then each person with theirs.
+- `propertyMenu(h, { caption, choices, value, placement?, embed })` is a property of the thing a pane is about that the
+  person changes, as `apps/ui`'s task pane has its status and assignee: the `caption` (see `property` in `details`) in
+  capitals over a quiet button, a trigger with no border at `hint` size, 32px tall (44px on touch), that shows the
+  current one of `choices` and a chevron and opens the menu. The button is pulled back by its padding so its words
+  start where the caption does, and is named "Status: Doing", the caption and the choice, with the caption over it
+  hidden from assistive technology, which would otherwise say it twice. Each choice is `{ value, label, mark?,
+taskStatus?, buttonIcon? }`: its `mark` is a person's, 22px in the list and 24px in the button, and its `taskStatus` a
+  status's drawing at 0.875rem in both; a `buttonIcon` is drawn in the button alone, at 15px, while the choice is
+  current, such as the people icon for Unassigned, which has nothing before it in the list. It is the `menu` with the
+  trigger `{ variant: "quiet", text, name, before? }`, a quiet button with a chevron after what comes `before` its
+  `text`.
+
+A Block uses it in three steps:
+
+- It creates the menu's Block once at module scope, `Menu.create<Value>()` from `@foldkit/ui/menu`, with the choices'
+  values for `Value`, and binds it as a child, with an `id` for the menu through `init`. A Block's ids are for one place,
+  so a menu is rendered once, and a place that shows two has two bindings.
+- Its binding's out message fold answers `Selected({ value })` with what the choice was for, and `Closed` with nothing.
+- Its view calls `menu`, `choiceMenu`, or `propertyMenu` with `embed: (viewInputs) => h.block(Binding.embedView({ slotId, model:
+model.menu, viewInputs }))`.
+
+The list is drawn in the document's portal root, outside the Block that renders it, 6px from its button and 8px from the
+window's edges, flipping to the other side when it does not fit, over a transparent backdrop that closes it. It is 12rem
+wide at least and `popover` on a border, with `shadow-popover`; an item is 32px tall, 44px on touch, filled `subtle` while
+it is active, and a checked choice has its check at the end and says "(selected)" to assistive technology, since a
+headless menu's item is a `menuitem`, which has no checked state. The Block's trigger is `aria-haspopup="menu"` and
+`aria-expanded`, and its list is a `menu` labelled by the trigger.
+
+### `@amends-dev/design/members`
+
+The people of a group: the field that chooses several workspace members, the line that counts the people a group
+holds, and the list of them. The field is the look of `@foldkit/ui`'s headless multi-select combobox, so the framework
+keeps the input, the arrow keys through the list, Enter, Escape, the focus, and the labels.
+
+- `memberPicker(h, config)` is a field of chips under a `label`. The `config` is
+  `{ id, label, isLabelHidden?, placeholder?, locked?, chosen, candidates, query, isOpen, hint?, action?, attributes?, onRemove, embed }`.
+  - The `locked` people, such as the reader as "You", are chips with no button. The `chosen` ones after them are chips
+    28px tall with a 22px mark, their name, and a Remove button named for them, such as "Remove Sara", which sends
+    `onRemove(id)`. Backspace in the empty input sends the same for the last chosen. Chips and input wrap inside a
+    bordered field at least 42px tall, 44px on touch. While the field holds no one but the locked, the input says
+    "Search workspace members…" (or the `placeholder`) behind a search mark, and once it holds a chosen person "Add
+    more…".
+  - Typing narrows the people offered to those who are in neither `locked` nor `chosen` and whose name holds the text
+    typed, whatever its case. The list opens as the field takes focus, and the button at the field's end, named "Show
+    members" or "Hide members" by `isOpen`, shows or hides it. It is as wide as the whole field, not as wide as its
+    input, and 6px under it, headed "Workspace members" with "N available" at its end. Each person is a row at
+    least 48px tall of a 28px mark, their name over "Person" or "Agent", and a plus. Under the people a line says
+    "Select one or more members.", or "No workspace members match." when none match, or "Everyone in the workspace is
+    here." when no one is left to offer. That line is a disabled item of the list, which no key chooses.
+  - The `hint` is a line under the field, in the look of `hint`, that describes the input, such as "3 members,
+    including you." The `action` is a control in a column 88px wide beside the field, level with its top, such as the
+    button that adds who is chosen, "Add" or "Add 2". The `attributes` go onto the input, such as a dialog's
+    `initialFocus` when the picker is the first thing the dialog asks, as in a New message.
+  - A Block creates `Combobox.Multi.create()` from `@foldkit/ui/combobox` once, binds it as a child with an `id` for
+    the combobox through `init`, and folds its `Selected({ value })` out message into the people it holds. A pick
+    does not empty the text the person typed, so the fold also asks the Block to `requestClose()` and `requestOpen()`
+    again, which empties it and leaves the list open for the next. The view embeds the Block with
+    `embed: (viewInputs) => h.block(Binding.embedView({ slotId, model: model.picker, viewInputs }))`. Removing a chip
+    moves no focus, so a Block that wants it back in the input runs its own `Dom.focus` Command on `inputId(id)`.
+  - The list is placed against the field and not the input, so the field carries the id `{id}-input-wrapper` that the
+    combobox places against, and the input's own wrapper another. Both are `memberPicker`'s to set, and a caller does
+    not give them.
+- `memberPickerList(h, config)` is the same field for a phone, where a list that opens over the form has no room. The
+  `config` is `{ id, label, placeholder?, chosen, candidates, query, onQuery, onPick, onRemove }`. The chips, the input,
+  Backspace, and the heading with "N available" are `memberPicker`'s, and the list is always shown under the field, in a
+  bordered panel with no popover, no combobox, and no button to show or hide it. Each person who is not in `chosen` and
+  whose name holds the text typed is a button named by their name and whether they are a person or an agent, at least
+  48px tall, that sends `onPick(id)`; the line under them says the same words as the picker's. There is nothing for a
+  Block to bind: the model holds the text typed and the people chosen, and the Block's update empties the text on a pick.
+- `memberCount(h, count)` is "1 member" or "4 members" at control size in medium weight and `ink-secondary`, before a
+  dashed rule that runs to the end of the line and is hidden from assistive technology.
+- `memberList(h, { label, members })` is the people a group holds as a list named `label`: a row each, at least 40px
+  tall and 56px below 48rem, of a 28px mark in the person's tone, their name in medium weight, a quiet `note` after
+  it, such as "You" or "Agent", below it on a phone, and, where the reader may remove them, a quiet button at the end.
+  A `GroupMember` is `{ key, name, mark, note?, action? }`, and the `action` is `{ label, name, isDisabled?, onClick }`,
+  named by `name`, which begins with the label, such as "Remove Sara". With `isDisabled` the button is dimmed and sends
+  nothing, for a removal that is on its way.
+
+## Tests
+
+`bun run test --project @amends-dev/design` runs the scene tests in happy-dom. They drive each
+renderer family as a person does, through what the app's own tests query: a button by
+`role("button", { name })`, a field by its label, an invalid field's `role("alert")`,
+`aria-invalid`, and description, a switch by its label, a disabled one by its `aria-disabled`, an icon button's `aria-pressed` while it is given `isPressed` and none otherwise, and its `aria-disabled` while it is disabled, which takes no click, the submit one's too, a select's change, a choice's description after its label and a choice that can't be chosen as a disabled option, a link by `role("link", { name })` with its address, its new tab, and its `noreferrer`, a hint and a refusal that describe a select or a textarea as they do a field, a disabled field, textarea, and select, a boxed note by `role("note", { name })` with a line for each reason, in each of its three tones, also when its label is
+hidden, a setting row's label, copy, and action, a button's icon, hidden from assistive technology, the centered screen's
+landmarks, a heading's action on its line, a form by its label, with the pane variant of a form the same; a row by its title and the `id` on its button, and the button of its own beside the row's, which it is not inside, named for the row, disabled alone, and sending its own message, and a list's quiet line, as a `status` while it is read, a compact row's 24px mark, its height, also with a 32px mark, its folded cells' indent, and `aria-current` while its details are open, a section's action, a row with a quiet button and an icon for its mark, a history row by its title, detail, and status as text, its quiet button named for what it acts on, disabled or absent, and its action moved under the status below 48rem, and a footnote by its text; the task list's labels, hidden from assistive technology, in the columns of the rows, with the Status label gone below 64rem and all of them below 48rem, a task by `role("button", { name })` of its title, described by all it says, in a `listitem` of the list named Tasks, its status drawn at 1rem and said in a word, its title quiet once finished, its assignee's mark in its tone or the people icon and Unassigned, its place after the title and under it below 48rem, its activity, its height, `aria-current` on the row open beside the list, and the quiet line that says no task matches; an
+icon by `role("img", { name })` when it has a label and as `aria-hidden` when it has none; the logo the same, with a
+class for each motion and none without one; each state art drawn, hidden from assistive technology, and moving in
+the part its kind moves; the code input's six cells, the digits it keeps, its completion at the sixth, its
+outlined cell and its refusal, and its loading line as a `status`, and an announcement by the `status` that is there while it says nothing and the words once it does; a list that is loading by its `status` line and
+its rows hidden from assistive technology; a rail
+destination by `role("button", { name })` with `aria-current`, and the search beside them, which is never current and
+sends what it is given, and the account at its foot, a button named for the person that opens a menu to the right with their
+name over their address, Appearance, and the rest, whose choice it reports, and that closes on Escape with the focus on its
+button; a menu by its trigger's `aria-haspopup` and `aria-expanded`, its list as a `menu` of `menuitem`s, the current one
+checked and named "(selected)", a choice that closes it and is reported, the arrow keys and Home and End and Enter and typeahead,
+Escape, a click on the backdrop, and the button pressed again, which each close it with the focus back on the button, its
+placement as the anchor its Mount is given, a header with a line under it, a heading over a group, the line between groups,
+and a plain button holding its content; a pane's toolbar by its search found by its label, its menus and its actions at the
+end, kept out of the body that scrolls, which starts flush under it, and a pane without one with its usual padding; a pane
+whose body is anchored to the bottom by the classes that rest its first element there, and says so in `data-anchor`; the quiet
+search by its hidden label, its placeholder and its magnifier, hidden from assistive technology; the theme's two dark
+blocks, which give the same values, by `theme.test.ts`; a sidebar item by its name, which has the status's word after the label, with
+`aria-current` and its count, read as "5 unread" when the row names what it counts, the dot of an unread row, read as "new activity", with its label in ink and medium weight, and no dot beside a count or while the row is pending, the row under it as a button or as a plain row, drawn with the status of a task in place of its icon and a word for it that only assistive technology reads, the working logo at the end of a row at
+work, the shape of a status at the end of a row with no mark, and the sections of
+`sidebarSections` among the sidebar's own, a section's title as a button inside its heading, current or not; a tab by `role("tab")` with `aria-selected`; a pane's
+section by `role("region")` and its `h3`, its trailing pieces and children, and its stitch, hidden from assistive technology, when it has one; a pane header's mark in its tone with its status as the patch, its hover text, and an `sr-only` word, and its phone-only line under the title, its subtitle as words or as pieces side by side, and its Back on every layout when it is always shown; a body that follows its end by `data-follows-end`; a line button as a button that sends its message and reads as part of the line; a turn's detail action at the detail's end and absent without a detail; the turn log's column, its summary with the model in mono, its activity as a list named Activity under its divider with each entry's dot, title, time, and line, its response as a card with its markdown, its cards plain and caution with their mark, note, and action, its problem as an alert in the caution color, and its footer in each of its forms; a pane's empty state by
+its `h2` under the pane's `h1`, or its `h1` with `level` 1, its copy, a paragraph for each line of several, its action, and its art as `aria-hidden`, with a working one in a live region; a detail list's labels
+and values, a value that is a button, a person's mark in its size and tone, hidden from assistive technology, and its name and detail; a badge by its label, and the logo in its motion; an entry list by `role("list")`, an
+entry by its title, its mark hidden from assistive technology, its trailing pieces and its children,
+an entry given a message as the button that holds them, with its key as its id and `aria-current` while
+it is active and not otherwise, a field's keys that `answerKeys` answers, handled, and the others, and
+those with a modifier, left to the browser; a grid's fields found by their labels; a field's `maxLength`; a choice group by `role("radiogroup", { name })` of `role("radio")`s with `aria-checked`, described by its hint, chosen by a click and moved by the arrow keys, and disabled as a whole; the members picker by its combobox found by its label and described by its hint, with the attributes it is given on its input and its placeholder, the locked chip with no Remove button, a chip for each person chosen with a Remove button named for them, the list of those not in the field with how many are available, narrowed by what is typed whatever its case, the line for none matching and for everyone being in, a click and Enter that pick, with the text emptied and the list kept open, Escape that closes it, and Backspace that removes the last chip in the empty field and leaves them while there is text; a count of members in the singular and the plural before a rule hidden from assistive technology; and a list of members by its name, a row each with its note, and a quiet button named for the person, dimmed while it is disabled; the list under a
+field of chips by the label of its search, with no combobox, the people offered as buttons named by their name and kind, how many are available, the
+line for none matching and for everyone being in, a pick that becomes a chip and leaves the list, and Backspace that removes the last chip in the empty
+input and leaves them while there is text; a
+toast by `role("alert")` with its text, detail, and Dismiss, in the stack's live region, and a confirmation by `role("status")` in the list named Notifications, with its check, its text, its one action that takes it away, no Dismiss, and the classes that centre it at the bottom 24px above the edge and any home indicator; a modal by its
+title as a level 2 heading, which names the dialog once a real `DialogBlock` has opened it, its
+context, description, tabs, and footer, the buttons of the footer in the order they sit, the leading ones and a
+Cancel told to lead at the start and the rest at the end, the control given `initialFocus` by its marker, and Close and
+Cancel by closing the dialog without sending the form, a Cancel that is disabled by `aria-disabled` and by closing
+nothing when pressed, the panel's width by its class for each of the three widths, its Close button named by `closeLabel`,
+a Back button named by `back` before the title in place of Close, and a list of rows by its label, a row each
+with its meta as its description, the side and bottom padding it cancels, and the message a row sends; a message by
+its `aria-current`, its note, its edited mark, actions, meta, and body, the words of a deleted one, its markdown as the blocks of `richText`, a string as the words it is, a mention in its text by the chip that holds it,
+its mark on the slate ground of a person and the lilac of an agent with its name in the agent's color, the attributes it is
+given, one stacked under its author's with no mark, its author and time kept for assistive technology and its short time
+in the mark's place, hidden from it, and its hover actions as the buttons of a group named Message actions, named by their
+label, described by the thread they open, out of sight and reach until the message is hovered or focused; a
+notification by its
+text button named by its author and activity and described by its text, its mark by its tone and by the icon that
+takes the place of letters, its place and age,
+and an unread one by its dot, hidden from assistive technology, and its "Unread", a thread's replies button by its
+label, with ", unread" after it while the dot shows, its description, its marks on a person's tone or their own and the count of the rest,
+the elbow and the marks hidden from assistive technology, and the agents at work and who types inside it, a
+Reply in thread button by its name, its description, and the `data-noted` it carries while something is going on there, with its words
+for the touch screen alone, and a task chip by the title and status that name it, its drawing hidden from assistive technology,
+and a divider by its label in the list; an event by its words as an item of the list, with its drawing hidden from assistive technology, and a description by its text, its mention as a chip, its actions, its body in place of the text, and `aria-current` while it is current; rich text by its paragraphs with a line break where the text has one, each form of emphasis and code, a code block as written with its language, quotes, lists numbered from where the text starts, task boxes by role and name, tables and the alignment of their columns, links by their address, target, and `rel`, images as links and never loaded, raw HTML and entity references as text, mentions as chips with the member's current name or the recorded one, and the inline form as one run of words, with `richTextWords` as plain tests; a property group by its label, its captions in capitals, hidden from assistive technology when the control under one names itself by it, a value that is read, and a property menu by the name its caption and its choice give, its icon, mark, or status drawing in the button and in the list, and the choice it reports; a list of where an agent is at work by its label, a line for each place, and the logo in the motion of each state, and a line with an action as a button named by it, that sends its message, 6px wider than its words, with a line with none beside it as text; a task's status in each of its shapes, its size and color, and a pane's header with it before the title, and Close task; a composer by its form, the textarea found by the same label, the placeholder, the attributes it is given, and the
+send button, which is unavailable while the box holds nothing or only spaces, Enter that sends the form and Shift+Enter, Control+Enter, Alt+Enter, and Meta+Enter that
+are left to the browser, and its list of people by the listbox named for it, its options with the active one selected and
+each mark at 22px in its tone, the
+textarea's `aria-autocomplete`, `aria-controls`, `aria-expanded`, and `aria-activedescendant`, a click that picks a
+row, the keys the caller answers, handled, and the others, and those with a modifier, left to the browser, and Enter
+that picks the active row with the list open and sends the form without it, a command's row by its name in medium weight
+and its description after it, and the list of commands, as wide as the box where the people's is 16rem; its toolbar of
+formatting by its role and name, a compact button for each of its buttons, their `aria-keyshortcuts`, the rules between
+groups hidden from assistive technology, the toolbar `hidden` and without the flex that would show it while it is not
+shown, the switch beside Send as `aria-pressed` and `aria-controls` the toolbar, the mention button, and the keys with
+a modifier that `onShortcut` answers, handled, and the others, ignored; a profile card as a dialog named by the member, with the words of what they are for a person, the reader, a member who left, and an agent in each status, the caution color of a status that needs attention, the logo before an agent at work, the mark at 40px with its patch and no tooltip, Close and the actions it is given sending their messages, and "Profile unavailable"; a trigger as a button that sends the member and its own id, with `aria-expanded` while its card is open and an id of its scope and its part, and as a mark that Tab does not reach; the author line and the mark of a message and a notification, and the mentions of a message, a description, and rich text, each opening a card, and none in a preview, a stacked message, or a row that does not say whose it is; a mark as `aria-hidden`, with the patch of every status at every size, its sizes, shape, and color, and its hover text, and with a drawing in place of letters, fitted to its square; a row's status in its name and on its mark, and its two-line cells; a mark stack by its label as a button that sends its message, with every mark it is given at 22px in its tone, hidden from assistive technology, its overlap, its height, and the width below which it is not shown; and the shell's landmarks by role and name: `navigation` for
+the rail and the sidebar, `main`, and `complementary`, with its notices, and by viewport: the sidebar
+in place at `Desktop` and `Split` with no navigation button, and at `Tablet` and `Phone` a button named Open navigation,
+with its `aria-expanded` and `aria-controls`, the sidebar, and at `Phone` the rail, and Close navigation, inside the
+dialog named Navigation once it is visible and nowhere before; the Skip to content link first in the frame at every
+viewport, to the main pane's `id`, which `tabindex` makes a place to put focus; the sidebar's workspace as one button
+named by it, with a 28px mark and a chevron hidden from assistive technology, and `currentSidebarRowSelector` finding the
+button of the current row; a drawer over a real dialog, opening with the focus on that row and closing by Close
+navigation; the side pane in place at `Split` and otherwise inside the dialog named Thread, or by the label it is given, once it is
+visible and nowhere before, which `isAsideInDialog` agrees with at every viewport; the notices' live region once, inside the dialog that is visible and
+in the frame otherwise; and the dialogs it is lent, in the frame at every viewport and last, after the
+drawer's and the side pane's, empty while closed, with the notices left in the frame while one is
+open. They query a class only where a layout is what is under test, such as the classes that fold a
+directory row below 48rem and size its columns by breakpoint, since happy-dom applies no CSS. The
+viewport's decision, `viewportOf`, is a plain test.

@@ -1,9 +1,10 @@
 # @amends-dev/icons
 
 The icons the amends apps draw: Solid SVG components generated from canonical drawings, with their
-raw SVGs and a separate metadata catalog. The [UI package](../ui/README.md) draws every icon it
-shows from here. The package has no runtime dependency beyond its Solid peer, no global styles,
-and no dependency on UI, application contracts, or a host.
+raw SVGs, their path data, and a separate metadata catalog. The [UI package](../ui/README.md) draws
+every icon it shows from the components, and the [design package](../design/README.md) draws the
+workspace app's icons from the path data. The package has no runtime dependency beyond its Solid
+peer, no global styles, and no dependency on UI, application contracts, or a host.
 
 The package is internal to this repository and not published to npm. A workspace uses it by adding
 `"@amends-dev/icons": "workspace:*"` to its dependencies and running `bun install` at the root.
@@ -72,6 +73,18 @@ consumers exclude Solid. Raw assets are available at `@amends-dev/icons/svg/<nam
 copy them to a public location if needed. External images do not inherit the page's
 text color; use Solid inline icons for themed UI.
 
+## Path data
+
+```ts
+import { filledIconNames, iconPaths, type IconName } from "@amends-dev/icons/paths"
+```
+
+`iconPaths` maps each icon name to its path data, the same string as in the raw SVG, for a view
+that draws an icon without Solid, such as a Foldkit renderer. It draws the path under the rendering
+contract above: a 24-unit viewBox, `currentColor` strokes of width 2 with round caps and joins, and
+no fill. The names in `filledIconNames`, `bell-filled`, also fill their path with `currentColor`.
+The module imports nothing, so a consumer's bundle holds only the paths it names.
+
 ## Adding an icon
 
 `drawings/<name>.icon.json` is canonical. Each file contains a shape-based kebab-case
@@ -99,7 +112,7 @@ Search existing names and meanings before drawing another icon.
 
 `bun run --filter @amends-dev/icons generate` validates the entire set before writing, then
 creates `src/generated/*.tsx`, the named-export `src/index.ts`, metadata-only `src/catalog.ts`,
-and `svg/*.svg`. Commit these alongside the canonical drawings. Do not hand-edit
+the path data in `src/paths.ts`, and `svg/*.svg`. Commit these alongside the canonical drawings. Do not hand-edit
 generated outputs. Removing a drawing and regenerating removes its obsolete outputs;
 references to the removed drawing fail validation. `check:icons` compares generated
 bytes and detects extra output files without writing. It runs in `bun run check`
@@ -164,5 +177,5 @@ bun run --filter @amends-dev/ui dev
 ```
 
 `generate` writes the generated files, `check:icons` verifies them without writing, and the tests
-cover the compiler's validation, the components' naming and reactivity, and what consumer bundles
-include. The last command opens the UI workshop for review.
+cover the compiler's validation, the components' naming and reactivity, what consumer bundles
+include, and that the path data matches the raw SVGs. The last command opens the UI workshop for review.

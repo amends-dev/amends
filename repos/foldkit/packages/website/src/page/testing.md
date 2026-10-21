@@ -1,0 +1,58 @@
+# Testing
+
+## Story and Scene {#overview}
+
+Story and Scene test two parts of a Foldkit application. Story calls update directly. Scene enters through the rendered view. Neither test runs a browser or executes the Effects inside Commands, so both stay deterministic and fast.
+
+### Compare the Boundaries
+
+|                | Story                                        | Scene                                              |
+| -------------- | -------------------------------------------- | -------------------------------------------------- |
+| Enters through | A Message                                    | An interaction or lifecycle result                 |
+| Observes       | Model changes, Commands, and OutMessages     | Rendered output, Commands, Mounts, and OutMessages |
+| Best suited to | Update logic, edge cases, and Command wiring | User flows, view behavior, and accessibility       |
+
+### Use Both Boundaries
+
+Use both. Story proves the state machine behaves correctly. Scene proves that a person can reach that behavior through the view.
+
+### Name Test Files by Boundary
+
+Name each file for the boundary it tests:
+
+- `story.test.ts` drives update.
+- `scene.test.ts` drives the rendered view.
+- When one folder has several tests of the same kind, prefix the subject: `login.story.test.ts`.
+- Keep root-level Scene tests for flows that cross pages. Colocate page and Block tests with the code they exercise.
+
+The names stay accurate whether update and view live together or in separate files. See [Project Organization](/patterns/project-organization) for the full layout.
+
+## Story
+
+`story` starts from a Model, sends Messages through update, and keeps Commands as data until the test supplies their result Messages. See the [Story](/testing/story) page for the full API.
+
+### Test a Root or Child Update
+
+Story can test a root update or a child update in isolation. The update function is the contract at either level.
+
+::Snippet{name="counterCommandsTest" label="Delayed-reset Story test"}
+
+## Scene
+
+`scene` renders the view after every step. Locators find elements by role, label, placeholder, and visible text. Interactions invoke the view's event handlers, while cause-named steps supply Subscription, ManagedResource, and CustomElement results. Scene also tracks pending Commands and Mounts. See the [Scene](/testing/scene) page for the full API.
+
+### Test at the Owning Level
+
+Scene can also start at the root or at a child Block. `withViewInputs` adapts a Block view that needs ViewInputs, and `expectOutMessage` checks a child's OutMessage directly.
+
+Choose the level by ownership. Test a Block's rendering, interactions, Commands, and OutMessages at the Block. Test parent folding, lifted Commands, route changes, and parent-computed ViewInputs at the root. Those behaviors cross the boundary and cannot be observed from the child.
+
+::Snippet{name="sceneWeatherFlow" label="Weather search Scene test"}
+
+## Executing Effects
+
+To test a Command's work, execute its Effect with the application's real handler Layer and controlled service providers. The [Commands guide](/core/commands#testing-the-handler-through-its-services) shows an HTTP test that runs the real request, decoding, and result Message mapping.
+
+Choose the lowest service boundary whose behavior the test needs to exercise. If an API service contains authentication or retry policy, retain that service and replace its transport. The same principle applies to Subscription Streams, Mount integrations, and ManagedResource acquisition and cleanup. [Testing through service boundaries](/core/layers#testing-through-service-boundaries) explains how to compose these providers at the application root.
+
+Replacing an entire handler tests a narrower orchestration path and excludes the replaced implementation. Story and Scene already supply results explicitly; execution tests use Effect and Layer composition to run the application's handlers.

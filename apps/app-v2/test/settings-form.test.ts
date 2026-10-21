@@ -53,4 +53,13 @@ describe("SettingsForm", () => {
       Result.fail("Retries needs a whole number.")
     )
   })
+
+  it("tells drafts of a form apart by any field's value", () => {
+    const saved = SettingsForm.draftOf(form, { url: "https://api.example", retries: 3, verbose: true, region: "us" })
+
+    expect(SettingsForm.isSameDraft(saved, { ...saved })).toBe(true)
+    expect(SettingsForm.isSameDraft(saved, { ...saved, url: "https://api.example/v2" })).toBe(false)
+    expect(SettingsForm.isSameDraft(saved, { ...saved, verbose: false })).toBe(false)
+    expect(SettingsForm.isSameDraft(saved, { url: "https://api.example" })).toBe(false)
+  })
 })

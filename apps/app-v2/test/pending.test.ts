@@ -14,7 +14,7 @@ import * as ThreadSync from "@amends-dev/sync/ThreadSync"
 import * as BrowserCrypto from "@effect/platform-browser/BrowserCrypto"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Option, Schema } from "effect"
-import * as Pending from "../src/sync/Pending.ts"
+import * as Pending from "../src/store/Pending.ts"
 
 const { cases } = ReplicaRecord.ReplicaRecord
 const author = {

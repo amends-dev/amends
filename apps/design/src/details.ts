@@ -1,0 +1,370 @@
+/**
+ * What a pane says about one thing: its facts as labelled values, a few properties under a caption each, a mark of
+ * how it stands, where an agent's turn stands, a person it is about, the places an agent is at work, the people and
+ * what stands for them that it lists.
+ */
+
+import * as Button from "@foldkit/ui/button"
+import type { Html, HtmlBuilder } from "foldkit/html"
+import { type IconName, icon } from "./icon.ts"
+import type { LogoMotion } from "./logo.ts"
+import { type MarkContent, type MarkSize, activityMark, mark } from "./mark.ts"
+
+const detailGrid = "m-0 grid grid-cols-[minmax(5rem,auto)_1fr] items-baseline gap-x-4 gap-y-2"
+
+const detailLabel = "m-0 text-hint text-ink-muted"
+
+const detailValue = "m-0 min-w-0 text-item wrap-break-word text-ink"
+
+const propertyGrid = "grid grid-cols-2 gap-x-6 gap-y-1"
+
+const propertyColumn = "flex min-w-0 flex-col"
+
+const propertyCaption = "mb-1.25 block text-meta font-medium uppercase text-ink-secondary"
+
+const propertyValueLook =
+  "inline-flex min-h-8 items-center gap-2 ps-0.75 text-hint text-ink-secondary max-desktop:min-h-11"
+
+const propertyIconBox = "flex size-3.75 flex-none [&>svg]:size-full"
+
+const activityColumn = "m-0 flex list-none flex-col items-start gap-1 p-0"
+
+const activityLine = "flex items-center gap-2.5 text-item text-ink"
+
+const activityButton = "-mx-1.5 cursor-pointer bg-transparent px-1.5 py-0.5 text-start focus-ring-inset hover:bg-hover"
+
+const activityState = "inline-flex items-center gap-1.25 text-hint whitespace-nowrap text-ink-secondary"
+
+const activityPlace = "font-medium"
+
+const badgeBase = "inline-flex h-5 flex-none items-center border px-1.5 text-meta font-medium whitespace-nowrap"
+
+const badgeTones = {
+  neutral: "border-transparent bg-subtle text-ink-secondary [--amends-status-knockout:var(--amends-subtle)]",
+  success:
+    "border-success-border bg-success-surface text-success-text [--amends-status-knockout:var(--amends-success-surface)]",
+  caution:
+    "border-caution-border bg-caution-surface text-caution-text [--amends-status-knockout:var(--amends-caution-surface)]",
+  danger:
+    "border-danger-border bg-danger-surface text-danger-text [--amends-status-knockout:var(--amends-danger-surface)]"
+}
+
+const turnChipBase =
+  "inline-flex min-h-5.5 flex-none items-center gap-1.25 px-2 text-hint font-medium whitespace-nowrap"
+
+const turnChipTones = {
+  quiet: "bg-subtle text-ink-secondary [--amends-status-knockout:var(--amends-subtle)]",
+  caution: "text-caution-text inset-ring-1 inset-ring-caution-border"
+}
+
+const turnMarkIcon = "flex size-3.5 flex-none [&>svg]:size-full"
+
+const personRow = "flex min-w-0 items-center gap-3"
+
+const personText = "flex min-w-0 flex-col"
+
+const personName = "block truncate text-item font-medium text-ink"
+
+const personDetail = "block truncate text-hint text-ink-secondary"
+
+const entryColumn = "m-0 flex list-none flex-col p-0"
+
+const entryRow = "flex items-start gap-3 py-2"
+
+const entryButton =
+  "w-full cursor-pointer bg-transparent px-3 text-start text-ink focus-ring-inset hover:bg-hover aria-[current=true]:bg-selected"
+
+const entryBody = "flex min-w-0 flex-1 flex-col gap-2"
+
+const entryTitleLine = "flex min-h-6 flex-wrap items-center gap-x-2 gap-y-1"
+
+const entryTitle = "min-w-0 text-item font-medium wrap-break-word text-ink"
+
+export type BadgeTone = keyof typeof badgeTones
+
+/**
+ * Labelled values as a definition list in two columns, a `label` before each `value`, 8px apart. A value is
+ * text or any `Html`, such as a link.
+ */
+export const detailList = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  items: ReadonlyArray<Readonly<{ label: string; value: Html | string }>>
+): Html =>
+  h.dl(
+    [h.Class(detailGrid)],
+    items.flatMap((item) => [h.dt([h.Class(detailLabel)], [item.label]), h.dd([h.Class(detailValue)], [item.value])])
+  )
+
+/**
+ * The properties of one thing side by side, such as a task's status and its assignee, in two columns 24px apart and
+ * 4px between rows, a group named by `label`. Each of the `children` is a `property`.
+ */
+export const properties = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ label: string; children: ReadonlyArray<Html> }>
+): Html => h.div([h.Role("group"), h.AriaLabel(config.label), h.Class(propertyGrid)], config.children)
+
+/**
+ * One property: its `caption`, small and in capitals, over its `children`, 5px below, such as a `propertyValue` or a
+ * `propertyMenu`. A control that names itself by its caption, as a menu does, says the caption to assistive
+ * technology already, so the caption is hidden from it with `isCaptionHidden`.
+ */
+export const property = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ caption: string; isCaptionHidden?: boolean; children: ReadonlyArray<Html> }>
+): Html =>
+  h.div(
+    [h.Class(propertyColumn)],
+    [
+      h.span(
+        [...(config.isCaptionHidden === true ? [h.AriaHidden(true)] : []), h.Class(propertyCaption)],
+        [config.caption]
+      ),
+      ...config.children
+    ]
+  )
+
+/**
+ * A drawing before a property's words, 15px, as `apps/ui` draws the people icon for an assignee that is no one, hidden
+ * from assistive technology, since the words say what it does. A `propertyMenu` draws its `buttonIcon` with it.
+ */
+export const propertyIcon = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, name: IconName): Html =>
+  h.span([h.AriaHidden(true), h.Class(propertyIconBox)], [icon(h, name, { size: "sm" })])
+
+/**
+ * The value of a property that is read and not changed, in the look of the quiet button a `propertyMenu` is, its
+ * `text` after what comes `before` it, such as a status's drawing or a person's mark, 8px from it, and level with the
+ * text such a button would hold.
+ */
+export const propertyValue = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ before?: Html; text: string }>
+): Html => h.span([h.Class(propertyValueLook)], [config.before ?? h.empty, config.text])
+
+/**
+ * A small mark of how something stands, 20px tall: `neutral` (the default) on `subtle`, and `success`,
+ * `caution`, and `danger` on their own surfaces with a border.
+ */
+export const badge = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ label: string; tone?: BadgeTone }>
+): Html => h.span([h.Class(`${badgeBase} ${badgeTones[config.tone ?? "neutral"]}`)], [config.label])
+
+/**
+ * Where an agent's turn stands: waiting to start, working, stopping as asked, done, failed, or stopped.
+ */
+export type TurnState = "queued" | "working" | "stopping" | "done" | "failed" | "stopped"
+
+const turnStateWords: Readonly<Record<TurnState, string>> = {
+  queued: "Queued",
+  working: "Working",
+  stopping: "Stopping…",
+  done: "Completed",
+  failed: "Failed",
+  stopped: "Stopped"
+}
+
+const turnStateMotions = { queued: "thread", working: "working", stopping: "tug" } as const satisfies Partial<
+  Record<TurnState, LogoMotion>
+>
+
+const turnStateIcons = { done: "check", failed: "alert-triangle", stopped: "minus" } as const satisfies Partial<
+  Record<TurnState, IconName>
+>
+
+const renderTurnMark = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, state: TurnState): Html =>
+  state === "queued" || state === "working" || state === "stopping"
+    ? activityMark(h, turnStateMotions[state])
+    : h.span([h.AriaHidden(true), h.Class(turnMarkIcon)], [icon(h, turnStateIcons[state], { size: "xs" })])
+
+/**
+ * Where an agent's turn stands, as `apps/ui`'s `TurnStatus` draws it: a quiet tile 22px tall on `subtle`, at `hint`
+ * size in medium weight, with the state's mark 0.875rem before its word, 5px from it. A turn that is under way moves
+ * the logo as the logo does, the thread drawn through while it is `queued`, the stitches lit while it is `working`, the
+ * patch tugged while it is `stopping`, "Stopping…"; one that ended is still, a check for `done`, "Completed", and a
+ * dash for `stopped`. A `failed` turn reads in the caution colors, outlined and not filled so that its text keeps its
+ * contrast, with a warning for its mark. The mark is hidden from assistive technology, and the tile is a live region
+ * (`role="status"`), so that a state that changes is announced.
+ */
+export const turnStatus = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, state: TurnState): Html =>
+  h.span(
+    [h.Role("status"), h.Class(`${turnChipBase} ${turnChipTones[state === "failed" ? "caution" : "quiet"]}`)],
+    [renderTurnMark(h, state), turnStateWords[state]]
+  )
+
+const turnActivityLook = "inline-flex min-w-0 items-center gap-1.25 text-hint whitespace-nowrap text-ink-secondary"
+
+/**
+ * Where an agent is at work, as `apps/ui`'s `TurnActivity` draws it under a message: the state's mark 0.875rem before
+ * the `label`, such as "Yumi working", 5px from it, at `hint` size in `ink-secondary` with no tile behind it. The mark
+ * moves as `turnStatus`'s does, and is hidden from assistive technology, since the label says what it does. The logo is
+ * cut out of the surface behind it, `status-knockout`, which a row that is current sets to its own.
+ */
+export const turnActivity = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ state: TurnState; label: string }>
+): Html => h.span([h.Class(turnActivityLook)], [renderTurnMark(h, config.state), config.label])
+
+/**
+ * One place an agent is at work: the `key` of its turn, the `state` of the turn in words, how its logo `motion` goes,
+ * and the `place`, which a turn has none of until its group is read. A line with an `action` is a button named
+ * `action.name` that sends `action.onClick`, such as one that opens the turn's thread.
+ */
+export type ActivityLine<Message> = Readonly<{
+  key: string
+  state: string
+  motion: LogoMotion
+  place?: string | undefined
+  action?: Readonly<{ name: string; onClick: Message }> | undefined
+}>
+
+const renderActivity = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  line: ActivityLine<Message>
+): ReadonlyArray<Html> => [
+  h.span(
+    [h.Class(activityState)],
+    [h.span([h.AriaHidden(true), h.Class("flex")], [activityMark(h, line.motion)]), line.state]
+  ),
+  line.place === undefined ? h.empty : h.span([h.Class(activityPlace)], [line.place])
+]
+
+/**
+ * Where an agent is at work, named by `label`, a line for each of the `lines`: the logo moving as its `motion` says
+ * and the `state` in quiet text, then the `place` in medium weight, 10px on, unless the line has none. The logo is
+ * hidden from assistive technology, since the state says what it does. A line with an `action` is one button, 6px
+ * wider than its words on each side, filled `hover` while it is hovered, and named by `action.name`, which says what it
+ * does, as `apps/ui` names the link that opens a turn's log: "Working in #general: open its log".
+ */
+export const activityList = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ label: string; lines: ReadonlyArray<ActivityLine<Message>> }>
+): Html =>
+  h.ul(
+    [h.AriaLabel(config.label), h.Class(activityColumn)],
+    config.lines.map((line) => {
+      const { action } = line
+
+      return action === undefined
+        ? h.keyed("li")(line.key, [h.Class(activityLine)], renderActivity(h, line))
+        : h.keyed("li")(
+            line.key,
+            [],
+            [
+              Button.view(
+                {
+                  onClick: action.onClick,
+                  toView: (attributes) =>
+                    h.button(
+                      [...attributes.button, h.AriaLabel(action.name), h.Class(`${activityLine} ${activityButton}`)],
+                      renderActivity(h, line)
+                    )
+                },
+                h
+              )
+            ]
+          )
+    })
+  )
+
+/**
+ * One person or agent, alone and not in a list: their `mark`, 40px unless `markSize` says otherwise, beside their
+ * `name` in medium weight, over a quieter line of what they are, the `detail`, such as who owns a workspace. The
+ * mark is hidden from assistive technology; the name and the detail are read as text.
+ */
+export const person = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ mark: MarkContent; markSize?: MarkSize; name: string; detail?: string }>
+): Html =>
+  h.div(
+    [h.Class(personRow)],
+    [
+      mark(h, { ...config.mark, size: config.markSize ?? "lg" }),
+      h.div(
+        [h.Class(personText)],
+        [
+          h.span([h.Class(personName)], [config.name]),
+          config.detail === undefined ? h.empty : h.span([h.Class(personDetail)], [config.detail])
+        ]
+      )
+    ]
+  )
+
+/**
+ * A list of people and what stands for them, such as a workspace's members and the channels it brings conversations
+ * in from, named by `label`, a column of `entry`s with no list style.
+ */
+export const entryList = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ label: string; children: ReadonlyArray<Html> }>
+): Html => h.ul([h.AriaLabel(config.label), h.Class(entryColumn)], config.children)
+
+/** What an `entry` shows: the `mark` letters, the `title`, and the `trailing` pieces after it. */
+type EntryContent = Readonly<{
+  key: string
+  mark?: string
+  title: string
+  trailing?: ReadonlyArray<Html>
+}>
+
+/**
+ * An `entry` either lists what is under it, its `children`, or is one button that sends `onClick`, which holds
+ * nothing a button cannot, and so has no `children`.
+ */
+export type EntryConfig<Message> = EntryContent &
+  (
+    | Readonly<{ children?: ReadonlyArray<Html>; onClick?: never; isActive?: never }>
+    | Readonly<{ onClick: Message; isActive?: boolean; children?: never }>
+  )
+
+/**
+ * One item of an `entryList`, keyed by `key`: the `mark` letters at the start when it has them, then the
+ * `title` with the `trailing` pieces after it, such as a `badge` or a quiet word, wrapping onto a new line
+ * when they do not fit, and the `children` under it, such as a failure or buttons, 8px apart.
+ *
+ * With `onClick` the whole entry is one button that sends it, with `key` as its id so that a field can name it
+ * as its active descendant, filled on hover. While it `isActive` it is filled with `selected` and is
+ * `aria-current="true"`, for the entry the person has reached with the arrow keys of the field above the list
+ * and would open with Enter. Such an entry holds no `children`, since a button holds no buttons.
+ */
+export const entry = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: EntryConfig<Message>
+): Html => {
+  const content = [
+    config.mark === undefined ? h.empty : mark(h, { text: config.mark }),
+    h.div(
+      [h.Class(entryBody)],
+      [
+        h.div([h.Class(entryTitleLine)], [h.span([h.Class(entryTitle)], [config.title]), ...(config.trailing ?? [])]),
+        ...(config.children ?? [])
+      ]
+    )
+  ]
+  const { onClick } = config
+
+  return onClick === undefined
+    ? h.keyed("li")(config.key, [h.Class(entryRow)], content)
+    : h.keyed("li")(
+        config.key,
+        [],
+        [
+          Button.view(
+            {
+              onClick,
+              toView: (attributes) =>
+                h.button(
+                  [
+                    ...attributes.button,
+                    h.Id(config.key),
+                    ...(config.isActive === true ? [h.AriaCurrent("true")] : []),
+                    h.Class(`${entryRow} ${entryButton}`)
+                  ],
+                  content
+                )
+            },
+            h
+          )
+        ]
+      )
+}

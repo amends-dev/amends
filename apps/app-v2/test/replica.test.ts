@@ -3,7 +3,7 @@ import { ReplicaChange, ReplicaRecord } from "@amends-dev/core/replica"
 import { IndexedDb } from "@effect/platform-browser"
 import { describe, expect, it } from "@effect/vitest"
 import { Arbitrary, DateTime, Effect, Layer, Option, Schema, Stream } from "effect"
-import * as Replica from "../src/sync/Replica.ts"
+import * as Replica from "../src/store/Replica.ts"
 
 const { cases } = ReplicaChange.ReplicaChange
 const records = ReplicaRecord.ReplicaRecord.cases
@@ -118,6 +118,83 @@ describe("Replica", () => {
         expect(yield* now(replica.actions)).toEqual([{ ...action("refused"), rejection: Option.some(error) }])
         yield* replica.dismiss("refused")
         expect(yield* now(replica.actions)).toEqual([])
+      })
+    )
+  )
+
+  it.effect("the tasks come with the threads that track them and those threads' messages, and no other thread's", () =>
+    withReplica(
+      Effect.gen(function* () {
+        const replica = yield* Replica.Replica
+        const tracked = yield* sample("Thread", { id: "thread-1" })
+        const plain = yield* sample("Thread", { id: "thread-2" })
+        const promised = yield* sample("Thread", { id: "thread-3" })
+        const refused = yield* sample("Thread", { id: "thread-4" })
+        const task = yield* sample("Task", { threadId: "thread-1" })
+        const trackedMessage = yield* sample("ThreadMessage", { id: "message-1", threadId: "thread-1" })
+        const plainMessage = yield* sample("ThreadMessage", { id: "message-2", threadId: "thread-2" })
+        const promisedMessage = yield* sample("ThreadMessage", { id: "message-3", threadId: "thread-3" })
+        const refusedMessage = yield* sample("ThreadMessage", { id: "message-4", threadId: "thread-4" })
+        yield* replica.apply(
+          batch(1, [
+            cases.Reset.make({}),
+            ...[
+              tracked,
+              plain,
+              promised,
+              refused,
+              task,
+              trackedMessage,
+              plainMessage,
+              promisedMessage,
+              refusedMessage
+            ].map((record) => cases.Changed.make({ record }))
+          ])
+        )
+        const keysOf = (list: ReadonlyArray<ReplicaRecord.ReplicaRecord>) => list.map(keyOf).toSorted()
+        const read = Effect.map(now(replica.tasks), ({ tasks, threads, messages }) => ({
+          tasks: keysOf(tasks),
+          threads: keysOf(threads),
+          messages: keysOf(messages)
+        }))
+        expect(yield* read).toEqual({
+          tasks: [keyOf(task)],
+          threads: [keyOf(tracked)],
+          messages: [keyOf(trackedMessage)]
+        })
+
+        // The thread of a task an unfinished action creates is read too, until the server refuses the action.
+        yield* replica.hold(action("promised", [yield* sample("Task", { threadId: "thread-3" })]))
+        yield* replica.hold(action("refused", [yield* sample("Task", { threadId: "thread-4" })]))
+        const error = new CoreError.NotFound({ resource: "Thread", id: "thread-4" })
+        yield* replica.apply(batch(2, [cases.Rejected.make({ key: "refused" as never, error })]))
+        expect(yield* read).toEqual({
+          tasks: [keyOf(task)],
+          threads: keysOf([tracked, promised]),
+          messages: keysOf([trackedMessage, promisedMessage])
+        })
+      })
+    )
+  )
+
+  it.effect("a group's threads come with the turns of their agents, and no other thread's", () =>
+    withReplica(
+      Effect.gen(function* () {
+        const replica = yield* Replica.Replica
+        const thread = yield* sample("Thread", { id: "thread-1", groupId: "group-1" })
+        const other = yield* sample("Thread", { id: "thread-2", groupId: "group-1" })
+        const turn = yield* sample("Turn", { id: "turn-1", threadId: "thread-1" })
+        const otherTurn = yield* sample("Turn", { id: "turn-2", threadId: "thread-2" })
+        yield* replica.apply(
+          batch(1, [
+            cases.Reset.make({}),
+            ...[thread, other, turn, otherTurn].map((record) => cases.Changed.make({ record }))
+          ])
+        )
+        const listed = yield* now(replica.threads("group-1" as never))
+        const turnsOf = (id: string) => listed.find((records) => records.thread.value.id === id)?.turns.map(keyOf) ?? []
+        expect(turnsOf("thread-1")).toEqual([keyOf(turn)])
+        expect(turnsOf("thread-2")).toEqual([keyOf(otherTurn)])
       })
     )
   )
