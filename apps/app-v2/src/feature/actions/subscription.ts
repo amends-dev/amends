@@ -39,7 +39,7 @@ const whatEach: Readonly<
   >
 > = {
   ConnectionRenamed: "rename a connection",
-  ConnectionConfigured: "change a connection's settings",
+  ConnectionConfigured: "change a connection’s settings",
   ConnectionRemoved: "remove a connection",
   AgentCreated: "add an agent",
   AgentConfigured: "change how an agent is set up",

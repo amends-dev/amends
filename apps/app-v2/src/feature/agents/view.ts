@@ -291,7 +291,7 @@ const isUnread = (model: Model): boolean => !model.isLoaded && Option.isSome(mod
 const unreadAgents = (model: Model, h: AgentsViewBuilder): Html =>
   paneEmpty(h, {
     art: "came-apart",
-    title: "Couldn't load agents",
+    title: "Couldn’t load agents",
     ...Option.match(model.notice, { onNone: () => ({}), onSome: (copy) => ({ copy }) }),
     action: button(h, "Retry", Message.ClickedRetry())
   })
@@ -476,7 +476,7 @@ const detailsSection = (item: AgentItem, model: Model, h: AgentsViewBuilder): Ht
     hasStitch: true,
     children: [
       detailList(h, [
-        { label: "Role", value: "Changed in Settings › Members, as any member's is." },
+        { label: "Role", value: "Changed in Settings › Members, as any member’s is." },
         { label: "Current activity", value: currentActivity(item, model, h) },
         {
           label: "Created by",
@@ -506,7 +506,7 @@ const readinessNote = ({ agent, pending }: AgentItem, h: AgentsViewBuilder): Htm
     : Agent.Readiness.match(agent.readiness, {
         Ready: () => h.empty,
         Incomplete: ({ issues }) =>
-          noticeBox(h, { title: "This agent can't run as it is set up", lines: issues.map(issueSentence) })
+          noticeBox(h, { title: "This agent can’t run as it is set up", lines: issues.map(issueSentence) })
       })
 
 /** The page of an agent: why it can't run, its name, its setup, its details, and its removal, in one column. */
@@ -549,7 +549,7 @@ const missingAgent = (workspaceName: string, h: AgentsViewBuilder): Html =>
     body: [
       paneEmpty(h, {
         art: "lost-thread",
-        title: "This agent isn't here",
+        title: "This agent isn’t here",
         copy: "It may have been removed, or you can no longer see it.",
         action: button(h, "Show all agents", Message.ClickedBrowse())
       })

@@ -247,9 +247,9 @@ describe("the inbox", () => {
         expect(model.tab).toBe("All")
         expect(shownItems(model).length).toBe(1)
       }),
-      message(Message.FailedRead({ error: "This browser could not read the workspace's copy." })),
+      message(Message.FailedRead({ error: "This browser could not read the workspace’s copy." })),
       model((model) => {
-        expect(model.notice).toEqual(Option.some("This browser could not read the workspace's copy."))
+        expect(model.notice).toEqual(Option.some("This browser could not read the workspace’s copy."))
       })
     )
   })
@@ -258,9 +258,9 @@ describe("the inbox", () => {
     story(
       update,
       given(init(workspace.id, member.id).model),
-      message(Message.FailedRead({ error: "This browser could not read the workspace's copy." })),
+      message(Message.FailedRead({ error: "This browser could not read the workspace’s copy." })),
       model((model) => {
-        expect(model.notice).toEqual(Option.some("This browser could not read the workspace's copy."))
+        expect(model.notice).toEqual(Option.some("This browser could not read the workspace’s copy."))
         expect(model.reads).toBe(0)
       }),
       message(Message.ClickedTryAgain()),
@@ -269,7 +269,7 @@ describe("the inbox", () => {
         expect(model.isLoaded).toBe(false)
         expect(model.reads).toBe(1)
       }),
-      message(Message.FailedRead({ error: "This browser could not read the workspace's copy." })),
+      message(Message.FailedRead({ error: "This browser could not read the workspace’s copy." })),
       message(Message.ClickedTryAgain()),
       model((model) => {
         expect(model.reads).toBe(2)

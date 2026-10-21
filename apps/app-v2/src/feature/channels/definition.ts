@@ -114,7 +114,7 @@ export const destinations = (
 /** A group's name, or that the person no longer sees it. */
 export const groupNameOf = (model: Pick<Model, "groups" | "members" | "memberId">, groupId: GroupId.GroupId): string =>
   Option.match(Option.fromUndefinedOr(model.groups.find((group) => group.id === groupId)), {
-    onNone: () => "a group you don't see",
+    onNone: () => "a group you don’t see",
     onSome: (group) => groupName(group, model.members, model.memberId)
   })
 

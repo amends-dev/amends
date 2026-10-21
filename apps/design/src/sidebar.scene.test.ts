@@ -603,7 +603,7 @@ describe("sidebarItem with a status", () => {
                 status: {
                   kind: "blocked",
                   label: "Unavailable",
-                  detail: "Its integration isn't installed on this host."
+                  detail: "Its integration isn’t installed on this host."
                 },
                 label: "OpenAI-compatible",
                 isCurrent: false,
@@ -622,7 +622,7 @@ describe("sidebarItem with a status", () => {
       expect(
         within(
           role("button", { name: "OpenAI-compatible, Unavailable" }),
-          text("Its integration isn't installed on this host.")
+          text("Its integration isn’t installed on this host.")
         )
       ).toExist(),
       expect(within(role("button", { name: "Team" }), selector(".tooltip-anchor"))).toBeAbsent()

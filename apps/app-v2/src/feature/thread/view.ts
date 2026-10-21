@@ -367,13 +367,13 @@ const stateView = (availability: Exclude<Availability, "Available">, h: ThreadVi
     case "Unavailable":
       return paneEmpty(h, {
         art: "held-back",
-        title: "This thread isn't available",
+        title: "This thread isn’t available",
         copy: "It may be in a group you no longer belong to."
       })
     case "Failed":
       return paneEmpty(h, {
         art: "came-apart",
-        title: "Can't load this thread",
+        title: "Can’t load this thread",
         copy: "Try again once the host is reachable.",
         action: button(h, "Try again", Message.ClickedTryAgain())
       })

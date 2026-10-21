@@ -85,7 +85,7 @@ export const connectionStatus = ({ connection, pending }: ConnectionItem): MarkS
         Uninstalled: (): MarkStatus => ({
           kind: "blocked",
           label: "Unavailable",
-          detail: "Its integration isn't installed on this host."
+          detail: "Its integration isn’t installed on this host."
         })
       })
 
@@ -94,13 +94,13 @@ export const healthWording: Readonly<
   Record<ConnectionContract.Health["status"], { title: string; line: string; tone: NoticeBoxTone }>
 > = {
   healthy: { title: "Working", line: "The check found nothing wrong.", tone: "success" },
-  unauthorized: { title: "Key refused", line: "The system refused this connection's key.", tone: "danger" },
+  unauthorized: { title: "Key refused", line: "The system refused this connection’s key.", tone: "danger" },
   misconfigured: {
-    title: "Settings don't work",
+    title: "Settings don’t work",
     line: "The settings lead nowhere this integration works.",
     tone: "danger"
   },
-  unavailable: { title: "Couldn't reach it", line: "The system didn't answer. It may answer later.", tone: "caution" }
+  unavailable: { title: "Couldn’t reach it", line: "The system didn’t answer. It may answer later.", tone: "caution" }
 }
 
 const changedMessages: Readonly<Record<ConnectionsAction, string>> = {
@@ -117,17 +117,17 @@ const invalidMessages: Readonly<Record<ConnectionsAction, string>> = {
   Rename: "Use 1 to 80 characters, with no invisible ones.",
   Configure: "Check the settings, then save again.",
   ReplaceKey: "Enter the key as the system issued it.",
-  Check: "This connection can't be checked as it is.",
-  Remove: "That change isn't possible."
+  Check: "This connection can’t be checked as it is.",
+  Remove: "That change isn’t possible."
 }
 
 const failedMessages: Readonly<Record<ConnectionsAction, string>> = {
-  Create: "The connection couldn't be created. Try again when the host is available; it won't be created twice.",
-  Rename: "The name couldn't be saved. Try again when the host is available.",
-  Configure: "The settings couldn't be saved. Try again when the host is available.",
-  ReplaceKey: "The key couldn't be saved. Try again when the host is available.",
-  Check: "The connection couldn't be checked. Try again when the host is available.",
-  Remove: "The connection couldn't be removed. Try again when the host is available."
+  Create: "The connection couldn’t be created. Try again when the host is available; it won’t be created twice.",
+  Rename: "The name couldn’t be saved. Try again when the host is available.",
+  Configure: "The settings couldn’t be saved. Try again when the host is available.",
+  ReplaceKey: "The key couldn’t be saved. Try again when the host is available.",
+  Check: "The connection couldn’t be checked. Try again when the host is available.",
+  Remove: "The connection couldn’t be removed. Try again when the host is available."
 }
 
 const messageOfReason: Readonly<Record<Reason, (failure: Failure) => string>> = {
@@ -139,7 +139,7 @@ const messageOfReason: Readonly<Record<Reason, (failure: Failure) => string>> = 
       ? "This workspace is no longer available to you."
       : "This connection is no longer available. Refresh to see the latest.",
   Changed: ({ action }) => changedMessages[action],
-  Uninstalled: () => "This integration isn't installed on this host anymore.",
+  Uninstalled: () => "This integration isn’t installed on this host anymore.",
   Refused: ({ description }) =>
     Option.getOrElse(description, () => "The integration refuses these settings. Check them, then try again."),
   StorageUnavailable: () =>

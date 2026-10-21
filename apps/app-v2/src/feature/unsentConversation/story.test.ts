@@ -127,9 +127,9 @@ describe("a conversation not started", () => {
     story(
       update,
       given(unstarted),
-      message(Message.FailedRead({ error: "This browser could not read the workspace's copy." })),
+      message(Message.FailedRead({ error: "This browser could not read the workspace’s copy." })),
       model((model) => {
-        expect(model.notice).toEqual(Option.some("This browser could not read the workspace's copy."))
+        expect(model.notice).toEqual(Option.some("This browser could not read the workspace’s copy."))
       })
     )
   })

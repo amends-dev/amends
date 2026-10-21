@@ -63,10 +63,10 @@ const refusedForm = (text: string) => FormErrors.make({ ...noFormErrors, form: O
 const wordFailure = (failure: unknown): FormErrors =>
   refusedForm(
     Schema.is(ApiErrors.Denied)(failure)
-      ? "This identity can't create workspaces."
+      ? "This identity can’t create workspaces."
       : Schema.is(ApiErrors.Invalid)(failure)
         ? "Those values were not accepted. Check them and try again."
-        : "We couldn't confirm creation. Try again with this name to safely check the same request."
+        : "We couldn’t confirm creation. Try again with this name to safely check the same request."
   )
 
 /** The names as the host takes them, which ignores the space around them, or where each is refused. */
@@ -137,12 +137,12 @@ const wordJoinFailure = (failure: unknown): JoinErrors =>
     Schema.is(ApiErrors.Changed)(failure)
       ? "This invitation changed while you were accepting it. Try again."
       : Schema.is(ApiErrors.Denied)(failure)
-        ? "This invitation isn't addressed to this address."
+        ? "This invitation isn’t addressed to this address."
         : Schema.is(ApiErrors.Conflict)(failure) || Schema.is(ApiErrors.NotFound)(failure)
           ? "This invitation is no longer available."
           : Schema.is(ApiErrors.Invalid)(failure)
-            ? "This invitation can't be accepted as it is."
-            : "We couldn't accept the invitation. Try again when the host is available."
+            ? "This invitation can’t be accepted as it is."
+            : "We couldn’t accept the invitation. Try again when the host is available."
   )
 
 /**

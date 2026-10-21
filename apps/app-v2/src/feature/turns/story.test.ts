@@ -41,9 +41,9 @@ describe("a thread's turns", () => {
         expect(model.turns.map(({ turn }) => turn.id)).toEqual([running.id, failed.id])
         expect(model.members).toEqual([member, bob, scout])
       }),
-      message(Message.FailedRead({ error: "This browser could not read the workspace's copy." })),
+      message(Message.FailedRead({ error: "This browser could not read the workspace’s copy." })),
       model((model) => {
-        expect(model.notice).toEqual(Option.some("This browser could not read the workspace's copy."))
+        expect(model.notice).toEqual(Option.some("This browser could not read the workspace’s copy."))
       })
     )
   })

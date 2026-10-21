@@ -20,17 +20,17 @@ const aboveButton = (words: string): Problem => ({ atField: Option.none(), above
 const emailProblems: Readonly<Record<EmailError, Problem>> = {
   InvalidEmail: atField("Enter a valid email address."),
   RateLimited: aboveButton("Too many codes were requested lately. Try again later."),
-  RequestFailed: aboveButton("We couldn't request a code. Try again.")
+  RequestFailed: aboveButton("We couldn’t request a code. Try again.")
 }
 
 const codeProblems: Readonly<Record<CodeError, Problem>> = {
   InvalidCode: atField("Enter all six digits."),
-  Mismatch: atField("That code doesn't match. Check it and try again."),
+  Mismatch: atField("That code doesn’t match. Check it and try again."),
   Expired: atField("This code has expired. Request a new one."),
   Unknown: atField("This code is no longer available. Request a new one."),
-  VerifyFailed: aboveButton("We couldn't verify your code. Try again."),
+  VerifyFailed: aboveButton("We couldn’t verify your code. Try again."),
   ResendLimited: aboveButton("Too many codes were requested lately. Use the last one, or try later."),
-  ResendFailed: aboveButton("We couldn't request a new code. Try again.")
+  ResendFailed: aboveButton("We couldn’t request a new code. Try again.")
 }
 
 /** What the person is told of why a code was not requested, if it was not. */

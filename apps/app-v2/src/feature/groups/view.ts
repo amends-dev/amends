@@ -375,16 +375,16 @@ export const dialogView = GroupsComposition.makeView((model, h) =>
 /** What each tab of the browse page says over its groups and in its search, and when it has none to list. */
 const browseTabs = {
   Yours: {
-    copy: "Public and private groups you've joined.",
+    copy: "Public and private groups you’ve joined.",
     placeholder: "Search your groups…",
     listLabel: "Your groups",
-    none: "You haven't joined any groups yet."
+    none: "You haven’t joined any groups yet."
   },
   Discover: {
-    copy: "Public groups you haven't joined. Join one to read its threads.",
+    copy: "Public groups you haven’t joined. Join one to read its threads.",
     placeholder: "Search public groups…",
     listLabel: "Public groups",
-    none: "You've joined every public group."
+    none: "You’ve joined every public group."
   }
 } as const satisfies Record<BrowseTab, unknown>
 
@@ -442,7 +442,7 @@ const listBody = (shown: ReadonlyArray<TeamItem>, model: Model, h: GroupsViewBui
 
   if (isUnread(model)) {
     return statusLine(h, {
-      text: "Can't load the groups.",
+      text: "Can’t load the groups.",
       action: button(h, "Try again", Message.ClickedTryAgain(), { variant: "quiet" })
     })
   }

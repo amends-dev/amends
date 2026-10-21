@@ -1395,7 +1395,7 @@ describe("turnRow", () => {
       children: [
         turnRow(h, {
           key: "turn-1",
-          label: "Atlas's turn",
+          label: "Atlas’s turn",
           mark: "A",
           name: "Atlas",
           status: turnStatus(h, "failed"),
@@ -1404,7 +1404,7 @@ describe("turnRow", () => {
             button(h, "Retry", Message.ClickedEdit({ key: "turn-1" }))
           ],
           detail: "The model provider is unavailable.",
-          problem: "Couldn't start another attempt. Try again."
+          problem: "Couldn’t start another attempt. Try again."
         })
       ]
     })
@@ -1415,7 +1415,7 @@ describe("turnRow", () => {
       children: [
         turnRow(h, {
           key: "turn-2",
-          label: "Atlas's turn",
+          label: "Atlas’s turn",
           mark: "A",
           name: "Atlas",
           status: turnStatus(h, "queued"),
@@ -1428,7 +1428,7 @@ describe("turnRow", () => {
     scene(
       { update, view: viewOf(turn) },
       given(initial),
-      expect(within(role("list", { name: "Thread" }), role("group", { name: "Atlas's turn" }))).toExist()
+      expect(within(role("list", { name: "Thread" }), role("group", { name: "Atlas’s turn" }))).toExist()
     )
   })
 
@@ -1441,7 +1441,7 @@ describe("turnRow", () => {
       expect(text("Atlas")).toHaveClass("text-agent"),
       expect(text("Atlas")).toHaveClass("font-medium"),
       expect(text("Atlas")).toHaveClass("text-item"),
-      expect(within(role("group", { name: "Atlas's turn" }), role("status"))).toHaveText("Failed")
+      expect(within(role("group", { name: "Atlas’s turn" }), role("status"))).toHaveText("Failed")
     )
   })
 
@@ -1449,8 +1449,8 @@ describe("turnRow", () => {
     scene(
       { update, view: viewOf(turn) },
       given(initial),
-      expect(role("group", { name: "Atlas's turn" })).toHaveClass("grid-cols-[1.5rem_minmax(0,1fr)_auto]"),
-      expect(role("group", { name: "Atlas's turn" })).toHaveClass("@max-[22.5rem]:grid-cols-[1.5rem_minmax(0,1fr)]"),
+      expect(role("group", { name: "Atlas’s turn" })).toHaveClass("grid-cols-[1.5rem_minmax(0,1fr)_auto]"),
+      expect(role("group", { name: "Atlas’s turn" })).toHaveClass("@max-[22.5rem]:grid-cols-[1.5rem_minmax(0,1fr)]"),
       expect(selector("li")).toHaveClass("@container"),
       expect(role("button", { name: "Retry" })).toExist(),
       expect(role("button", { name: "View log" })).toExist()
@@ -1463,7 +1463,7 @@ describe("turnRow", () => {
       given(initial),
       expect(text("The model provider is unavailable.")).toHaveClass("text-ink-secondary"),
       expect(text("The model provider is unavailable.")).toHaveClass("col-[2/-1]"),
-      expect(role("alert")).toHaveText("Couldn't start another attempt. Try again."),
+      expect(role("alert")).toHaveText("Couldn’t start another attempt. Try again."),
       expect(role("alert")).toHaveClass("text-caution-text")
     )
   })
@@ -1475,7 +1475,7 @@ describe("turnRow", () => {
         children: [
           turnRow(h, {
             key: "turn-3",
-            label: "Atlas's turn",
+            label: "Atlas’s turn",
             mark: "A",
             name: "Atlas",
             status: turnStatus(h, "failed"),
@@ -1489,18 +1489,18 @@ describe("turnRow", () => {
     scene(
       { update, view: viewOf(withAction) },
       given(initial),
-      expect(within(role("group", { name: "Atlas's turn" }), selector("p"))).toHaveClass("flex"),
-      expect(within(role("group", { name: "Atlas's turn" }), selector("p"))).toHaveClass("justify-between"),
-      expect(within(role("group", { name: "Atlas's turn" }), selector("p"))).toHaveClass("gap-3"),
-      expect(within(role("group", { name: "Atlas's turn" }), selector("p"))).toHaveClass("max-tablet:flex-col"),
-      expect(within(role("group", { name: "Atlas's turn" }), selector("p"))).toHaveClass("col-[2/-1]"),
-      expect(within(role("group", { name: "Atlas's turn" }), selector("p"))).toHaveClass("text-ink-secondary"),
-      expect(within(role("group", { name: "Atlas's turn" }), selector("p"))).toContainText(
+      expect(within(role("group", { name: "Atlas’s turn" }), selector("p"))).toHaveClass("flex"),
+      expect(within(role("group", { name: "Atlas’s turn" }), selector("p"))).toHaveClass("justify-between"),
+      expect(within(role("group", { name: "Atlas’s turn" }), selector("p"))).toHaveClass("gap-3"),
+      expect(within(role("group", { name: "Atlas’s turn" }), selector("p"))).toHaveClass("max-tablet:flex-col"),
+      expect(within(role("group", { name: "Atlas’s turn" }), selector("p"))).toHaveClass("col-[2/-1]"),
+      expect(within(role("group", { name: "Atlas’s turn" }), selector("p"))).toHaveClass("text-ink-secondary"),
+      expect(within(role("group", { name: "Atlas’s turn" }), selector("p"))).toContainText(
         "The model provider is unavailable."
       ),
       expect(
         within(
-          within(role("group", { name: "Atlas's turn" }), selector("p")),
+          within(role("group", { name: "Atlas’s turn" }), selector("p")),
           role("button", { name: "Agent settings" })
         )
       ).toExist(),
@@ -1516,7 +1516,7 @@ describe("turnRow", () => {
         children: [
           turnRow(h, {
             key: "turn-4",
-            label: "Atlas's turn",
+            label: "Atlas’s turn",
             mark: "A",
             name: "Atlas",
             status: turnStatus(h, "stopped"),
@@ -1545,7 +1545,7 @@ describe("turnRow", () => {
       given(initial),
       expect(role("alert")).toBeAbsent(),
       expect(role("button")).toBeAbsent(),
-      expect(within(role("group", { name: "Atlas's turn" }), selector("p"))).toBeAbsent()
+      expect(within(role("group", { name: "Atlas’s turn" }), selector("p"))).toBeAbsent()
     )
   })
 })

@@ -133,7 +133,7 @@ const summaryOf = (line: string, reloadFailed: boolean, h: WorkspacesViewBuilder
   reloadFailed
     ? column(h, [
         copy(h, line),
-        notice(h, Option.some("Couldn't refresh your workspaces.")),
+        notice(h, Option.some("Couldn’t refresh your workspaces.")),
         buttonRow(h, [button(h, "Try again", Message.ClickedTryAgain(), { variant: "quiet" })])
       ])
     : copy(h, line)
@@ -189,8 +189,8 @@ const listing = (model: Model, now: DateTime.Utc, h: WorkspacesViewBuilder): Rea
     Unreachable: () => [
       paneEmpty(h, {
         art: "lost-thread",
-        title: "Can't reach your workspace host",
-        copy: "You're still signed in. Try again once the host is running.",
+        title: "Can’t reach your workspace host",
+        copy: "You’re still signed in. Try again once the host is running.",
         action: button(h, "Try again", Message.ClickedTryAgain(), { variant: "primary" }),
         level: 1
       })
@@ -223,7 +223,7 @@ const createFormModal = (
           label: "Workspace name",
           type: "text",
           value: names.name,
-          hint: "You'll be the owner of this workspace.",
+          hint: "You’ll be the owner of this workspace.",
           onInput: (name) => Message.TypedName({ name }),
           isAutofocus: false,
           attributes: render.initialFocus
@@ -266,7 +266,7 @@ const openingModal = (
     description: `${workspaceName} is ready.`,
     size: "compact",
     body: reloadFailed
-      ? [notice(h, Option.some("Your workspace was created, but we couldn't refresh the list. Try again to open it."))]
+      ? [notice(h, Option.some("Your workspace was created, but we couldn’t refresh the list. Try again to open it."))]
       : [hint(h, "Opening your workspace…")],
     ...(reloadFailed
       ? { cancelLabel: "Close", footer: [button(h, "Try again", Message.ClickedTryAgain(), { variant: "primary" })] }
@@ -327,7 +327,7 @@ const joinedModal = (
     title: joinTitle(invitation),
     size: "compact",
     body: reloadFailed
-      ? [notice(h, Option.some("Joined, but we couldn't load your workspaces. Try again."))]
+      ? [notice(h, Option.some("Joined, but we couldn’t load your workspaces. Try again."))]
       : [hint(h, "Joining…")],
     ...(reloadFailed
       ? { cancelLabel: "Close", footer: [button(h, "Try again", Message.ClickedTryAgain(), { variant: "primary" })] }

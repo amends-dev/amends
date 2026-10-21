@@ -269,8 +269,8 @@ describe("the inbox", () => {
       click(role("tab", { name: "Unread" })),
       expect(role("tab", { name: "Unread" })).toHaveAttr("aria-selected", "true"),
       expect(role("tab", { name: "All" })).toHaveAttr("aria-selected", "false"),
-      expect(role("heading", { name: "You're all caught up", level: 2 })).toExist(),
-      expect(text("You've seen everything that came to you.")).toExist(),
+      expect(role("heading", { name: "You’re all caught up", level: 2 })).toExist(),
+      expect(text("You’ve seen everything that came to you.")).toExist(),
       expect(notifications).toBeAbsent()
     )
   })
@@ -552,15 +552,15 @@ describe("the inbox", () => {
       expect(within(notifications, role("button", { name: "Bob replied" }))).toExist(),
       expect(within(notifications, text("Unread"))).toBeAbsent(),
       expect(role("button", { name: "Mark all seen" })).toBeAbsent(),
-      expect(role("heading", { name: "You're all caught up", level: 2 })).toBeAbsent(),
+      expect(role("heading", { name: "You’re all caught up", level: 2 })).toBeAbsent(),
       expect(role("complementary", { name: "Thread" })).toExist(),
       // Closing the panel clears the selection, and with nothing waiting the inbox is caught up.
       click(role("button", { name: "Close thread" })),
       expectOutMessage(OutMessage.ClosedThread()),
       expect(role("complementary", { name: "Thread" })).toBeAbsent(),
       expect(notifications).toBeAbsent(),
-      expect(role("heading", { name: "You're all caught up", level: 2 })).toExist(),
-      expect(text("You've seen everything that came to you.")).toExist()
+      expect(role("heading", { name: "You’re all caught up", level: 2 })).toExist(),
+      expect(text("You’ve seen everything that came to you.")).toExist()
     )
   })
 
@@ -615,8 +615,8 @@ describe("the inbox", () => {
       { update, view: sceneView },
       given(modifyFields(init(workspace.id, member.id).model, { isLoaded: () => true })),
       expect(role("tab", { name: "Unread" })).toHaveAttr("aria-selected", "true"),
-      expect(role("heading", { name: "You're all caught up", level: 2 })).toExist(),
-      expect(text("You've seen everything that came to you.")).toExist(),
+      expect(role("heading", { name: "You’re all caught up", level: 2 })).toExist(),
+      expect(text("You’ve seen everything that came to you.")).toExist(),
       expect(selector("svg g.art-breathing")).toExist(),
       expect(role("heading", { name: "No activity yet" })).toBeAbsent(),
       expect(role("button", { name: "Mark all seen" })).toBeAbsent(),
@@ -627,7 +627,7 @@ describe("the inbox", () => {
       expect(selector("svg g.art-breathing")).toBeAbsent(),
       expect(selector("svg path.art-caret")).toExist(),
       click(role("tab", { name: "Unread" })),
-      expect(role("heading", { name: "You're all caught up", level: 2 })).toExist()
+      expect(role("heading", { name: "You’re all caught up", level: 2 })).toExist()
     )
   })
 
@@ -640,7 +640,7 @@ describe("the inbox", () => {
       expect(role("list", { name: "Notifications" })).toBeAbsent(),
       click(role("tab", { name: "Unread" })),
       expect(role("status")).toHaveText("Loading your inbox…"),
-      expect(role("heading", { name: "You're all caught up" })).toBeAbsent()
+      expect(role("heading", { name: "You’re all caught up" })).toBeAbsent()
     )
   })
 
@@ -649,11 +649,11 @@ describe("the inbox", () => {
       { update, view: sceneView },
       given(
         modifyFields(init(workspace.id, member.id).model, {
-          notice: () => Option.some("This browser could not read the workspace's copy.")
+          notice: () => Option.some("This browser could not read the workspace’s copy.")
         })
       ),
-      expect(role("heading", { name: "Can't load your inbox", level: 2 })).toExist(),
-      expect(text("This browser could not read the workspace's copy.")).toExist(),
+      expect(role("heading", { name: "Can’t load your inbox", level: 2 })).toExist(),
+      expect(text("This browser could not read the workspace’s copy.")).toExist(),
       expect(role("alert")).toBeAbsent(),
       expect(role("status")).toBeAbsent(),
       expect(selector("svg g.art-swinging")).toExist(),
@@ -666,11 +666,11 @@ describe("the inbox", () => {
       { update, view: sceneView },
       given(
         modifyFields(init(workspace.id, member.id).model, {
-          notice: () => Option.some("This browser could not read the workspace's copy.")
+          notice: () => Option.some("This browser could not read the workspace’s copy.")
         })
       ),
       click(role("button", { name: "Try again" })),
-      expect(role("heading", { name: "Can't load your inbox" })).toBeAbsent(),
+      expect(role("heading", { name: "Can’t load your inbox" })).toBeAbsent(),
       expect(role("button", { name: "Try again" })).toBeAbsent(),
       expect(role("status")).toHaveText("Loading your inbox…")
     )
@@ -679,10 +679,10 @@ describe("the inbox", () => {
   it("keeps the notifications it read and says why a later read failed", () => {
     scene(
       { update, view: sceneView },
-      given(modifyFields(opened, { notice: () => Option.some("This browser could not read the workspace's copy.") })),
-      expect(role("alert")).toHaveText("This browser could not read the workspace's copy."),
+      given(modifyFields(opened, { notice: () => Option.some("This browser could not read the workspace’s copy.") })),
+      expect(role("alert")).toHaveText("This browser could not read the workspace’s copy."),
       expect(role("button", { name: "Bob replied" })).toExist(),
-      expect(role("heading", { name: "Can't load your inbox" })).toBeAbsent()
+      expect(role("heading", { name: "Can’t load your inbox" })).toBeAbsent()
     )
   })
 })

@@ -84,8 +84,8 @@ const paletteItem = (item: Item, isActive: boolean): PaletteItem<Message> => ({
 /** What the palette says when it has nothing to list: why the read failed, or that nothing matches what is typed. */
 const emptyTextOf = (model: Model): string =>
   SearchStatus.match(model.status, {
-    Reading: () => `Nothing matches "${model.query.trim()}".`,
-    Read: () => `Nothing matches "${model.query.trim()}".`,
+    Reading: () => `Nothing matches “${model.query.trim()}”.`,
+    Read: () => `Nothing matches “${model.query.trim()}”.`,
     Failed: ({ error }) => error
   })
 

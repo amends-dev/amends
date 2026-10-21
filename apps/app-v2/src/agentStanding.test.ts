@@ -16,7 +16,7 @@ describe("how an agent stands as a row of the sidebar says it", () => {
     expect(statusOfAgent({ agent: incomplete, pending: false }, Option.none())).toEqual({
       kind: "attention",
       label: "Needs setup",
-      detail: "Its harness connection's integration isn't installed on this host."
+      detail: "Its harness connection’s integration isn’t installed on this host."
     })
     expect(statusOfAgent({ agent: incomplete, pending: false }, working)).toMatchObject({ label: "Needs setup" })
   })

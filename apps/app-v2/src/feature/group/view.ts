@@ -198,12 +198,12 @@ const membershipSetting = (group: Group.Team, model: Model, h: GroupViewBuilder)
   return belongs(model)
     ? settingRow(h, {
         label: "Membership",
-        copy: "You're a member of this group.",
+        copy: "You’re a member of this group.",
         action: button(h, "Leave group", Message.ClickedLeave(), { isDisabled: isChanging })
       })
     : settingRow(h, {
         label: "Membership",
-        copy: "You're not a member of this group.",
+        copy: "You’re not a member of this group.",
         action: isJoinable(group)
           ? button(h, "Join group", Message.ClickedJoin(), { isDisabled: isChanging })
           : undefined
@@ -438,7 +438,7 @@ const settingsModal = (render: RenderInfo, model: Model, viewport: Viewport, h: 
 const unavailableGroup = (h: GroupViewBuilder): Html =>
   paneEmpty(h, {
     art: "held-back",
-    title: "This group isn't available",
+    title: "This group isn’t available",
     copy: "You may no longer be a member of it."
   })
 

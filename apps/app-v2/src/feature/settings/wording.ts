@@ -106,9 +106,9 @@ const invalidMessages: Readonly<Record<Exclude<SettingsAction, "Read">, string>>
   RenameSelf: "Use 1 to 80 characters, with no invisible ones.",
   Transfer: "Choose a new owner.",
   ChangeRole: "Choose a role.",
-  Remove: "That change isn't possible.",
+  Remove: "That change isn’t possible.",
   Invite: "Enter the email they sign in with.",
-  Revoke: "That change isn't possible."
+  Revoke: "That change isn’t possible."
 }
 
 const failedMessages: Readonly<Record<Exclude<SettingsAction, "Read">, string>> = {
@@ -117,7 +117,7 @@ const failedMessages: Readonly<Record<Exclude<SettingsAction, "Read">, string>> 
   Transfer: "Ownership could not be transferred. Try again when the host is available.",
   ChangeRole: "The role could not be saved. Try again when the host is available.",
   Remove: "The member could not be removed. Try again when the host is available.",
-  Invite: "The invitation could not be created. Try again when the host is available; it won't be created twice.",
+  Invite: "The invitation could not be created. Try again when the host is available; it won’t be created twice.",
   Revoke: "The invitation could not be revoked. Try again when the host is available."
 }
 

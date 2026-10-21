@@ -137,13 +137,13 @@ describe("the profile card", () => {
             standing: Option.some({
               kind: "attention",
               label: "Needs setup",
-              detail: Option.some("Its harness connection's integration isn't installed on this host.")
+              detail: Option.some("Its harness connection’s integration isn’t installed on this host.")
             })
           })
         )
       ),
       expect(within(card, text("Agent · Needs setup"))).toHaveAttr("data-tone", "caution"),
-      expect(within(card, text("Its harness connection's integration isn't installed on this host."))).toExist(),
+      expect(within(card, text("Its harness connection’s integration isn’t installed on this host."))).toExist(),
       expect(within(card, role("button", { name: "Message" }))).toExist(),
       expect(within(card, role("button", { name: "Open agent" }))).toExist(),
       Mount.resolve(AnchorProfileCard, Message.CompletedAnchorProfileCard())

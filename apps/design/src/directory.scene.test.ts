@@ -883,14 +883,14 @@ describe("statusLine", () => {
         update,
         view: viewOf((h) => [
           statusLine(h, {
-            text: "Can't load the groups.",
+            text: "Can’t load the groups.",
             action: button(h, "Try again", Message.ClickedTryAgain(), { variant: "quiet" })
           })
         ])
       },
       given(initial),
-      expect(text("Can't load the groups.")).toHaveAttr("role", "status"),
-      expect(within(text("Can't load the groups."), role("button", { name: "Try again" }))).toExist(),
+      expect(text("Can’t load the groups.")).toHaveAttr("role", "status"),
+      expect(within(text("Can’t load the groups."), role("button", { name: "Try again" }))).toExist(),
       click(role("button", { name: "Try again" })),
       expect(text("Opened Try again")).toExist()
     )

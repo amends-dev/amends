@@ -92,7 +92,7 @@ const refusals = [
     "StorageUnavailable",
     undefined
   ],
-  ["the host answers something this app can't tell", { status: 500, body: { message: "Boom" } }, "Failed", undefined],
+  ["the host answers something this app can’t tell", { status: 500, body: { message: "Boom" } }, "Failed", undefined],
   ["the host cannot be reached", "unreachable", "Failed", undefined]
 ] as const satisfies ReadonlyArray<readonly [string, Answer, Reason, string | undefined]>
 

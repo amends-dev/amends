@@ -250,7 +250,7 @@ describe("a thread being read", () => {
       given(opened),
       ...answered(false),
       expect(
-        within(role("region", { name: "Thread" }), role("heading", { name: "This thread isn't available", level: 2 }))
+        within(role("region", { name: "Thread" }), role("heading", { name: "This thread isn’t available", level: 2 }))
       ).toExist(),
       expect(text("It may be in a group you no longer belong to.")).toExist(),
       expect(text("Loading the thread…")).toBeAbsent(),
@@ -258,7 +258,7 @@ describe("a thread being read", () => {
       expect(role("button", { name: "Rename" })).toBeAbsent(),
       expect(role("button", { name: "Try again" })).toBeAbsent(),
       ...answered(true),
-      expect(role("heading", { name: "This thread isn't available" })).toBeAbsent(),
+      expect(role("heading", { name: "This thread isn’t available" })).toBeAbsent(),
       expect(role("list", { name: "Messages" })).toExist()
     )
   })
@@ -269,12 +269,12 @@ describe("a thread being read", () => {
       given(opened),
       Subscription.emit(subscriptions.thread, Message.FailedRead({ error: "This browser could not read that." })),
       expect(
-        within(role("region", { name: "Thread" }), role("heading", { name: "Can't load this thread", level: 2 }))
+        within(role("region", { name: "Thread" }), role("heading", { name: "Can’t load this thread", level: 2 }))
       ).toExist(),
       expect(text("Try again once the host is reachable.")).toExist(),
       expect(role("list", { name: "Messages" })).toBeAbsent(),
       click(role("button", { name: "Try again" })),
-      expect(role("heading", { name: "Can't load this thread" })).toBeAbsent(),
+      expect(role("heading", { name: "Can’t load this thread" })).toBeAbsent(),
       expect(text("Loading the thread…")).toExist(),
       ...answered(true),
       expect(role("list", { name: "Messages" })).toExist()
@@ -289,7 +289,7 @@ describe("a thread being read", () => {
       Subscription.emit(subscriptions.thread, Message.FailedRead({ error: "This browser could not read that." })),
       expect(role("list", { name: "Messages" })).toExist(),
       expect(text("This browser could not read that.")).toExist(),
-      expect(role("heading", { name: "Can't load this thread" })).toBeAbsent()
+      expect(role("heading", { name: "Can’t load this thread" })).toBeAbsent()
     )
   })
 })
@@ -532,7 +532,7 @@ describe("a thread", () => {
       expect(nth(all.role("listitem"), 0)).toHaveText("Yesterday"),
       expect(within(nth(all.role("listitem"), 1), text("Plans for the week"))).toExist(),
       expect(nth(all.role("listitem"), 2)).toHaveText("1 reply"),
-      expect(within(nth(all.role("listitem"), 3), role("group", { name: "Scout's turn" }))).toExist(),
+      expect(within(nth(all.role("listitem"), 3), role("group", { name: "Scout’s turn" }))).toExist(),
       expect(nth(all.role("listitem"), 4)).toHaveText("Today"),
       expect(within(nth(all.role("listitem"), 5), text("Sounds good"))).toExist(),
       // The turns are not a section of their own above the messages.
@@ -547,11 +547,11 @@ describe("a thread", () => {
       ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
       ...turnsRead(turnOf("turn-1", "running", { createdAt: "2026-10-18T12:02:00Z" })),
       expect(nth(all.role("listitem"), 0)).toHaveText("Today"),
-      expect(within(nth(all.role("listitem"), 3), role("group", { name: "Scout's turn" }))).toExist(),
+      expect(within(nth(all.role("listitem"), 3), role("group", { name: "Scout’s turn" }))).toExist(),
       expect(within(nth(all.role("listitem"), 4), text("Sounds good"))).toExist(),
       ...turnsRead(turnOf("turn-1", "running", { createdAt: "2026-10-18T12:10:00Z" })),
       expect(within(nth(all.role("listitem"), 3), text("Sounds good"))).toExist(),
-      expect(within(nth(all.role("listitem"), 4), role("group", { name: "Scout's turn" }))).toExist()
+      expect(within(nth(all.role("listitem"), 4), role("group", { name: "Scout’s turn" }))).toExist()
     )
   })
 
@@ -563,14 +563,14 @@ describe("a thread", () => {
       given(opened),
       ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
       ...turnsRead(replied),
-      expect(role("group", { name: "Scout's turn" })).toBeAbsent(),
+      expect(role("group", { name: "Scout’s turn" })).toBeAbsent(),
       expect(within(role("list", { name: "Messages" }), text("Sounds good"))).toExist(),
       expectAll(all.role("button", { name: "View turn log" })).toHaveCount(1),
       expect(within(nth(all.role("listitem"), 3), text("Sounds good"))).toExist(),
       expect(within(nth(all.role("listitem"), 3), role("button", { name: "View turn log" }))).toExist(),
       // Its log is not drawn among the messages: it opens in the side pane.
       click(role("button", { name: "View turn log" })),
-      expect(role("group", { name: "Scout's turn log" })).toBeAbsent(),
+      expect(role("group", { name: "Scout’s turn log" })).toBeAbsent(),
       expectAll(all.role("button", { name: "View turn log" })).toHaveCount(1)
     )
   })
@@ -719,7 +719,7 @@ describe("a thread", () => {
       given(opened),
       ...readWith({ message: opening, pending: false }),
       ...turnsRead(turnOf("turn-1", "completed", { messageIds: ["message-9"] })),
-      expect(role("group", { name: "Scout's turn" })).toExist(),
+      expect(role("group", { name: "Scout’s turn" })).toExist(),
       expect(role("button", { name: "View turn log" })).toBeAbsent()
     )
   })
@@ -730,11 +730,11 @@ describe("a thread", () => {
       given(opened),
       ...readWith({ message: opening, pending: false }),
       ...turnsRead(turnOf("turn-1", "running")),
-      expect(within(role("group", { name: "Scout's turn" }), text("Scout"))).toExist(),
-      expect(within(role("group", { name: "Scout's turn" }), role("status"))).toHaveText("Working"),
+      expect(within(role("group", { name: "Scout’s turn" }), text("Scout"))).toExist(),
+      expect(within(role("group", { name: "Scout’s turn" }), role("status"))).toHaveText("Working"),
       click(role("button", { name: "View log" })),
       expect(role("complementary", { name: "Turn log" })).toExist(),
-      expect(within(role("group", { name: "Scout's turn" }), text("Loading the turn log…"))).toBeAbsent()
+      expect(within(role("group", { name: "Scout’s turn" }), text("Loading the turn log…"))).toBeAbsent()
     )
   })
 
@@ -777,7 +777,7 @@ describe("a thread", () => {
       ...turnsRead(turnOf("turn-1", "running", { createdAt: "2026-10-18T12:02:00Z" })),
       expect(nth(all.role("listitem"), 0)).toHaveText("Activity"),
       expect(within(nth(all.role("listitem"), 1), text(/^Alice created this task · /))).toExist(),
-      expect(within(nth(all.role("listitem"), 2), role("group", { name: "Scout's turn" }))).toExist(),
+      expect(within(nth(all.role("listitem"), 2), role("group", { name: "Scout’s turn" }))).toExist(),
       expect(within(nth(all.role("listitem"), 3), text("Sounds good"))).toExist(),
       expect(role("region", { name: "Turns" })).toBeAbsent()
     )
@@ -790,9 +790,9 @@ describe("a thread", () => {
       ...readWith({ message: opening, pending: false }),
       Subscription.emit(
         turnsSubscriptions.turns,
-        TurnsBlock.Message.FailedRead({ error: "This browser could not read the workspace's copy." })
+        TurnsBlock.Message.FailedRead({ error: "This browser could not read the workspace’s copy." })
       ),
-      expect(text("This browser could not read the workspace's copy.")).toExist()
+      expect(text("This browser could not read the workspace’s copy.")).toExist()
     )
   })
 

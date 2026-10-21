@@ -44,7 +44,7 @@ const acme = Schema.decodeSync(WorkspaceDirectory.Membership)({
 
 const key = Request.Key.make("key-1")
 
-const unreachable = "We couldn't confirm creation. Try again with this name to safely check the same request."
+const unreachable = "We couldn’t confirm creation. Try again with this name to safely check the same request."
 
 const refusedForm = (text: string) => FormErrors.make({ ...noFormErrors, form: Option.some(text) })
 
@@ -426,7 +426,7 @@ describe("creating a workspace", () => {
 
 const refusedJoin = (text: string) => JoinErrors.make({ ...noJoinErrors, form: Option.some(text) })
 
-const unreachableJoin = "We couldn't accept the invitation. Try again when the host is available."
+const unreachableJoin = "We couldn’t accept the invitation. Try again when the host is available."
 
 /** The listing as it is while two invitations wait. */
 const invited = showing(loaded([membership], [northstarInvitation, atlasInvitation]))

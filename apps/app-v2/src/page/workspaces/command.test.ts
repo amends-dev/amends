@@ -42,7 +42,7 @@ const inDialog = (entering: Entering) =>
 /** The answers that are no answer the contract lists: the client reports a defect, or the host is not there. */
 const unlisted = [
   ["answers a status the contract does not list", { status: 500, body: { message: "Boom" } }],
-  ["makes the client's call die", "dies"]
+  ["makes the client’s call die", "dies"]
 ] as const satisfies ReadonlyArray<readonly [string, Answer]>
 
 const load = (answer: Answer) => {
@@ -205,7 +205,7 @@ describe("CreateWorkspace", () => {
       )
 
       expect(message).toEqual(
-        Message.FailedCreate({ key: Option.some(key), error: refusedForm("This identity can't create workspaces.") })
+        Message.FailedCreate({ key: Option.some(key), error: refusedForm("This identity can’t create workspaces.") })
       )
     })
   )
@@ -251,7 +251,7 @@ describe("CreateWorkspace", () => {
           Message.FailedCreate({
             key: Option.some(Request.Key.make(sent[0]?.key ?? "")),
             error: refusedForm(
-              "We couldn't confirm creation. Try again with this name to safely check the same request."
+              "We couldn’t confirm creation. Try again with this name to safely check the same request."
             )
           })
         )
@@ -263,7 +263,7 @@ describe("CreateWorkspace", () => {
     Effect.gen(function* () {
       const { message: outcome } = yield* create("dies", names, Option.some(key))
       const error = refusedForm(
-        "We couldn't confirm creation. Try again with this name to safely check the same request."
+        "We couldn’t confirm creation. Try again with this name to safely check the same request."
       )
 
       expect(outcome).toEqual(Message.FailedCreate({ key: Option.some(key), error }))
@@ -337,7 +337,7 @@ describe("AcceptInvitation", () => {
     [
       "is not addressed to this account",
       { status: 403, body: { _tag: "CoreError.Denied", reason: { _tag: "HumanRequired" } } },
-      refusedJoin("This invitation isn't addressed to this address.")
+      refusedJoin("This invitation isn’t addressed to this address.")
     ],
     [
       "is no longer open",
@@ -361,7 +361,7 @@ describe("AcceptInvitation", () => {
         status: 422,
         body: { _tag: "CoreError.Invalid", reason: { _tag: "Malformed", description: "Expected a name" } }
       },
-      refusedJoin("This invitation can't be accepted as it is.")
+      refusedJoin("This invitation can’t be accepted as it is.")
     ],
     [
       "cannot be accepted because the host is not ready",
@@ -369,27 +369,27 @@ describe("AcceptInvitation", () => {
         status: 503,
         body: { _tag: "CoreError.Unavailable", reason: { _tag: "CredentialsUnavailable", description: "No keys" } }
       },
-      refusedJoin("We couldn't accept the invitation. Try again when the host is available.")
+      refusedJoin("We couldn’t accept the invitation. Try again when the host is available.")
     ],
     [
       "cannot be accepted because the outcome is not known",
       { status: 500, body: { _tag: "CoreError.Uncertain", commitId: "commit-1" } },
-      refusedJoin("We couldn't accept the invitation. Try again when the host is available.")
+      refusedJoin("We couldn’t accept the invitation. Try again when the host is available.")
     ],
     [
       "cannot be accepted because the host cannot be reached",
       "unreachable",
-      refusedJoin("We couldn't accept the invitation. Try again when the host is available.")
+      refusedJoin("We couldn’t accept the invitation. Try again when the host is available.")
     ],
     [
       "cannot be accepted because the host answers a status the contract does not list",
       { status: 500, body: { message: "Boom" } },
-      refusedJoin("We couldn't accept the invitation. Try again when the host is available.")
+      refusedJoin("We couldn’t accept the invitation. Try again when the host is available.")
     ],
     [
-      "cannot be accepted because the client's call dies",
+      "cannot be accepted because the client’s call dies",
       "dies",
-      refusedJoin("We couldn't accept the invitation. Try again when the host is available.")
+      refusedJoin("We couldn’t accept the invitation. Try again when the host is available.")
     ]
   ] as const satisfies ReadonlyArray<readonly [string, Answer, JoinErrors]>) {
     it.effect(`says so when the invitation ${description}`, () =>
@@ -405,7 +405,7 @@ describe("AcceptInvitation", () => {
   it.effect("ends the form's sending with the general failure when the client's call dies", () =>
     Effect.gen(function* () {
       const { message: outcome } = yield* accept("dies", "Alex")
-      const errors = refusedJoin("We couldn't accept the invitation. Try again when the host is available.")
+      const errors = refusedJoin("We couldn’t accept the invitation. Try again when the host is available.")
 
       expect(outcome).toEqual(Message.FailedJoin({ error: errors }))
       Story.story(

@@ -317,7 +317,7 @@ const withRefusal = modifyFields(opened, {
           key: "action-1",
           tag: "PostReply",
           what: "post the reply",
-          text: Option.some("Thanks! I'll attach the image."),
+          text: Option.some("Thanks! I’ll attach the image."),
           rejection: Option.some("You may not reply here.")
         }
       ]
@@ -981,13 +981,13 @@ describe("a workspace", () => {
       Command.resolve(LoadModels, AgentsBlock.Message.ReceivedModels({ connectionId: models.id, models: offered })),
       expect(role("main", { name: "Scout" })).toExist(),
       expect(sidebarButton("Scout")).toHaveAttr("aria-current", "page"),
-      expect(role("heading", { name: "This agent isn't here" })).toBeAbsent()
+      expect(role("heading", { name: "This agent isn’t here" })).toBeAbsent()
     )
     scene(
       { update, view: sceneView },
       given(modifyFields(withAgent, { open: () => Open.Agent({ agentId: Identity.AgentId.make("agent-9") }) })),
       expect(role("main", { name: "Agent" })).toExist(),
-      expect(role("heading", { name: "This agent isn't here", level: 2 })).toExist(),
+      expect(role("heading", { name: "This agent isn’t here", level: 2 })).toExist(),
       click(role("button", { name: "Show all agents" })),
       expect(role("main", { name: "Agents" })).toExist()
     )
@@ -1139,7 +1139,7 @@ describe("a workspace", () => {
         })
       ),
       expect(role("main", { name: "Connection" })).toExist(),
-      expect(role("heading", { name: "This connection isn't here", level: 2 })).toExist(),
+      expect(role("heading", { name: "This connection isn’t here", level: 2 })).toExist(),
       click(role("button", { name: "Show all connections" })),
       expect(role("main", { name: "Connections" })).toExist()
     )
@@ -1924,7 +1924,7 @@ describe("a workspace", () => {
     scene(
       { update, view: sceneView },
       given(modifyFields(inWindow(withoutThread, "Desktop"), { actions: () => withRefusal.actions })),
-      expect(within(role("alert"), text("Couldn't post the reply: You may not reply here."))).toExist(),
+      expect(within(role("alert"), text("Couldn’t post the reply: You may not reply here."))).toExist(),
       expect(within(role("dialog", { name: "Thread" }), role("alert"))).toBeAbsent(),
       click(within(role("group", { name: "Message actions" }), role("button", { name: "Reply in thread" }))),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
@@ -2104,8 +2104,8 @@ describe("a workspace", () => {
     scene(
       { update, view: sceneView },
       given(withRefusal),
-      expect(within(role("alert"), text("Couldn't post the reply: You may not reply here."))).toExist(),
-      expect(within(role("alert"), text("Thanks! I'll attach the image."))).toExist(),
+      expect(within(role("alert"), text("Couldn’t post the reply: You may not reply here."))).toExist(),
+      expect(within(role("alert"), text("Thanks! I’ll attach the image."))).toExist(),
       click(within(role("alert"), role("button", { name: "Dismiss" }))),
       Command.expectExact(Dismiss({ workspaceId: workspace.id, memberId: member.id, key: "action-1" })),
       Command.resolve(Dismiss, ActionsBlock.Message.CompletedDismiss())

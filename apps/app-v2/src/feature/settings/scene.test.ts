@@ -295,7 +295,7 @@ describe("the Workspace page of the settings", () => {
       expect(role("textbox", { name: "Workspace name" })).toBeAbsent(),
       Subscription.emit(subscriptions.settings, Message.FailedRead()),
       expect(text("Loading settings…")).toBeAbsent(),
-      expect(role("heading", { name: "Can't load settings", level: 2 })).toExist(),
+      expect(role("heading", { name: "Can’t load settings", level: 2 })).toExist(),
       expect(text("Try again once the host is reachable.")).toExist(),
       expect(art("came-apart")).toExist(),
       click(role("button", { name: "Try again" })),
@@ -641,7 +641,7 @@ describe("a member in the side pane", () => {
           members: (members) => members.filter(({ member }) => member.id !== bob.id)
         })
       ),
-      expect(text("This member isn't here")).toExist(),
+      expect(text("This member isn’t here")).toExist(),
       expect(art("lost-thread")).toExist(),
       expect(role("button", { name: "Back to Members" })).toExist()
     )
@@ -698,12 +698,12 @@ describe("the Workspace page of the settings, for handing the workspace over", (
         expect(text("Studio")).toExist(),
         expect(role("combobox", { name: "New owner" })).toHaveValue(""),
         expect(
-          text("The new owner becomes the only owner. You'll remain an administrator and lose owner-only actions.")
+          text("The new owner becomes the only owner. You’ll remain an administrator and lose owner-only actions.")
         ).toExist(),
         expect(role("button", { name: "Transfer ownership" })).toBeDisabled(),
         change(role("combobox", { name: "New owner" }), bob.id),
         expect(
-          text("Bob becomes the only owner. You'll remain an administrator and lose owner-only actions.")
+          text("Bob becomes the only owner. You’ll remain an administrator and lose owner-only actions.")
         ).toExist(),
         expect(role("button", { name: "Transfer ownership" })).toBeEnabled(),
         click(role("button", { name: "Transfer ownership" }))
@@ -957,7 +957,7 @@ describe("the dialog for inviting someone", () => {
       inside(
         inviteDialog,
         expect(
-          text("The invitation could not be created. Try again when the host is available; it won't be created twice.")
+          text("The invitation could not be created. Try again when the host is available; it won’t be created twice.")
         ).toExist(),
         expect(role("textbox", { name: "Sign-in email" })).toHaveValue("dana@example.com")
       )
@@ -1201,7 +1201,7 @@ describe("the dialog for removing a member", () => {
         removeDialog,
         expect(
           text(
-            "They will lose access to Studio. To rejoin, they'll need a fresh invitation. Their previous membership will remain in the removed-member history."
+            "They will lose access to Studio. To rejoin, they’ll need a fresh invitation. Their previous membership will remain in the removed-member history."
           )
         ).toExist(),
         click(role("button", { name: "Remove member" }))

@@ -762,7 +762,7 @@ describe("choiceSelect", () => {
     const harnesses: ReadonlyArray<Choice<string>> = [
       ["", "Auto", { description: "amends chooses a harness as the agent works" }],
       ["opencode", "opencode", { description: "opencode · Works only in a sandbox" }],
-      ["vertex", "Vertex", { description: "Its integration isn't installed on this host.", isDisabled: true }],
+      ["vertex", "Vertex", { description: "Its integration isn’t installed on this host.", isDisabled: true }],
       ["plain", "Plain"]
     ]
     scene(
@@ -781,7 +781,7 @@ describe("choiceSelect", () => {
       given(modifyFields(initial, { plan: () => "" })),
       expect(role("option", { name: "Auto · amends chooses a harness as the agent works" })).toExist(),
       expect(role("option", { name: "opencode · opencode · Works only in a sandbox" })).toBeEnabled(),
-      expect(role("option", { name: "Vertex · Its integration isn't installed on this host." })).toBeDisabled(),
+      expect(role("option", { name: "Vertex · Its integration isn’t installed on this host." })).toBeDisabled(),
       expect(role("option", { name: "Plain" })).toBeEnabled(),
       change(label("Harness"), "opencode"),
       expect(label("Harness")).toHaveValue("opencode")
@@ -902,17 +902,17 @@ describe("noticeBox", () => {
         update,
         view: viewOf((_, h) => [
           noticeBox(h, {
-            title: "This agent can't run as it is set up",
+            title: "This agent can’t run as it is set up",
             lines: ["Its model connection was removed.", "Its harness works only in a sandbox, and it has none."]
           })
         ])
       },
       given(initial),
-      expect(role("note", { name: "This agent can't run as it is set up" })).toExist(),
+      expect(role("note", { name: "This agent can’t run as it is set up" })).toExist(),
       expect(
         within(
-          role("note", { name: "This agent can't run as it is set up" }),
-          text("This agent can't run as it is set up")
+          role("note", { name: "This agent can’t run as it is set up" }),
+          text("This agent can’t run as it is set up")
         )
       ).toExist(),
       expect(role("listitem", { name: "Its model connection was removed." })).toExist(),
@@ -1454,12 +1454,12 @@ describe("codeInput", () => {
 
   it("outlines every cell in danger and describes the input with the reason it was refused", () => {
     scene(
-      { update, view: codeView({ error: "That code doesn't match. Check it and try again." }) },
+      { update, view: codeView({ error: "That code doesn’t match. Check it and try again." }) },
       given(initial),
       expect(selector("[data-invalid]")).toExist(),
       expect(label("Verification code")).toHaveAttr("aria-invalid", "true"),
       expect(label("Verification code")).toHaveAttr("aria-describedby", "code-description"),
-      expect(role("alert")).toHaveText("That code doesn't match. Check it and try again.")
+      expect(role("alert")).toHaveText("That code doesn’t match. Check it and try again.")
     )
     scene(
       { update, view: codeView() },

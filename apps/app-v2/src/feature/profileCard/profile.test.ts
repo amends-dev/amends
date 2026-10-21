@@ -89,7 +89,7 @@ describe("a member as their card shows them", () => {
         standing: Option.some({
           kind: "attention",
           label: "Needs setup",
-          detail: Option.some("Its harness connection's integration isn't installed on this host.")
+          detail: Option.some("Its harness connection’s integration isn’t installed on this host.")
         })
       })
     )

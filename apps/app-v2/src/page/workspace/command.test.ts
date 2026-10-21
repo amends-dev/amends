@@ -28,7 +28,7 @@ describe("LoadIntegrations", () => {
   for (const [description, answer] of [
     ["the host cannot be reached", "unreachable"],
     ["the host answers a status the contract does not list", { status: 500, body: { message: "Boom" } }],
-    ["the client's call dies", "dies"]
+    ["the client’s call dies", "dies"]
   ] as const satisfies ReadonlyArray<readonly [string, Answer]>) {
     it.effect(`says they could not be listed when ${description}, so the page stops waiting`, () =>
       Effect.gen(function* () {

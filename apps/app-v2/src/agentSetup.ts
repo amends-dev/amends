@@ -75,7 +75,7 @@ export const configurationOf = (draft: Draft): Result.Result<Agent.Configuration
   if (Result.isFailure(decodeInstructions(instructions))) {
     return Result.fail({
       field: "Instructions",
-      message: "The instructions are too long, or hold what can't be stored."
+      message: "The instructions are too long, or hold what can’t be stored."
     })
   }
   return Result.mapError(
@@ -89,6 +89,6 @@ export const configurationOf = (draft: Draft): Result.Result<Agent.Configuration
       },
       sandbox: draft.sandbox === "" ? null : { connectionId: draft.sandbox }
     }),
-    (): Problem => ({ field: "Model", message: "This model ID can't be used. Use 1 to 200 characters." })
+    (): Problem => ({ field: "Model", message: "This model ID can’t be used. Use 1 to 200 characters." })
   )
 }

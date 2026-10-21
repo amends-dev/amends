@@ -63,10 +63,10 @@ describe("AgentSetup", () => {
       Result.fail({ field: "Model", message: "Choose a model." })
     )
     expect(AgentSetup.configurationOf({ ...draft, instructions: "x".repeat(20_001) })).toEqual(
-      Result.fail({ field: "Instructions", message: "The instructions are too long, or hold what can't be stored." })
+      Result.fail({ field: "Instructions", message: "The instructions are too long, or hold what can’t be stored." })
     )
     expect(AgentSetup.configurationOf({ ...draft, modelId: "x".repeat(201) })).toEqual(
-      Result.fail({ field: "Model", message: "This model ID can't be used. Use 1 to 200 characters." })
+      Result.fail({ field: "Model", message: "This model ID can’t be used. Use 1 to 200 characters." })
     )
   })
 

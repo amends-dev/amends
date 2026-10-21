@@ -50,7 +50,7 @@ describe("the actions", () => {
     scene(
       { update, view },
       given(modifyFields(started, { actions: () => [refused] })),
-      expect(within(role("alert"), text("Couldn't rename the agent: This agent was renamed meanwhile."))).toExist(),
+      expect(within(role("alert"), text("Couldn’t rename the agent: This agent was renamed meanwhile."))).toExist(),
       click(within(role("alert"), role("button", { name: "Dismiss" }))),
       Command.resolve(Dismiss, Message.CompletedDismiss())
     )
@@ -82,7 +82,7 @@ describe("the actions", () => {
       expect(notifications).toHaveClass("items-center"),
       expect(role("alert")).toHaveClass("shadow-toast"),
       expect(within(notifications, role("alert"))).toBeAbsent(),
-      expect(within(role("alert"), text("Couldn't rename the agent: This agent was renamed meanwhile."))).toExist()
+      expect(within(role("alert"), text("Couldn’t rename the agent: This agent was renamed meanwhile."))).toExist()
     )
   })
 
@@ -118,7 +118,7 @@ describe("the actions", () => {
           nextConfirmationId: () => 3
         })
       ),
-      expect(within(role("alert"), text("Couldn't rename the agent: This agent was renamed meanwhile."))).toExist(),
+      expect(within(role("alert"), text("Couldn’t rename the agent: This agent was renamed meanwhile."))).toExist(),
       expect(within(notifications, text("Name saved"))).toExist(),
       expect(within(notifications, text("Setup saved"))).toExist(),
       expectAll(all.role("button", { name: "Dismiss" })).toHaveCount(1)

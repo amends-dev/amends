@@ -53,7 +53,7 @@ export const RenameThread = ThreadDefinition.command("RenameThread", {
       Stores.decoded(
         Thread.RenameInput,
         { threadId, title, expectedTitle },
-        failed("A thread's title needs some text.")
+        failed("A thread’s title needs some text.")
       ).pipe(
         Effect.flatMap((input) => write(member, (store) => store.write("ThreadRenamed", input))),
         Effect.catch(Effect.succeed)

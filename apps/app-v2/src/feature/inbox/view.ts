@@ -43,8 +43,8 @@ const nothingToList = (tab: Tab, h: InboxViewBuilder): Html =>
   tab === "Unread"
     ? paneEmpty(h, {
         art: "rest",
-        title: "You're all caught up",
-        copy: "You've seen everything that came to you.",
+        title: "You’re all caught up",
+        copy: "You’ve seen everything that came to you.",
         action: button(h, "View all activity", Message.ChoseTab({ tab: "All" }))
       })
     : paneEmpty(h, {
@@ -60,7 +60,7 @@ const isUnread = (model: Model): boolean => !model.isLoaded && Option.isSome(mod
 const unreadInbox = (model: Model, h: InboxViewBuilder): Html =>
   paneEmpty(h, {
     art: "came-apart",
-    title: "Can't load your inbox",
+    title: "Can’t load your inbox",
     ...Option.match(model.notice, { onNone: () => ({}), onSome: (copy) => ({ copy }) }),
     action: button(h, "Try again", Message.ClickedTryAgain())
   })

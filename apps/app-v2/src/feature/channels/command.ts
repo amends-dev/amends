@@ -49,7 +49,7 @@ export const RedirectChannel = ChannelsDefinition.command("RedirectChannel", {
       Stores.decoded(
         Channel.RedirectInput,
         { channelId, groupId },
-        failed("A channel's conversations need a group to open in.")
+        failed("A channel’s conversations need a group to open in.")
       ).pipe(
         Effect.flatMap((input) => write(member, (store) => store.write("ChannelRedirected", input))),
         Effect.catch(Effect.succeed)

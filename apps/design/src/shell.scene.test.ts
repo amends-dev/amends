@@ -125,7 +125,7 @@ const viewWith =
         ? {
             notices: toastStack(h, [
               toast(h, {
-                text: "Couldn't post the reply: You may not.",
+                text: "Couldn’t post the reply: You may not.",
                 action: { label: "Dismiss", onClick: Message.DismissedRefusal() }
               })
             ])
@@ -230,7 +230,7 @@ describe("shell", () => {
       { update, view },
       given({ ...initial, isRefused: true }),
       expect(
-        within(selector('[aria-live="polite"]'), within(role("alert"), text("Couldn't post the reply: You may not.")))
+        within(selector('[aria-live="polite"]'), within(role("alert"), text("Couldn’t post the reply: You may not.")))
       ).toExist(),
       expect(role("complementary", { name: "Composer paste crash" })).toExist(),
       click(role("button", { name: "Dismiss" })),

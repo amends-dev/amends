@@ -312,7 +312,7 @@ describe("the search", () => {
       given(opened),
       dialogOpened,
       type(jumpTo, "  zzz "),
-      expect(role("status")).toHaveText('Nothing matches "zzz".'),
+      expect(role("status")).toHaveText("Nothing matches “zzz”."),
       expectAll(all.role("group")).toHaveCount(0),
       expectAll(all.role("option")).toHaveCount(0),
       expect(jumpTo).not.toHaveAttr("aria-activedescendant")

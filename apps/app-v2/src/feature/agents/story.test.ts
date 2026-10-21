@@ -378,7 +378,7 @@ describe("the agents", () => {
         expect(model.offered).toEqual([OfferedModels.Loaded({ connectionId: modelsId, models: offered })])
       }),
       // Once they could not be loaded, picking it asks again.
-      message(Message.FailedLoadModels({ connectionId: modelsId, error: "It can't be reached." })),
+      message(Message.FailedLoadModels({ connectionId: modelsId, error: "It can’t be reached." })),
       message(Message.ClickedAgent({ agentId })),
       Command.expectExact(LoadModels({ workspaceId, connectionId: modelsId })),
       Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: modelsId, models: offered }))
@@ -615,7 +615,7 @@ describe("the agents", () => {
               action: "Create",
               reason: Reason.Incomplete({
                 problems: [
-                  { field: "Instructions", message: "The instructions are too long, or hold what can't be stored." }
+                  { field: "Instructions", message: "The instructions are too long, or hold what can’t be stored." }
                 ]
               })
             })
@@ -699,12 +699,12 @@ describe("the agents", () => {
       }),
       Command.resolve(
         LoadModels,
-        Message.FailedLoadModels({ connectionId: otherModelsId, error: "It can't be reached." })
+        Message.FailedLoadModels({ connectionId: otherModelsId, error: "It can’t be reached." })
       ),
       model((model) => {
         expect(model.offered).toEqual([
           OfferedModels.Loaded({ connectionId: modelsId, models: offered }),
-          OfferedModels.Failed({ connectionId: otherModelsId, error: "It can't be reached." })
+          OfferedModels.Failed({ connectionId: otherModelsId, error: "It can’t be reached." })
         ])
       }),
       // Choosing no connection asks for none, and a connection the workspace does not have offers none.
@@ -938,7 +938,7 @@ describe("removing an agent", () => {
             Option.flatMap(model.removing, ({ failure }) => failure),
             failureMessage
           )
-        ).toEqual(Option.some("The agent couldn't be removed. Try again when the host is available."))
+        ).toEqual(Option.some("The agent couldn’t be removed. Try again when the host is available."))
         expect(model.dialog.isOpen).toBe(true)
       }),
       message(Message.ConfirmedRemoval()),
@@ -1114,7 +1114,7 @@ describe("an agent's page", () => {
       ),
       model((model) => {
         expect(Option.map(model.edits[0]?.failure ?? Option.none(), failureMessage)).toEqual(
-          Option.some("The name couldn't be saved. Try again when the host is available.")
+          Option.some("The name couldn’t be saved. Try again when the host is available.")
         )
       })
     )
@@ -1241,7 +1241,7 @@ describe("an agent's page", () => {
           })
         )
         expect(Option.map(model.edits[0]?.failure ?? Option.none(), failureMessage)).toEqual(
-          Option.some("This setup can't be saved as it is. Change what's marked, then try again.")
+          Option.some("This setup can’t be saved as it is. Change what’s marked, then try again.")
         )
       }),
       message(Message.ChoseModelConnection({ target: onScout, connectionId: otherModelsId })),
@@ -1286,7 +1286,7 @@ describe("an agent's page", () => {
           failure: Option.some({ action: "Configure", reason: Reason.Unwritable() })
         })
         expect(Option.map(model.edits[0]?.failure ?? Option.none(), failureMessage)).toEqual(
-          Option.some("The setup couldn't be saved. Try again when the host is available.")
+          Option.some("The setup couldn’t be saved. Try again when the host is available.")
         )
       })
     )
@@ -1390,9 +1390,9 @@ describe("an agent's page", () => {
       update,
       given(listed),
       ...read,
-      message(Message.FailedRead({ error: "This browser could not read the workspace's copy." })),
+      message(Message.FailedRead({ error: "This browser could not read the workspace’s copy." })),
       model((model) => {
-        expect(model.notice).toEqual(Option.some("This browser could not read the workspace's copy."))
+        expect(model.notice).toEqual(Option.some("This browser could not read the workspace’s copy."))
       }),
       message(Message.WroteAction({ written: Written.Rename({ agentId }) })),
       model((model) => {
@@ -1407,9 +1407,9 @@ describe("trying again", () => {
     story(
       update,
       given(listed),
-      message(Message.FailedRead({ error: "This browser could not read the workspace's copy." })),
+      message(Message.FailedRead({ error: "This browser could not read the workspace’s copy." })),
       model((model) => {
-        expect(model.notice).toEqual(Option.some("This browser could not read the workspace's copy."))
+        expect(model.notice).toEqual(Option.some("This browser could not read the workspace’s copy."))
         expect(model.reads).toBe(0)
       }),
       message(Message.ClickedRetry()),
@@ -1458,7 +1458,7 @@ describe("the setup of an agent", () => {
       { field: "Model", message: "Choose a model." }
     ])
     expect(problemsOf(withOffered, { ...setup, instructions: "x".repeat(20_001) })).toEqual([
-      { field: "Instructions", message: "The instructions are too long, or hold what can't be stored." }
+      { field: "Instructions", message: "The instructions are too long, or hold what can’t be stored." }
     ])
   })
 
@@ -1516,7 +1516,7 @@ describe("the setup of an agent", () => {
     expect(connectionChoices(opened, "harnesses", modelsId, ({ name }) => name)[1]).toEqual([
       modelsId,
       "Models",
-      { description: "Its integration doesn't give this.", isDisabled: true }
+      { description: "Its integration doesn’t give this.", isDisabled: true }
     ])
     const vertex = keylessConnection("vertex-1", "vertex", "Vertex")
     expect(
@@ -1526,7 +1526,7 @@ describe("the setup of an agent", () => {
         vertex.id,
         ({ name }) => name
       )[2]
-    ).toEqual([vertex.id, "Vertex", { description: "Its integration isn't installed on this host.", isDisabled: true }])
+    ).toEqual([vertex.id, "Vertex", { description: "Its integration isn’t installed on this host.", isDisabled: true }])
     // Until the host lists its integrations, it does not say so.
     expect(
       connectionChoices({ ...opened, integrations: Integrations.Loading() }, "harnesses", modelsId, ({ name }) => name)
@@ -1538,27 +1538,27 @@ describe("the setup of an agent", () => {
       "Check the name, instructions, and model, then try again."
     )
     expect(failureMessage({ action: "Create", reason: Reason.Unwritable() })).toBe(
-      "The agent couldn't be created. Try again when the host is available."
+      "The agent couldn’t be created. Try again when the host is available."
     )
     expect(failureMessage({ action: "Rename", reason: Reason.Invalid() })).toBe(
       "Use 1 to 80 characters, with no invisible ones."
     )
     expect(failureMessage({ action: "Rename", reason: Reason.Unwritable() })).toBe(
-      "The name couldn't be saved. Try again when the host is available."
+      "The name couldn’t be saved. Try again when the host is available."
     )
     expect(failureMessage({ action: "Configure", reason: Reason.Invalid() })).toBe(
       "Check the instructions and model, then save again."
     )
     expect(failureMessage({ action: "Configure", reason: Reason.Unwritable() })).toBe(
-      "The setup couldn't be saved. Try again when the host is available."
+      "The setup couldn’t be saved. Try again when the host is available."
     )
-    expect(failureMessage({ action: "Remove", reason: Reason.Invalid() })).toBe("That change isn't possible.")
+    expect(failureMessage({ action: "Remove", reason: Reason.Invalid() })).toBe("That change isn’t possible.")
     expect(failureMessage({ action: "Remove", reason: Reason.Unwritable() })).toBe(
-      "The agent couldn't be removed. Try again when the host is available."
+      "The agent couldn’t be removed. Try again when the host is available."
     )
     for (const action of ["Create", "Configure"] as const) {
       expect(failureMessage({ action, reason: Reason.Incomplete({ problems: [] }) })).toBe(
-        "This setup can't be saved as it is. Change what's marked, then try again."
+        "This setup can’t be saved as it is. Change what’s marked, then try again."
       )
     }
   })

@@ -145,7 +145,7 @@ const paletteView =
               onClick: Message.PickedPlace({ id: place.id })
             }))
           })),
-          emptyText: `Nothing matches "${model.query.trim()}".`
+          emptyText: `Nothing matches “${model.query.trim()}”.`
         })
       ]
     )
@@ -285,7 +285,7 @@ describe("palette", () => {
     scene(
       { update, view: paletteView() },
       given({ ...initial, query: " zzz " }),
-      expect(role("status")).toHaveText('Nothing matches "zzz".'),
+      expect(role("status")).toHaveText("Nothing matches “zzz”."),
       expectAll(all.role("group")).toHaveCount(0),
       expectAll(all.role("option")).toHaveCount(0),
       expect(role("listbox", { name: "Places" })).toExist(),

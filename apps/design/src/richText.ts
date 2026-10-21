@@ -152,7 +152,7 @@ const lastSurrogate = 0xdfff
 
 const replacementCharacter = "�"
 
-/** The character an entity reference names: a known name's, a code point's, or the replacement for an invalid one. */
+/** The character an entity reference names: a known name’s, a code point’s, or the replacement for an invalid one. */
 const characterOfEntity = (
   whole: string,
   decimal: string | undefined,
@@ -297,7 +297,7 @@ const previewRuns = ({ text, mentions = [] }: Markdown): ReadonlyArray<Run> =>
 
 /**
  * The words of `markdown` as a reader hears them, without its syntax or layout: one line of words, each mention as "@"
- * and the member's current name. It is the text of the `isInline` form of `richText`.
+ * and the member’s current name. It is the text of the `isInline` form of `richText`.
  */
 export const richTextWords = (markdown: Markdown): string => joinRuns(previewRuns(markdown))
 
@@ -311,7 +311,7 @@ type Renderer<Message, Requirements> = Readonly<{
 const renderMentionChip = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, label: string): Html =>
   h.span([h.Class(mentionLook)], [label])
 
-/** A mention as a chip, a button that opens the member's card when the text has somewhere to open it. */
+/** A mention as a chip, a button that opens the member’s card when the text has somewhere to open it. */
 const renderMention = <Message, Requirements>(
   { h, profiles, nextMentionPart }: Renderer<Message, Requirements>,
   memberId: string,
@@ -506,12 +506,12 @@ const renderBlockToken = <Message, Requirements>(
 /**
  * `config.text` as the markdown it is, in the type around it: paragraphs with a line break where the text has one,
  * emphasis, strong text, strikethrough, inline code and code blocks, quotes, numbered, bulleted, and task lists,
- * tables that scroll sideways when wide, rules, headings that keep the text's size and only weigh more, links, and
- * mentions. A mention, a link to `member:<id>`, is a chip with "@" and the member's current name among `mentions`, or
+ * tables that scroll sideways when wide, rules, headings that keep the text’s size and only weigh more, links, and
+ * mentions. A mention, a link to `member:<id>`, is a chip with "@" and the member’s current name among `mentions`, or
  * the name the text recorded for anyone else. Only web and email addresses link, in a new tab; any other link shows
  * its text. Images are not loaded: they show as links to them. Raw HTML shows as written, and entity references as the
  * characters they name, except in code. With `profiles` each mention is a button that opens the card of the member it
- * names, with an id made of the scope, "mention", and the mention's number in the text. With `isInline` it is one run
+ * names, with an id made of the scope, "mention", and the mention’s number in the text. With `isInline` it is one run
  * of words and mentions, a `span` without layout or formatting, for a preview, whose mentions open nothing.
  */
 export const richText = <Message, Requirements>(

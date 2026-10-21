@@ -226,7 +226,7 @@ describe("the connections list", () => {
       expect(
         within(
           role("button", { name: "Vertex · Research, Unavailable" }),
-          text("Its integration isn't installed on this host.")
+          text("Its integration isn’t installed on this host.")
         )
       ).toExist(),
       expect(within(role("button", { name: "Anthropic · Team" }), selector(".tooltip-anchor"))).toBeAbsent()
@@ -374,11 +374,11 @@ describe("the connections list", () => {
       given(modifyFields(opened, { isLoaded: () => false })),
       Subscription.emit(
         subscriptions.connections,
-        Message.FailedRead({ error: "This browser could not read the workspace's copy." })
+        Message.FailedRead({ error: "This browser could not read the workspace’s copy." })
       ),
       expect(role("main", { name: "Connections" })).toExist(),
-      expect(role("heading", { name: "Couldn't load connections", level: 2 })).toExist(),
-      expect(text("This browser could not read the workspace's copy.")).toExist(),
+      expect(role("heading", { name: "Couldn’t load connections", level: 2 })).toExist(),
+      expect(text("This browser could not read the workspace’s copy.")).toExist(),
       expect(art("came-apart")).toExist(),
       expect(role("alert")).toBeAbsent(),
       expect(role("status")).toBeAbsent(),
@@ -439,9 +439,9 @@ describe("the connections list", () => {
       given(opened),
       Subscription.emit(
         subscriptions.connections,
-        Message.FailedRead({ error: "This browser could not read the workspace's copy." })
+        Message.FailedRead({ error: "This browser could not read the workspace’s copy." })
       ),
-      expect(text("This browser could not read the workspace's copy.")).toExist(),
+      expect(text("This browser could not read the workspace’s copy.")).toExist(),
       expect(role("alert")).toExist()
     )
   })
@@ -623,7 +623,7 @@ describe("the connections' sections of the sidebar", () => {
       expect(
         within(
           first(all.role("button", { name: "Hosted, Unavailable" })),
-          text("Its integration isn't installed on this host.")
+          text("Its integration isn’t installed on this host.")
         )
       ).toExist()
     )
@@ -737,18 +737,18 @@ describe("a connection's page", () => {
   })
 
   for (const [status, title, line, mark, description] of [
-    ["unauthorized", "Key refused", "The system refused this connection's key.", "bg-danger-mark", undefined],
+    ["unauthorized", "Key refused", "The system refused this connection’s key.", "bg-danger-mark", undefined],
     [
       "misconfigured",
-      "Settings don't work",
+      "Settings don’t work",
       "The settings lead nowhere this integration works.",
       "bg-danger-mark",
       undefined
     ],
     [
       "unavailable",
-      "Couldn't reach it",
-      "The system didn't answer. It may answer later.",
+      "Couldn’t reach it",
+      "The system didn’t answer. It may answer later.",
       "bg-caution-mark",
       undefined
     ],
@@ -794,7 +794,7 @@ describe("a connection's page", () => {
           failure: { action: "Check", reason: "Failed", description: Option.none() }
         })
       ),
-      expect(text("The connection couldn't be checked. Try again when the host is available.")).toExist(),
+      expect(text("The connection couldn’t be checked. Try again when the host is available.")).toExist(),
       expect(role("button", { name: "Refresh" })).toBeAbsent(),
       expect(role("button", { name: "Check connection" })).toBeEnabled(),
       click(role("button", { name: "Check connection" })),
@@ -805,10 +805,10 @@ describe("a connection's page", () => {
           failure: { action: "Check", reason: "Uninstalled", description: Option.none() }
         })
       ),
-      expect(text("This integration isn't installed on this host anymore.")).toExist(),
+      expect(text("This integration isn’t installed on this host anymore.")).toExist(),
       click(role("button", { name: "Refresh" })),
       expectOutMessage(OutMessage.RequestedIntegrations()),
-      expect(text("This integration isn't installed on this host anymore.")).toBeAbsent(),
+      expect(text("This integration isn’t installed on this host anymore.")).toBeAbsent(),
       expect(role("button", { name: "Refresh" })).toBeAbsent()
     )
   })
@@ -841,10 +841,10 @@ describe("a connection's page", () => {
         RenameConnection,
         Message.FailedWriteAction({ written: { _tag: "Rename", connectionId: search.id }, reason: "Failed" })
       ),
-      expect(text("The name couldn't be saved. Try again when the host is available.")).toExist(),
+      expect(text("The name couldn’t be saved. Try again when the host is available.")).toExist(),
       click(role("button", { name: "Save name" })),
       Command.resolve(RenameConnection, Message.WroteAction({ written: { _tag: "Rename", connectionId: search.id } })),
-      expect(text("The name couldn't be saved. Try again when the host is available.")).toBeAbsent(),
+      expect(text("The name couldn’t be saved. Try again when the host is available.")).toBeAbsent(),
       expect(label("Connection name")).toBeEnabled()
     )
   })
@@ -874,14 +874,14 @@ describe("a connection's page", () => {
         ConfigureConnection,
         Message.FailedWriteAction({ written: { _tag: "Configure", connectionId: search.id }, reason: "Failed" })
       ),
-      expect(text("The settings couldn't be saved. Try again when the host is available.")).toExist(),
+      expect(text("The settings couldn’t be saved. Try again when the host is available.")).toExist(),
       expect(label("Server URL")).toHaveValue("https://search.example.com/v2/mcp"),
       click(role("button", { name: "Save settings" })),
       Command.resolve(
         ConfigureConnection,
         Message.WroteAction({ written: { _tag: "Configure", connectionId: search.id } })
       ),
-      expect(text("The settings couldn't be saved. Try again when the host is available.")).toBeAbsent()
+      expect(text("The settings couldn’t be saved. Try again when the host is available.")).toBeAbsent()
     )
   })
 
@@ -985,7 +985,7 @@ describe("a connection's page", () => {
       { update, view: page(gone) },
       given(modifyFields(opened, { connections: () => [{ connection: gone, pending: false }] })),
       inside(
-        role("note", { name: "Its integration isn't installed on this host" }),
+        role("note", { name: "Its integration isn’t installed on this host" }),
         expect(text("Nothing can use this connection. Its settings stay until it is removed.")).toExist()
       ),
       expect(role("region", { name: "Check" })).toBeAbsent(),
@@ -1037,7 +1037,7 @@ describe("a connection's page", () => {
       { update, view: page(search) },
       given(opened),
       expect(role("main", { name: "Connection" })).toExist(),
-      expect(role("heading", { name: "This connection isn't here", level: 2 })).toExist(),
+      expect(role("heading", { name: "This connection isn’t here", level: 2 })).toExist(),
       expect(art("lost-thread")).toExist(),
       expect(text("It may have been removed, or you can no longer see it.")).toExist(),
       click(role("button", { name: "Show all connections" })),
@@ -1051,7 +1051,7 @@ describe("a connection's page", () => {
       given(modifyFields(opened, { isLoaded: () => false })),
       expect(role("main", { name: "Connection" })).toExist(),
       expect(role("status")).toHaveText("Loading connection…"),
-      expect(role("heading", { name: "This connection isn't here" })).toBeAbsent()
+      expect(role("heading", { name: "This connection isn’t here" })).toBeAbsent()
     )
   })
 
@@ -1061,13 +1061,13 @@ describe("a connection's page", () => {
       given(
         modifyFields(opened, {
           isLoaded: () => false,
-          notice: () => Option.some("This browser could not read the workspace's copy.")
+          notice: () => Option.some("This browser could not read the workspace’s copy.")
         })
       ),
-      expect(role("heading", { name: "Couldn't load connections", level: 2 })).toExist(),
+      expect(role("heading", { name: "Couldn’t load connections", level: 2 })).toExist(),
       expect(art("came-apart")).toExist(),
       expect(role("status")).toBeAbsent(),
-      expect(role("heading", { name: "This connection isn't here" })).toBeAbsent(),
+      expect(role("heading", { name: "This connection isn’t here" })).toBeAbsent(),
       click(role("button", { name: "Retry" })),
       expect(art("came-apart")).toBeAbsent(),
       expect(role("status")).toHaveText("Loading connection…")
@@ -1140,7 +1140,7 @@ describe("the connections", () => {
       ),
       expect(role("note", { name: "Working" })).toExist(),
       Subscription.emit(subscriptions.connections, Message.ReceivedConnections({ connections: [] })),
-      expect(role("heading", { name: "This connection isn't here", level: 2 })).toExist(),
+      expect(role("heading", { name: "This connection isn’t here", level: 2 })).toExist(),
       Subscription.emit(
         subscriptions.connections,
         Message.ReceivedConnections({ connections: [{ connection: search, pending: false }] })
@@ -1557,7 +1557,7 @@ describe("adding a connection", () => {
       inside(
         configureDialog,
         expect(
-          text("The connection couldn't be created. Try again when the host is available; it won't be created twice.")
+          text("The connection couldn’t be created. Try again when the host is available; it won’t be created twice.")
         ).toExist(),
         expect(label("Server URL")).toHaveValue("https://search.example.com/mcp"),
         expect(label("API key")).toHaveValue("secret"),
@@ -1632,9 +1632,9 @@ describe("adding a connection", () => {
       ),
       inside(
         configureDialog,
-        expect(text("This integration isn't installed on this host anymore.")).toExist(),
+        expect(text("This integration isn’t installed on this host anymore.")).toExist(),
         click(role("button", { name: "Refresh" })),
-        expect(text("This integration isn't installed on this host anymore.")).toBeAbsent()
+        expect(text("This integration isn’t installed on this host anymore.")).toBeAbsent()
       ),
       expectOutMessage(OutMessage.RequestedIntegrations())
     )
@@ -1902,7 +1902,7 @@ describe("removing a connection", () => {
       ),
       inside(
         removeDialog,
-        expect(text("The connection couldn't be removed. Try again when the host is available.")).toExist(),
+        expect(text("The connection couldn’t be removed. Try again when the host is available.")).toExist(),
         click(role("button", { name: "Remove connection" }))
       ),
       Command.resolve(RemoveConnection, Message.WroteAction({ written: Written.Remove({ connectionId: search.id }) })),

@@ -451,21 +451,21 @@ const invalidMessages: Readonly<Record<AgentAction, string>> = {
   Create: "Check the name, instructions, and model, then try again.",
   Rename: "Use 1 to 80 characters, with no invisible ones.",
   Configure: "Check the instructions and model, then save again.",
-  Remove: "That change isn't possible."
+  Remove: "That change isn’t possible."
 }
 
 const unwritableMessages: Readonly<Record<AgentAction, string>> = {
-  Create: "The agent couldn't be created. Try again when the host is available.",
-  Rename: "The name couldn't be saved. Try again when the host is available.",
-  Configure: "The setup couldn't be saved. Try again when the host is available.",
-  Remove: "The agent couldn't be removed. Try again when the host is available."
+  Create: "The agent couldn’t be created. Try again when the host is available.",
+  Rename: "The name couldn’t be saved. Try again when the host is available.",
+  Configure: "The setup couldn’t be saved. Try again when the host is available.",
+  Remove: "The agent couldn’t be removed. Try again when the host is available."
 }
 
 /** What a failure says under the form that made it, for the action it belongs to. */
 export const failureMessage = ({ action, reason }: Failure): string =>
   Reason.match(reason, {
     Invalid: () => invalidMessages[action],
-    Incomplete: () => "This setup can't be saved as it is. Change what's marked, then try again.",
+    Incomplete: () => "This setup can’t be saved as it is. Change what’s marked, then try again.",
     Unwritable: () => unwritableMessages[action]
   })
 
@@ -510,8 +510,8 @@ const unavailableChoice = (model: Pick<Model, "connections" | "integrations">, c
         ...(areIntegrationsListed(model)
           ? {
               description: Option.isSome(findIntegration(model, connection.integration))
-                ? "Its integration doesn't give this."
-                : "Its integration isn't installed on this host."
+                ? "Its integration doesn’t give this."
+                : "Its integration isn’t installed on this host."
             }
           : {}),
         isDisabled: true

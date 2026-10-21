@@ -243,7 +243,7 @@ describe("the channels", () => {
           [withBob.id, "Bob"]
         ])
         expect(groupNameOf(model, withBob.id)).toBe("Bob")
-        expect(groupNameOf(model, GroupId.GroupId.make("gone"))).toBe("a group you don't see")
+        expect(groupNameOf(model, GroupId.GroupId.make("gone"))).toBe("a group you don’t see")
       })
     )
   })
@@ -315,9 +315,9 @@ describe("the channels", () => {
       update,
       given(listed),
       ...read,
-      message(Message.FailedRead({ error: "This browser could not read the workspace's copy." })),
+      message(Message.FailedRead({ error: "This browser could not read the workspace’s copy." })),
       model((model) => {
-        expect(model.notice).toEqual(Option.some("This browser could not read the workspace's copy."))
+        expect(model.notice).toEqual(Option.some("This browser could not read the workspace’s copy."))
       }),
       message(Message.ClickedRemove({ channelId: support.id })),
       Command.resolve(

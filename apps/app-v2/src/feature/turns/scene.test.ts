@@ -70,11 +70,11 @@ describe("an agent's turn in a thread", () => {
     scene(
       { update, view: rowOf(running.id) },
       given(opened([itemOf(running)])),
-      expect(role("group", { name: "Scout's turn" })).toExist(),
-      expect(within(role("group", { name: "Scout's turn" }), text("Scout"))).toHaveClass("text-agent"),
+      expect(role("group", { name: "Scout’s turn" })).toExist(),
+      expect(within(role("group", { name: "Scout’s turn" }), text("Scout"))).toHaveClass("text-agent"),
       expect(text("S")).toHaveAttr("aria-hidden", "true"),
       expect(text("S")).toHaveClass("bg-avatar-lilac-bg"),
-      expect(within(role("group", { name: "Scout's turn" }), role("status"))).toHaveText("Working")
+      expect(within(role("group", { name: "Scout’s turn" }), role("status"))).toHaveText("Working")
     )
   })
 
@@ -85,7 +85,7 @@ describe("an agent's turn in a thread", () => {
       { update, view: (model, h) => h.div([h.Role("region")], [row(model, h)]) },
       given(opened([itemOf(running)])),
       expect(role("region")).toExist(),
-      expect(role("group", { name: "Scout's turn" })).toBeAbsent()
+      expect(role("group", { name: "Scout’s turn" })).toBeAbsent()
     )
   })
 
@@ -130,21 +130,21 @@ describe("what a turn that ended says under its row", () => {
     scene(
       { update, view: rowOf(turn.id) },
       given(opened([itemOf(turn)])),
-      expect(within(role("group", { name: "Scout's turn" }), text(line))).toHaveClass("text-ink-secondary")
+      expect(within(role("group", { name: "Scout’s turn" }), text(line))).toHaveClass("text-ink-secondary")
     )
 
   const saysNothing = (turn: typeof running) =>
     scene(
       { update, view: rowOf(turn.id) },
       given(opened([itemOf(turn)])),
-      expect(within(role("group", { name: "Scout's turn" }), selector("p"))).toBeAbsent()
+      expect(within(role("group", { name: "Scout’s turn" }), selector("p"))).toBeAbsent()
     )
 
   it("is why it failed, with Agent settings at its end, which asks for the page of its agent", () => {
     scene(
       { update, view: rowOf(failed.id) },
       given(opened([itemOf(failed)])),
-      expect(within(role("group", { name: "Scout's turn" }), text("The model was unavailable."))).toHaveClass(
+      expect(within(role("group", { name: "Scout’s turn" }), text("The model was unavailable."))).toHaveClass(
         "text-ink-secondary"
       ),
       expect(role("button", { name: "Agent settings" })).toHaveClass("text-ink-secondary"),
@@ -195,7 +195,7 @@ describe("what a turn that ended says under its row", () => {
     scene(
       { update, view: rowOf(running.id) },
       given(opened([itemOf({ ...running, status: "cancelling" }, { pending: true })])),
-      expect(within(role("group", { name: "Scout's turn" }), text("Sending…"))).toExist()
+      expect(within(role("group", { name: "Scout’s turn" }), text("Sending…"))).toExist()
     )
   })
 })
@@ -284,14 +284,14 @@ describe("stopping and retrying a turn", () => {
 
 describe("why a stop or a retry did not go through", () => {
   const problems: ReadonlyArray<readonly [TurnProblem, string]> = [
-    ["stop-failed", "Couldn't stop the turn. Try again."],
-    ["retry-failed", "Couldn't start another attempt. Try again."],
+    ["stop-failed", "Couldn’t stop the turn. Try again."],
+    ["retry-failed", "Couldn’t start another attempt. Try again."],
     ["finished", "This turn has already finished."],
     ["still-running", "This turn is still running."],
     ["replied", "This turn already replied."],
     ["superseded", "A newer turn followed this one."],
     ["departed", "Scout no longer takes part in this thread."],
-    ["denied", "You can't direct Scout."],
+    ["denied", "You can’t direct Scout."],
     ["gone", "This turn is no longer available."]
   ]
 
@@ -330,7 +330,7 @@ describe("why a stop or a retry did not go through", () => {
       given(opened([itemOf(running)], mayUseAgents)),
       click(role("button", { name: "Stop Scout" })),
       Command.resolve(StopTurn, Message.FailedStop({ turnId: running.id })),
-      expect(role("alert")).toHaveText("Couldn't stop the turn. Try again."),
+      expect(role("alert")).toHaveText("Couldn’t stop the turn. Try again."),
       click(role("button", { name: "Stop Scout" })),
       expect(role("alert")).toBeAbsent(),
       Command.resolve(StopTurn, Message.WroteAction()),
@@ -344,7 +344,7 @@ describe("why a stop or a retry did not go through", () => {
       given(opened([itemOf(failed, { retryOpen: true })], mayUseAgents)),
       click(role("button", { name: "Retry" })),
       Command.resolve(RetryTurn, Message.FailedRetry({ turnId: failed.id })),
-      expect(role("alert")).toHaveText("Couldn't start another attempt. Try again.")
+      expect(role("alert")).toHaveText("Couldn’t start another attempt. Try again.")
     )
   })
 })
@@ -559,7 +559,7 @@ describe("a turn's log, as the side pane", () => {
       given(showing([itemOf(broken)], logOf(broken.id, { state: LogState.Ended() }))),
       expect(text("Turn failed")).toExist(),
       expect(text("The model was unavailable.")).toExist(),
-      expect(text("Review the agent's setup")).toExist(),
+      expect(text("Review the agent’s setup")).toExist(),
       expect(text("Fix what stopped this turn before starting another attempt.")).toHaveClass("text-ink"),
       expect(text("This turn has finished.")).toExist()
     )
@@ -620,7 +620,7 @@ describe("a turn's log, as the side pane", () => {
       expect(text("Waiting to start. There is no output yet.")).toExist(),
       expect(text("Waiting for activity")).toExist(),
       expect(text("Following live")).toBeAbsent(),
-      expect(text("Review the agent's setup")).toBeAbsent()
+      expect(text("Review the agent’s setup")).toBeAbsent()
     )
   })
 
@@ -707,7 +707,7 @@ describe("a turn's log, as the side pane", () => {
     scene(
       { update, view: logPane },
       given(showing([itemOf(working)], logOf(working.id, { state: LogState.Unavailable() }))),
-      expect(text("This turn log isn't available")).toExist(),
+      expect(text("This turn log isn’t available")).toExist(),
       expect(text("It may be in a thread you can no longer open.")).toExist(),
       expect(role("list", { name: "Activity" })).toBeAbsent(),
       expect(role("button", { name: "Close turn log" })).toExist()
@@ -715,7 +715,7 @@ describe("a turn's log, as the side pane", () => {
     scene(
       { update, view: logPane },
       given(showing([itemOf(broken)], logOf(working.id))),
-      expect(text("This turn log isn't available")).toExist(),
+      expect(text("This turn log isn’t available")).toExist(),
       expect(role("button", { name: "Back to thread" })).toExist(),
       expect(role("status")).toBeAbsent()
     )
@@ -732,11 +732,11 @@ describe("a turn's log, as the side pane", () => {
           })
         )
       ),
-      expect(text("Can't load this turn log")).toExist(),
+      expect(text("Can’t load this turn log")).toExist(),
       expect(text("The log could not be followed. Check the connection.")).toExist(),
       click(role("button", { name: "Try again" })),
       expect(text("Loading the turn log…")).toExist(),
-      expect(text("Can't load this turn log")).toBeAbsent()
+      expect(text("Can’t load this turn log")).toBeAbsent()
     )
   })
 })
@@ -800,7 +800,7 @@ describe("showing a turn's log", () => {
       click(role("button", { name: "Try again" })),
       expect(text("Loading the turn log…")).toExist(),
       Subscription.emit(subscriptions.log, Message.FoundLogUnavailable({ turnId: working.id })),
-      expect(text("This turn log isn't available")).toExist()
+      expect(text("This turn log isn’t available")).toExist()
     )
   })
 

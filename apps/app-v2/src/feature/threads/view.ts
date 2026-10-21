@@ -231,7 +231,7 @@ export const cantLoadConversation = <Message, Requirements>(
 ): Html =>
   paneEmpty(h, {
     art: "came-apart",
-    title: "Can't load this conversation",
+    title: "Can’t load this conversation",
     copy: "Try again once the host is reachable.",
     action: button(h, "Try again", onTryAgain)
   })

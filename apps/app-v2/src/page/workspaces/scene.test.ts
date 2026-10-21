@@ -340,8 +340,8 @@ describe("a listing the host could not give", () => {
     scene(
       { update, view: sceneView },
       given(showing(Workspaces.Unreachable())),
-      expect(role("heading", { name: "Can't reach your workspace host", level: 1 })).toExist(),
-      expect(text("You're still signed in. Try again once the host is running.")).toExist(),
+      expect(role("heading", { name: "Can’t reach your workspace host", level: 1 })).toExist(),
+      expect(text("You’re still signed in. Try again once the host is running.")).toExist(),
       expect(role("heading", { name: "Choose a workspace" })).toBeAbsent(),
       expect(role("button", { name: "Create workspace" })).toBeAbsent(),
       expect(role("alert")).toBeAbsent(),
@@ -350,7 +350,7 @@ describe("a listing the host could not give", () => {
       click(role("button", { name: "Try again" })),
       Command.expectExact(LoadWorkspaces()),
       expect(role("heading", { name: "Checking your session" })).toExist(),
-      expect(role("heading", { name: "Can't reach your workspace host" })).toBeAbsent(),
+      expect(role("heading", { name: "Can’t reach your workspace host" })).toBeAbsent(),
       Command.resolve(
         LoadWorkspaces,
         Message.SucceededLoadWorkspaces({ memberships: [membership], invitations: [northstarInvitation] })
@@ -368,19 +368,19 @@ describe("a listing the host could not give", () => {
           Workspaces.Loaded({ memberships: [membership], invitations: [northstarInvitation], reloadFailed: true })
         )
       ),
-      expect(role("alert")).toHaveText("Couldn't refresh your workspaces."),
+      expect(role("alert")).toHaveText("Couldn’t refresh your workspaces."),
       expect(text("1 workspace · 1 pending invitation")).toExist(),
       expect(role("button", { name: "Studio" })).toExist(),
       expect(role("button", { name: "Accept invite to Northstar Studio" })).toExist(),
       expect(role("button", { name: "Create workspace" })).toExist(),
-      expect(role("heading", { name: "Can't reach your workspace host" })).toBeAbsent(),
+      expect(role("heading", { name: "Can’t reach your workspace host" })).toBeAbsent(),
       expect(role("button", { name: "Try again" })).toHaveClass("text-ink-secondary"),
       click(role("button", { name: "Try again" })),
       Command.expectExact(LoadWorkspaces()),
       expect(role("alert")).toBeAbsent(),
       expect(role("button", { name: "Studio" })).toExist(),
       Command.resolve(LoadWorkspaces, Message.FailedLoadWorkspaces()),
-      expect(role("alert")).toHaveText("Couldn't refresh your workspaces."),
+      expect(role("alert")).toHaveText("Couldn’t refresh your workspaces."),
       expect(role("button", { name: "Studio" })).toExist(),
       click(role("button", { name: "Try again" })),
       Command.resolve(
@@ -448,7 +448,7 @@ describe("creating a workspace", () => {
       expect(label("Workspace name")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
       expect(label("Workspace name")).toHaveValue(""),
       expect(label("Your name")).toHaveValue(""),
-      expect(text("You'll be the owner of this workspace.")).toExist(),
+      expect(text("You’ll be the owner of this workspace.")).toExist(),
       expect(text("What people there will call you. You can change it later.")).toExist(),
       expect(inDialog("Create workspace")).toBeDisabled(),
       type(label("Workspace name"), "Acme"),
@@ -577,13 +577,13 @@ describe("creating a workspace", () => {
           error: FormErrors.make({
             ...noFormErrors,
             form: Option.some(
-              "We couldn't confirm creation. Try again with this name to safely check the same request."
+              "We couldn’t confirm creation. Try again with this name to safely check the same request."
             )
           })
         })
       ),
       expect(role("alert")).toHaveText(
-        "We couldn't confirm creation. Try again with this name to safely check the same request."
+        "We couldn’t confirm creation. Try again with this name to safely check the same request."
       ),
       expect(label("Workspace name")).not.toHaveAttr("aria-invalid"),
       expect(label("Your name")).not.toHaveAttr("aria-invalid"),
@@ -604,14 +604,14 @@ describe("creating a workspace", () => {
       Command.resolve(CreateWorkspace, Message.SucceededCreate({ workspace: acme.workspace })),
       Command.resolve(LoadWorkspaces, Message.FailedLoadWorkspaces()),
       expect(within(createdDialog, role("alert"))).toHaveText(
-        "Your workspace was created, but we couldn't refresh the list. Try again to open it."
+        "Your workspace was created, but we couldn’t refresh the list. Try again to open it."
       ),
       expect(createdDialog).toHaveAccessibleDescription("Acme is ready."),
       expect(inCreatedDialog("Close")).toExist(),
       expect(inCreatedDialog("Try again")).toHaveClass("bg-action"),
       expect(within(createdDialog, role("button", { name: "Create workspace" }))).toBeAbsent(),
       expect(text("Opening your workspace…")).toBeAbsent(),
-      expect(text("Couldn't refresh your workspaces.")).toExist(),
+      expect(text("Couldn’t refresh your workspaces.")).toExist(),
       click(inCreatedDialog("Try again")),
       Command.expectExact(LoadWorkspaces()),
       expect(text("Opening your workspace…")).toExist(),
@@ -637,7 +637,7 @@ describe("creating a workspace", () => {
       click(inCreatedDialog("Close")),
       ...dialogClosed(),
       expect(createdDialog).toBeAbsent(),
-      expect(role("alert")).toHaveText("Couldn't refresh your workspaces."),
+      expect(role("alert")).toHaveText("Couldn’t refresh your workspaces."),
       expect(role("button", { name: "Studio" })).toExist()
     )
   })
@@ -790,12 +790,12 @@ describe("joining a workspace", () => {
 
   for (const [description, wording] of [
     ["changed", "This invitation changed while you were accepting it. Try again."],
-    ["is for another address", "This invitation isn't addressed to this address."],
+    ["is for another address", "This invitation isn’t addressed to this address."],
     ["is no longer there", "This invitation is no longer available."],
-    ["cannot be accepted as it is", "This invitation can't be accepted as it is."],
+    ["cannot be accepted as it is", "This invitation can’t be accepted as it is."],
     [
       "could not be accepted because the host could not be reached",
-      "We couldn't accept the invitation. Try again when the host is available."
+      "We couldn’t accept the invitation. Try again when the host is available."
     ]
   ] as const) {
     it(`says under the field, and clears it as the person types, that the invitation ${description}`, () => {
@@ -828,7 +828,7 @@ describe("joining a workspace", () => {
       Command.resolve(AcceptInvitation, Message.SucceededJoin()),
       Mount.expectEnded(SelectOnFocus),
       Command.resolve(LoadWorkspaces, Message.FailedLoadWorkspaces()),
-      expect(within(joinDialog, role("alert"))).toHaveText("Joined, but we couldn't load your workspaces. Try again."),
+      expect(within(joinDialog, role("alert"))).toHaveText("Joined, but we couldn’t load your workspaces. Try again."),
       expect(inJoinDialog("Close")).toExist(),
       expect(inJoinDialog("Try again")).toHaveClass("bg-action"),
       expect(inJoinDialog("Join")).toBeAbsent(),
@@ -856,7 +856,7 @@ describe("joining a workspace", () => {
       click(inJoinDialog("Close")),
       ...dialogClosed(),
       expect(joinDialog).toBeAbsent(),
-      expect(role("alert")).toHaveText("Couldn't refresh your workspaces."),
+      expect(role("alert")).toHaveText("Couldn’t refresh your workspaces."),
       expect(role("button", { name: "Accept invite to Northstar Studio" })).toExist()
     )
   })

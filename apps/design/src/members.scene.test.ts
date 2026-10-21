@@ -90,7 +90,7 @@ const view = Composition.makeView((model, h) =>
     candidates: people,
     query: model.picker.inputValue,
     isOpen: model.picker.isOpen,
-    hint: "You're included automatically. Add others now or later.",
+    hint: "You’re included automatically. Add others now or later.",
     onRemove: (id) => Message.ClickedRemove({ id }),
     embed: (viewInputs) => h.block(PickerBinding.embedView({ slotId: "members", model: model.picker, viewInputs }))
   })
@@ -134,7 +134,7 @@ describe("memberPicker", () => {
       given(initial),
       toggleReady,
       expect(combobox).toExist(),
-      expect(combobox).toHaveAccessibleDescription("You're included automatically. Add others now or later.")
+      expect(combobox).toHaveAccessibleDescription("You’re included automatically. Add others now or later.")
     )
   })
 

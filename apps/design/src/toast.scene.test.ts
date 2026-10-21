@@ -37,7 +37,7 @@ const toasts = (model: Model, h: HtmlBuilder<Message>) =>
     notice(h, Option.none()),
     ...model.refused.map((key) =>
       toast(h, {
-        text: `Couldn't ${key}: You may not.`,
+        text: `Couldn’t ${key}: You may not.`,
         ...(key === "post" ? { detail: "found a bug. composer crashes" } : {}),
         action: { label: "Dismiss", onClick: Message.Dismissed({ key }) }
       })
@@ -61,7 +61,7 @@ describe("toast", () => {
     scene(
       { update, view: toasts },
       given({ ...initial, refused: ["post"] }),
-      expect(within(role("alert"), text("Couldn't post: You may not."))).toExist(),
+      expect(within(role("alert"), text("Couldn’t post: You may not."))).toExist(),
       expect(within(role("alert"), text("found a bug. composer crashes"))).toExist(),
       expect(within(role("alert"), role("button", { name: "Dismiss" }))).toExist()
     )
@@ -71,7 +71,7 @@ describe("toast", () => {
     scene(
       { update, view: toasts },
       given({ ...initial, refused: ["rename"] }),
-      expect(text("Couldn't rename: You may not.")).toExist(),
+      expect(text("Couldn’t rename: You may not.")).toExist(),
       expect(text("found a bug. composer crashes")).toBeAbsent()
     )
   })
@@ -81,8 +81,8 @@ describe("toast", () => {
       { update, view: toasts },
       given(initial),
       click(within(role("alert"), role("button", { name: "Dismiss" }))),
-      expect(text("Couldn't post: You may not.")).toBeAbsent(),
-      expect(text("Couldn't rename: You may not.")).toExist()
+      expect(text("Couldn’t post: You may not.")).toBeAbsent(),
+      expect(text("Couldn’t rename: You may not.")).toExist()
     )
   })
 
@@ -103,8 +103,8 @@ describe("toastStack", () => {
       { update, view: toasts },
       given(initial),
       expect(selector('[aria-live="polite"]')).toExist(),
-      expect(within(selector('[aria-live="polite"]'), text("Couldn't post: You may not."))).toExist(),
-      expect(within(selector('[aria-live="polite"]'), text("Couldn't rename: You may not."))).toExist(),
+      expect(within(selector('[aria-live="polite"]'), text("Couldn’t post: You may not."))).toExist(),
+      expect(within(selector('[aria-live="polite"]'), text("Couldn’t rename: You may not."))).toExist(),
       click(within(selector('[aria-live="polite"]'), role("button", { name: "Dismiss" }))),
       click(role("button", { name: "Dismiss" })),
       expect(role("alert")).toBeAbsent(),
@@ -224,7 +224,7 @@ describe("confirmationStack", () => {
     scene(
       { update, view: (model, h) => h.div([], [toasts(model, h), confirmations(model, h)]) },
       given(initial),
-      expect(within(selector('div[aria-live="polite"]'), text("Couldn't post: You may not."))).toExist(),
+      expect(within(selector('div[aria-live="polite"]'), text("Couldn’t post: You may not."))).toExist(),
       expect(within(role("list", { name: "Notifications" }), text("Name saved"))).toExist(),
       expect(within(selector('div[aria-live="polite"]'), role("button", { name: "Dismiss" }))).toExist(),
       expect(within(role("list", { name: "Notifications" }), role("button", { name: "Open" }))).toExist()

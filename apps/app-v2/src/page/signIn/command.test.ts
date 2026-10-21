@@ -30,7 +30,7 @@ const checkCode = (answer: Answer, code: string) => {
 const unlisted = [
   ["answers a status the contract does not list", { status: 500, body: { message: "Boom" } }],
   ["cannot be reached", "unreachable"],
-  ["makes the client's call die", "dies"]
+  ["makes the client’s call die", "dies"]
 ] as const satisfies ReadonlyArray<readonly [string, Answer]>
 
 /** Why the host rejected a code, which reaches the app in the error the contract lists for it, and how it is told. */

@@ -28,7 +28,7 @@ export const view = ActionsComposition.makeView((model, h) => {
             [],
             [
               toast(h, {
-                text: `Couldn't ${what}: ${why}`,
+                text: `Couldn’t ${what}: ${why}`,
                 ...Option.match(text, { onNone: () => ({}), onSome: (detail) => ({ detail }) }),
                 action: { label: "Dismiss", onClick: Message.ClickedDismiss({ key }) }
               })

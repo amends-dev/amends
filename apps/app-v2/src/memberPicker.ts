@@ -45,7 +45,7 @@ export const youInPicker = (members: ReadonlyArray<Member.Member>, memberId: Mem
 /** What a picker says under it of who is in: the person themself, who is always included, and `chosen` others. */
 export const includedHint = (chosen: number): string =>
   chosen === 0
-    ? "You're included automatically. Add others now or later."
+    ? "You’re included automatically. Add others now or later."
     : `${pluralize(chosen + 1, "member", "members")}, including you.`
 
 /** Move focus to the input of the picker `id`, such as after the chip that held it was removed. */

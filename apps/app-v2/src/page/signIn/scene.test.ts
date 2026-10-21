@@ -77,7 +77,7 @@ describe("the sign-in page", () => {
     scene(
       { update, view },
       given(enteringEmail("RequestFailed")),
-      expect(role("alert")).toHaveText("We couldn't request a code. Try again."),
+      expect(role("alert")).toHaveText("We couldn’t request a code. Try again."),
       expect(label("Email")).not.toHaveAttr("aria-invalid")
     )
   })
@@ -90,7 +90,7 @@ describe("the sign-in page", () => {
       Command.expectExact(SendCode({ email })),
       expect(role("button", { name: "Continue" })).toBeDisabled(),
       Command.resolve(SendCode, Message.FailedSendCode({ error: "RequestFailed" })),
-      expect(role("alert")).toHaveText("We couldn't request a code. Try again."),
+      expect(role("alert")).toHaveText("We couldn’t request a code. Try again."),
       expect(label("Email")).toHaveValue(email),
       expect(role("button", { name: "Continue" })).not.toBeDisabled()
     )
@@ -139,7 +139,7 @@ describe("the sign-in page", () => {
       expect(role("button", { name: "Change email" })).toBeDisabled(),
       expect(text("Checking the code…")).toBeAbsent(),
       Command.resolve(CheckCode, Message.FailedSignIn({ error: "Mismatch" })),
-      expect(role("alert")).toHaveText("That code doesn't match. Check it and try again."),
+      expect(role("alert")).toHaveText("That code doesn’t match. Check it and try again."),
       expect(label("Verification code")).toHaveValue("042816"),
       expect(selector("[data-invalid]")).toExist(),
       expect(role("button", { name: "Verify code" })).not.toBeDisabled(),
@@ -193,7 +193,7 @@ describe("the sign-in page", () => {
 
   const codeErrors = [
     ["InvalidCode", "Enter all six digits."],
-    ["Mismatch", "That code doesn't match. Check it and try again."],
+    ["Mismatch", "That code doesn’t match. Check it and try again."],
     ["Expired", "This code has expired. Request a new one."],
     ["Unknown", "This code is no longer available. Request a new one."]
   ] as const satisfies ReadonlyArray<readonly [CodeError, string]>
@@ -211,9 +211,9 @@ describe("the sign-in page", () => {
   }
 
   const requestErrors = [
-    ["VerifyFailed", "We couldn't verify your code. Try again."],
+    ["VerifyFailed", "We couldn’t verify your code. Try again."],
     ["ResendLimited", "Too many codes were requested lately. Use the last one, or try later."],
-    ["ResendFailed", "We couldn't request a new code. Try again."]
+    ["ResendFailed", "We couldn’t request a new code. Try again."]
   ] as const satisfies ReadonlyArray<readonly [CodeError, string]>
 
   for (const [error, words] of requestErrors) {
@@ -299,7 +299,7 @@ describe("the sign-in page", () => {
       expect(role("button", { name: "Send again" })).not.toBeDisabled(),
       click(role("button", { name: "Send again" })),
       Command.resolve(SendCode, Message.FailedSendCode({ error: "RequestFailed" })),
-      expect(role("alert")).toHaveText("We couldn't request a new code. Try again.")
+      expect(role("alert")).toHaveText("We couldn’t request a new code. Try again.")
     )
   })
 })

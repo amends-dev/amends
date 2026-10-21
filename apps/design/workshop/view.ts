@@ -304,7 +304,7 @@ const needsSetup: MarkStatus = {
 const unavailable: MarkStatus = {
   kind: "blocked",
   label: "Unavailable",
-  detail: "Its integration isn't installed on this host."
+  detail: "Its integration isn’t installed on this host."
 }
 
 const iconNames: ReadonlyArray<IconName> = [
@@ -351,7 +351,7 @@ const harnessChoices: ReadonlyArray<Choice<string>> = [
   ["", "Auto", { description: "amends chooses a harness as the agent works" }],
   ["amends", "Amends harness", { description: "amends · Works on this host" }],
   ["opencode", "opencode", { description: "opencode · Works only in a sandbox" }],
-  ["vertex", "Vertex", { description: "Its integration isn't installed on this host.", isDisabled: true }]
+  ["vertex", "Vertex", { description: "Its integration isn’t installed on this host.", isDisabled: true }]
 ]
 
 const taskAssigneeChoices: ReadonlyArray<readonly [TaskAssignee, string]> = [
@@ -639,7 +639,7 @@ const fieldGroup = (
           id: "refused-instructions",
           label: "Instructions",
           value: model.notes,
-          error: Option.some("The instructions are too long, or hold what can't be stored."),
+          error: Option.some("The instructions are too long, or hold what can’t be stored."),
           onInput: (value) => Message.TypedNotes({ value })
         }),
         textarea(h, {
@@ -782,7 +782,7 @@ const selectGroup = (h: ApplicationViewBuilder, plan: Plan): Html =>
     ),
     sample(
       h,
-      "With descriptions, a choice that can't be chosen, and a hint",
+      "With descriptions, a choice that can’t be chosen, and a hint",
       [
         choiceSelect(h, {
           id: "harness",
@@ -844,10 +844,10 @@ const noticeGroup = (h: ApplicationViewBuilder): Html =>
       "Boxed note: caution with a line for each reason, danger, and success",
       [
         noticeBox(h, {
-          title: "This agent can't run as it is set up",
+          title: "This agent can’t run as it is set up",
           lines: ["Its model connection was removed.", "Its harness works only in a sandbox, and it has none."]
         }),
-        noticeBox(h, { title: "Its integration isn't installed on this host", lines: [], tone: "danger" }),
+        noticeBox(h, { title: "Its integration isn’t installed on this host", lines: [], tone: "danger" }),
         noticeBox(h, { title: "Working", lines: ["The check found nothing wrong."], tone: "success" })
       ],
       sampleStack
@@ -994,7 +994,7 @@ const groupList = (h: ApplicationViewBuilder): Html =>
   )
 
 const groupTable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
-  summary(h, { copy: "Public and private groups you've joined.", count: `${groupRows.length} groups` }),
+  summary(h, { copy: "Public and private groups you’ve joined.", count: `${groupRows.length} groups` }),
   columns(h, { label: "Group", cells: ["Visibility", "Members"] }),
   groupList(h)
 ]
@@ -1035,7 +1035,7 @@ const publicGroupList = (h: ApplicationViewBuilder): Html =>
 
 const publicGroupTable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
   summary(h, {
-    copy: "Public groups you haven't joined. Join one to read its threads.",
+    copy: "Public groups you haven’t joined. Join one to read its threads.",
     count: `${publicGroupRows.length} groups`
   }),
   groupColumns(h),
@@ -1345,7 +1345,7 @@ const reloadFailed = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
   createWorkspaceHeading(h),
   column(h, [
     copy(h, `${workspaces.length} workspaces`),
-    notice(h, Option.some("Couldn't refresh your workspaces.")),
+    notice(h, Option.some("Couldn’t refresh your workspaces.")),
     buttonRow(h, [button(h, "Try again", Message.ClickedButton(), { variant: "quiet" })])
   ]),
   section(h, { label: "Your workspaces", count: workspaces.length }),
@@ -1364,8 +1364,8 @@ const checkingSession = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
 const hostUnreachable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
   paneEmpty(h, {
     art: "lost-thread",
-    title: "Can't reach your workspace host",
-    copy: "You're still signed in. Try again once the host is running.",
+    title: "Can’t reach your workspace host",
+    copy: "You’re still signed in. Try again once the host is running.",
     action: button(h, "Try again", Message.ClickedButton(), { variant: "primary" }),
     level: 1
   })
@@ -1375,7 +1375,7 @@ const nothingAtThisAddress = (h: ApplicationViewBuilder): ReadonlyArray<Html> =>
   paneEmpty(h, {
     art: "nothing-here",
     title: "Nothing at this address",
-    copy: "This page doesn't exist. Check the link, or start again from your workspaces.",
+    copy: "This page doesn’t exist. Check the link, or start again from your workspaces.",
     action: button(h, "Your workspaces", Message.ClickedButton(), { variant: "primary" }),
     level: 1
   })
@@ -1399,7 +1399,7 @@ const workspaceClosedToYou = (h: ApplicationViewBuilder): ReadonlyArray<Html> =>
   paneEmpty(h, {
     art: "held-back",
     title: "That workspace is closed to you",
-    copy: "This workspace doesn't exist, or it hasn't been shared with alex@mercier.example. Ask a member to invite this address.",
+    copy: "This workspace doesn’t exist, or it hasn’t been shared with alex@mercier.example. Ask a member to invite this address.",
     action: button(h, "Your workspaces", Message.ClickedButton()),
     level: 1
   })
@@ -1487,7 +1487,7 @@ const directoryGroup = (h: ApplicationViewBuilder): Html =>
       [
         groupColumns(h),
         statusLine(h, {
-          text: "Can't load the groups.",
+          text: "Can’t load the groups.",
           action: button(h, "Try again", Message.ClickedButton(), { variant: "quiet" })
         })
       ],
@@ -1495,7 +1495,7 @@ const directoryGroup = (h: ApplicationViewBuilder): Html =>
     ),
     sample(
       h,
-      "Table of members: 32px marks in rows 56px tall, the second the member open beside the list (filled, with the bar), an agent's lilac mark with Agent under its name, and the role and status as cells",
+      "Table of members: 32px marks in rows 56px tall, the second the member open beside the list (filled, with the bar), an agent’s lilac mark with Agent under its name, and the role and status as cells",
       memberTable(h),
       "flex max-w-3xl flex-col"
     ),
@@ -1649,7 +1649,7 @@ const centeredGroup = (h: ApplicationViewBuilder, signInEmail: string, code: str
     ),
     sample(
       h,
-      "Directory width, with nothing yet, and the empty state's action in place of the heading's",
+      "Directory width, with nothing yet, and the empty state’s action in place of the heading’s",
       [h.div([h.Class(screenFrame)], [directoryScreen(h, noWorkspacesYet(h))])],
       "flex flex-col"
     ),
@@ -1661,7 +1661,7 @@ const centeredGroup = (h: ApplicationViewBuilder, signInEmail: string, code: str
     ),
     sample(
       h,
-      "Form width, while the session is checked against the host: the logo working, in a live region, and the message is the screen's h1",
+      "Form width, while the session is checked against the host: the logo working, in a live region, and the message is the screen’s h1",
       [h.div([h.Class(screenFrame)], [formScreen(h, checkingSession(h))])],
       "flex flex-col"
     ),
@@ -1739,19 +1739,19 @@ const markGroup = (h: ApplicationViewBuilder): Html =>
     ),
     sample(
       h,
-      "A status mark alone, 9px, for an item with no mark of its own, in its tooltip, and the logo's mark of what is at work",
+      "A status mark alone, 9px, for an item with no mark of its own, in its tooltip, and the logo’s mark of what is at work",
       [...markStatuses.map((status) => statusTooltip(h, status, [statusMark(h, status.kind)])), activityMark(h)],
       iconSizeRow
     ),
     sample(
       h,
-      "The logo's mark of what is at work, 0.875rem, in each motion: the thread drawn through while it waits, the stitches lit while it works, and the patch tugged while it stops",
+      "The logo’s mark of what is at work, 0.875rem, in each motion: the thread drawn through while it waits, the stitches lit while it works, and the patch tugged while it stops",
       [activityMark(h, "thread"), activityMark(h, "working"), activityMark(h, "tug")],
       iconSizeRow
     ),
     sample(
       h,
-      "Where a task stands, in each drawing: triage, open, progress, paused, done, and dismissed, at 0.875rem and at the 1rem of a pane's title",
+      "Where a task stands, in each drawing: triage, open, progress, paused, done, and dismissed, at 0.875rem and at the 1rem of a pane’s title",
       [
         ...taskStatusShapes.map((shape) => taskStatus(h, shape)),
         ...taskStatusShapes.map((shape) => taskStatus(h, shape, { size: "1rem" }))
@@ -1807,7 +1807,7 @@ const tooltipTones = [
   { title: "Offline", detail: "It has not answered in a day." },
   { title: "Online", detail: "It is at work in #general.", tone: "success" },
   { title: "Needs setup", detail: "Its model connection was removed.", tone: "caution" },
-  { title: "Unavailable", detail: "Its integration isn't installed on this host.", tone: "danger" }
+  { title: "Unavailable", detail: "Its integration isn’t installed on this host.", tone: "danger" }
 ] as const
 
 const tooltipGroup = (h: ApplicationViewBuilder): Html =>
@@ -1852,7 +1852,7 @@ const tooltipGroup = (h: ApplicationViewBuilder): Html =>
           }),
           tooltip(h, {
             title: "Unavailable",
-            detail: "Its integration isn't installed on this host.",
+            detail: "Its integration isn’t installed on this host.",
             tone: "danger",
             children: [mark(h, { text: "V", size: "md" })]
           })
@@ -1861,7 +1861,7 @@ const tooltipGroup = (h: ApplicationViewBuilder): Html =>
     ]),
     sample(
       h,
-      "Below the mark, for one with no room above it, such as the mark in a pane's header",
+      "Below the mark, for one with no room above it, such as the mark in a pane’s header",
       [
         tooltip(h, {
           title: "Needs setup",
@@ -1898,7 +1898,7 @@ const yumiWorking: ThreadWork = { state: "working", label: "Yumi working" }
 const openableThreads: ReadonlyArray<ThreadSample> = [
   {
     ...preview,
-    text: "The preview is ready for another look. I've linked the latest notes in the task.",
+    text: "The preview is ready for another look. I’ve linked the latest notes in the task.",
     replies: { marks: [{ text: "S" }, { text: "Y", tone: "lilac" }], label: "2 replies", isUnread: true }
   },
   {
@@ -1988,7 +1988,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
   return group(h, "Messages", [
     sample(
       h,
-      "The threads of a group under their day: the time of day after each author, a person's mark on the slate ground and an agent's on the lilac with its name in the agent's color, the task a thread tracks as a chip, and under each the button that opens it, with a reply as the action the pointer brings up; the open thread is filled, and follows a click",
+      "The threads of a group under their day: the time of day after each author, a person’s mark on the slate ground and an agent’s on the lilac with its name in the agent’s color, the task a thread tracks as a chip, and under each the button that opens it, with a reply as the action the pointer brings up; the open thread is filled, and follows a click",
       [
         messageList(h, {
           label: "Threads",
@@ -1999,7 +1999,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
     ),
     sample(
       h,
-      "A person's messages within five minutes stacked under the one before, with no mark or name and the short time in the mark's place while the pointer or the keyboard is on it",
+      "A person’s messages within five minutes stacked under the one before, with no mark or name and the short time in the mark’s place while the pointer or the keyboard is on it",
       [
         messageList(h, {
           label: "Stacked threads",
@@ -2205,7 +2205,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               mark: "AJ",
               author: "AJ",
               note: "Sending…",
-              text: "Thanks! I'll attach the image to the task."
+              text: "Thanks! I’ll attach the image to the task."
             }),
             message(h, {
               key: "deleted",
@@ -2239,7 +2239,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               mark: "G",
               author: "Graeme",
               time: "10:08 AM",
-              text: written("[@Caleb](member:caleb) Let's grab some coffee")
+              text: written("[@Caleb](member:caleb) Let’s grab some coffee")
             }),
             message(h, {
               key: "current-mention",
@@ -2320,7 +2320,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               author: "Oliver",
               activity: "replied",
               place: "#product",
-              text: "The empty state copy is updated. I've attached the latest version.",
+              text: "The empty state copy is updated. I’ve attached the latest version.",
               age: "1h ago",
               onOpen: press
             }),
@@ -2331,7 +2331,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               author: "Caleb",
               activity: "mentioned you",
               place: "Caleb · Direct message",
-              text: written("[@Jamie](member:jamie) let's grab coffee after the rollout."),
+              text: written("[@Jamie](member:jamie) let’s grab coffee after the rollout."),
               age: "Yesterday",
               onOpen: press
             }),
@@ -2385,7 +2385,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               author: "Oliver",
               activity: "replied",
               place: "#product",
-              text: "The empty state copy is updated. I've attached the latest version.",
+              text: "The empty state copy is updated. I’ve attached the latest version.",
               age: "1h ago",
               onOpen: press
             })
@@ -2408,7 +2408,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               author: "Caleb",
               activity: "mentioned you",
               place: "Caleb · Direct message",
-              text: written("[@Jamie](member:jamie) let's grab coffee after the rollout."),
+              text: written("[@Jamie](member:jamie) let’s grab coffee after the rollout."),
               age: "Yesterday",
               onOpen: press
             })
@@ -2484,7 +2484,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
     ),
     sample(
       h,
-      "An agent's turn among the messages in each state, with the actions it offers and what it says under its line",
+      "An agent’s turn among the messages in each state, with the actions it offers and what it says under its line",
       [
         messageList(h, {
           label: "Turns",
@@ -2502,7 +2502,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
           children: [
             turnRow(h, {
               key: "refused",
-              label: "Yumi's turn",
+              label: "Yumi’s turn",
               mark: "Y",
               name: "Yumi",
               status: turnStatus(h, "working"),
@@ -2519,7 +2519,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
     ),
     sample(
       h,
-      "A turn that replied is its reply, with View turn log among the message's actions",
+      "A turn that replied is its reply, with View turn log among the message’s actions",
       [
         messageList(h, {
           label: "Reply",
@@ -2539,14 +2539,14 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
     ),
     sample(
       h,
-      "A turn's row in a column 20rem wide, where its actions drop under the name",
+      "A turn’s row in a column 20rem wide, where its actions drop under the name",
       [
         messageList(h, {
           label: "Narrow turn",
           children: [
             turnRow(h, {
               key: "narrow",
-              label: "Atlas's turn",
+              label: "Atlas’s turn",
               mark: "A",
               name: "Atlas",
               status: turnStatus(h, "stopped"),
@@ -2555,7 +2555,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
             }),
             turnRow(h, {
               key: "narrow-failed",
-              label: "Atlas's turn",
+              label: "Atlas’s turn",
               mark: "A",
               name: "Atlas",
               status: turnStatus(h, "failed"),
@@ -2587,7 +2587,7 @@ const turnRowSamples = (h: ApplicationViewBuilder): ReadonlyArray<Html> => {
   ) =>
     turnRow(h, {
       key,
-      label: `${name}'s turn`,
+      label: `${name}’s turn`,
       mark: name.charAt(0),
       name,
       status: turnStatus(h, state),
@@ -2737,7 +2737,7 @@ const profileCardGroup = (h: ApplicationViewBuilder, openProfile: Model["openPro
   return group(h, "Profile cards", [
     sample(
       h,
-      "The name and the mark of a message's author, and a mention in its text, each open the member's card, which the app places against what opened it and the workshop shows below the messages; the trigger of the open card is underlined, and follows a click; Close closes it, and so does each of its buttons",
+      "The name and the mark of a message’s author, and a mention in its text, each open the member’s card, which the app places against what opened it and the workshop shows below the messages; the trigger of the open card is underlined, and follows a click; Close closes it, and so does each of its buttons",
       [
         messageList(h, {
           label: "Conversation",
@@ -2974,12 +2974,12 @@ const turnLogGroup = (h: ApplicationViewBuilder): Html => {
                 ]
               }),
               turnLogCard(h, {
-                title: "Review the agent's setup",
+                title: "Review the agent’s setup",
                 tone: "caution",
                 note: "Fix what stopped this turn before starting another attempt.",
                 action: button(h, "Agent settings", press)
               }),
-              turnLogProblem(h, "Couldn't start another attempt. Try again.")
+              turnLogProblem(h, "Couldn’t start another attempt. Try again.")
             ])
           ],
           footer: turnLogFooter(h, {
@@ -3023,7 +3023,7 @@ const turnLogGroup = (h: ApplicationViewBuilder): Html => {
           body: [
             paneEmpty(h, {
               art: "held-back",
-              title: "This turn log isn't available",
+              title: "This turn log isn’t available",
               copy: "It may be in a thread you can no longer open."
             })
           ]
@@ -3033,7 +3033,7 @@ const turnLogGroup = (h: ApplicationViewBuilder): Html => {
           body: [
             paneEmpty(h, {
               art: "came-apart",
-              title: "Can't load this turn log",
+              title: "Can’t load this turn log",
               copy: "The log could not be followed. Check the connection.",
               action: button(h, "Try again", press)
             })
@@ -3083,7 +3083,7 @@ const richTextGroup = (h: ApplicationViewBuilder): Html =>
   group(h, "Rich text", [
     sample(
       h,
-      "A message's text with every form",
+      "A message’s text with every form",
       [richText(h, { text: everyFormOfRichText, mentions: richTextMentions })],
       richTextColumn
     ),
@@ -3131,7 +3131,7 @@ const paneEmptyGroup = (h: ApplicationViewBuilder): Html => {
               variant: "main",
               label: "Inbox",
               header: { title: "Inbox", icon: "mark-mail", actions: [button(h, "Mark all seen", press)] },
-              body: [paneEmpty(h, { art: "rest", title: "You're all caught up", copy: "Nothing new." })]
+              body: [paneEmpty(h, { art: "rest", title: "You’re all caught up", copy: "Nothing new." })]
             })
           ]
         )
@@ -3237,7 +3237,7 @@ const paneEmptyGroup = (h: ApplicationViewBuilder): Html => {
               body: [
                 paneEmpty(h, {
                   art: "came-apart",
-                  title: "Can't load settings",
+                  title: "Can’t load settings",
                   copy: "Try again once the host is reachable.",
                   action: button(h, "Try again", press)
                 })
@@ -3259,7 +3259,7 @@ const stateArtMeanings: Readonly<Record<StateArtKind, string>> = {
   rest: "the mark breathing, for nothing left to do",
   "came-apart": "the patch swinging loose, for something that failed",
   "lost-thread": "the thread between two pieces snapping back, for something out of reach",
-  "nothing-here": "a scan across an empty hole, for something that isn't there",
+  "nothing-here": "a scan across an empty hole, for something that isn’t there",
   "held-back": "the patch straining at its stitches, for access the reader lacks"
 }
 
@@ -3440,7 +3440,7 @@ const codeInputGroup = (h: ApplicationViewBuilder, code: string): Html => {
         codeInput(
           h,
           { id: "code-refused", label: "Verification code", value: "482916", onInput: press, isAutofocus: false },
-          Option.some("That code doesn't match. Check it and try again.")
+          Option.some("That code doesn’t match. Check it and try again.")
         )
       ],
       sampleStack
@@ -3861,13 +3861,13 @@ const menuGroup = (h: ApplicationViewBuilder, model: Model): Html =>
     ),
     sample(
       h,
-      "A choice with a mark before each person: Anyone and Unassigned, then each person at 22px, the button saying Assignee while anyone is chosen and the person's name once one is",
+      "A choice with a mark before each person: Anyone and Unassigned, then each person at 22px, the button saying Assignee while anyone is chosen and the person’s name once one is",
       [assigneeFilterMenu(h, model)],
       menuFrame
     ),
     sample(
       h,
-      "Groups behind a plain button: a header of a title over a detail, a labelled group of checked choices, actions, and a line between the groups, opening to the right and below, with the account's mark as its button",
+      "Groups behind a plain button: a header of a title over a detail, a labelled group of checked choices, actions, and a line between the groups, opening to the right and below, with the account’s mark as its button",
       [
         menu(h, {
           trigger: { variant: "plain", name: "Account: Jamie Morgan", content: mark(h, { text: "JM" }) },
@@ -3999,13 +3999,13 @@ const taskListGroup = (h: ApplicationViewBuilder): Html =>
   group(h, "Task list", [
     sample(
       h,
-      "A group's Tasks tab: the labels over the rows, each 56px tall, the status drawn at 1rem, the title in medium weight and quiet once done or dismissed, an assignee as a 24px mark and name or the people icon and Unassigned, and the activity at the end; the second is open beside the list, a long title is cut with an ellipsis, and a task on its way says Sending…",
+      "A group’s Tasks tab: the labels over the rows, each 56px tall, the status drawn at 1rem, the title in medium weight and quiet once done or dismissed, an assignee as a 24px mark and name or the people icon and Unassigned, and the activity at the end; the second is open beside the list, a long title is cut with an ellipsis, and a task on its way says Sending…",
       [taskHeadings(h), taskList(h, taskListRows(false))],
       taskListColumn
     ),
     sample(
       h,
-      "The workspace's lists, which hold the tasks of several groups: the group after each title in quiet text",
+      "The workspace’s lists, which hold the tasks of several groups: the group after each title in quiet text",
       [taskHeadings(h), taskList(h, taskListRows(true))],
       taskListColumn
     ),
@@ -4622,14 +4622,14 @@ const groupThreads = (h: ApplicationViewBuilder): Html => {
       thread({
         ...preview,
         time: "4:01 PM",
-        text: "The preview is ready for another look. I've linked the latest notes in the task."
+        text: "The preview is ready for another look. I’ve linked the latest notes in the task."
       }),
       thread({
         key: "release-morning",
         mark: "S",
         author: "Sara",
         time: "4:30 PM",
-        text: "Looks good. I'll keep an eye on the release this morning."
+        text: "Looks good. I’ll keep an eye on the release this morning."
       }),
       divider(h, "Today"),
       thread({ key: "morning-all", mark: "O", author: "Oliver", time: "9:41 AM", text: "morning all! ☕" }),
@@ -4655,7 +4655,7 @@ const groupThreads = (h: ApplicationViewBuilder): Html => {
         mark: "G",
         author: "Graeme",
         time: "10:08 AM",
-        text: "@Caleb Let's grab some coffee",
+        text: "@Caleb Let’s grab some coffee",
         typing: "Caleb is typing…"
       })
     ]
@@ -4761,7 +4761,7 @@ const threadPane = (h: ApplicationViewBuilder, reply: string): Html => {
             mark: "AJ",
             author: "AJ",
             time: "10:07 AM",
-            text: "Thanks! I'll attach the image to the task."
+            text: "Thanks! I’ll attach the image to the task."
           }),
           message(h, {
             key: "pick-up",
@@ -4898,14 +4898,14 @@ const taskPane = (h: ApplicationViewBuilder, model: Model): Html => {
               mark: "S",
               author: "Sara",
               time: "10:09 AM",
-              text: "I can reproduce it. I'm checking the image size handling before the paste completes."
+              text: "I can reproduce it. I’m checking the image size handling before the paste completes."
             }),
             message(h, {
               key: "preview",
               mark: "Y",
               author: "Yumi",
               time: "10:12 AM",
-              text: "The crash starts when the preview is generated. I've added the reproduction steps."
+              text: "The crash starts when the preview is generated. I’ve added the reproduction steps."
             })
           ]
         })
@@ -4933,7 +4933,7 @@ const agentPane = (h: ApplicationViewBuilder): Html =>
     body: [
       paneColumn(h, [
         noticeBox(h, {
-          title: "This agent can't run as it is set up",
+          title: "This agent can’t run as it is set up",
           lines: ["Its model connection was removed.", "Its harness works only in a sandbox, and it has none."]
         }),
         form(h, { onSubmit: Message.ClickedButton(), label: "Name", variant: "pane" }, [
@@ -4967,7 +4967,7 @@ const agentPane = (h: ApplicationViewBuilder): Html =>
           hasStitch: true,
           children: [
             detailList(h, [
-              { label: "Role", value: "Changed in Settings › Members, as any member's is." },
+              { label: "Role", value: "Changed in Settings › Members, as any member’s is." },
               { label: "Current activity", value: "Idle" },
               { label: "Created by", value: "Alex Morgan · 6 Oct 2026" }
             ])
@@ -4987,14 +4987,14 @@ const agentPane = (h: ApplicationViewBuilder): Html =>
 
 const renameRefusal = (h: ApplicationViewBuilder): Html =>
   toast(h, {
-    text: "Couldn't rename the thread: You may not rename this thread.",
+    text: "Couldn’t rename the thread: You may not rename this thread.",
     action: { label: "Dismiss", onClick: Message.ClickedButton() }
   })
 
 const postRefusal = (h: ApplicationViewBuilder): Html =>
   toast(h, {
-    text: "Couldn't post the reply: This browser could not keep that. Try again.",
-    detail: "Thanks! I'll attach the image to the task.",
+    text: "Couldn’t post the reply: This browser could not keep that. Try again.",
+    detail: "Thanks! I’ll attach the image to the task.",
     action: { label: "Dismiss", onClick: Message.ClickedButton() }
   })
 
@@ -5118,7 +5118,7 @@ const detailsGroup = (
     ),
     sample(
       h,
-      "Each place a button that opens the turn's thread: 6px wider than its words each side, filled on hover, with the focus ring inside it",
+      "Each place a button that opens the turn’s thread: 6px wider than its words each side, filled on hover, with the focus ring inside it",
       [
         activityList(h, {
           label: "Turns under way",
@@ -5150,7 +5150,7 @@ const detailsGroup = (
     ),
     sample(
       h,
-      "A person: a mark beside a name over what they are, at 40px, in the agent's tone, and at 24px with a name alone",
+      "A person: a mark beside a name over what they are, at 40px, in the agent’s tone, and at 24px with a name alone",
       [
         person(h, { mark: { text: "JM" }, name: "Jamie Morgan · You", detail: "Workspace owner" }),
         person(h, { mark: { text: "Y", tone: "lilac" }, name: "Yumi", detail: "Agent · Active" }),
@@ -5703,7 +5703,7 @@ const visibilityHints: Readonly<Record<Visibility, string>> = {
 }
 
 const membersHint = (chosen: number): string =>
-  chosen === 0 ? "You're included automatically. Add others now or later." : `${chosen + 1} members, including you.`
+  chosen === 0 ? "You’re included automatically. Add others now or later." : `${chosen + 1} members, including you.`
 
 const emptyMemberPicker = (h: ApplicationViewBuilder, model: Model): Html =>
   memberPicker(h, {
@@ -6003,7 +6003,7 @@ export const phonePaletteFrame = "phone-palette"
 const phoneModalSample = (h: ApplicationViewBuilder): Html =>
   sample(
     h,
-    "Below 48rem every modal fills the window, in a frame 360px wide: no shadow, below the safe area at the top, and the footer's buttons sharing its width. The palette fills it too, with no keys to show",
+    "Below 48rem every modal fills the window, in a frame 360px wide: no shadow, below the safe area at the top, and the footer’s buttons sharing its width. The palette fills it too, with no keys to show",
     [
       h.iframe([
         h.Class(phoneWindowFrame),
@@ -6139,7 +6139,7 @@ const modalGroup = (h: ApplicationViewBuilder, model: Model): Html =>
         })
       )
     ]),
-    sample(h, "Regular, a search over rows that run to the panel's edges", [
+    sample(h, "Regular, a search over rows that run to the panel’s edges", [
       button(h, "Open the chooser", Message.ClickedOpenChooserModal()),
       h.block(
         ChooserModalBinding.embedView({
@@ -6239,7 +6239,7 @@ const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
     ),
     sample(
       h,
-      "Without the side pane: an agent's page, with its mark and status in the header and sections set apart by a stitch, and notices",
+      "Without the side pane: an agent’s page, with its mark and status in the header and sections set apart by a stitch, and notices",
       [
         h.div(
           [h.Class(shellFrame)],
@@ -6258,7 +6258,7 @@ const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
     ),
     sample(
       h,
-      "Agents: the rail on Agents and the Search item, the sidebar's title current with each agent's status and the logo at those at work, and the list",
+      "Agents: the rail on Agents and the Search item, the sidebar’s title current with each agent’s status and the logo at those at work, and the list",
       [
         h.div(
           [h.Class(shellFrame)],
@@ -6276,7 +6276,7 @@ const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
     ),
     sample(
       h,
-      "Agents with one open: its row current, and its patch cut out of the row's own surface",
+      "Agents with one open: its row current, and its patch cut out of the row’s own surface",
       [
         h.div(
           [h.Class(shellFrame)],

@@ -365,7 +365,7 @@ describe("home", () => {
       given(opened),
       click(role("button", { name: "Inbox" })),
       Subscription.emit(homeSubscriptions["inbox/inbox"], InboxBlock.Message.ReceivedInbox({ items: [] })),
-      expect(within(role("main", { name: "Inbox" }), role("heading", { name: "You're all caught up" }))).toExist(),
+      expect(within(role("main", { name: "Inbox" }), role("heading", { name: "You’re all caught up" }))).toExist(),
       click(role("tab", { name: "All" })),
       expect(within(role("main", { name: "Inbox" }), role("heading", { name: "No activity yet" }))).toExist(),
       expect(text("Mentions, replies, and new threads in groups you follow appear here.")).toExist()

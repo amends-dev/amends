@@ -72,7 +72,7 @@ const rowView = (item: TurnItem, model: Model, h: TurnsViewBuilder): Html => {
 
   return turnRow(h, {
     key: turn.id,
-    label: `${agent}'s turn`,
+    label: `${agent}’s turn`,
     mark: initials(agent),
     name: agent,
     status: turnStatus(h, stateOf(turn)),
@@ -140,7 +140,7 @@ const cardViews = (turn: ReplicaRecord.Turn, h: TurnsViewBuilder): ReadonlyArray
   ...(turn.status === "failed"
     ? [
         turnLogCard(h, {
-          title: "Review the agent's setup",
+          title: "Review the agent’s setup",
           tone: "caution",
           note: "Fix what stopped this turn before starting another attempt.",
           action: button(h, "Agent settings", Message.ClickedAgentSettings({ agentId: turn.agentId }))
@@ -206,7 +206,7 @@ const footerView = (item: TurnItem, turnLog: TurnLog, model: Model, h: TurnsView
 const unavailableView = (h: TurnsViewBuilder): Html =>
   paneEmpty(h, {
     art: "held-back",
-    title: "This turn log isn't available",
+    title: "This turn log isn’t available",
     copy: "It may be in a thread you can no longer open."
   })
 
@@ -236,7 +236,7 @@ const bodyAndFooter = (
         Failed: ({ error }) => ({
           body: paneEmpty(h, {
             art: "came-apart",
-            title: "Can't load this turn log",
+            title: "Can’t load this turn log",
             copy: error,
             action: button(h, "Try again", Message.ClickedViewLog({ turnId: turnLog.turnId }))
           }),

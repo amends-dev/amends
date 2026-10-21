@@ -153,7 +153,7 @@ const settingsPage = (
         : model.isUnreadable
           ? paneEmpty(h, {
               art: "came-apart",
-              title: "Can't load settings",
+              title: "Can’t load settings",
               copy: "Try again once the host is reachable.",
               action: button(h, "Try again", Message.ClickedRefresh())
             })
@@ -620,7 +620,7 @@ const missingMember = (h: SettingsViewBuilder, model: Model): Html =>
     body: [
       paneEmpty(h, {
         art: "lost-thread",
-        title: "This member isn't here",
+        title: "This member isn’t here",
         copy: "They may have been removed, or you can no longer see them."
       })
     ]
@@ -784,7 +784,7 @@ const transferringModal = (
         label: "New owner",
         choices: newOwnerChoices,
         value: Option.match(chosen, { onNone: () => "", onSome: ({ id }) => id }),
-        hint: `${Option.match(chosen, { onNone: () => "The new owner", onSome: ({ name }) => name })} becomes the only owner. You'll remain an administrator and lose owner-only actions.`,
+        hint: `${Option.match(chosen, { onNone: () => "The new owner", onSome: ({ name }) => name })} becomes the only owner. You’ll remain an administrator and lose owner-only actions.`,
         isDisabled: transferring.isSending,
         attributes: render.initialFocus,
         onChange: (value) =>
@@ -812,7 +812,7 @@ const removingModal = (render: RenderInfo, removing: RemovingEntering, model: Mo
   modal(h, render, {
     title: `Remove ${removing.name}?`,
     size: "compact",
-    description: `They will lose access to ${workspaceName(model)}. To rejoin, they'll need a fresh invitation. Their previous membership will remain in the removed-member history.`,
+    description: `They will lose access to ${workspaceName(model)}. To rejoin, they’ll need a fresh invitation. Their previous membership will remain in the removed-member history.`,
     body: [failureView(removing.failure, h)],
     cancelLabel: "Cancel",
     footer: [submit(h, removing.isSending ? "Removing…" : "Remove member", { isDisabled: removing.isSending })],

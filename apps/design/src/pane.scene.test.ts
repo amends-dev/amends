@@ -450,7 +450,7 @@ describe("paneEmpty", () => {
       body: [
         paneEmpty(h, {
           art: "rest",
-          title: "You're all caught up",
+          title: "You’re all caught up",
           ...(copy === undefined ? {} : { copy })
         })
       ]
@@ -461,7 +461,7 @@ describe("paneEmpty", () => {
       { update, view: paneView(emptyPane("Nothing new.")) },
       given(initial),
       expect(within(role("main"), role("heading", { name: "Inbox", level: 1 }))).toExist(),
-      expect(within(role("main"), role("heading", { name: "You're all caught up", level: 2 }))).toExist(),
+      expect(within(role("main"), role("heading", { name: "You’re all caught up", level: 2 }))).toExist(),
       expect(within(role("main"), text("Nothing new."))).toExist()
     )
   })
@@ -473,16 +473,16 @@ describe("paneEmpty", () => {
         view: paneView((_: Model, h: HtmlBuilder<Message>) =>
           paneEmpty(h, {
             art: "lost-thread",
-            title: "Can't reach your workspace host",
-            copy: "You're still signed in. Try again once the host is running.",
+            title: "Can’t reach your workspace host",
+            copy: "You’re still signed in. Try again once the host is running.",
             level: 1
           })
         )
       },
       given(initial),
-      expect(role("heading", { name: "Can't reach your workspace host", level: 1 })).toExist(),
+      expect(role("heading", { name: "Can’t reach your workspace host", level: 1 })).toExist(),
       expect(role("heading", { level: 2 })).toBeAbsent(),
-      expect(text("You're still signed in. Try again once the host is running.")).toExist()
+      expect(text("You’re still signed in. Try again once the host is running.")).toExist()
     )
   })
 
@@ -510,7 +510,7 @@ describe("paneEmpty", () => {
     scene(
       { update, view: paneView(emptyPane()) },
       given(initial),
-      expect(role("heading", { name: "You're all caught up", level: 2 })).toExist(),
+      expect(role("heading", { name: "You’re all caught up", level: 2 })).toExist(),
       expect(selector("p:not([role])")).toBeAbsent()
     )
   })
@@ -533,7 +533,7 @@ describe("paneEmpty", () => {
       {
         update,
         view: paneView((_: Model, h: HtmlBuilder<Message>) =>
-          paneEmpty(h, { art: "lost-thread", title: "Can't reach your workspace host", level: 1 })
+          paneEmpty(h, { art: "lost-thread", title: "Can’t reach your workspace host", level: 1 })
         )
       },
       given(initial),

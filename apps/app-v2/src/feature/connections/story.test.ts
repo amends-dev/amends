@@ -178,9 +178,9 @@ describe("the connections", () => {
     story(
       update,
       given(listed),
-      message(Message.FailedRead({ error: "This browser could not read the workspace's copy." })),
+      message(Message.FailedRead({ error: "This browser could not read the workspace’s copy." })),
       model((model) => {
-        expect(model.notice).toEqual(Option.some("This browser could not read the workspace's copy."))
+        expect(model.notice).toEqual(Option.some("This browser could not read the workspace’s copy."))
         expect(model.reads).toBe(0)
       }),
       message(Message.ClickedRetry()),
@@ -200,14 +200,14 @@ describe("the connections", () => {
       model((model) => {
         expect(model.members).toEqual([member, bob])
       }),
-      message(Message.FailedRead({ error: "This browser could not read the workspace's copy." })),
+      message(Message.FailedRead({ error: "This browser could not read the workspace’s copy." })),
       model((model) => {
-        expect(model.notice).toEqual(Option.some("This browser could not read the workspace's copy."))
+        expect(model.notice).toEqual(Option.some("This browser could not read the workspace’s copy."))
       })
     )
     story(
       update,
-      given(modifyFields(listed, { notice: () => Option.some("This browser could not read the workspace's copy.") })),
+      given(modifyFields(listed, { notice: () => Option.some("This browser could not read the workspace’s copy.") })),
       ...read,
       message(Message.TypedName({ connectionId: team.id, name: "Anthropic" })),
       message(Message.SubmittedName({ connectionId: team.id })),
@@ -301,7 +301,7 @@ describe("the connections", () => {
     expect(connectionStatus({ connection: gone, pending: false })).toEqual({
       kind: "blocked",
       label: "Unavailable",
-      detail: "Its integration isn't installed on this host."
+      detail: "Its integration isn’t installed on this host."
     })
     expect(connectionStatus({ connection: needsSetup, pending: true })).toBeUndefined()
     expect(integrationLine(Option.some(searchApi), { connection: search, pending: false })).toEqual(
@@ -454,7 +454,7 @@ describe("the connections", () => {
             Option.flatMap(edit, (open) => open.failure),
             connectionsMessage
           )
-        ).toEqual(Option.some("The name couldn't be saved. Try again when the host is available."))
+        ).toEqual(Option.some("The name couldn’t be saved. Try again when the host is available."))
       }),
       // Typing the name again says the failure is out of date.
       message(Message.TypedName({ connectionId: search.id, name: "Search server" })),
@@ -530,7 +530,7 @@ describe("the connections", () => {
             Option.flatMap(edit, (open) => open.failure),
             connectionsMessage
           )
-        ).toEqual(Option.some("The settings couldn't be saved. Try again when the host is available."))
+        ).toEqual(Option.some("The settings couldn’t be saved. Try again when the host is available."))
         expect(Option.isSome(Option.flatMap(edit, (open) => open.settings))).toBe(true)
       }),
       message(Message.ChangedSetting({ connectionId: search.id, name: "region", value: "us" })),
@@ -653,7 +653,7 @@ describe("the connections", () => {
 
   it("word a failure for the action it was about, and say which need the person to refresh", () => {
     expect(connectionsMessage({ action: "Check", reason: "Uninstalled", description: Option.none() })).toBe(
-      "This integration isn't installed on this host anymore."
+      "This integration isn’t installed on this host anymore."
     )
     expect(
       connectionsMessage({ action: "Configure", reason: "Refused", description: Option.some("No such region.") })

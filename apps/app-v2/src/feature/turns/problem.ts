@@ -35,9 +35,9 @@ export type Refusal = typeof Refusal.Type
 export const problemText = (problem: TurnProblem, agent: string): string => {
   switch (problem) {
     case "stop-failed":
-      return "Couldn't stop the turn. Try again."
+      return "Couldn’t stop the turn. Try again."
     case "retry-failed":
-      return "Couldn't start another attempt. Try again."
+      return "Couldn’t start another attempt. Try again."
     case "finished":
       return "This turn has already finished."
     case "still-running":
@@ -49,7 +49,7 @@ export const problemText = (problem: TurnProblem, agent: string): string => {
     case "departed":
       return `${agent} no longer takes part in this thread.`
     case "denied":
-      return `You can't direct ${agent}.`
+      return `You can’t direct ${agent}.`
     case "gone":
       return "This turn is no longer available."
   }

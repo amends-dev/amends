@@ -316,7 +316,7 @@ const isUnread = (model: Model): boolean => !model.isLoaded && Option.isSome(mod
 const unreadConnections = (model: Model, h: ConnectionsViewBuilder): Html =>
   paneEmpty(h, {
     art: "came-apart",
-    title: "Couldn't load connections",
+    title: "Couldn’t load connections",
     ...Option.match(model.notice, { onNone: () => ({}), onSome: (copy) => ({ copy }) }),
     action: button(h, "Retry", Message.ClickedRetry())
   })
@@ -416,7 +416,7 @@ const readinessNote = (item: ConnectionItem, model: Model, h: ConnectionsViewBui
           }),
         Uninstalled: () =>
           noticeBox(h, {
-            title: "Its integration isn't installed on this host",
+            title: "Its integration isn’t installed on this host",
             lines: ["Nothing can use this connection. Its settings stay until it is removed."],
             tone: "danger"
           })
@@ -688,7 +688,7 @@ const missingConnection = (workspaceName: string, h: ConnectionsViewBuilder): Ht
     body: [
       paneEmpty(h, {
         art: "lost-thread",
-        title: "This connection isn't here",
+        title: "This connection isn’t here",
         copy: "It may have been removed, or you can no longer see it.",
         action: button(h, "Show all connections", Message.ClickedBrowse({ tab: "all" }))
       })

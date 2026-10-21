@@ -16,7 +16,7 @@ type StoredAgent = Readonly<{ agent: ReplicaRecord.Agent; pending: boolean }>
 export const issueSentence = (issue: Agent.Issue): string =>
   Agent.Issue.match(issue, {
     Removed: ({ part }) => `Its ${part} connection was removed.`,
-    Uninstalled: ({ part }) => `Its ${part} connection's integration isn't installed on this host.`,
+    Uninstalled: ({ part }) => `Its ${part} connection’s integration isn’t installed on this host.`,
     Invalid: ({ description }) => (description.endsWith(".") ? description : `${description}.`),
     SandboxRequired: () => "Its harness works only in a sandbox, and it has none.",
     NoHarness: () => "No connection gives a harness it can run on."

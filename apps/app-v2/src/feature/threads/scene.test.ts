@@ -527,7 +527,7 @@ describe("a group's threads", () => {
       { update, view: sceneView },
       given(modifyFields(empty, { notice: () => Option.some("This browser could not read that. Try again.") })),
       expect(role("alert")).toHaveText("This browser could not read that. Try again."),
-      expect(role("heading", { name: "Can't load this conversation" })).toBeAbsent()
+      expect(role("heading", { name: "Can’t load this conversation" })).toBeAbsent()
     )
   })
 
@@ -537,13 +537,13 @@ describe("a group's threads", () => {
     scene(
       { update, view: sceneView },
       given(failed),
-      expect(role("heading", { name: "Can't load this conversation", level: 2 })).toExist(),
+      expect(role("heading", { name: "Can’t load this conversation", level: 2 })).toExist(),
       expect(text("Try again once the host is reachable.")).toExist(),
       expect(selector("svg g.art-swinging")).toExist(),
       expect(role("status")).toBeAbsent(),
       expect(role("alert")).toBeAbsent(),
       click(role("button", { name: "Try again" })),
-      expect(role("heading", { name: "Can't load this conversation" })).toBeAbsent(),
+      expect(role("heading", { name: "Can’t load this conversation" })).toBeAbsent(),
       expect(role("status")).toHaveText("Loading the conversation…")
     )
   })
@@ -557,7 +557,7 @@ describe("a group's threads", () => {
           notice: () => Option.some("This browser could not read that.")
         })
       ),
-      expect(role("heading", { name: "Can't load this conversation", level: 2 })).toExist(),
+      expect(role("heading", { name: "Can’t load this conversation", level: 2 })).toExist(),
       expect(role("button", { name: "Try again" })).toExist(),
       expect(text("No tasks yet")).toBeAbsent()
     )

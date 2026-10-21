@@ -225,7 +225,7 @@ describe("turnLogCard", () => {
         note: "Waiting to start. There is no output yet."
       }),
       turnLogCard(h, {
-        title: "Review the agent's setup",
+        title: "Review the agent’s setup",
         tone: "caution",
         note: "Fix what stopped this turn before starting another attempt.",
         action: button(h, "Agent settings", Message.ClickedAction())
@@ -253,7 +253,7 @@ describe("turnLogCard", () => {
       { update, view: cards },
       given(initial),
       expect(within(text("Queued"), selector("svg.logo-thread"))).toHaveAttr("aria-hidden", "true"),
-      expect(within(text("Review the agent's setup"), selector("svg"))).toBeAbsent()
+      expect(within(text("Review the agent’s setup"), selector("svg"))).toBeAbsent()
     )
   })
 
@@ -284,9 +284,9 @@ describe("turnLogCard", () => {
 describe("turnLogProblem", () => {
   it("says why a stop or retry did not go through, as an alert in the caution color at control size", () => {
     scene(
-      { update, view: viewOf((h) => turnLogProblem(h, "Couldn't start another attempt. Try again.")) },
+      { update, view: viewOf((h) => turnLogProblem(h, "Couldn’t start another attempt. Try again.")) },
       given(initial),
-      expect(role("alert")).toHaveText("Couldn't start another attempt. Try again."),
+      expect(role("alert")).toHaveText("Couldn’t start another attempt. Try again."),
       expect(role("alert")).toHaveClass("text-caution-text"),
       expect(role("alert")).toHaveClass("text-control")
     )

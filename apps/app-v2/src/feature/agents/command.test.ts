@@ -20,7 +20,7 @@ describe("LoadModels", () => {
   for (const [description, answer] of [
     ["the host cannot be reached", "unreachable"],
     ["the host answers a status the contract does not list", { status: 500, body: { message: "Boom" } }],
-    ["the client's call dies", "dies"]
+    ["the client’s call dies", "dies"]
   ] as const satisfies ReadonlyArray<readonly [string, Answer]>) {
     it.effect(`says the models could not be listed when ${description}, so the form stops waiting for them`, () =>
       Effect.gen(function* () {

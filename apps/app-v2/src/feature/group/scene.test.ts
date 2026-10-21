@@ -673,7 +673,7 @@ describe("a group's header on a phone", () => {
     scene(
       { update, view: phoneView },
       given(unavailable),
-      expect(role("heading", { name: "This group isn't available", level: 2 })).toExist(),
+      expect(role("heading", { name: "This group isn’t available", level: 2 })).toExist(),
       expect(role("button", { name: "Search" })).toBeAbsent()
     )
     scene(
@@ -916,7 +916,7 @@ describe("a group's settings", () => {
       inside(
         role("dialog", { name: "Group settings" }),
         expect(text("Membership")).toExist(),
-        expect(text("You're a member of this group.")).toExist(),
+        expect(text("You’re a member of this group.")).toExist(),
         expect(role("button", { name: "Leave group" })).not.toBeDisabled(),
         expect(role("button", { name: "Join group" })).toBeAbsent(),
         click(role("button", { name: "Leave group" }))
@@ -941,7 +941,7 @@ describe("a group's settings", () => {
       ...openSettings(),
       inside(
         role("dialog", { name: "Group settings" }),
-        expect(text("You're a member of this group.")).toExist(),
+        expect(text("You’re a member of this group.")).toExist(),
         expect(role("button", { name: "Leave group" })).toBeDisabled()
       )
     )
@@ -960,7 +960,7 @@ describe("a group's settings", () => {
       ...openSettings(),
       inside(
         role("dialog", { name: "Group settings" }),
-        expect(text("You're not a member of this group.")).toExist(),
+        expect(text("You’re not a member of this group.")).toExist(),
         expect(role("button", { name: "Join group" })).toBeDisabled()
       )
     )
@@ -973,7 +973,7 @@ describe("a group's settings", () => {
       ...openSettings(),
       inside(
         role("dialog", { name: "Group settings" }),
-        expect(text("You're not a member of this group.")).toExist(),
+        expect(text("You’re not a member of this group.")).toExist(),
         expect(role("button", { name: "Leave group" })).toBeAbsent(),
         expect(role("button", { name: "Join group" })).not.toBeDisabled(),
         click(role("button", { name: "Join group" }))
@@ -995,7 +995,7 @@ describe("a group's settings", () => {
       ...openSettings(),
       inside(
         role("dialog", { name: "Group settings" }),
-        expect(text("You're not a member of this group.")).toExist(),
+        expect(text("You’re not a member of this group.")).toExist(),
         expect(role("button", { name: "Join group" })).toBeAbsent(),
         expect(role("button", { name: "Leave group" })).toBeAbsent()
       )
@@ -1519,7 +1519,7 @@ describe("a group's side pane", () => {
             }))
           })
         ),
-        expect(within(pane, role("heading", { name: "This thread isn't available" }))).toExist(),
+        expect(within(pane, role("heading", { name: "This thread isn’t available" }))).toExist(),
         expect(within(pane, text("It may be in a group you no longer belong to."))).toExist(),
         expect(within(pane, role("button", { name: "Follow thread" }))).toBeAbsent(),
         expect(within(pane, role("form", { name: "Reply in thread" }))).toBeAbsent(),
@@ -1540,7 +1540,7 @@ describe("a group's side pane", () => {
             }))
           })
         ),
-        expect(within(pane, role("heading", { name: "Can't load this thread" }))).toExist(),
+        expect(within(pane, role("heading", { name: "Can’t load this thread" }))).toExist(),
         expect(within(pane, role("button", { name: "Try again" }))).toExist(),
         expect(within(pane, role("button", { name: "Follow thread" }))).toBeAbsent()
       )
@@ -1748,7 +1748,7 @@ describe("a group the person cannot read", () => {
       { update, view },
       given(unavailable),
       expect(role("heading", { name: "A group", level: 1 })).toExist(),
-      expect(role("heading", { name: "This group isn't available", level: 2 })).toExist(),
+      expect(role("heading", { name: "This group isn’t available", level: 2 })).toExist(),
       expect(text("You may no longer be a member of it.")).toExist(),
       expect(selector("svg g.art-pulling")).toExist(),
       expect(role("tablist")).toBeAbsent(),
@@ -1764,7 +1764,7 @@ describe("a group the person cannot read", () => {
     scene(
       { update, view },
       given(init(workspace.id, member.id, design.id, Option.none()).model),
-      expect(role("heading", { name: "This group isn't available" })).toBeAbsent(),
+      expect(role("heading", { name: "This group isn’t available" })).toBeAbsent(),
       expect(role("status")).toHaveText("Loading the conversation…"),
       expect(role("textbox")).toExist(),
       expect(role("tablist")).toExist()
@@ -1775,14 +1775,14 @@ describe("a group the person cannot read", () => {
     scene(
       { update, view },
       given(failedToLoad),
-      expect(role("heading", { name: "Can't load this conversation", level: 2 })).toExist(),
+      expect(role("heading", { name: "Can’t load this conversation", level: 2 })).toExist(),
       expect(text("Try again once the host is reachable.")).toExist(),
       expect(selector("svg g.art-swinging")).toExist(),
-      expect(role("heading", { name: "This group isn't available" })).toBeAbsent(),
+      expect(role("heading", { name: "This group isn’t available" })).toBeAbsent(),
       expect(role("alert")).toBeAbsent(),
       expect(role("textbox")).toExist(),
       click(role("button", { name: "Try again" })),
-      expect(role("heading", { name: "Can't load this conversation" })).toBeAbsent(),
+      expect(role("heading", { name: "Can’t load this conversation" })).toBeAbsent(),
       expect(role("status")).toHaveText("Loading the conversation…")
     )
   })

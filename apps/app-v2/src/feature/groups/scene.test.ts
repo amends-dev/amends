@@ -440,7 +440,7 @@ describe("the groups", () => {
       pickerReady,
       expect(role("combobox", { name: "Members" })).toExist(),
       expect(within(createDialog, text("You"))).toExist(),
-      expect(text("You're included automatically. Add others now or later.")).toExist(),
+      expect(text("You’re included automatically. Add others now or later.")).toExist(),
       expect(role("combobox", { name: "Members" })).toHaveAttr("placeholder", "Search workspace members…"),
       focus(role("combobox", { name: "Members" })),
       ...pickerOpened,
@@ -1238,7 +1238,7 @@ describe("the browse page", () => {
       expect(role("heading", { name: "Groups", level: 1 })).toExist(),
       expect(role("tab", { name: "Your groups" })).toHaveAttr("aria-selected", "true"),
       expect(role("tab", { name: "Discover" })).toHaveAttr("aria-selected", "false"),
-      expect(text("Public and private groups you've joined.")).toExist(),
+      expect(text("Public and private groups you’ve joined.")).toExist(),
       expect(text("2 groups")).toExist(),
       expect(role("list", { name: "Your groups" })).toExist(),
       expect(role("button", { name: "Bob" })).toBeAbsent()
@@ -1307,7 +1307,7 @@ describe("the browse page", () => {
       given(withConversation),
       click(role("tab", { name: "Discover" })),
       expect(role("tab", { name: "Discover" })).toHaveAttr("aria-selected", "true"),
-      expect(text("Public groups you haven't joined. Join one to read its threads.")).toExist(),
+      expect(text("Public groups you haven’t joined. Join one to read its threads.")).toExist(),
       expect(text("1 group")).toExist(),
       expect(role("list", { name: "Public groups" })).toExist(),
       expect(role("button", { name: "Announcements" })).toHaveAttr("aria-description", "Public · 3 members"),
@@ -1374,7 +1374,7 @@ describe("the browse page", () => {
       { update, view: browseView },
       given(joinedEveryPublicTeam),
       click(role("tab", { name: "Discover" })),
-      expect(text("You've joined every public group.")).toExist(),
+      expect(text("You’ve joined every public group.")).toExist(),
       expect(role("heading", { level: 2 })).toBeAbsent(),
       expect(art("rest")).toBeAbsent(),
       expect(role("tab", { name: "Discover" })).toHaveAttr("aria-description", "0")
@@ -1385,7 +1385,7 @@ describe("the browse page", () => {
     scene(
       { update, view: browseView },
       given(modifyFields(listed, { memberships: () => [] })),
-      expect(text("You haven't joined any groups yet.")).toExist(),
+      expect(text("You haven’t joined any groups yet.")).toExist(),
       expect(role("heading", { level: 2 })).toBeAbsent(),
       expect(art("sew-in")).toBeAbsent(),
       expect(role("tab", { name: "Your groups" })).toHaveAttr("aria-description", "0")
@@ -1403,7 +1403,7 @@ describe("the browse page", () => {
           memberships: () => []
         })
       ),
-      expect(text("You haven't joined any groups yet.")).toExist(),
+      expect(text("You haven’t joined any groups yet.")).toExist(),
       expect(role("button", { name: "Bob" })).toBeAbsent(),
       expect(role("tab", { name: "Your groups" })).toHaveAttr("aria-description", "0")
     )
@@ -1432,7 +1432,7 @@ describe("the browse page", () => {
       { update, view: browseView, subscriptions: GroupsBlock.subscriptions },
       given(unread),
       expect(role("status")).toHaveText("Loading groups…"),
-      expect(text("You haven't joined any groups yet.")).toBeAbsent(),
+      expect(text("You haven’t joined any groups yet.")).toBeAbsent(),
       expect(role("list", { name: "Your groups" })).toBeAbsent(),
       expect(role("button", { name: "Try again" })).toBeAbsent(),
       Subscription.emit(
@@ -1455,17 +1455,17 @@ describe("the browse page", () => {
       { update, view: browseView, subscriptions: GroupsBlock.subscriptions },
       given(unread),
       Subscription.emit(subscriptions.groups, Message.FailedRead({ error: "This browser could not read the groups." })),
-      expect(role("status")).toHaveText(/^Can't load the groups\./),
+      expect(role("status")).toHaveText(/^Can’t load the groups\./),
       expect(role("alert")).toBeAbsent(),
       expect(text("Loading groups…")).toBeAbsent(),
       click(role("button", { name: "Try again" })),
-      expect(text("Can't load the groups.")).toBeAbsent(),
+      expect(text("Can’t load the groups.")).toBeAbsent(),
       expect(role("status")).toHaveText("Loading groups…"),
       Subscription.emit(
         subscriptions.groups,
         Message.ReceivedGroups({ groups: [], members: [], memberships: [], grants: [] })
       ),
-      expect(text("You haven't joined any groups yet.")).toExist()
+      expect(text("You haven’t joined any groups yet.")).toExist()
     )
   })
 
@@ -1513,7 +1513,7 @@ describe("the browse page", () => {
         })
       ),
       expect(role("button", { name: "Join #Announcements" })).toBeAbsent(),
-      expect(text("You've joined every public group.")).toExist(),
+      expect(text("You’ve joined every public group.")).toExist(),
       expect(role("tab", { name: "Discover" })).toHaveAttr("aria-description", "0"),
       expect(role("tab", { name: "Your groups" })).toHaveAttr("aria-description", "3")
     )

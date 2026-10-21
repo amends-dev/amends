@@ -118,7 +118,7 @@ const modelFields = (h: AgentsViewBuilder, model: Model, config: SetupFieldsConf
         Loading: () => [
           chooseListed(modelId === "" ? [] : [[modelId, modelId]], {
             id: `${idPrefix}-model`,
-            hint: "Loading this connection's models…",
+            hint: "Loading this connection’s models…",
             error: problem,
             isOff: true
           })
@@ -126,7 +126,7 @@ const modelFields = (h: AgentsViewBuilder, model: Model, config: SetupFieldsConf
         Failed: ({ error }) => [
           enterModel(
             "Model",
-            "Its models couldn't be loaded. You can still enter a model's ID.",
+            "Its models couldn’t be loaded. You can still enter a model’s ID.",
             Option.orElse(problem, () => Option.some(error))
           )
         ],
@@ -140,7 +140,7 @@ const modelFields = (h: AgentsViewBuilder, model: Model, config: SetupFieldsConf
             ? [
                 chooseListed(listed, {
                   id: `${idPrefix}-model-listed`,
-                  hint: "Choose one it lists, or enter any model's ID.",
+                  hint: "Choose one it lists, or enter any model’s ID.",
                   error: Option.none(),
                   isOff: isDisabled
                 }),

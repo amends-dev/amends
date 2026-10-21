@@ -153,14 +153,14 @@ describe("the agents", () => {
       Command.expectExact(LoadModels({ workspaceId, connectionId: models.id })),
       inside(
         addDialog,
-        expect(text("Loading this connection's models…")).toExist(),
+        expect(text("Loading this connection’s models…")).toExist(),
         expect(label("Model")).toBeDisabled(),
         expect(role("button", { name: "Create agent" })).toBeDisabled()
       ),
       Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: models.id, models: offered })),
       inside(
         addDialog,
-        expect(text("Loading this connection's models…")).toBeAbsent(),
+        expect(text("Loading this connection’s models…")).toBeAbsent(),
         expect(label("Model")).not.toBeDisabled(),
         expect(label("Effort")).toBeAbsent(),
         expect(role("button", { name: "Create agent" })).toBeDisabled(),
@@ -230,7 +230,7 @@ describe("the agents", () => {
       Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: models.id, models: offered })),
       inside(
         addDialog,
-        expect(text("Choose one it lists, or enter any model's ID.")).toExist(),
+        expect(text("Choose one it lists, or enter any model’s ID.")).toExist(),
         type(label("Model ID"), "other-model"),
         click(role("button", { name: "Create agent" }))
       ),
@@ -304,7 +304,7 @@ describe("the agents", () => {
       ),
       inside(
         addDialog,
-        expect(text("The agent couldn't be created. Try again when the host is available.")).toExist(),
+        expect(text("The agent couldn’t be created. Try again when the host is available.")).toExist(),
         expect(label("Agent name")).toHaveValue("Reviewer"),
         expect(label("Agent name")).not.toBeDisabled(),
         expect(role("button", { name: "Create agent" })).not.toBeDisabled()
@@ -338,7 +338,7 @@ describe("the agents", () => {
       inside(
         addDialog,
         expect(text("This connection is no longer available to you. Choose another.")).toExist(),
-        expect(text("This setup can't be saved as it is. Change what's marked, then try again.")).toExist()
+        expect(text("This setup can’t be saved as it is. Change what’s marked, then try again.")).toExist()
       )
     )
   })
@@ -385,7 +385,7 @@ describe("the agents", () => {
       inside(
         addDialog,
         expect(text("The host could not be reached. Try again.")).toExist(),
-        expect(text("Its models couldn't be loaded. You can still enter a model's ID.")).toExist(),
+        expect(text("Its models couldn’t be loaded. You can still enter a model’s ID.")).toExist(),
         type(label("Model"), "any-model"),
         expect(label("Model")).toHaveValue("any-model")
       )
@@ -566,7 +566,7 @@ describe("the agents", () => {
       })
     const reasons: ReadonlyArray<readonly [typeof Agent.Issue.Encoded, string]> = [
       [{ _tag: "Removed", part: "sandbox" }, "Its sandbox connection was removed."],
-      [{ _tag: "Uninstalled", part: "harness" }, "Its harness connection's integration isn't installed on this host."],
+      [{ _tag: "Uninstalled", part: "harness" }, "Its harness connection’s integration isn’t installed on this host."],
       [{ _tag: "Invalid", part: "sandbox", description: "It takes no sandboxes" }, "It takes no sandboxes."],
       [{ _tag: "SandboxRequired" }, "Its harness works only in a sandbox, and it has none."],
       [{ _tag: "NoHarness" }, "No connection gives a harness it can run on."]
@@ -629,9 +629,9 @@ describe("the agents", () => {
       given(opened),
       Subscription.emit(
         subscriptions.agents,
-        Message.FailedRead({ error: "This browser could not read the workspace's copy." })
+        Message.FailedRead({ error: "This browser could not read the workspace’s copy." })
       ),
-      expect(text("This browser could not read the workspace's copy.")).toExist(),
+      expect(text("This browser could not read the workspace’s copy.")).toExist(),
       expect(role("alert")).toExist()
     )
   })
@@ -642,11 +642,11 @@ describe("the agents", () => {
       given(init(workspace.id, alice.id).model),
       Subscription.emit(
         subscriptions.agents,
-        Message.FailedRead({ error: "This browser could not read the workspace's copy." })
+        Message.FailedRead({ error: "This browser could not read the workspace’s copy." })
       ),
       expect(role("heading", { name: "Agents", level: 1 })).toExist(),
-      expect(role("heading", { name: "Couldn't load agents", level: 2 })).toExist(),
-      expect(text("This browser could not read the workspace's copy.")).toExist(),
+      expect(role("heading", { name: "Couldn’t load agents", level: 2 })).toExist(),
+      expect(text("This browser could not read the workspace’s copy.")).toExist(),
       expect(art("came-apart")).toExist(),
       expect(role("alert")).toBeAbsent(),
       expect(role("status")).toBeAbsent(),
@@ -1046,7 +1046,7 @@ describe("an agent's page", () => {
       given(withModels),
       expect(role("heading", { name: "Details" })).toExist(),
       expect(text("Role")).toExist(),
-      expect(text("Changed in Settings › Members, as any member's is.")).toExist(),
+      expect(text("Changed in Settings › Members, as any member’s is.")).toExist(),
       expect(text("Current activity")).toExist(),
       expect(text("Idle")).toExist(),
       expect(text("Created by")).toExist(),
@@ -1065,7 +1065,7 @@ describe("an agent's page", () => {
     scene(
       { update, view: page() },
       given(modifyFields(withModels, { agents: () => [{ agent: stranded, pending: false }] })),
-      expect(role("note", { name: "This agent can't run as it is set up" })).toExist(),
+      expect(role("note", { name: "This agent can’t run as it is set up" })).toExist(),
       expect(text("Its model connection was removed.")).toExist(),
       expect(text("Its harness works only in a sandbox, and it has none.")).toExist(),
       expect(selector(".sr-only")).toHaveText("Needs setup"),
@@ -1167,7 +1167,7 @@ describe("an agent's page", () => {
       click(role("button", { name: "Save setup" })),
       Command.expectNone(),
       expect(text("This connection is no longer available to you. Choose another.")).toExist(),
-      expect(text("This setup can't be saved as it is. Change what's marked, then try again.")).toExist(),
+      expect(text("This setup can’t be saved as it is. Change what’s marked, then try again.")).toExist(),
       type(label("Instructions"), "Review it thrice."),
       expect(text("This connection is no longer available to you. Choose another.")).toBeAbsent()
     )
@@ -1183,7 +1183,7 @@ describe("an agent's page", () => {
         ConfigureAgent,
         Message.FailedWriteAction({ written: Written.Configure({ agentId }), reason: Reason.Unwritable() })
       ),
-      expect(text("The setup couldn't be saved. Try again when the host is available.")).toExist(),
+      expect(text("The setup couldn’t be saved. Try again when the host is available.")).toExist(),
       expect(label("Instructions")).toHaveValue("Review it twice."),
       expect(role("button", { name: "Save setup" })).not.toBeDisabled()
     )
@@ -1220,7 +1220,7 @@ describe("an agent's page", () => {
     scene(
       { update, view: withViewInputs(agentView, { agentId: Identity.AgentId.make("agent-9"), workspaceName })() },
       given(withModels),
-      expect(role("heading", { name: "This agent isn't here", level: 2 })).toExist(),
+      expect(role("heading", { name: "This agent isn’t here", level: 2 })).toExist(),
       expect(art("lost-thread")).toExist(),
       expect(text("It may have been removed, or you can no longer see it.")).toExist(),
       click(role("button", { name: "Show all agents" })),
@@ -1233,7 +1233,7 @@ describe("an agent's page", () => {
       { update, view: page() },
       given(init(workspace.id, alice.id).model),
       expect(role("status")).toHaveText("Loading agent…"),
-      expect(role("heading", { name: "This agent isn't here" })).toBeAbsent(),
+      expect(role("heading", { name: "This agent isn’t here" })).toBeAbsent(),
       expect(label("Agent name")).toBeAbsent()
     )
   })
@@ -1243,13 +1243,13 @@ describe("an agent's page", () => {
       { update, view: page() },
       given(
         modifyFields(init(workspace.id, alice.id).model, {
-          notice: () => Option.some("This browser could not read the workspace's copy.")
+          notice: () => Option.some("This browser could not read the workspace’s copy.")
         })
       ),
-      expect(role("heading", { name: "Couldn't load agents", level: 2 })).toExist(),
+      expect(role("heading", { name: "Couldn’t load agents", level: 2 })).toExist(),
       expect(art("came-apart")).toExist(),
       expect(role("status")).toBeAbsent(),
-      expect(role("heading", { name: "This agent isn't here" })).toBeAbsent(),
+      expect(role("heading", { name: "This agent isn’t here" })).toBeAbsent(),
       click(role("button", { name: "Retry" })),
       expect(art("came-apart")).toBeAbsent(),
       expect(role("status")).toHaveText("Loading agent…")
@@ -1272,7 +1272,7 @@ describe("an agent's page", () => {
           grants: withModels.grants
         })
       ),
-      expect(role("heading", { name: "This agent isn't here", level: 2 })).toExist()
+      expect(role("heading", { name: "This agent isn’t here", level: 2 })).toExist()
     )
   })
 
@@ -1336,7 +1336,7 @@ describe("an agent's page", () => {
       ),
       inside(
         removeDialog,
-        expect(text("The agent couldn't be removed. Try again when the host is available.")).toExist(),
+        expect(text("The agent couldn’t be removed. Try again when the host is available.")).toExist(),
         expect(role("button", { name: "Remove agent" })).not.toBeDisabled()
       ),
       expect(removeDialog).toExist()

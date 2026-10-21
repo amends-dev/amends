@@ -205,8 +205,8 @@ describe("the app", () => {
       { update, view },
       given(askingHost(Workspaces.Unreachable())),
       expect(within(role("banner"), role("button", { name: "Sign out" }))).toExist(),
-      expect(within(role("main"), role("heading", { name: "Can't reach your workspace host", level: 1 }))).toExist(),
-      expect(text("You're still signed in. Try again once the host is running.")).toExist(),
+      expect(within(role("main"), role("heading", { name: "Can’t reach your workspace host", level: 1 }))).toExist(),
+      expect(text("You’re still signed in. Try again once the host is running.")).toExist(),
       expect(art("lost-thread")).toExist(),
       expect(role("button", { name: "Try again" })).toExist(),
       expect(selector("svg.logo-working")).toBeAbsent()

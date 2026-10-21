@@ -186,7 +186,7 @@ describe("mark with an icon", () => {
                 status: {
                   kind: "blocked",
                   label: "Unavailable",
-                  detail: "Its integration isn't installed on this host."
+                  detail: "Its integration isn’t installed on this host."
                 }
               })
             ]
@@ -194,7 +194,7 @@ describe("mark with an icon", () => {
       },
       given(null),
       expect(text("Unavailable")).toHaveClass("text-danger-text"),
-      expect(text("Its integration isn't installed on this host.")).toExist(),
+      expect(text("Its integration isn’t installed on this host.")).toExist(),
       expect(within(selector("span.size-8"), selector("span.bg-danger-mark"))).toExist()
     )
   })
@@ -289,7 +289,7 @@ describe("mark with a status", () => {
                 status: {
                   kind: "blocked",
                   label: "Unavailable",
-                  detail: "Its integration isn't installed on this host."
+                  detail: "Its integration isn’t installed on this host."
                 }
               }),
               mark(h, { text: "A", status: { kind: "available", label: "Online" } })
@@ -301,7 +301,7 @@ describe("mark with a status", () => {
       expect(text("R")).toHaveAttr("aria-hidden", "true"),
       expect(text("Needs setup")).toHaveClass("text-caution-text"),
       expect(text("Unavailable")).toHaveClass("text-danger-text"),
-      expect(text("Its integration isn't installed on this host.")).toHaveClass("text-ink-secondary"),
+      expect(text("Its integration isn’t installed on this host.")).toHaveClass("text-ink-secondary"),
       expect(text("Online")).toHaveClass("text-ink"),
       expect(role("img")).toBeAbsent()
     )

@@ -28,7 +28,7 @@ class Key extends Data.Class<{
 export type OpenError = Session.NotSignedIn | Layer.Error<ReturnType<typeof Store.layer>>
 
 /** How the person reads that their replica could not be read. */
-export const unreadable = "This browser could not read the workspace's copy."
+export const unreadable = "This browser could not read the workspace’s copy."
 
 /** How the person reads that an action could not be kept. */
 export const unwritable = "This browser could not keep that. Try again."

@@ -214,7 +214,7 @@ describe("the channels", () => {
     scene(
       { update, view },
       given(modifyFields(withSupport, { connections: () => [], groups: () => [] })),
-      expect(text("From a removed connection into a group you don't see")).toExist()
+      expect(text("From a removed connection into a group you don’t see")).toExist()
     )
   })
 
@@ -286,9 +286,9 @@ describe("the channels", () => {
       given(opened),
       Subscription.emit(
         subscriptions.channels,
-        Message.FailedRead({ error: "This browser could not read the workspace's copy." })
+        Message.FailedRead({ error: "This browser could not read the workspace’s copy." })
       ),
-      expect(text("This browser could not read the workspace's copy.")).toExist(),
+      expect(text("This browser could not read the workspace’s copy.")).toExist(),
       expect(role("alert")).toExist()
     )
   })
