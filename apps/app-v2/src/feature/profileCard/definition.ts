@@ -22,9 +22,9 @@ export const Standing = Schema.Struct({
 export type Standing = typeof Standing.Type
 
 /**
- * A member as the card shows them: who they are, their name, whether they are a person or an agent, whether they are the
- * person and whether they left the workspace, the agent they are, if they are one, and for an agent how it stands and
- * how its logo moves while it is at work.
+ * A member as the card shows them: who they are, their name, whether they are a person or an agent, whether they are
+ * the person and whether they left the workspace, the agent they are, if they are one, and for an agent how it stands
+ * and how its logo moves while it is at work.
  */
 export const MemberProfile = Schema.Struct({
   memberId: MemberId.MemberId,
@@ -39,8 +39,8 @@ export const MemberProfile = Schema.Struct({
 export type MemberProfile = typeof MemberProfile.Type
 
 /**
- * The card of the `subject`, the ID of a member as the trigger `triggerId` has it, which opened the card and which it is
- * placed against and returns the focus to: not open; open, while the member is read; or showing the member, whose
+ * The card of the `subject`, the ID of a member as the trigger `triggerId` has it, which opened the card and which it
+ * is placed against and returns the focus to: not open; open, while the member is read; or showing the member, whose
  * `profile` is none when the workspace has no such member or they cannot be read. A mention in a text names its member
  * by whatever ID the text was written with, so the subject is not known to be a member's.
  */

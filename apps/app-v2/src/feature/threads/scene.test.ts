@@ -100,7 +100,10 @@ const place = Drafts.Place.cases.Thread.make({ groupId })
 /** The item of the list at `index`, a day's divider or a thread. */
 const item = (index: number) => nth(all.role("listitem"), index)
 
-/** The marks drawn with `letter`, each of which reads as the letter twice: itself, and the trigger around it that opens its author's card. */
+/**
+ * The marks drawn with `letter`, each of which reads as the letter twice: itself, and the trigger around it that opens
+ * its author's card.
+ */
 const expectMarks = (letter: string, count: number) => expectAll(all.text(letter)).toHaveCount(count * 2)
 
 /** Bob's thread, which was created a day before the time now. */

@@ -936,7 +936,10 @@ describe("Home, with the card of a member", () => {
     agentId: Option.some(scoutAgent.id)
   }
 
-  /** The inbox read, on All, with the notification of a message written by `author`, who the workspace's members include. */
+  /**
+   * The inbox read, on All, with the notification of a message written by `author`, who the workspace's members
+   * include.
+   */
   const notifiedOf = (author: ThreadMessage.ThreadMessage["author"]) =>
     modifyFields(opened, {
       inbox: (inbox) =>
