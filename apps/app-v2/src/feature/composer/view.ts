@@ -3,7 +3,7 @@ import { composer, type Formatting, type Suggestion, type Suggestions } from "@a
 import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import { memberMark } from "../../seen.ts"
-import { ComposerComposition } from "./composition.ts"
+import { ComposerBlock } from "./block.ts"
 import {
   boxId,
   isFormattingShown,
@@ -13,7 +13,7 @@ import {
   type Picking,
   suggestMembers
 } from "./definition.ts"
-import { buttonOf, formatGroups, formatOfKey } from "./format.ts"
+import { buttonOf, formatGroups, formatOfKey } from "./toolbar.ts"
 
 /**
  * What the box shows while it is empty, which also names it, the members the person may mention in it, and the slash
@@ -124,20 +124,19 @@ const suggestionsOf = (
         : commandSuggestions(model, commands, picking)
   )
 
-export const view = ComposerComposition.makeView.withInputs<ViewInputs>(
-  (model, { placeholder, members, commands = [] }, h) =>
-    composer(h, {
-      id: boxId(model.place),
-      label: placeholder,
-      placeholder,
-      value: Option.getOrElse(model.text, () => ""),
-      onInput: (text) => Message.TypedText({ text }),
-      onSubmit: Message.SubmittedText(),
-      submitLabel: "Send",
-      formatting: formattingOf(model),
-      mention: { label: "Mention someone", onClick: Message.ClickedMention() },
-      onShortcut: (key, modifiers) =>
-        Option.map(formatOfKey(key, modifiers), (format) => Message.ChoseFormat({ format })),
-      suggestions: Option.getOrUndefined(suggestionsOf(model, members, commands))
-    })
+export const view = ComposerBlock.makeView.withInputs<ViewInputs>((model, { placeholder, members, commands = [] }, h) =>
+  composer(h, {
+    id: boxId(model.place),
+    label: placeholder,
+    placeholder,
+    value: Option.getOrElse(model.text, () => ""),
+    onInput: (text) => Message.TypedText({ text }),
+    onSubmit: Message.SubmittedText(),
+    submitLabel: "Send",
+    formatting: formattingOf(model),
+    mention: { label: "Mention someone", onClick: Message.ClickedMention() },
+    onShortcut: (key, modifiers) =>
+      Option.map(formatOfKey(key, modifiers), (format) => Message.ChoseFormat({ format })),
+    suggestions: Option.getOrUndefined(suggestionsOf(model, members, commands))
+  })
 )

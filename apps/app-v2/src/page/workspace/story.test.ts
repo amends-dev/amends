@@ -82,7 +82,7 @@ import { ThreadsBlock } from "../../feature/threads/block.ts"
 import { ComposerBinding as ThreadsComposerBinding } from "../../feature/threads/composition.ts"
 import { TurnsBlock } from "../../feature/turns/block.ts"
 import * as Drafts from "../../store/Drafts.ts"
-import { LoadIntegrations, RequestNameChange } from "./command.ts"
+import { LoadIntegrations } from "./command.ts"
 import {
   AgentsBinding,
   AsideBinding,
@@ -525,16 +525,17 @@ describe("a workspace", () => {
     story(update, given(opened), message(choseAccountEntry("ChangeName")), expectNoOutMessage())
   })
 
-  it("reports that the header of the open group asked for the search, for the app to open, and opens none itself", () => {
+  it("opens search directly when the header of the open group asks for it", () => {
     story(
       update,
       given(opened),
       message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       message(fromGroup(GroupBlock.Message.ClickedSearch())),
-      expectOutMessage(OutMessage.RequestedSearch()),
+      expectNoOutMessage(),
+      dialogShown,
       model((model) => {
-        expect(model.search.dialog.isOpen).toBe(false)
+        expect(model.search.dialog.isOpen).toBe(true)
       })
     )
   })
@@ -1805,7 +1806,7 @@ const fromComposer = (message: typeof ComposerBlock.Message.Type) =>
     ThreadsComposerBinding.embedView({
       slotId: "composer",
       model: openGroupModel.threads.composer,
-      viewInputs: { placeholder: "Message #General", members: [] }
+      view: ComposerBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 
@@ -1918,8 +1919,6 @@ describe("a workspace, with the card of a member", () => {
       given(settingsRead),
       ...showing({ ...person, memberId: membership.member.id, name: "Alice", isYou: true }),
       message(fromProfileCard(ProfileCardBlock.Message.ClickedChangeName())),
-      Command.expectExact(RequestNameChange({})),
-      Command.resolve(RequestNameChange, Message.CompletedRequestNameChange()),
       dialogShown,
       model((model) => {
         expect(model.settings.dialog.isOpen).toBe(true)

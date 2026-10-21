@@ -1023,7 +1023,7 @@ const fromComposer = (message: typeof ComposerBlock.Message.Type) =>
     ThreadsComposerBinding.embedView({
       slotId: "composer",
       model: openGroupModel.threads.composer,
-      viewInputs: { placeholder: "Message #General", members: [] }
+      view: ComposerBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 

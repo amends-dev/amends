@@ -31,7 +31,7 @@ const fromComposer = (message: typeof ComposerBlock.Message.Type) =>
   ComposerBinding.embedView({
     slotId: "composer",
     model: unstarted.composer,
-    viewInputs: { placeholder: "Message Bob", members: [] }
+    view: ComposerBlock.makeView((_model, h) => h.empty)
   }).toParentMessage(message)
 
 describe("a conversation not started", () => {

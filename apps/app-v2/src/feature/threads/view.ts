@@ -41,6 +41,7 @@ import {
 import { assigneeFilterMenu, statusChoices, statusFilterMenu } from "../../taskFilter.ts"
 import { noTasksMatch, taskRows } from "../../taskList.ts"
 import type { OfferedSlashCommand } from "../composer/definition.ts"
+import { view as composerInputView } from "../composer/view.ts"
 import {
   AssigneeBinding,
   ComposerBinding,
@@ -362,6 +363,7 @@ export const composerView = ThreadsComposition.makeView.withInputs<ViewInputs>(
       ComposerBinding.embedView({
         slotId: "composer",
         model: model.composer,
+        view: composerInputView,
         viewInputs: {
           placeholder: model.tab === "Tasks" ? `New task in ${place}` : `Message ${place}`,
           members,

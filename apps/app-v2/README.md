@@ -45,6 +45,18 @@ to `ImplementationForValidation` in `dist/block/definition.d.ts`. The fix belong
 `packages/foldkit/src/block/requirements.ts`, and this part of the patch goes when a build carries
 it.
 
+The patch also changes how `dist/block/deferredPolicy.d.ts` resolves sibling policies. A policy can
+call another binding, whose policy can call back: Home opens search, and search opens Home. The
+canary recursively builds complete update results, including the workspace model, at each hop,
+then extracts their messages, requirements, and registration evidence. With this app's graph that
+reaches TS2589. The patch collects those channels directly during recursion and constructs the
+update result at the outer boundary. It preserves the visited-placement check, handler scoping,
+and registration evidence; it changes no runtime code. `test/foldkit-policies.test.ts` checks
+cyclic transitions, exact command/service/outgoing-message types, and rejection of missing
+handlers or sibling bindings. The workspace now handles search and name-change requests directly.
+Remove this declaration patch when the installed Foldkit release provides equivalent behavior
+and passes these checks and the app's type-check.
+
 ## Run
 
 Start the [local host](../../hosts/local/README.md) on its default port, then the app:
@@ -148,7 +160,8 @@ the composer does, and writes them as links when saved, but suggests no one; it 
 caret moves to its end, since that form sets no selection.
 
 The composer's toolbar named "Formatting" writes markdown, because the box holds the markdown a message is rendered
-from: Bold, Italic, Strikethrough, Link, Numbered list, Bulleted list, Quote, Code, and Code block (`src/feature/composer/format.ts`).
+from: Bold, Italic, Strikethrough, Link, Numbered list, Bulleted list, Quote, Code, and Code block. The editing operations
+live in `src/feature/composer/format.ts`; `toolbar.ts` owns their buttons, icons, groups, and keyboard shortcuts.
 A button reads the selection through a command, which runs before the render commits, and the answer is formatted by a
 pure function of the text, its mentions, and the selection: an inline format wraps the selected words in its markers,
 leaving the spaces at the ends outside, or takes the markers off when they are just outside the selection or its first
@@ -234,10 +247,17 @@ Each `block.ts` exports its completed Block under a name of its own: the assembl
 private as `XBlockValue`, `type XBlockType = typeof XBlockValue` takes its type,
 `interface XBlock extends XBlockType {}` names that, and `XBlock` is the value, declared as the
 interface. The parents that bind the Block, and theirs, then refer to the name, where otherwise each
-would work through the whole structure of the Block and of everything it binds again. That keeps
-room for the app to grow: TypeScript stops checking one expression at 5,000,000 type instantiations
-(TS2589), and the workspace page's `makeUpdate` is the first to reach it, with every Block bound
-below it counted at each level above.
+would work through the whole structure of the Block and of everything it binds again. Keep these
+named contracts alongside the declaration patches described above; removing one requires checking
+the complete app, including the workspace's sibling policies.
+
+The composer is the first feature whose Block is assembled without a default view. Its
+`definition.ts` holds the definition and its empty composition, and `block.ts` assembles init,
+update, commands, and subscriptions without importing the view. `view.ts` uses
+`ComposerBlock.makeView` and the design's renderer. The thread, thread list, and unsent conversation
+select that view explicitly with `Binding.embedView({ view, ... })`. Other features still assemble
+their default views; they have not yet adopted this boundary. The composer remains a browser
+feature: it uses viewport and selection behavior and the existing shared store services.
 
 - `feature/composer`: what the person writes at a place, a reply in a thread, a new thread in a
   group, or the first message of a conversation not yet started, kept as a draft in their browser until they send it. It reports what it sends, and that
@@ -1322,13 +1342,12 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   confirming its removal, and the settings' `dialogView` (the slot `settings-dialog`, given the time now), for
   inviting someone, reading the invitations, revoking one, handing the workspace over, or removing a member, and the
   search, which the page binds as `search` (`SearchBinding`). All are in the document after the drawer and the side
-  pane's dialog, so the one opened last is over the rest. `ClickedSearch` and `RequestedSearch`, which the root
-  sends, ask the search to open. Home's card (`profileCardView`, the slot `home-profile-card`) is lent to the shell's `dialogs` too. Message on it
+  pane's dialog, so the one opened last is over the rest. `ClickedSearch` comes from the workspace's controls;
+  `RequestedSearch` is the operation the root calls for the global keyboard shortcut. Both open the search.
+  Home's card (`profileCardView`, the slot `home-profile-card`) is lent to the shell's `dialogs` too. Message on it
   opens the conversation with the person (`requestConversationWith`), as the search's person does, and Open agent the
   agent's page, as picking the agent does; Change name asks the settings (`requestNameChange`) for the dialog of the
-  account menu's "Change your name…" by a Command, `RequestNameChange`, which dispatches the page's own Message
-  `CompletedRequestNameChange` for the page's update to carry out, because a fold of Home's reports that called the
-  settings' operation tips TS2589 at the page's `makeUpdate`, which a branch of its update does not. The search reports
+  account menu's "Change your name…" directly in the fold of Home's report. The search reports
   what was opened and the page opens it: a page as the rail goes to it (`goToDestination`: Inbox is
   Home, which opens on its inbox, and Settings is the Workspace page, as the account menu goes to it), and, in Home,
   as Home's own lists do, a group (`requestOpenGroup`), a thread in its group (`requestOpenThread`), as a task's is,
@@ -1455,9 +1474,7 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   reports as it is, for the page to carry out: `OpenedPerson` (Message), `OpenedAgent` (Open agent), and
   `RequestedNameChange` (Change name). The search
   the open group's header asks for on a phone, which the group reports as `RequestedSearch`, Home reports as it is,
-  and the page's Home binding forwards it to the app, which opens the workspace's search as it does for the search key.
-  The page does not fold it itself: its step would be in the type of the fold of Home's report, whose search fold
-  already holds Home's steps, and TypeScript gives up on the page's `makeUpdate` (TS2589). The page asks it for the rest: to reset
+  and the page's Home binding opens the workspace's search directly. The page asks Home to reset
   (`requestReset`), which closes the thread, leaves no group marked, shows the inbox, and closes the dialog, as leaving
   Home does; to open a group without a thread (`requestOpenGroup`) or a thread in its group (`requestOpenThread`);
   and to open the conversation with a member (`requestConversationWith`), the one the person has or, when there is
@@ -1498,7 +1515,8 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   `Tick` sends `Ticked` each minute (the first at once, a moment after the flags read it), whose update sets it.
   The subscription `OpenSearch` follows Control+K, or Command+K on an Apple platform, which Foldkit's
   `Mod` decides from the user agent, also from a field, and sends `PressedSearchKey` while a workspace is open, which the update asks the workspace
-  to open its search for, as the workspace's `RequestedSearch` report does when a group's Search button asks (the root's `foldWorkspaceOutMessage`); with none open the key is left to the browser. Nothing acts on the time, so it goes no further than views: the root's view gives the open
+  to open its search for; with none open the key is left to the browser. A group's Search button is handled within the
+  workspace. Nothing acts on the time, so it goes no further than views: the root's view gives the open
   workspace's view the time now beside the email, as a view input and not a message, and the page
   gives it on to the inbox and the open group, the destinations that show ages and days; the workspace
   list's view takes it too, for when each invitation closes. `entry.ts` assembles the application over `services.ts`, which supplies the stores, the
@@ -1672,6 +1690,13 @@ it leaves its sending state with the general failure. `appearance.test.ts` runs 
 key `keepAppearance` keeps, to show the two agree. `crash.test.ts` renders the crash view: the heading and its words, the
 state art, the brand alone in the header, and Reload as a link to the page's own address:
 
+- `feature/composer/block.scene.test.ts` embeds the same Block with a plain HTML view and the Amends view. Both
+  keep and send drafts, send on Enter, and leave Shift+Enter to the browser. The plain consumer has no classes or
+  inline styles; the type-check rejects embedding this Block without selecting a view. The existing composer
+  scenes cover the Amends toolbar, mentions, and slash commands.
+- `test/foldkit-policies.test.ts` exercises a cycle of three sibling bindings, including a command emitted only
+  by their policies, and checks that its handler and service requirements and outgoing messages remain typed.
+  Compile-time rejection cases require the handler layer and every sibling used by the policies.
 - `conversationScroll.test.ts` gives a pane body the extent a browser would measure, with happy-dom's `scrollHeight`
   and `clientHeight` stubbed, and reads back the `scrollTop` the effects set: near the end is less than 80px, a list
   scrolls to the end when the render has committed unless a message is current and it is told to keep the view, a list

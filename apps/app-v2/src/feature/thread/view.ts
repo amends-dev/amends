@@ -37,6 +37,7 @@ import {
   typingLine,
   whenLabel
 } from "../../seen.ts"
+import { view as composerView } from "../composer/view.ts"
 import { logPaneView, replyActionView } from "../turns/view.ts"
 import { RevealHighlightedMessage } from "./command.ts"
 import { ReplyBinding, TaskBinding, ThreadComposition, type ThreadViewBuilder, TurnsBinding } from "./composition.ts"
@@ -415,6 +416,7 @@ export const replyView = ThreadComposition.makeView((model, h) =>
     ReplyBinding.embedView({
       slotId: "reply",
       model: model.reply,
+      view: composerView,
       viewInputs: { placeholder: "Reply in thread", members: model.members }
     })
   )

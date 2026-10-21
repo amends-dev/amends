@@ -69,7 +69,7 @@ const fromComposer = (message: typeof ComposerBlock.Message.Type) =>
   ComposerBinding.embedView({
     slotId: "composer",
     model: listing.composer,
-    viewInputs: { placeholder: "Message #General", members: [] }
+    view: ComposerBlock.makeView((_model, h) => h.empty)
   }).toParentMessage(message)
 
 /** The status menu reporting that the person chose `status`, as the threads receive it. */

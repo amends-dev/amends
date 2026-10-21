@@ -2,9 +2,9 @@ import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import { editedText, pickMention, readMarkdown, replaceRange, type Written, writeMarkdown } from "../../mentions.ts"
 import { ReadSelection, SaveDraft, SelectText } from "./command.ts"
-import { ComposerComposition } from "./composition.ts"
 import {
   boxId,
+  ComposerComposition,
   isFormattingShown,
   Message,
   type Model,

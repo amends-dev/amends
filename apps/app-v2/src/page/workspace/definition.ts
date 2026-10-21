@@ -14,7 +14,7 @@
  * or a conversation with a member, in Home. Its rail ends with the person's account, which the settings draw: a menu
  * of their Appearance, the way to another workspace, the workspace's settings, which it shows, a dialog that changes
  * their name, which the settings open, and signing out. It reports when the person leaves it, the entries they
- * choose that the app acts on, and the search a group's header asks for on a phone, which the app asks it to open.
+ * choose that the app acts on. Requests for search or a name change stay within this workspace.
  */
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
@@ -121,7 +121,6 @@ export const Message = defineMessageUnion({
   ClickedMenu: {},
   ClickedSearch: {},
   RequestedSearch: {},
-  CompletedRequestNameChange: {},
   InformedOfViewport: { viewport: Viewport },
   ReceivedIntegrations: { integrations: Schema.Array(Connection.IntegrationView) },
   FailedLoadIntegrations: { error: Schema.String }
@@ -130,8 +129,7 @@ export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
   ClosedWorkspace: {},
-  ChoseAccountEntry: { entry: AppAccountEntry },
-  RequestedSearch: {}
+  ChoseAccountEntry: { entry: AppAccountEntry }
 })
 export type OutMessage = typeof OutMessage.Type
 

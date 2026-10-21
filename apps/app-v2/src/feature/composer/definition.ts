@@ -110,6 +110,7 @@ export const OutMessage = defineMessageUnion({
 export type OutMessage = typeof OutMessage.Type
 
 export const ComposerDefinition = Block.makeDefinition("Composer", { Model, Message, OutMessage })
+export const ComposerComposition = ComposerDefinition.makeComposition()
 
 /** The id of the box at a place, so a label finds it and the focus can be moved to it. */
 export const boxId = (place: Drafts.Place): string =>

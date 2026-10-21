@@ -1,5 +1,6 @@
 import { notice } from "@amends-dev/design/control"
 import { pane, paneColumn } from "@amends-dev/design/pane"
+import { view as composerView } from "../composer/view.ts"
 import { welcome } from "../threads/view.ts"
 import { ComposerBinding, UnsentConversationComposition } from "./composition.ts"
 import { nameOf } from "./definition.ts"
@@ -30,6 +31,7 @@ export const view = UnsentConversationComposition.makeView.withInputs<ViewInputs
         ComposerBinding.embedView({
           slotId: "composer",
           model: model.composer,
+          view: composerView,
           viewInputs: { placeholder: `Message ${name}`, members: model.members }
         })
       )

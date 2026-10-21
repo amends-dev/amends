@@ -117,17 +117,15 @@ const chooseAccountEntry = (entry: AppAccountEntry) =>
   )
 
 /**
- * A workspace leaving it closes it, and an entry of its account menu is acted on. The search a workspace's group asks
- * for on a phone is opened by that workspace, as the key for it does.
+ * Leaving a workspace closes it, and an entry of its account menu is acted on.
  */
 const foldWorkspaceOutMessage = (
-  workspaceId: WorkspaceId.WorkspaceId,
+  _workspaceId: WorkspaceId.WorkspaceId,
   outMessage: typeof WorkspaceBlock.OutMessage.Type
 ) =>
   WorkspaceBlock.OutMessage.match(outMessage, {
     ClosedWorkspace: () => closeWorkspace,
-    ChoseAccountEntry: ({ entry }) => chooseAccountEntry(entry),
-    RequestedSearch: (_outMessage) => WorkspaceBinding.requestSearch(workspaceId)
+    ChoseAccountEntry: ({ entry }) => chooseAccountEntry(entry)
   })
 
 export const WorkspaceBinding = ApplicationDefinition.bindChild(WorkspaceBlock, {

@@ -21,7 +21,7 @@ import { SearchBlock } from "../../feature/search/block.ts"
 import type { Destination } from "../../feature/search/definition.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { settingsToast } from "../../feature/settings/wording.ts"
-import { LoadIntegrations, RequestNameChange } from "./command.ts"
+import { LoadIntegrations } from "./command.ts"
 import { AppAccountEntry, type Model, Open, OutMessage, type SettingsPage, WorkspaceDefinition } from "./definition.ts"
 import { HomeBlock } from "./home/block.ts"
 
@@ -30,9 +30,6 @@ const loadIntegrationsAgain = WorkspaceDefinition.step((model: Model) => ({
   model,
   commands: [LoadIntegrations({ workspaceId: model.workspaceId })]
 }))
-
-/** Have the page ask the settings, as a Message of its own, for the dialog that changes the person's own name. */
-const requestNameChange = WorkspaceDefinition.step((model: Model) => ({ model, commands: [RequestNameChange({})] }))
 
 /** Show Home in the main content. */
 export const showHome = WorkspaceDefinition.step((model: Model) => ({
@@ -108,23 +105,21 @@ const goToHome = () => Update.combine([MenuBinding.requestClose(), hideAside, sh
  * confirmed to them, that they created one, which is confirmed to them and shown, as it is already open, and that they
  * asked for the settings of an agent whose turn failed or from a member's card, which opens its page as picking the
  * agent does, that they chose Message on a member's card, which opens the conversation with them, and Change name on
- * their own, which asks for the dialog the account menu's does. The search a group's header asks for on a phone is
- * reported to the app by the binding below, which asks this page to open it, as it does for the key for it; opening it
- * here needs the search's step in the type of this fold, whose search fold already needs Home's, and TypeScript gives
- * up on the page's update.
+ * their own, which opens the same dialog as the account menu. A group's Search button opens this workspace's search.
  */
-const foldHomeOutMessage = HomeBlock.OutMessage.match({
-  Navigated: () => goToHome(),
-  JoinedGroup: ({ groupId, place }) =>
-    ActionsBinding.confirm({ text: `Joined ${place}`, offer: Offer.OpenGroup({ groupId }) }),
-  FollowedGroup: ({ place }) => ActionsBinding.confirm({ text: `Following ${place}` }),
-  UnfollowedGroup: ({ place }) => ActionsBinding.confirm({ text: `Unfollowed ${place}` }),
-  CreatedGroup: () => Update.combine([ActionsBinding.confirm({ text: "Group created" }), goToHome()]),
-  OpenedAgent: ({ agentId }) => goTo(showAgent(agentId)),
-  OpenedPerson: ({ memberId }) => HomeBinding.requestConversationWith({ memberId }),
-  RequestedNameChange: () => requestNameChange,
-  RequestedSearch: () => WorkspaceDefinition.stepNoop()
-})
+const foldHomeOutMessage = (outMessage: typeof HomeBlock.OutMessage.Type) =>
+  HomeBlock.OutMessage.match(outMessage, {
+    Navigated: () => goToHome(),
+    JoinedGroup: ({ groupId, place }) =>
+      ActionsBinding.confirm({ text: `Joined ${place}`, offer: Offer.OpenGroup({ groupId }) }),
+    FollowedGroup: ({ place }) => ActionsBinding.confirm({ text: `Following ${place}` }),
+    UnfollowedGroup: ({ place }) => ActionsBinding.confirm({ text: `Unfollowed ${place}` }),
+    CreatedGroup: () => Update.combine([ActionsBinding.confirm({ text: "Group created" }), goToHome()]),
+    OpenedAgent: ({ agentId }) => goTo(showAgent(agentId)),
+    OpenedPerson: ({ memberId }) => HomeBinding.requestConversationWith({ memberId }),
+    RequestedNameChange: () => SettingsBinding.requestNameChange(),
+    RequestedSearch: () => SearchBinding.requestOpen()
+  })
 
 /** Open the group `groupId` in Home, as picking it in the sidebar does, and show Home. */
 const openGroupInHome = (groupId: GroupId.GroupId) =>
@@ -283,21 +278,7 @@ export const SearchBinding = WorkspaceDefinition.bindChild(SearchBlock, {
 export const HomeBinding = WorkspaceDefinition.bindChild(HomeBlock, {
   field: "home",
   init: { contextToArgs: ({ workspaceId, memberId, viewport }) => [workspaceId, memberId, viewport] },
-  outMessage: {
-    /** The search a group asks for is reported to the app, which opens it as the key for it does. */
-    forward: HomeBlock.OutMessage.match({
-      Navigated: () => undefined,
-      JoinedGroup: () => undefined,
-      FollowedGroup: () => undefined,
-      UnfollowedGroup: () => undefined,
-      CreatedGroup: () => undefined,
-      OpenedAgent: () => undefined,
-      OpenedPerson: () => undefined,
-      RequestedNameChange: () => undefined,
-      RequestedSearch: () => OutMessage.RequestedSearch()
-    }),
-    fold: foldHomeOutMessage
-  }
+  outMessage: { fold: foldHomeOutMessage }
 })
 
 export const ConnectionsBinding = WorkspaceDefinition.bindChild(ConnectionsBlock, {

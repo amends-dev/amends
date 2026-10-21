@@ -103,7 +103,7 @@ import { AccountMenu, Written as SettingsWritten } from "../../feature/settings/
 import { TasksBlock } from "../../feature/tasks/block.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { WorkspaceBlock } from "./block.ts"
-import { LoadIntegrations, RequestNameChange } from "./command.ts"
+import { LoadIntegrations } from "./command.ts"
 import { Message, Open, OutMessage } from "./definition.ts"
 import { Open as HomeOpen } from "./home/definition.ts"
 import { init } from "./init.ts"
@@ -1649,15 +1649,16 @@ describe("a workspace", () => {
     )
   })
 
-  it("has a Search button in the header of the open group on a phone only, which asks the app to open the search", () => {
+  it("has a Search button in the header on a phone only, which opens the workspace search", () => {
     scene(
       { update, view: sceneView },
       given(inWindow(withoutThread, "Phone")),
       expect(within(role("main", { name: "General" }), role("button", { name: "Search" }))).toExist(),
       expect(role("dialog", { name: "Jump to" })).toBeAbsent(),
       click(within(role("main", { name: "General" }), role("button", { name: "Search" }))),
-      expectOutMessage(OutMessage.RequestedSearch()),
-      expect(role("dialog", { name: "Jump to" })).toBeAbsent()
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(role("dialog", { name: "Jump to" })).toExist()
     )
 
     for (const viewport of ["Tablet", "Desktop", "Split"] as const) {
@@ -2296,8 +2297,6 @@ describe("a workspace, with the card of a member", () => {
       click(within(role("dialog", { name: "Alice" }), role("button", { name: "Change name" }))),
       Mount.expectEnded(AnchorProfileCard),
       expect(role("dialog", { name: "Alice" })).toBeAbsent(),
-      Command.expectExact(RequestNameChange({})),
-      Command.resolve(RequestNameChange, Message.CompletedRequestNameChange()),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
       Mount.resolve(SelectOnFocus, SettingsBlock.Message.CompletedSelectOnFocus()),

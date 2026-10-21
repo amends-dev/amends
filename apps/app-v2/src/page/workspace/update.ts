@@ -10,7 +10,6 @@ import {
   hideAside,
   MenuBinding,
   SearchBinding,
-  SettingsBinding,
   showAgents,
   showAside,
   showConnections,
@@ -55,7 +54,6 @@ export const update = WorkspaceComposition.makeUpdate((model, message) =>
     ClickedMenu: () => Update.combine(model, [MenuBinding.requestOpen()]),
     ClickedSearch: () => Update.combine(model, [SearchBinding.requestOpen()]),
     RequestedSearch: () => Update.combine(model, [SearchBinding.requestOpen()]),
-    CompletedRequestNameChange: () => Update.combine(model, [SettingsBinding.requestNameChange()]),
     InformedOfViewport: ({ viewport }) =>
       Update.combine(model, [
         showViewport(viewport),

@@ -54,7 +54,7 @@ const fromReply = (message: typeof ComposerBlock.Message.Type) =>
   ReplyBinding.embedView({
     slotId: "reply",
     model: opened.reply,
-    viewInputs: { placeholder: "Reply in thread", members: [] }
+    view: ComposerBlock.makeView((_model, h) => h.empty)
   }).toParentMessage(message)
 
 const inThread = { workspaceId, memberId, threadId }
