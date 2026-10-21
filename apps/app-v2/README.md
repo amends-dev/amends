@@ -1115,6 +1115,29 @@ below it counted at each level above.
   integrations, or of why they could not be reached, to know which connections give channels, by
   the connections feature's `connectionsGiving`; the person then asks again, and the Block asks the
   page, by its out message `RequestedIntegrations`. A form about a channel that is gone closes.
+- `feature/profileCard`: the card that a member's mark, name, or mention opens, as `apps/ui`'s `ProfileCard` draws it,
+  in the design's `profileCard`. A pane that shows people binds one and asks it to open (`requestOpen({ memberId,
+triggerId })`), `triggerId` being the id of the design's `profileTrigger` that was pressed; it gives its rows the
+  design's `ProfileOpener` that `profileOpener(scope, model, open)` makes, whose `scope` begins each trigger's id and
+  tells it from every other pane's. One card is open in a pane at a time: another trigger replaces it, and its own
+  trigger leaves it as it is. A mention names its member by whatever id its text was written with, so the Block takes
+  `memberId` as a string and shows "Profile unavailable" for one the workspace lacks, or whose read failed. While a
+  card is open the Block reads the member (`ReadProfile`, which starts again for another trigger): the members, the
+  agents, and the turns and groups that say what an agent is doing, as `readProfile` puts them together. The card says
+  Person or Agent, "You" on the person's own, "Former member" with "No longer in this workspace." and no buttons for a
+  member who left, and for an agent that is still there how it stands as its mark in the sidebar says it
+  (`statusOfAgent`): "Needs setup" with why under the name, or where it is at work, "Working in #general", with its
+  logo moving as its turn does; an agent with a change on its way stands as none. The buttons are Message, for anyone
+  else, Open agent, for an agent, and Change name, on the person's own card. Choosing one closes the card and reports
+  `OpenedPerson({ memberId })`, `OpenedAgent({ agentId })`, or `RequestedNameChange`, which the page carries out. The
+  `AnchorProfileCard` mount places the card with `@foldkit/ui`'s `anchorSetup`, under its trigger 8px away, above it
+  where there is no room below, 16px inside the window's edges, and keeps it there as the page scrolls and resizes; the
+  headless Popover is one button and one panel for each Block, where a pane has a trigger for each author and mention.
+  The mount moves the focus into the card once it is placed. Escape and Close close it and give the focus back to the
+  trigger (`FocusTrigger`), and the card closes when the focus leaves it, taking it nowhere. The mark beside a name is
+  not reached by Tab, only the name. Unlike `apps/ui`'s, a card does not open on hover or as keyboard focus reaches a
+  name, only on a click, Enter, or Space; the focus goes into the card as it opens, where `apps/ui` leaves it on the
+  trigger and sends it into the card on Tab; and a card whose trigger leaves the page stays until it is closed.
 - `feature/actions`: the person's actions the server has not finished, each with why it was
   refused, until they dismiss it, shown as the design's `toast`s in its `toastStack` over the shell's bottom end
   corner, with Dismiss; and what the page confirms to the person that they did, which a Block reports and the page
