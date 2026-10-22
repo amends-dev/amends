@@ -1,11 +1,11 @@
 import { describe, it } from "@effect/vitest"
 import type { HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { click, expect, given, role, scene, within } from "foldkit/scene"
+import { click, expect, given, role, scene, selector, within } from "foldkit/scene"
 import { row } from "./directory.ts"
 import { paneTabs } from "./pane.ts"
 import { rail } from "./rail.ts"
-import { sidebarItem, sidebarSection } from "./sidebar.ts"
+import { currentSidebarRowSelector, sidebar, sidebarItem, sidebarSection } from "./sidebar.ts"
 
 const Message = defineMessageUnion({ Clicked: {} })
 type Message = typeof Message.Type
@@ -20,11 +20,17 @@ const view = (model: number, h: HtmlBuilder<Message>) =>
         items: [{ label: "Agents", icon: "mark-agents", isCurrent: true, onClick: Message.Clicked(), href: "/agents" }],
         footer: []
       }),
-      sidebarSection(h, {
-        label: "Groups",
-        titleHref: "/groups",
+      sidebar(h, {
+        label: "Workspace",
+        header: h.empty,
         children: [
-          sidebarItem(h, { label: "General", isCurrent: true, onClick: Message.Clicked(), href: "/groups/general" })
+          sidebarSection(h, {
+            label: "Groups",
+            titleHref: "/groups",
+            children: [
+              sidebarItem(h, { label: "General", isCurrent: true, onClick: Message.Clicked(), href: "/groups/general" })
+            ]
+          })
         ]
       }),
       paneTabs(h, {
@@ -53,6 +59,7 @@ describe("native navigation renderers", () => {
       expect(role("link", { name: "Agents" })).toHaveAttr("aria-current", "true"),
       expect(role("link", { name: "Groups" })).toHaveAttr("href", "/groups"),
       expect(role("link", { name: "General" })).toHaveAttr("aria-current", "page"),
+      expect(selector(currentSidebarRowSelector)).toHaveAttr("href", "/groups/general"),
       expect(within(role("navigation", { name: "Activity" }), role("link", { name: "Unread" }))).toHaveAttr(
         "aria-current",
         "page"

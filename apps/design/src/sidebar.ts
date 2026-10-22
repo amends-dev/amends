@@ -160,7 +160,10 @@ const renderSubItem = <Message, Requirements>(
             {
               onClick,
               toView: (attributes) =>
-                h.button([...attributes.button, ...current, h.Class(subItemButton)], renderSubItemContent(h, subItem))
+                h.button(
+                  [...attributes.button, h.DataAttribute("sidebar-target", ""), ...current, h.Class(subItemButton)],
+                  renderSubItemContent(h, subItem)
+                )
             },
             h
           )
@@ -248,10 +251,10 @@ const itemDescription = (
 }
 
 /**
- * Selects the row of the sidebar that is current, a button, within a dialog that holds the sidebar, for the dialog to
- * focus when it opens.
+ * Selects the current interactive sidebar row, whether a link or a button, for the navigation
+ * drawer to focus when it opens. Noninteractive current rows, such as thread labels, are excluded.
  */
-export const currentSidebarRowSelector = '[data-sidebar] button[aria-current="page"]'
+export const currentSidebarRowSelector = '[data-sidebar] [data-sidebar-target][aria-current="page"]'
 
 /**
  * The sidebar, a `nav` named by `label`: the `header` above the `children` that scroll, and the `footer`
@@ -339,7 +342,11 @@ const renderSectionLabel = <Message, Requirements>(
         : navigationTarget(
             h,
             { onClick: onTitleClick, href: config.titleHref },
-            [...(config.isTitleCurrent === true ? [h.AriaCurrent("page")] : []), h.Class(sectionTitleButton)],
+            [
+              h.DataAttribute("sidebar-target", ""),
+              ...(config.isTitleCurrent === true ? [h.AriaCurrent("page")] : []),
+              h.Class(sectionTitleButton)
+            ],
             [config.label]
           )
     ]
@@ -443,6 +450,7 @@ export const sidebarItem = <Message, Requirements>(
         h,
         config,
         [
+          h.DataAttribute("sidebar-target", ""),
           h.AriaLabel(itemName(config)),
           ...(description === undefined ? [] : [h.AriaDescription(description)]),
           ...(config.isCurrent ? [h.AriaCurrent("page")] : []),
