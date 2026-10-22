@@ -306,12 +306,16 @@ const fromAgents = (message: typeof AgentsBlock.Message.Type) =>
   AgentsBinding.embedView({
     slotId: "agents",
     model: opened.agents,
-    viewInputs: { workspaceName: "Studio", viewport: "Desktop" }
+    view: AgentsBlock.makeView((_model, h) => h.empty)
   }).toParentMessage(message)
 
 /** What the settings report, as the workspace receives it. */
 const fromSettings = (message: typeof SettingsBlock.Message.Type) =>
-  SettingsBinding.embedView({ slotId: "settings", model: opened.settings }).toParentMessage(message)
+  SettingsBinding.embedView({
+    slotId: "settings",
+    model: opened.settings,
+    view: SettingsBlock.makeView((_model, h) => h.empty)
+  }).toParentMessage(message)
 
 /** What the channels report, as the workspace receives it. */
 const fromChannels = (message: typeof ChannelsBlock.Message.Type) =>

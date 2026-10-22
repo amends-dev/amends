@@ -13,6 +13,7 @@ import { ReadDraft } from "./feature/composer/command.ts"
 import { GroupBlock } from "./feature/group/block.ts"
 import { init as initGroup } from "./feature/group/init.ts"
 import { GroupsBlock } from "./feature/groups/block.ts"
+import { SettingsBlock } from "./feature/settings/block.ts"
 import { AccountBinding } from "./feature/settings/composition.ts"
 import { AccountEntry, AccountMenu } from "./feature/settings/definition.ts"
 import { init } from "./init.ts"
@@ -90,7 +91,11 @@ const settings = WorkspaceBlock.init(membership.workspace.id, membership.member.
  */
 const choseAccountEntry = (entry: AccountEntry) =>
   fromWorkspace(
-    SettingsBinding.embedView({ slotId: "settings", model: settings }).toParentMessage(
+    SettingsBinding.embedView({
+      slotId: "settings",
+      model: settings,
+      view: SettingsBlock.makeView((_model, h) => h.empty)
+    }).toParentMessage(
       AccountBinding.embedView({
         slotId: "account",
         model: settings.accountMenu,

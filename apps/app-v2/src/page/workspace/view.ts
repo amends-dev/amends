@@ -6,22 +6,19 @@ import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import type { Appearance } from "../../appearance.ts"
-import {
-  agentView,
-  dialogView as agentsDialogView,
-  sidebarView as agentsSidebarView,
-  view as agentsView
-} from "../../feature/agents/view.ts"
+import { agentView } from "../../feature/agents/view/detail.ts"
+import { dialogView as agentsDialogView } from "../../feature/agents/view/dialog.ts"
+import { view as agentsView } from "../../feature/agents/view/list.ts"
+import { sidebarView as agentsSidebarView } from "../../feature/agents/view/sidebar.ts"
 import { connectionView } from "../../feature/connections/view/detail.ts"
 import { dialogView as connectionsDialogView } from "../../feature/connections/view/dialog.ts"
 import { view as connectionsView } from "../../feature/connections/view/list.ts"
 import { sidebarView as connectionsSidebarView } from "../../feature/connections/view/sidebar.ts"
-import {
-  accountView as settingsAccountView,
-  dialogView as settingsDialogView,
-  memberView as settingsMemberView,
-  membersView as settingsMembersView
-} from "../../feature/settings/view.ts"
+import { accountView as settingsAccountView } from "../../feature/settings/view/account.ts"
+import { dialogView as settingsDialogView } from "../../feature/settings/view/dialog.ts"
+import { memberView as settingsMemberView } from "../../feature/settings/view/member.ts"
+import { membersView as settingsMembersView } from "../../feature/settings/view/members.ts"
+import { view as settingsWorkspaceView } from "../../feature/settings/view/workspace.ts"
 import {
   ActionsBinding,
   AgentsBinding,
@@ -234,7 +231,13 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
       ),
     Settings: ({ page }) =>
       page === "Workspace"
-        ? h.block(SettingsBinding.embedView({ slotId: "settings-workspace", model: model.settings }))
+        ? h.block(
+            SettingsBinding.embedView({
+              slotId: "settings-workspace",
+              model: model.settings,
+              view: settingsWorkspaceView
+            })
+          )
         : h.block(
             SettingsBinding.embedView({
               slotId: "settings-members",

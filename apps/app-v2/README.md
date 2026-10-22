@@ -260,7 +260,7 @@ would work through the whole structure of the Block and of everything it binds a
 named contracts alongside the declaration patches described above; removing one requires checking
 the complete app, including the workspace's sibling policies.
 
-The composer, profile card, and connections Blocks assemble without default views. Their
+The composer, profile card, connections, agents, and settings Blocks assemble without default views. Their
 `block.ts` files assemble behavior without importing a view. Views use the completed Block's
 `makeView`, and parents select them explicitly with `Binding.embedView({ view, ... })`. The
 composer's `definition.ts` also holds its empty composition. The profile card keeps agent
@@ -268,11 +268,13 @@ readiness and activity in its model; its view chooses status wording and logo mo
 `view/agents.ts`. These remain browser features with commands, mounts, and store subscriptions.
 Other features still assemble their default views; they have not yet adopted this boundary.
 
-A feature with several surfaces keeps them under `view/`. Connections has `sidebar.ts`,
-`list.ts`, `detail.ts`, and `dialog.ts`, each authored through `ConnectionsBlock.makeView`.
-The workspace imports the surface it embeds directly. Shared error displays live in
-`view/feedback.ts`, and the detail page and dialog share `view/settingsFields.ts`. The feature
-keeps one state machine and one dialog binding across those surfaces.
+A feature with several surfaces keeps them under `view/`. Connections and agents each have
+`sidebar.ts`, `list.ts`, `detail.ts`, and `dialog.ts`. Settings has `workspace.ts`, `members.ts`,
+`member.ts`, `account.ts`, and `dialog.ts` for its distinct surfaces. The workspace imports the
+surface it embeds directly; every surface uses its completed Block's `makeView`. Shared render
+helpers stay beside those views: error displays, the settings page frame, and connection settings
+or agent setup fields. Each feature keeps one state machine and its existing child bindings
+across those surfaces.
 
 - `feature/composer`: what the person writes at a place, a reply in a thread, a new thread in a
   group, or the first message of a conversation not yet started, kept as a draft in their browser until they send it. It reports what it sends, and that

@@ -62,7 +62,10 @@ import { Message, type Model, OfferedModels, OutMessage, Reason, Written } from 
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
-import { agentView, dialogView, sidebarView, view } from "./view.ts"
+import { agentView } from "./view/detail.ts"
+import { dialogView } from "./view/dialog.ts"
+import { view } from "./view/list.ts"
+import { sidebarView } from "./view/sidebar.ts"
 
 const { workspace, member: alice } = membership
 const asMember = { workspaceId: workspace.id, memberId: alice.id }
