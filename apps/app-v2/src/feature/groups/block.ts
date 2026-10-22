@@ -11,6 +11,8 @@ const implementation = {
   update,
   subscriptions,
   operations: {
+    requestDismiss: Message.RequestedDismiss,
+    requestBrowseTab: Message.ChoseBrowseTab,
     informOpenGroup: Message.InformedOfOpenGroup,
     requestConversationWith: Message.RequestedConversationWith
   },

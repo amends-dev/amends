@@ -11,6 +11,7 @@ const implementation = {
   update,
   subscriptions,
   operations: {
+    requestDismiss: Message.RequestedDismiss,
     requestBrowseTab: Message.ChoseBrowseTab,
     informReceivedIntegrations: Message.ReceivedIntegrations,
     informFailedLoadIntegrations: Message.FailedLoadIntegrations

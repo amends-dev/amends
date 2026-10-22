@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { KeyValueStore } from "effect/persistence"
 import { readKeptAppearance } from "./appearance.ts"
-import { KeepAppearance, ShowAppearance } from "./command.ts"
+import { KeepAppearance, ShowAppearance, Navigate } from "./command.ts"
 import { Message } from "./message.ts"
 
 const theme = () => document.documentElement.getAttribute("data-theme")
@@ -59,5 +59,56 @@ describe("KeepAppearance", () => {
 
       expect(message).toEqual(Message.CompletedKeepAppearance())
     })
+  )
+})
+
+describe("Navigate", () => {
+  it.effect("writes history once, replaces when asked, and focuses same-page fragments", () =>
+    Effect.gen(function* () {
+      const original = window.location.href
+      const element = document.createElement("main")
+      element.id = "route-focus-target"
+      element.tabIndex = -1
+      const pushes: Array<string | URL | null | undefined> = []
+      const replacements: Array<string | URL | null | undefined> = []
+      const pushState = window.history.pushState.bind(window.history)
+      const replaceState = window.history.replaceState.bind(window.history)
+      let changes = 0
+      const changed = () => {
+        changes++
+      }
+      yield* Effect.acquireRelease(
+        Effect.sync(() => {
+          document.body.append(element)
+          window.addEventListener("foldkit:urlchange", changed)
+          window.history.pushState = (data, unused, url) => {
+            pushes.push(url)
+            pushState(data, unused, url)
+          }
+          window.history.replaceState = (data, unused, url) => {
+            replacements.push(url)
+            replaceState(data, unused, url)
+          }
+        }),
+        () =>
+          Effect.sync(() => {
+            window.removeEventListener("foldkit:urlchange", changed)
+            window.history.pushState = pushState
+            window.history.replaceState = replaceState
+            replaceState({}, "", original)
+            element.remove()
+          })
+      )
+      yield* Navigate({ url: "/workspaces/test/agents", replace: false }).effect
+      yield* Navigate({ url: "/workspaces/test/agents", replace: false }).effect
+      expect(pushes).toHaveLength(1)
+      expect(changes).toBe(1)
+      yield* Navigate({ url: "/workspaces/test/inbox", replace: true }).effect
+      expect(replacements).toHaveLength(1)
+      yield* Navigate({ url: "#route-focus-target", replace: false }).effect
+      expect(document.activeElement).toBe(element)
+      expect(window.location.pathname).toBe("/workspaces/test/inbox")
+      expect(window.location.hash).toBe("#route-focus-target")
+    }).pipe(Effect.provide(Navigate.layer), Effect.scoped)
   )
 })

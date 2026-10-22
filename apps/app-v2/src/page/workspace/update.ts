@@ -2,6 +2,7 @@ import { isAsideInDialog } from "@amends-dev/design/shell"
 import type { Viewport } from "@amends-dev/design/viewport"
 import * as Update from "foldkit/update"
 import {
+  dismissOverlays,
   AgentsBinding,
   ChannelsBinding,
   ConnectionsBinding,
@@ -45,7 +46,7 @@ const hasSidebarInPlace = (viewport: Viewport): boolean => viewport === "Desktop
 
 export const update = WorkspaceComposition.makeUpdate((model, message) =>
   Message.match(message, {
-    RequestedDestination: ({ destination }) => Update.combine(model, [showDestination(destination)]),
+    RequestedDestination: ({ destination }) => Update.combine(model, [dismissOverlays, showDestination(destination)]),
     ClickedWorkspaceSwitcher: () => ({ model, outMessage: OutMessage.ClosedWorkspace() }),
     ClickedHome: () => Update.withOutMessage(Update.combine(model, [switchTo(showHome)]), OutMessage.Navigated()),
     ClickedConnections: () =>

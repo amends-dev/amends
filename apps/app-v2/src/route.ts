@@ -21,8 +21,12 @@ export const HomeDestination = defineTaggedUnion({
   Inbox: { tab: Schema.Literals(["Unread", "All"]), selected: Schema.Option(InboxSelection) },
   Triage: {},
   Tasks: {},
-  Groups: {},
-  Group: { groupId: GroupId.GroupId, threadId: Schema.Option(ThreadId.ThreadId) },
+  Groups: { tab: Schema.Literals(["Yours", "Discover"]) },
+  Group: {
+    groupId: GroupId.GroupId,
+    threadId: Schema.Option(ThreadId.ThreadId),
+    tab: Schema.Literals(["Threads", "Tasks"])
+  },
   Conversation: { memberIds: Schema.NonEmptyArray(MemberId.MemberId) }
 })
 export type HomeDestination = typeof HomeDestination.Type
@@ -37,6 +41,8 @@ export const Destination = defineTaggedUnion({
   Channels: {}
 })
 export type Destination = typeof Destination.Type
+export type DestinationHref = (destination: Destination) => string | undefined
+export type HomeDestinationHref = (destination: HomeDestination) => string | undefined
 
 export const Route = defineTaggedUnion({
   Workspaces: {},
@@ -70,12 +76,12 @@ const homePath = HomeDestination.match({
   },
   Triage: () => "triage",
   Tasks: () => "tasks",
-  Groups: () => "groups",
-  Group: ({ groupId, threadId }) =>
+  Groups: ({ tab }) => (tab === "Yours" ? "groups" : "groups?tab=discover"),
+  Group: ({ groupId, threadId, tab }) =>
     `groups/${segment(groupId)}${Option.match(threadId, {
       onNone: () => "",
       onSome: (id) => `/threads/${segment(id)}`
-    })}`,
+    })}${tab === "Tasks" ? "?tab=tasks" : ""}`,
   Conversation: ({ memberIds }) => {
     const query = new URLSearchParams()
     for (const id of [...new Set(memberIds)].sort()) query.append("member", id)
@@ -115,6 +121,8 @@ const decodeDestination = Schema.decodeUnknownOption(Destination)
 /** Query values are validated with the same schemas as the destinations. Unknown keys are ignored. */
 const parseDestination = (parts: ReadonlyArray<string>, query: URLSearchParams): Option.Option<Destination> => {
   const [section, id, detail, selected] = parts
+  const groupTab =
+    query.get("tab") === "tasks" ? "Tasks" : query.has("tab") && query.get("tab") !== "threads" ? undefined : "Threads"
   const homeDestination = (value: unknown) => decodeDestination({ _tag: "Home", destination: value })
   if (parts.length === 0) return Option.some(home())
   if (parts.length === 1) {
@@ -134,7 +142,16 @@ const parseDestination = (parts: ReadonlyArray<string>, query: URLSearchParams):
     }
     if (section === "triage") return Option.some(Destination.Home({ destination: HomeDestination.Triage() }))
     if (section === "tasks") return Option.some(Destination.Home({ destination: HomeDestination.Tasks() }))
-    if (section === "groups") return Option.some(Destination.Home({ destination: HomeDestination.Groups() }))
+    if (section === "groups")
+      return homeDestination({
+        _tag: "Groups",
+        tab:
+          query.get("tab") === "discover"
+            ? "Discover"
+            : !query.has("tab") || query.get("tab") === "yours"
+              ? "Yours"
+              : undefined
+      })
     if (section === "connections") return decodeDestination({ _tag: "Connections", tab: query.get("tab") ?? "all" })
     if (section === "agents") {
       const tab = query.get("tab")
@@ -146,7 +163,8 @@ const parseDestination = (parts: ReadonlyArray<string>, query: URLSearchParams):
     if (section === "channels") return Option.some(Destination.Channels())
   }
   if (parts.length === 2) {
-    if (section === "groups") return homeDestination({ _tag: "Group", groupId: id, threadId: Option.none() })
+    if (section === "groups")
+      return homeDestination({ _tag: "Group", groupId: id, threadId: Option.none(), tab: groupTab })
     if (section === "agents") return decodeDestination({ _tag: "Agent", agentId: id })
     if (section === "connections") return decodeDestination({ _tag: "Connection", connectionId: id })
     if (section === "settings" && id === "members")
@@ -157,7 +175,7 @@ const parseDestination = (parts: ReadonlyArray<string>, query: URLSearchParams):
   if (parts.length === 3 && section === "settings" && id === "members")
     return decodeDestination({ _tag: "Settings", page: "Members", memberId: Option.some(detail) })
   if (parts.length === 4 && section === "groups" && detail === "threads")
-    return homeDestination({ _tag: "Group", groupId: id, threadId: Option.some(selected) })
+    return homeDestination({ _tag: "Group", groupId: id, threadId: Option.some(selected), tab: groupTab })
   return Option.none()
 }
 

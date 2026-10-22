@@ -215,6 +215,7 @@ export const Model = Schema.Struct({
 export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
+  RequestedDismiss: {},
   ReceivedSettings: {
     workspace: Schema.Option(WorkspaceItem),
     members: Schema.Array(MemberItem),

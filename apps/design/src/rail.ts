@@ -1,14 +1,15 @@
 /**
  * The first layout pattern: the leftmost column of global destinations, on the canvas beside the
- * card of the sidebar and main pane. Each destination is an icon-only button named by its label.
+ * card of the sidebar and main pane. A destination with a `href` is a native link; otherwise it is
+ * an icon-only button. Both are named by the label.
  */
 
-import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { type IconName, icon } from "./icon.ts"
 import { logo } from "./logo.ts"
 import { mark } from "./mark.ts"
 import { type MenuConfig, menu } from "./menu.ts"
+import { navigationTarget } from "./navigation.ts"
 
 const railColumn =
   "flex w-13 flex-none flex-col items-center pt-2.5 pb-3.25 [--amends-status-knockout:var(--amends-canvas)]"
@@ -35,6 +36,7 @@ export type RailItem<Message> = Readonly<{
   label: string
   isCurrent: boolean
   onClick: Message
+  href?: string | undefined
 }>
 
 export type RailBrand<Message> = Readonly<{
@@ -42,6 +44,7 @@ export type RailBrand<Message> = Readonly<{
   label: string
   /** The mark is a button when it has one. */
   onClick?: Message
+  href?: string | undefined
 }>
 
 /** The way to search, which is not a destination: it is never current. */
@@ -51,35 +54,23 @@ const renderDestination = <Message, Requirements>(h: HtmlBuilder<Message, Requir
   h.li(
     [],
     [
-      Button.view(
-        {
-          onClick: item.onClick,
-          toView: (attributes) =>
-            h.button(
-              [
-                ...attributes.button,
-                h.AriaLabel(item.label),
-                ...(item.isCurrent ? [h.AriaCurrent("true")] : []),
-                h.Class(railDestination)
-              ],
-              [icon(h, item.icon)]
-            )
-        },
-        h
+      navigationTarget(
+        h,
+        item,
+        [h.AriaLabel(item.label), ...(item.isCurrent ? [h.AriaCurrent("true")] : []), h.Class(railDestination)],
+        [icon(h, item.icon)]
       )
     ]
   )
 
 const renderBrand = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, brand: RailBrand<Message>) =>
-  brand.onClick === undefined
+  brand.onClick === undefined && brand.href === undefined
     ? h.span([h.Class(railMark)], [logo(h, { label: brand.label })])
-    : Button.view(
-        {
-          onClick: brand.onClick,
-          toView: (attributes) =>
-            h.button([...attributes.button, h.AriaLabel(brand.label), h.Class(railBrand)], [logo(h)])
-        },
-        h
+    : navigationTarget(
+        h,
+        { onClick: brand.onClick, href: brand.href },
+        [h.AriaLabel(brand.label), h.Class(railBrand)],
+        [logo(h)]
       )
 
 /**

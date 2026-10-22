@@ -12,6 +12,12 @@ is, and imports nothing of `ui`. The design is flat and quiet: no rounded corner
 between panel regions, shadows on floating layers only, one saturated color for status marks, and
 the rest shades of gray.
 
+Navigation renderers accept destinations without owning routes: rail items and brands, sidebar
+items, directory rows, and pane tabs accept `href`; sidebar section titles accept `titleHref`.
+With a destination they render native anchors, preserving modified clicks and the browser’s
+link menu. Without one they keep their Block action. A pane whose tabs all have destinations
+uses a labelled navigation with `aria-current="page"`; local panels remain a tablist.
+
 ## The workshop
 
 ```sh

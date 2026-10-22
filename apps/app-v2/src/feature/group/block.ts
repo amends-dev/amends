@@ -10,7 +10,12 @@ const implementation = {
   init,
   update,
   subscriptions,
-  operations: { requestCloseThread: Message.RequestedCloseThread },
+  operations: {
+    requestDismiss: Message.RequestedDismiss,
+    requestCloseThread: Message.RequestedCloseThread,
+    requestThread: Message.RequestedThread,
+    requestTab: Message.RequestedTab
+  },
   EffectsLayer: Layer.merge(EffectsLayer, subscriptions.layer)
 }
 

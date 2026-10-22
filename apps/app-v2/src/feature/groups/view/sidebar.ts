@@ -1,6 +1,6 @@
 /** The groups and conversations in the workspace sidebar. */
 
-import type { Group } from "@amends-dev/core/group"
+import type { Group, GroupId } from "@amends-dev/core/group"
 import type { Task } from "@amends-dev/core/task"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
 import { iconButton, notice } from "@amends-dev/design/control"
@@ -40,6 +40,9 @@ export type OpenThread = Readonly<{ title: string; taskStatus: Option.Option<Tas
  * their row current.
  */
 export type ViewInputs = Readonly<{
+  groupHref?: ((id: GroupId.GroupId) => string | undefined) | undefined
+  memberHref?: ((id: MemberId.MemberId) => string | undefined) | undefined
+  browseHref?: string | undefined
   openThread: Option.Option<OpenThread>
   isBrowsing: boolean
   unsentWith: Option.Option<MemberId.MemberId>
@@ -108,7 +111,8 @@ const groupRow = (
   { group, pending }: GroupItem,
   model: Model,
   openThread: Option.Option<OpenThread>,
-  h: GroupsViewBuilder
+  h: GroupsViewBuilder,
+  groupHref?: ViewInputs["groupHref"]
 ): Html => {
   const isCurrent = Option.contains(model.selected, group.id)
   const waiting = waitingIn(model, group.id)
@@ -120,6 +124,7 @@ const groupRow = (
     isUnread: hasNewActivityIn(model, group.id),
     isPending: pending,
     isCurrent,
+    href: groupHref?.(group.id),
     onClick: Message.ClickedGroup({ groupId: group.id }),
     ...(isCurrent && Option.isSome(openThread) ? { children: [openThreadRow(openThread.value)] } : {})
   })
@@ -134,7 +139,8 @@ const teammateRow = (
   member: Member.Member,
   model: Model,
   unsentWith: Option.Option<MemberId.MemberId>,
-  h: GroupsViewBuilder
+  h: GroupsViewBuilder,
+  memberHref?: ViewInputs["memberHref"]
 ): Html =>
   sidebarItem(h, {
     mark: memberMark(member),
@@ -144,6 +150,7 @@ const teammateRow = (
     }),
     label: member.name,
     isCurrent: Option.contains(unsentWith, member.id),
+    href: memberHref?.(member.id),
     onClick: Message.ClickedTeammate({ memberId: member.id })
   })
 
@@ -155,10 +162,11 @@ const teamRows = (
   teams: ReadonlyArray<GroupItem>,
   model: Model,
   openThread: Option.Option<OpenThread>,
-  h: GroupsViewBuilder
+  h: GroupsViewBuilder,
+  groupHref?: ViewInputs["groupHref"]
 ): ReadonlyArray<Html> => {
   if (teams.length > 0) {
-    return teams.map((item) => groupRow(item, model, openThread, h))
+    return teams.map((item) => groupRow(item, model, openThread, h, groupHref))
   }
 
   return model.isLoaded ? [sidebarEmpty(h, "No groups yet")] : []
@@ -173,7 +181,7 @@ const teamRows = (
  * start a team or a conversation open the dialog `dialogView` renders.
  */
 export const sidebarView = GroupsBlock.makeView.withInputs<ViewInputs>(
-  (model, { openThread, isBrowsing, unsentWith }, h) => {
+  (model, { openThread, isBrowsing, unsentWith, groupHref, memberHref, browseHref }, h) => {
     const own = yours(model)
     const teams = own.filter(({ group }) => group.kind === "Team")
     const conversations = own.filter(({ group }) => group.kind !== "Team")
@@ -183,6 +191,7 @@ export const sidebarView = GroupsBlock.makeView.withInputs<ViewInputs>(
       sidebarSection(h, {
         label: "Groups",
         onTitleClick: Message.ClickedGroupsTitle(),
+        titleHref: browseHref,
         isTitleCurrent: isBrowsing,
         actions: [
           iconButton(
@@ -200,7 +209,7 @@ export const sidebarView = GroupsBlock.makeView.withInputs<ViewInputs>(
               ]
             : [])
         ],
-        children: teamRows(teams, model, openThread, h)
+        children: teamRows(teams, model, openThread, h, groupHref)
       }),
       sidebarSection(h, {
         label: "Direct messages",
@@ -212,8 +221,8 @@ export const sidebarView = GroupsBlock.makeView.withInputs<ViewInputs>(
           )
         ],
         children: [
-          ...conversations.map((item) => groupRow(item, model, openThread, h)),
-          ...teammates(model).map((member) => teammateRow(member, model, unsentWith, h))
+          ...conversations.map((item) => groupRow(item, model, openThread, h, groupHref)),
+          ...teammates(model).map((member) => teammateRow(member, model, unsentWith, h, memberHref))
         ]
       })
     ])

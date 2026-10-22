@@ -34,7 +34,8 @@ const memberRow = (
   item: MemberItem,
   model: Model,
   openMemberId: Option.Option<MemberId.MemberId>,
-  h: SettingsViewBuilder
+  h: SettingsViewBuilder,
+  memberHref?: MembersInputs["memberHref"]
 ): Html => {
   const { member, pending } = item
   const role = roleLabel(model, member.id)
@@ -54,7 +55,8 @@ const memberRow = (
         cells: [h.span([], [role]), h.span([], [status])],
         cellsText: [role, status].filter((part) => part !== "").join(" · "),
         isCurrent: Option.contains(openMemberId, member.id),
-        onClick: Message.ClickedMember({ memberId: member.id })
+        onClick: Message.ClickedMember({ memberId: member.id }),
+        href: memberHref?.(member.id)
       })
     ]
   )
@@ -89,14 +91,19 @@ const rosterToolbar = (model: Model, h: SettingsViewBuilder): ReadonlyArray<Html
 ]
 
 /** The roster, or what it says when it has no one to show. */
-const roster = (model: Model, openMemberId: Option.Option<MemberId.MemberId>, h: SettingsViewBuilder): Html => {
+const roster = (
+  model: Model,
+  openMemberId: Option.Option<MemberId.MemberId>,
+  h: SettingsViewBuilder,
+  memberHref?: MembersInputs["memberHref"]
+): Html => {
   const shown = shownMembers(model)
 
   return shown.length === 0
     ? paneEmpty(h, { art: emptyRosterArt(model.filter), title: emptyRoster(model.filter) })
     : h.ul(
         [h.AriaLabel(model.filter.status === "removed" ? "Removed members" : "Members")],
-        shown.map((item) => memberRow(item, model, openMemberId, h))
+        shown.map((item) => memberRow(item, model, openMemberId, h, memberHref))
       )
 }
 
@@ -168,6 +175,7 @@ const invitationsCard = (waiting: ReadonlyArray<InvitationItem>, h: SettingsView
  * the member the page has open beside the roster, whose row is current.
  */
 export type MembersInputs = Readonly<{
+  memberHref?: ((id: MemberId.MemberId) => string | undefined) | undefined
   now: DateTime.Utc
   viewport: Viewport
   openMemberId: Option.Option<MemberId.MemberId>
@@ -179,7 +187,7 @@ export type MembersInputs = Readonly<{
  * header and the invitations still to be accepted after the roster, or on a phone as a card.
  */
 export const membersView = SettingsBlock.makeView.withInputs<MembersInputs>(
-  (model, { now, viewport, openMemberId }, h) => {
+  (model, { now, viewport, openMemberId, memberHref }, h) => {
     const mayManageInvitations = mayInvite(model)
     const waiting = pendingInvitations(model, now)
 
@@ -190,7 +198,7 @@ export const membersView = SettingsBlock.makeView.withInputs<MembersInputs>(
       ...(mayManageInvitations ? { actions: [button(h, "Invite people", Message.ClickedInvite())] } : {}),
       toolbar: rosterToolbar(model, h),
       body: [
-        roster(model, openMemberId, h),
+        roster(model, openMemberId, h, memberHref),
         ...(mayManageInvitations
           ? [viewport === "Phone" ? invitationsCard(waiting, h) : waitingInvitations(waiting, model, now, h)]
           : [])

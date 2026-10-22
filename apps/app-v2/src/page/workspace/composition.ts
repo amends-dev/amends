@@ -111,6 +111,7 @@ const goToHome = () => Update.combine([MenuBinding.requestClose(), hideAside, sh
 const foldHomeOutMessage = (outMessage: typeof HomeBlock.OutMessage.Type) =>
   HomeBlock.OutMessage.match(outMessage, {
     Navigated: () => goToHome(),
+    ReplacedConversation: () => goToHome(),
     JoinedGroup: ({ groupId, place }) =>
       ActionsBinding.confirm({ text: `Joined ${place}`, offer: Offer.OpenGroup({ groupId }) }),
     FollowedGroup: ({ place }) => ActionsBinding.confirm({ text: `Following ${place}` }),
@@ -290,6 +291,7 @@ export const HomeBinding = WorkspaceDefinition.bindChild(HomeBlock, {
     fold: foldHomeOutMessage,
     forward: HomeBlock.OutMessage.match({
       Navigated: () => OutMessage.Navigated(),
+      ReplacedConversation: () => OutMessage.ReplacedDestination(),
       CreatedGroup: () => OutMessage.Navigated(),
       OpenedAgent: () => OutMessage.Navigated(),
       JoinedGroup: () => undefined,
@@ -368,6 +370,14 @@ export const ChannelsBinding = WorkspaceDefinition.bindChild(ChannelsBlock, {
 })
 
 /** Restore a destination through the same child operations used by visible navigation. */
+export const dismissOverlays = Update.combine([
+  SearchBinding.requestDismiss(),
+  AgentsBinding.requestDismiss(),
+  ConnectionsBinding.requestDismiss(),
+  SettingsBinding.requestDismiss(),
+  HomeBinding.requestDismiss()
+])
+
 export const showDestination = (destination: WorkspaceDestination) =>
   WorkspaceDestination.match(destination, {
     Home: ({ destination }) =>

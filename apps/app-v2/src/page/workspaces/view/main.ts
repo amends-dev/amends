@@ -1,5 +1,6 @@
 /** The workspace picker, its entry dialog, and confirmations. */
 
+import type { WorkspaceId } from "@amends-dev/core/workspace"
 import { screenContent } from "@amends-dev/design/centered"
 import { confirmation, confirmationStack } from "@amends-dev/design/toast"
 import type * as DateTime from "effect/DateTime"
@@ -17,8 +18,11 @@ const confirmations = (model: Model, h: WorkspacesViewBuilder): Html =>
   )
 
 /** The time now, which when each invitation closes is read from. */
-export type ViewInputs = Readonly<{ now: DateTime.Utc }>
+export type ViewInputs = Readonly<{
+  now: DateTime.Utc
+  workspaceHref?: ((id: WorkspaceId.WorkspaceId) => string | undefined) | undefined
+}>
 
-export const view = WorkspacesComposition.makeView.withInputs<ViewInputs>((model, { now }, h) =>
-  screenContent(h, [...listing(model, now, h), dialogView(model, h), confirmations(model, h)])
+export const view = WorkspacesComposition.makeView.withInputs<ViewInputs>((model, { now, workspaceHref }, h) =>
+  screenContent(h, [...listing(model, now, h, workspaceHref), dialogView(model, h), confirmations(model, h)])
 )

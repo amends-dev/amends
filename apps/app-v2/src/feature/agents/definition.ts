@@ -177,6 +177,7 @@ export const Model = Schema.Struct({
 export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
+  RequestedDismiss: {},
   ReceivedAgents: {
     agents: Schema.Array(AgentItem),
     members: Schema.Array(Member.Member),

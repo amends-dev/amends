@@ -12,6 +12,7 @@ import { pluralize } from "../../../view/counts.ts"
 import { expiryLabel } from "../../../view/time.ts"
 import type { WorkspacesViewBuilder } from "../composition.ts"
 import { Message, type Model, type PendingInvitation, Workspaces, workspaceRowId } from "../definition.ts"
+import type { ViewInputs } from "./main.ts"
 
 const firstLetterOf = (name: string): string => Array.from(name).at(0) ?? ""
 
@@ -52,7 +53,8 @@ const createButton = (h: WorkspacesViewBuilder, variant: "secondary" | "primary"
 /** The workspaces the person belongs to, each to open, while they belong to any. */
 const workspacesSection = (
   memberships: ReadonlyArray<WorkspaceDirectory.Membership>,
-  h: WorkspacesViewBuilder
+  h: WorkspacesViewBuilder,
+  workspaceHref?: ViewInputs["workspaceHref"]
 ): ReadonlyArray<Html> =>
   memberships.length === 0
     ? []
@@ -71,7 +73,8 @@ const workspacesSection = (
                   title: membership.workspace.name,
                   meta: workspaceMeta(membership),
                   action: "Open →",
-                  onClick: Message.ClickedWorkspace({ workspaceId: membership.workspace.id })
+                  onClick: Message.ClickedWorkspace({ workspaceId: membership.workspace.id }),
+                  href: workspaceHref?.(membership.workspace.id)
                 })
               ]
             )
@@ -131,7 +134,8 @@ const loadedContent = (
   invitations: ReadonlyArray<PendingInvitation>,
   reloadFailed: boolean,
   now: DateTime.Utc,
-  h: WorkspacesViewBuilder
+  h: WorkspacesViewBuilder,
+  workspaceHref?: ViewInputs["workspaceHref"]
 ): ReadonlyArray<Html> => {
   const summary = summaryOf(countLine(memberships.length, invitations.length), reloadFailed, h)
 
@@ -149,7 +153,7 @@ const loadedContent = (
     : [
         heading(h, "Choose a workspace", { action: createButton(h, "secondary") }),
         summary,
-        ...workspacesSection(memberships, h),
+        ...workspacesSection(memberships, h, workspaceHref),
         ...invitationsSection(invitations, memberships.length > 0, now, h)
       ]
 }
@@ -170,7 +174,12 @@ const checkingSession = (h: WorkspacesViewBuilder): Html =>
  * What the page says under its heading, or in its place: that the listing is on its way, that the host was not
  * reached the first time, or what it holds.
  */
-export const listing = (model: Model, now: DateTime.Utc, h: WorkspacesViewBuilder): ReadonlyArray<Html> =>
+export const listing = (
+  model: Model,
+  now: DateTime.Utc,
+  h: WorkspacesViewBuilder,
+  workspaceHref?: ViewInputs["workspaceHref"]
+): ReadonlyArray<Html> =>
   Workspaces.match(model.workspaces, {
     Loading: () => [checkingSession(h)],
     Unreachable: () => [
@@ -183,5 +192,5 @@ export const listing = (model: Model, now: DateTime.Utc, h: WorkspacesViewBuilde
       })
     ],
     Loaded: ({ memberships, invitations, reloadFailed }) =>
-      loadedContent(memberships, invitations, reloadFailed, now, h)
+      loadedContent(memberships, invitations, reloadFailed, now, h, workspaceHref)
   })

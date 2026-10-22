@@ -201,6 +201,7 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
     })
 
   return Message.match(message, {
+    RequestedDismiss: () => Update.combine(model, [DialogBinding.requestClose()]),
     ReceivedConnections: ({ connections }) => {
       const sorted = connections.toSorted(byName)
       const isListed = (connectionId: ConnectionContract.ConnectionId) =>

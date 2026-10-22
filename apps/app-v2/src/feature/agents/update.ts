@@ -129,6 +129,7 @@ export const update = AgentsComposition.makeUpdate((model, message) => {
     })
 
   return Message.match(message, {
+    RequestedDismiss: () => Update.combine(model, [DialogBinding.requestClose()]),
     ReceivedAgents: ({ agents, members, connections, roles, workspace, grants }) => {
       const received = modifyFields(model, {
         isLoaded: () => true,

@@ -132,6 +132,7 @@ export type Message = typeof Message.Type
 export const OutMessage = defineMessageUnion({
   ClosedWorkspace: {},
   Navigated: {},
+  ReplacedDestination: {},
   ChoseAccountEntry: { entry: AppAccountEntry }
 })
 export type OutMessage = typeof OutMessage.Type

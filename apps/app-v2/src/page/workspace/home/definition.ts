@@ -109,6 +109,7 @@ export const Message = defineMessageUnion({
   ClickedTriage: {},
   ClickedTasks: {},
   RequestedReset: {},
+  RequestedDismiss: {},
   RequestedDestination: { destination: HomeDestination },
   RequestedOpenGroup: { groupId: GroupId.GroupId },
   RequestedOpenThread: { groupId: GroupId.GroupId, threadId: ThreadId.ThreadId },
@@ -119,6 +120,7 @@ export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
   Navigated: {},
+  ReplacedConversation: {},
   JoinedGroup: { groupId: GroupId.GroupId, place: Schema.String },
   CreatedGroup: { groupId: GroupId.GroupId },
   OpenedAgent: { agentId: Identity.AgentId },

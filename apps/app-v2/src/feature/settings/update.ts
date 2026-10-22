@@ -7,7 +7,15 @@ import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import { CopyWorkspaceId, ExpireCopied } from "./command.ts"
-import { askToChangeName, DialogBinding, leaveDialog, openDialog, SettingsComposition } from "./composition.ts"
+import {
+  askToChangeName,
+  DialogBinding,
+  leaveDialog,
+  openDialog,
+  SettingsComposition,
+  AccountBinding,
+  MemberStatusBinding
+} from "./composition.ts"
 import {
   findWaitingInvitation,
   Entering,
@@ -183,6 +191,12 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
     })
 
   return Message.match(message, {
+    RequestedDismiss: () =>
+      Update.combine(model, [
+        AccountBinding.requestClose(),
+        MemberStatusBinding.requestClose(),
+        DialogBinding.requestClose()
+      ]),
     ReceivedSettings: ({ workspace, members, roles, assignments, invitations, grants }) => ({
       model: modifyFields(model, {
         workspace: () => workspace,

@@ -1,5 +1,6 @@
 /** Browse and search the workspace’s connections. */
 
+import type { Connection } from "@amends-dev/connection"
 import { button, buttonRow, column, hint, notice, searchField } from "@amends-dev/design/control"
 import { columns, loadingRows, row } from "@amends-dev/design/directory"
 import { pane, paneColumn, paneEmpty, paneTabs, paneToolbar } from "@amends-dev/design/pane"
@@ -40,7 +41,12 @@ const integrationsView = (model: Model, h: ConnectionsViewBuilder): Html =>
  * A connection as a row of the list: its tile with how it stands as a patch on it, its name over its integration, and
  * how it authenticates.
  */
-const connectionRow = (item: ConnectionItem, model: Model, h: ConnectionsViewBuilder): Html => {
+const connectionRow = (
+  item: ConnectionItem,
+  model: Model,
+  h: ConnectionsViewBuilder,
+  itemHref?: ListInputs["itemHref"]
+): Html => {
   const { connection, pending } = item
   const authentication = authLabels[connection.auth]
   const integration = integrationLine(integrationOf(model, item), item)
@@ -59,7 +65,8 @@ const connectionRow = (item: ConnectionItem, model: Model, h: ConnectionsViewBui
           : Option.match(integration, { onNone: () => ({}), onSome: (meta) => ({ meta }) })),
         cells: [h.span([], [authentication])],
         cellsText: authentication,
-        onClick: Message.ClickedConnection({ connectionId: connection.id })
+        onClick: Message.ClickedConnection({ connectionId: connection.id }),
+        href: itemHref?.(connection.id)
       })
     ]
   )
@@ -100,14 +107,14 @@ const connectionToolbar = (model: Model, h: ConnectionsViewBuilder): ReadonlyArr
 ]
 
 /** A row for each connection shown, or what the list says when it has none to show. */
-const connectionRows = (model: Model, h: ConnectionsViewBuilder): Html => {
+const connectionRows = (model: Model, h: ConnectionsViewBuilder, itemHref?: ListInputs["itemHref"]): Html => {
   const shown = shownConnections(model)
 
   return shown.length === 0
     ? emptyList(model, h)
     : h.ul(
         [h.AriaLabel("Connections")],
-        shown.map((item) => connectionRow(item, model, h))
+        shown.map((item) => connectionRow(item, model, h, itemHref))
       )
 }
 
@@ -132,7 +139,7 @@ const noConnections = (model: Model, h: ConnectionsViewBuilder): Html =>
  * The tabs over the list, All and then what a connection can give, each with how many connections are on it once they
  * are known.
  */
-const browseTabs = (model: Model, h: ConnectionsViewBuilder): Html => {
+const browseTabs = (model: Model, h: ConnectionsViewBuilder, tabHref?: ListInputs["tabHref"]): Html => {
   const tabs: ReadonlyArray<ConnectionsTab> = ["all", "models", "tools", "sandboxes", "harnesses", "channels"]
   const isCounted = (tab: ConnectionsTab) => model.isLoaded && (tab === "all" || areIntegrationsListed(model))
 
@@ -142,7 +149,8 @@ const browseTabs = (model: Model, h: ConnectionsViewBuilder): Html => {
       label: tabLabel(tab),
       ...(isCounted(tab) ? { count: connectionsOnTab(model, tab).length } : {}),
       isCurrent: model.browse.tab === tab,
-      onClick: Message.ChoseBrowseTab({ tab })
+      onClick: Message.ChoseBrowseTab({ tab }),
+      href: tabHref?.(tab)
     }))
   })
 }
@@ -151,7 +159,7 @@ const browseTabs = (model: Model, h: ConnectionsViewBuilder): Html => {
  * The list, or what it says when the workspace has no connection; rows that stand in for it while the connections
  * are read, and why they could not be when they could not.
  */
-const listBody = (model: Model, h: ConnectionsViewBuilder): Html => {
+const listBody = (model: Model, h: ConnectionsViewBuilder, itemHref?: ListInputs["itemHref"]): Html => {
   if (isUnread(model)) {
     return unreadConnections(model, h)
   }
@@ -160,7 +168,7 @@ const listBody = (model: Model, h: ConnectionsViewBuilder): Html => {
     return loadingRows(h, { label: "Loading connections…", markSize: "md" })
   }
 
-  return model.connections.length === 0 ? noConnections(model, h) : connectionRows(model, h)
+  return model.connections.length === 0 ? noConnections(model, h) : connectionRows(model, h, itemHref)
 }
 
 /** Whether the list has connections to search and label, which is when it has a toolbar. */
@@ -170,7 +178,12 @@ const hasConnectionList = (model: Model): boolean => model.isLoaded && model.con
  * The name of the workspace, which a phone shows under the title, and the width of the window, which a phone has the
  * button to add a connection say Add for.
  */
-export type ListInputs = Readonly<{ workspaceName: string; viewport: Viewport }>
+export type ListInputs = Readonly<{
+  workspaceName: string
+  viewport: Viewport
+  itemHref?: ((id: Connection.ConnectionId) => string | undefined) | undefined
+  tabHref?: ((tab: ConnectionsTab) => string | undefined) | undefined
+}>
 
 /** The button to add a connection, for a person who may, which is called Add where there is no room for more. */
 const addActions = (model: Model, viewport: Viewport, h: ConnectionsViewBuilder): ReadonlyArray<Html> =>
@@ -183,28 +196,29 @@ const addActions = (model: Model, viewport: Viewport, h: ConnectionsViewBuilder)
  * connections each holds, a toolbar with a search that narrows the tab by the name of a connection or of its
  * integration, and a row for each connection, which picking opens as its own page.
  */
-export const view = ConnectionsBlock.makeView.withInputs<ListInputs>((model, { workspaceName, viewport }, h) =>
-  pane(h, {
-    variant: "main",
-    label: "Connections",
-    header: {
-      title: "Connections",
-      icon: "mark-connections",
-      phoneContext: workspaceName,
-      actions: addActions(model, viewport, h),
-      tabs: browseTabs(model, h)
-    },
-    ...(hasConnectionList(model) ? { toolbar: connectionToolbar(model, h) } : {}),
-    body: [
-      paneColumn(
-        h,
-        [
-          isUnread(model) ? h.empty : notice(h, model.notice),
-          mayCreate(model) ? integrationsView(model, h) : h.empty,
-          listBody(model, h)
-        ],
-        { isWide: true }
-      )
-    ]
-  })
+export const view = ConnectionsBlock.makeView.withInputs<ListInputs>(
+  (model, { workspaceName, viewport, itemHref, tabHref }, h) =>
+    pane(h, {
+      variant: "main",
+      label: "Connections",
+      header: {
+        title: "Connections",
+        icon: "mark-connections",
+        phoneContext: workspaceName,
+        actions: addActions(model, viewport, h),
+        tabs: browseTabs(model, h, tabHref)
+      },
+      ...(hasConnectionList(model) ? { toolbar: connectionToolbar(model, h) } : {}),
+      body: [
+        paneColumn(
+          h,
+          [
+            isUnread(model) ? h.empty : notice(h, model.notice),
+            mayCreate(model) ? integrationsView(model, h) : h.empty,
+            listBody(model, h, itemHref)
+          ],
+          { isWide: true }
+        )
+      ]
+    })
 )

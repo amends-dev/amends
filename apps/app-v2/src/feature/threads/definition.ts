@@ -112,6 +112,7 @@ export const Message = defineMessageUnion({
 export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
+  ChangedTab: {},
   SelectedThread: { threadId: ThreadId.ThreadId },
   RanSlashCommand: { command: SlashCommand },
   OpenedProfile: { memberId: Schema.String, triggerId: Schema.String }

@@ -45,13 +45,16 @@ import { pickerClosed, pickerEnded, pickerOpened, pickerPicked, pickerReady } fr
 import { panelIs } from "../../../test/panelSize.ts"
 import { GroupsBlock } from "./block.ts"
 import { CreateTeam, FocusStartingMembers, JoinGroup } from "./command.ts"
+import type { GroupsViewBuilder } from "./composition.ts"
 import { Message, type Model, type NewActivity, OutMessage, VisibilityRadioGroupBlock } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { dialogView } from "./view/dialog.ts"
-import { view as browseView } from "./view/list.ts"
+import { view as browseViewWithInputs } from "./view/list.ts"
 import { sidebarView as view } from "./view/sidebar.ts"
+
+const browseView = (model: Model, h: GroupsViewBuilder) => browseViewWithInputs(model, {}, h)
 
 const { workspace, member } = membership
 

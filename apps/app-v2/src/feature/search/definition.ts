@@ -88,6 +88,7 @@ export const Model = Schema.Struct({
 export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
+  RequestedDismiss: {},
   RequestedOpen: {},
   ReceivedTargets: { targets: JumpTargets },
   FailedRead: { error: Schema.String },

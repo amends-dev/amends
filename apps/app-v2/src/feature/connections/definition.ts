@@ -195,6 +195,7 @@ export const Model = Schema.Struct({
 export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
+  RequestedDismiss: {},
   ReceivedConnections: { connections: Schema.Array(ConnectionItem) },
   ReceivedMembers: { members: Schema.Array(Member.Member) },
   ReceivedGrants: { grants: Schema.Array(Grant.Grant) },

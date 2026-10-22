@@ -132,6 +132,7 @@ export const Model = Schema.Struct({
 export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
+  RequestedDismiss: {},
   ReceivedGroups: {
     groups: Schema.Array(GroupItem),
     members: Schema.Array(Member.Member),
@@ -177,6 +178,7 @@ export type Message = typeof Message.Type
  * with where it is as a line says it, "#launches", and to open the team the person created and confirm it.
  */
 export const OutMessage = defineMessageUnion({
+  ChangedBrowseTab: {},
   SelectedGroup: { groupId: GroupId.GroupId },
   SelectedPeople: { memberIds: Schema.Array(MemberId.MemberId) },
   RequestedBrowse: {},

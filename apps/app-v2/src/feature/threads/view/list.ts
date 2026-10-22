@@ -75,7 +75,10 @@ export type ViewInputs = Readonly<{
 }>
 
 /** The group's name, which names its tabs. */
-export type TabsInputs = Readonly<{ groupName: string }>
+export type TabsInputs = Readonly<{
+  groupName: string
+  tabHref?: ((tab: "Threads" | "Tasks") => string | undefined) | undefined
+}>
 
 /** The statuses the Tasks tab narrows to: any, then each as the person reads it. */
 const taskStatusChoices = statusChoices(Task.Status.literals)
@@ -84,18 +87,24 @@ const taskStatusChoices = statusChoices(Task.Status.literals)
  * The tabs under the group's title, named for the group: its threads, and those that track a task, counted while any
  * is open.
  */
-export const tabsView = ThreadsBlock.makeView.withInputs<TabsInputs>((model, { groupName }, h) => {
+export const tabsView = ThreadsBlock.makeView.withInputs<TabsInputs>((model, { groupName, tabHref }, h) => {
   const open = openTaskCount(model.threads)
 
   return paneTabs(h, {
     label: groupName,
     tabs: [
-      { label: "Threads", isCurrent: model.tab === "Threads", onClick: Message.ChoseTab({ tab: "Threads" }) },
+      {
+        label: "Threads",
+        isCurrent: model.tab === "Threads",
+        onClick: Message.ChoseTab({ tab: "Threads" }),
+        href: tabHref?.("Threads")
+      },
       {
         label: "Tasks",
         ...(open > 0 ? { count: open } : {}),
         isCurrent: model.tab === "Tasks",
-        onClick: Message.ChoseTab({ tab: "Tasks" })
+        onClick: Message.ChoseTab({ tab: "Tasks" }),
+        href: tabHref?.("Tasks")
       }
     ]
   })

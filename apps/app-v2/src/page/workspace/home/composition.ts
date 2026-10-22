@@ -113,6 +113,7 @@ export const openThreadInGroup = (groupId: GroupId.GroupId, threadId: ThreadId.T
  * created opens, as picking it does.
  */
 const foldGroupsOutMessage = GroupsBlock.OutMessage.match({
+  ChangedBrowseTab: () => HomeDefinition.stepNoop(),
   SelectedGroup: ({ groupId }) => openGroupAlone(groupId),
   SelectedPeople: ({ memberIds }) => openUnsentConversationAlone(memberIds),
   RequestedBrowse: () => switchTo(showGroups),
@@ -125,6 +126,7 @@ const foldGroupsOutMessage = GroupsBlock.OutMessage.match({
  * and joining a group and creating one are reported as they are, for the page to confirm.
  */
 const forwardGroupsOutMessage = GroupsBlock.OutMessage.match({
+  ChangedBrowseTab: () => OutMessage.Navigated(),
   SelectedGroup: () => OutMessage.Navigated(),
   SelectedPeople: () => OutMessage.Navigated(),
   RequestedBrowse: () => OutMessage.Navigated(),
@@ -258,6 +260,7 @@ export const TasksBinding = HomeDefinition.bindChild(TasksBlock, {
  */
 const foldGroupOutMessage = (_groupId: GroupId.GroupId, outMessage: typeof GroupBlock.OutMessage.Type) =>
   GroupBlock.OutMessage.match(outMessage, {
+    ChangedTab: () => HomeDefinition.stepNoop(),
     OpenedThread: () => showAside,
     ClosedThread: () => hideAside,
     OpenedAgent: () => HomeDefinition.stepNoop(),
@@ -274,6 +277,7 @@ const foldGroupOutMessage = (_groupId: GroupId.GroupId, outMessage: typeof Group
  */
 const forwardGroupOutMessage = (_groupId: GroupId.GroupId, outMessage: typeof GroupBlock.OutMessage.Type) =>
   GroupBlock.OutMessage.match(outMessage, {
+    ChangedTab: () => OutMessage.Navigated(),
     OpenedThread: () => OutMessage.Navigated(),
     ClosedThread: () => OutMessage.Navigated(),
     OpenedAgent: ({ agentId }) => OutMessage.OpenedAgent({ agentId }),
@@ -316,8 +320,16 @@ export const UnsentBinding = HomeDefinition.bindChild(UnsentConversationBlock, {
           ? Open.Unsent({ model: nextUnsent })
           : open
     }),
-  outMessage: { fold: foldUnsentOutMessage, forward: () => OutMessage.Navigated() }
+  outMessage: { fold: foldUnsentOutMessage, forward: () => OutMessage.ReplacedConversation() }
 })
+
+export const dismissOverlays = HomeDefinition.step((model: Model) =>
+  Update.combine([
+    GroupsBinding.requestDismiss(),
+    ProfileCardBinding.requestDismiss(),
+    ...(Open.isAnyOf(["Group"])(model.open) ? [GroupBinding.requestDismiss(model.open.groupId)] : [])
+  ])
+)
 
 export const showDestination = (destination: HomeDestination) =>
   HomeDestination.match(destination, {
@@ -331,12 +343,19 @@ export const showDestination = (destination: HomeDestination) =>
       ]),
     Triage: () => switchTo(showTriage),
     Tasks: () => switchTo(showTasks),
-    Groups: () => switchTo(showGroups),
-    Group: ({ groupId, threadId }) =>
-      Option.match(threadId, {
-        onNone: () => markAndOpenGroup(groupId),
-        onSome: (threadId) => openThreadInGroup(groupId, threadId)
-      }),
+    Groups: ({ tab }) => Update.combine([switchTo(showGroups), GroupsBinding.requestBrowseTab({ tab })]),
+    Group: ({ groupId, threadId, tab }) =>
+      HomeDefinition.step((model: Model) =>
+        Update.combine([
+          InboxBinding.requestCloseThread(),
+          GroupsBinding.informOpenGroup({ groupId: Option.some(groupId) }),
+          Open.isAnyOf(["Group"])(model.open) && model.open.groupId === groupId
+            ? GroupBinding.requestThread(groupId, { threadId })
+            : openGroup(groupId, threadId),
+          GroupBinding.requestTab(groupId, { tab }),
+          Option.isSome(threadId) ? showAside : hideAside
+        ])
+      ),
     Conversation: ({ memberIds }) => openUnsentConversationAlone(memberIds)
   })
 

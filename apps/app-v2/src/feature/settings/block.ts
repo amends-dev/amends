@@ -10,7 +10,7 @@ const implementation = {
   init,
   update,
   subscriptions,
-  operations: { requestNameChange: Message.RequestedNameChange },
+  operations: { requestDismiss: Message.RequestedDismiss, requestNameChange: Message.RequestedNameChange },
   EffectsLayer: Layer.merge(EffectsLayer, subscriptions.layer)
 }
 

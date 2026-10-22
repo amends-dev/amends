@@ -11,7 +11,15 @@ import {
   RenameGroup,
   UnfollowGroup
 } from "./command.ts"
-import { closeThread, DialogBinding, GroupComposition, MembersBinding, openSettings } from "./composition.ts"
+import {
+  closeThread,
+  DialogBinding,
+  GroupComposition,
+  MembersBinding,
+  openSettings,
+  openThread,
+  ThreadsBinding
+} from "./composition.ts"
 import {
   chooseToAdmit,
   GroupDefinition,
@@ -41,6 +49,7 @@ const admitChosen = GroupDefinition.step((model: Model) => ({
 
 export const update = GroupComposition.makeUpdate((model, message) =>
   Message.match(message, {
+    RequestedDismiss: () => Update.combine(model, [DialogBinding.requestClose()]),
     ReceivedGroup: ({ group, memberships, follow }) => {
       const received = modifyFields(model, {
         group: () => group,
@@ -92,6 +101,15 @@ export const update = GroupComposition.makeUpdate((model, message) =>
       commands: [RemoveMember({ ...inGroup(model), membershipId })]
     }),
     ClickedAllThreads: () => Update.withOutMessage(Update.combine(model, [closeThread]), OutMessage.ClosedThread()),
+    RequestedTab: ({ tab }) => Update.combine(model, [ThreadsBinding.requestTab({ tab })]),
+    RequestedThread: ({ threadId }) =>
+      Option.match(threadId, {
+        onNone: () => Update.combine(model, [closeThread]),
+        onSome: (id) =>
+          Option.exists(model.thread, ({ threadId }) => threadId === id)
+            ? { model }
+            : Update.combine(model, [openThread(id)])
+      }),
     RequestedCloseThread: () => Update.combine(model, [closeThread]),
     WroteAction: () => ({ model: modifyFields(model, { notice: () => Option.none() }) }),
     FailedWriteAction: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) })

@@ -10,7 +10,7 @@ const implementation = {
   init,
   update,
   subscriptions,
-  operations: { requestOpen: Message.RequestedOpen },
+  operations: { requestDismiss: Message.RequestedDismiss, requestOpen: Message.RequestedOpen },
   EffectsLayer: Layer.merge(EffectsLayer, subscriptions.layer)
 }
 

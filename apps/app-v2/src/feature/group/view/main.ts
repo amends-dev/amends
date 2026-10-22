@@ -10,7 +10,7 @@ import type { Html } from "foldkit/html"
 import { isJoinable } from "../../../data/groups.ts"
 import { memberName } from "../../../data/members.ts"
 import { pluralize } from "../../../view/counts.ts"
-import { showsConversation } from "../../threads/definition.ts"
+import { type ThreadsTab, showsConversation } from "../../threads/definition.ts"
 import {
   cantLoadConversation,
   composerView,
@@ -43,6 +43,7 @@ import { nameOf, markOfMember } from "./identity.ts"
  * in a field or, on a phone, in a view of their own, and the trigger whose member's card is open.
  */
 export type ViewInputs = Readonly<{
+  tabHref?: ((tab: ThreadsTab) => string | undefined) | undefined
   now: DateTime.Utc
   workspaceName: string
   viewport: Viewport
@@ -224,7 +225,7 @@ export const view = GroupBlock.makeView.withInputs<ViewInputs>((model, inputs, h
                 slotId: "tabs",
                 model: model.threads,
                 view: tabsView,
-                viewInputs: { groupName: name }
+                viewInputs: { groupName: name, tabHref: inputs.tabHref }
               })
             )
           }

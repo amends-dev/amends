@@ -21,6 +21,7 @@ export const update = SearchComposition.makeUpdate((model, message) => {
     )
 
   return Message.match(message, {
+    RequestedDismiss: () => Update.combine(model, [DialogBinding.requestClose()]),
     RequestedOpen: () => Update.combine(model, [clearQuery, DialogBinding.requestOpen()]),
     // The item reached stays reached while the places change under it, unless the list is now too short to hold it.
     ReceivedTargets: ({ targets }) => {

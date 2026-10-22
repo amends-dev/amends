@@ -26,7 +26,12 @@ import { byDay, notificationHeadline, notificationPlace, notificationText } from
  * The time now, which the days the notifications came on and how long ago they came are read from, the workspace's
  * name, which a phone shows under the inbox's title, and the trigger whose member's card is open.
  */
-export type ViewInputs = Readonly<{ now: DateTime.Utc; workspaceName: string; openTriggerId: string | undefined }>
+export type ViewInputs = Readonly<{
+  now: DateTime.Utc
+  workspaceName: string
+  openTriggerId: string | undefined
+  tabHref?: ((tab: Tab) => string | undefined) | undefined
+}>
 
 /** What the body says when a tab has nothing to list; on Unread, with the way to see what was seen. */
 const nothingToList = (tab: Tab, h: InboxViewBuilder): Html =>
@@ -56,7 +61,7 @@ const unreadInbox = (model: Model, h: InboxViewBuilder): Html =>
   })
 
 /** The tabs under the title: those waiting, counted even when none wait, and every notification. */
-const tabs = (model: Model, h: InboxViewBuilder): Html =>
+const tabs = (model: Model, h: InboxViewBuilder, tabHref?: ViewInputs["tabHref"]): Html =>
   paneTabs(h, {
     label: "Inbox",
     tabs: [
@@ -64,9 +69,15 @@ const tabs = (model: Model, h: InboxViewBuilder): Html =>
         label: "Unread",
         count: waitingCount(model),
         isCurrent: model.tab === "Unread",
-        onClick: Message.ChoseTab({ tab: "Unread" })
+        onClick: Message.ChoseTab({ tab: "Unread" }),
+        href: tabHref?.("Unread")
       },
-      { label: "All", isCurrent: model.tab === "All", onClick: Message.ChoseTab({ tab: "All" }) }
+      {
+        label: "All",
+        isCurrent: model.tab === "All",
+        onClick: Message.ChoseTab({ tab: "All" }),
+        href: tabHref?.("All")
+      }
     ]
   })
 
@@ -141,7 +152,7 @@ export const view = InboxBlock.makeView.withInputs<ViewInputs>((model, inputs, h
       title: "Inbox",
       icon: "mark-mail",
       phoneContext: inputs.workspaceName,
-      tabs: tabs(model, h),
+      tabs: tabs(model, h, inputs.tabHref),
       actions:
         waitingCount(model) === 0
           ? []

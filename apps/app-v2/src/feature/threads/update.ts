@@ -25,6 +25,7 @@ export const update = ThreadsComposition.makeUpdate((model, message) =>
     }),
     ChoseTab: ({ tab }) => ({
       model: modifyFields(model, { tab: () => tab }),
+      outMessage: OutMessage.ChangedTab(),
       commands:
         tab === "Threads" && model.tab !== "Threads"
           ? [ScrollThreadsToEnd({ groupId: model.groupId, onlyIfNearEnd: false })]

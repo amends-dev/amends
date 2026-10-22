@@ -6,7 +6,7 @@ import { ApplicationComposition, SignInBinding, WorkspaceBinding, WorkspacesBind
 import { Message } from "./message.ts"
 import { Page } from "./model.ts"
 import { hasListing, Workspaces } from "./page/workspaces/definition.ts"
-import { Route } from "./route.ts"
+import { Route, href, home } from "./route.ts"
 
 export const view = ApplicationComposition.makeView((model, h) => ({
   title: "amends",
@@ -15,7 +15,8 @@ export const view = ApplicationComposition.makeView((model, h) => ({
         width: "form",
         children: [
           paneEmpty(h, {
-            art: "came-apart",
+            art: "nothing-here",
+            level: 1,
             title: "Page not found",
             copy: "This address doesn’t lead to a page in amends.",
             action: button(h, "Go to workspaces", Message.ClickedWorkspaces())
@@ -32,7 +33,7 @@ export const view = ApplicationComposition.makeView((model, h) => ({
           Option.match(workspace, {
             onNone: () =>
               centered(h, {
-                width: hasListing(workspaces) ? "directory" : "form",
+                width: !Route.isAnyOf(["Workspace"])(model.route) && hasListing(workspaces) ? "directory" : "form",
                 actions: [centeredAccount(h, account.email), button(h, "Sign out", Message.ClickedSignOut())],
                 children: Route.isAnyOf(["Workspace"])(model.route)
                   ? [
@@ -40,14 +41,16 @@ export const view = ApplicationComposition.makeView((model, h) => ({
                         Loading: () => loadingLine(h, "Opening workspace…"),
                         Unreachable: () =>
                           paneEmpty(h, {
-                            art: "came-apart",
+                            art: "lost-thread",
+                            level: 1,
                             title: "Can’t reach the host",
                             copy: "Your destination is saved. Try again when the host is reachable.",
                             action: button(h, "Try again", Message.ClickedRetryWorkspace())
                           }),
                         Loaded: ({ reloadFailed }) =>
                           paneEmpty(h, {
-                            art: "came-apart",
+                            art: reloadFailed ? "lost-thread" : "held-back",
+                            level: 1,
                             title: reloadFailed ? "Can’t reach the host" : "Workspace unavailable",
                             copy: reloadFailed
                               ? "Try again when the host is reachable."
@@ -62,7 +65,10 @@ export const view = ApplicationComposition.makeView((model, h) => ({
                         WorkspacesBinding.embedView({
                           slotId: "workspaces",
                           model: workspaces,
-                          viewInputs: { now: model.now }
+                          viewInputs: {
+                            now: model.now,
+                            workspaceHref: (workspaceId) => href(Route.Workspace({ workspaceId, destination: home() }))
+                          }
                         })
                       )
                     ]
@@ -74,6 +80,7 @@ export const view = ApplicationComposition.makeView((model, h) => ({
                   slotId: "workspace",
                   model: opened,
                   viewInputs: {
+                    destinationHref: (destination) => href(Route.Workspace({ workspaceId, destination })),
                     email: account.email,
                     appearance: model.appearance,
                     now: model.now,

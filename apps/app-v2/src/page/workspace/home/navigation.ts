@@ -18,11 +18,15 @@ export const destinationOf = (model: Model): HomeDestination =>
       }),
     Triage: () => HomeDestination.Triage(),
     Tasks: () => HomeDestination.Tasks(),
-    Groups: () => HomeDestination.Groups(),
+    Groups: () => HomeDestination.Groups({ tab: model.groups.browse.tab }),
     Group: ({ groupId, model }) =>
-      HomeDestination.Group({ groupId, threadId: Option.map(model.thread, ({ threadId }) => threadId) }),
+      HomeDestination.Group({
+        groupId,
+        threadId: Option.map(model.thread, ({ threadId }) => threadId),
+        tab: model.threads.tab
+      }),
     Unsent: ({ model }) =>
       Array.isReadonlyArrayNonEmpty(model.memberIds)
         ? HomeDestination.Conversation({ memberIds: model.memberIds })
-        : HomeDestination.Groups()
+        : HomeDestination.Groups({ tab: "Yours" })
   })

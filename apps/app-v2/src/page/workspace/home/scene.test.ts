@@ -91,7 +91,7 @@ const sceneView: typeof mainView = (model, h) =>
   h.div(
     [],
     [
-      h.nav([h.AriaLabel("Studio")], [sidebarView(model, h)]),
+      h.nav([h.AriaLabel("Studio")], [sidebarView(model, {}, h)]),
       mainView(model, h),
       sideView(model, h),
       dialogView(model, h),

@@ -45,7 +45,13 @@ const listedOn = (model: Model, tab: BrowseTab): ReadonlyArray<TeamItem> =>
  * or private, how many members it has, and a way to open it. A team the person may join has a Join button, named for
  * it, which is disabled while it is being joined, in place of Open →.
  */
-const browseRow = ({ group, pending, members }: TeamItem, tab: BrowseTab, model: Model, h: GroupsViewBuilder): Html => {
+const browseRow = (
+  { group, pending, members }: TeamItem,
+  tab: BrowseTab,
+  model: Model,
+  h: GroupsViewBuilder,
+  groupHref?: ViewInputs["groupHref"]
+): Html => {
   const memberCount = pluralize(members, "member", "members")
 
   return h.keyed("li")(
@@ -68,7 +74,8 @@ const browseRow = ({ group, pending, members }: TeamItem, tab: BrowseTab, model:
                 onClick: Message.ClickedJoin({ groupId: group.id })
               }
             }),
-        onClick: Message.ClickedGroup({ groupId: group.id })
+        onClick: Message.ClickedGroup({ groupId: group.id }),
+        href: groupHref?.(group.id)
       })
     ]
   )
@@ -85,7 +92,12 @@ const noneListed = (query: string, tab: BrowseTab): string =>
  * The list of teams, or, in its place, a quiet line: that they are being read, that they could not be, with a way to
  * read them again, or that there are none to list.
  */
-const listBody = (shown: ReadonlyArray<TeamItem>, model: Model, h: GroupsViewBuilder): Html => {
+const listBody = (
+  shown: ReadonlyArray<TeamItem>,
+  model: Model,
+  h: GroupsViewBuilder,
+  groupHref?: ViewInputs["groupHref"]
+): Html => {
   const { tab, query } = model.browse
 
   if (isUnread(model)) {
@@ -105,17 +117,30 @@ const listBody = (shown: ReadonlyArray<TeamItem>, model: Model, h: GroupsViewBui
 
   return h.ul(
     [h.AriaLabel(browseTabs[tab].listLabel)],
-    shown.map((item) => browseRow(item, tab, model, h))
+    shown.map((item) => browseRow(item, tab, model, h, groupHref))
   )
 }
 
 /** The tab of the browse page `label` names, counted once the groups are read, and chosen by a click. */
-const browseTab = (model: Model, tab: BrowseTab, label: string, items: ReadonlyArray<TeamItem>) => ({
+const browseTab = (
+  model: Model,
+  tab: BrowseTab,
+  label: string,
+  items: ReadonlyArray<TeamItem>,
+  tabHref?: ViewInputs["tabHref"]
+) => ({
   label,
   ...(model.isLoaded ? { count: items.length } : {}),
   isCurrent: model.browse.tab === tab,
-  onClick: Message.ChoseBrowseTab({ tab })
+  onClick: Message.ChoseBrowseTab({ tab }),
+  href: tabHref?.(tab)
 })
+
+/** URL providers supplied by the page; standalone views keep their action messages. */
+export type ViewInputs = Readonly<{
+  groupHref?: ((groupId: TeamItem["group"]["id"]) => string | undefined) | undefined
+  tabHref?: ((tab: BrowseTab) => string | undefined) | undefined
+}>
 
 /**
  * The browse page, the main pane's whole content: the teams the person belongs to and the public teams they may join
@@ -124,7 +149,7 @@ const browseTab = (model: Model, tab: BrowseTab, label: string, items: ReadonlyA
  * empty, being read, or could not be too, and a row for each team, to open, with Join on those they may join. A join
  * that could not be kept says why over the list. The button opens the dialog `dialogView` renders.
  */
-export const view = GroupsBlock.makeView((model, h) => {
+export const view = GroupsBlock.makeView.withInputs<ViewInputs>((model, { groupHref, tabHref }, h) => {
   const { tab, query } = model.browse
   const shown = matching(model, listedOn(model, tab), query)
 
@@ -138,8 +163,8 @@ export const view = GroupsBlock.makeView((model, h) => {
       tabs: paneTabs(h, {
         label: "Groups",
         tabs: [
-          browseTab(model, "Yours", "Your groups", yourTeams(model)),
-          browseTab(model, "Discover", "Discover", discoverable(model))
+          browseTab(model, "Yours", "Your groups", yourTeams(model), tabHref),
+          browseTab(model, "Discover", "Discover", discoverable(model), tabHref)
         ]
       })
     },
@@ -162,7 +187,9 @@ export const view = GroupsBlock.makeView((model, h) => {
       columns(h, { label: "Group", cells: ["Visibility", "Members"] })
     ],
     body: [
-      paneColumn(h, [isUnread(model) ? h.empty : notice(h, model.notice), listBody(shown, model, h)], { isWide: true })
+      paneColumn(h, [isUnread(model) ? h.empty : notice(h, model.notice), listBody(shown, model, h, groupHref)], {
+        isWide: true
+      })
     ]
   })
 })

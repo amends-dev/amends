@@ -1,6 +1,6 @@
 /**
- * How the pages join the app: signing in gives a session to keep and the person's workspaces to
- * pick from; picking one opens it; leaving it goes back to the list.
+ * Root navigation: authenticate, resolve membership through the workspace directory, restore the
+ * latest URL through page operations, and record destinations reported by the open workspace.
  */
 
 import { WorkspaceId } from "@amends-dev/core/workspace"
@@ -169,6 +169,23 @@ const chooseAccountEntry = (entry: AppAccountEntry) =>
     Match.exhaustive
   )
 
+/** A destination changed inside the workspace; automatic resolution replaces its temporary address. */
+const recordWorkspaceDestination = (replace: boolean) =>
+  ApplicationDefinition.step((model: Model) =>
+    Page.matchOrElse(
+      model.page,
+      {
+        SignedIn: ({ workspace }) =>
+          Option.match(workspace, {
+            onNone: () => ApplicationDefinition.stepNoop(),
+            onSome: ({ workspaceId, model: workspace }) =>
+              navigate(Route.Workspace({ workspaceId, destination: destinationOf(workspace) }), replace)
+          })
+      },
+      () => ApplicationDefinition.stepNoop()
+    )
+  )
+
 /**
  * Leaving a workspace closes it, and an entry of its account menu is acted on.
  */
@@ -178,21 +195,8 @@ const foldWorkspaceOutMessage = (
 ) =>
   WorkspaceBlock.OutMessage.match(outMessage, {
     ClosedWorkspace: () => closeWorkspace,
-    Navigated: () =>
-      ApplicationDefinition.step((model: Model) =>
-        Page.matchOrElse(
-          model.page,
-          {
-            SignedIn: ({ workspace }) =>
-              Option.match(workspace, {
-                onNone: () => ApplicationDefinition.stepNoop(),
-                onSome: ({ workspaceId, model: workspace }) =>
-                  navigate(Route.Workspace({ workspaceId, destination: destinationOf(workspace) }))
-              })
-          },
-          () => ApplicationDefinition.stepNoop()
-        )
-      ),
+    Navigated: () => recordWorkspaceDestination(false),
+    ReplacedDestination: () => recordWorkspaceDestination(true),
     ChoseAccountEntry: ({ entry }) => chooseAccountEntry(entry)
   })
 

@@ -3,7 +3,6 @@
  * of a header, tabs or a subtitle, a body that scrolls, and a footer that stays in place.
  */
 
-import * as Button from "@foldkit/ui/button"
 import * as Predicate from "effect/Predicate"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { hint, iconButton } from "./control.ts"
@@ -11,6 +10,7 @@ import { form } from "./form.ts"
 import { type IconName, icon } from "./icon.ts"
 import { logo } from "./logo.ts"
 import { type MarkContent, type MarkStatus, type TaskStatusShape, mark, taskStatus } from "./mark.ts"
+import { navigationTarget } from "./navigation.ts"
 import { type StateArtKind, stateArt } from "./stateArt.ts"
 
 const paneRoot = "flex min-h-0 min-w-0 flex-1 flex-col"
@@ -76,7 +76,7 @@ const footerBar = "flex-none px-6 py-5"
 const tabList = "flex gap-6"
 
 const tabButton =
-  "relative inline-flex h-9 flex-none cursor-pointer items-center gap-1.5 bg-transparent p-0 text-item text-ink-secondary focus-ring hover:text-ink aria-selected:font-medium aria-selected:text-ink aria-selected:after:absolute aria-selected:after:inset-x-0 aria-selected:after:bottom-0 aria-selected:after:h-0.5 aria-selected:after:bg-indicator"
+  "relative inline-flex h-9 flex-none cursor-pointer items-center gap-1.5 bg-transparent p-0 text-item text-ink-secondary focus-ring hover:text-ink aria-selected:font-medium aria-selected:text-ink aria-selected:after:absolute aria-selected:after:inset-x-0 aria-selected:after:bottom-0 aria-selected:after:h-0.5 aria-selected:after:bg-indicator aria-[current=page]:font-medium aria-[current=page]:text-ink aria-[current=page]:after:absolute aria-[current=page]:after:inset-x-0 aria-[current=page]:after:bottom-0 aria-[current=page]:after:h-0.5 aria-[current=page]:after:bg-indicator"
 
 const tabCount =
   "inline-grid h-5 min-w-5 flex-none place-items-center bg-subtle px-1.25 text-meta font-medium text-ink-secondary tabular-nums"
@@ -144,6 +144,7 @@ export type PaneTab<Message> = Readonly<{
   count?: number
   isCurrent: boolean
   onClick: Message
+  href?: string | undefined
 }>
 
 export type PaneColumnOptions = Readonly<{
@@ -305,40 +306,37 @@ export const paneToolbarStack = <Message, Requirements>(
 ): Html => h.div([h.Class(toolbarStack)], children)
 
 /**
- * The tabs under a title, a `tablist` named by `label`, each a button that sends its `onClick`. The
- * current tab is `aria-selected`, darker, with a 2px bar over the header's line. A `count` shows in a
+ * Tabs with a `href` on every item are a navigation of native links. Otherwise they are a `tablist`
+ * named by `label`, each a button that sends its `onClick`. The
+ * current tab is `aria-current="page"` for navigation or `aria-selected` for local panels, darker, with a 2px bar over the header's line. A `count` shows in a
  * small badge after the label, and describes the tab, which the label names.
  */
 export const paneTabs = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{ label: string; tabs: ReadonlyArray<PaneTab<Message>> }>
-): Html =>
-  h.div(
-    [h.Role("tablist"), h.AriaLabel(config.label), h.Class(tabList)],
-    config.tabs.map((tab) =>
-      Button.view(
-        {
-          onClick: tab.onClick,
-          toView: (attributes) =>
-            h.button(
-              [
-                ...attributes.button,
-                h.Role("tab"),
-                h.AriaSelected(tab.isCurrent),
-                h.AriaLabel(tab.label),
-                ...(tab.count === undefined ? [] : [h.AriaDescription(`${tab.count}`)]),
-                h.Class(tabButton)
-              ],
-              [
-                tab.label,
-                tab.count === undefined ? h.empty : h.span([h.AriaHidden(true), h.Class(tabCount)], [`${tab.count}`])
-              ]
-            )
-        },
-        h
-      )
+): Html => {
+  const isNavigation = config.tabs.every((tab) => tab.href !== undefined)
+  const children = config.tabs.map((tab) =>
+    navigationTarget(
+      h,
+      { onClick: tab.onClick, href: isNavigation ? tab.href : undefined },
+      [
+        ...(isNavigation
+          ? tab.isCurrent
+            ? [h.AriaCurrent("page")]
+            : []
+          : [h.Role("tab"), h.AriaSelected(tab.isCurrent)]),
+        h.AriaLabel(tab.label),
+        ...(tab.count === undefined ? [] : [h.AriaDescription(`${tab.count}`)]),
+        h.Class(tabButton)
+      ],
+      [tab.label, tab.count === undefined ? h.empty : h.span([h.AriaHidden(true), h.Class(tabCount)], [`${tab.count}`])]
     )
   )
+  return isNavigation
+    ? h.nav([h.AriaLabel(config.label), h.Class(tabList)], children)
+    : h.div([h.Role("tablist"), h.AriaLabel(config.label), h.Class(tabList)], children)
+}
 
 const copyLines = (copy: string | ReadonlyArray<string> | undefined): ReadonlyArray<string> => {
   if (copy === undefined) {

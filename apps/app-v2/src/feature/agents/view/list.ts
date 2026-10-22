@@ -1,6 +1,7 @@
 /** Browse and search agents, their setup, and their activity. */
 
 import { Agent } from "@amends-dev/core/agent"
+import type { Identity } from "@amends-dev/core/identity"
 import { button, buttonRow, column, hint, notice, searchField } from "@amends-dev/design/control"
 import { activityCell, cellWithDetail, columns, loadingRows, row } from "@amends-dev/design/directory"
 import { pane, paneColumn, paneEmpty, paneTabs, paneToolbar } from "@amends-dev/design/pane"
@@ -71,7 +72,7 @@ const activityCellOf = (activity: Option.Option<AgentActivity>, h: AgentsViewBui
  * An agent as a row of the list: its lilac mark with how it stands as a patch on it, its name, its harness over its
  * sandbox, its model over its connection, and, blank while it is idle, where it is at work and in what state.
  */
-const agentRow = (item: AgentItem, model: Model, h: AgentsViewBuilder): Html => {
+const agentRow = (item: AgentItem, model: Model, h: AgentsViewBuilder, itemHref?: ListInputs["itemHref"]): Html => {
   const { agent, pending } = item
   const name = nameOfAgent(model, agent)
   const harness = harnessLine(agent, model)
@@ -101,7 +102,8 @@ const agentRow = (item: AgentItem, model: Model, h: AgentsViewBuilder): Html => 
           connection,
           ...Option.toArray(Option.map(activity, activityLabel))
         ].join(" · "),
-        onClick: Message.ClickedAgent({ agentId: agent.id })
+        onClick: Message.ClickedAgent({ agentId: agent.id }),
+        href: itemHref?.(agent.id)
       })
     ]
   )
@@ -143,14 +145,14 @@ const agentToolbar = (model: Model, h: AgentsViewBuilder): ReadonlyArray<Html> =
 ]
 
 /** A row for each agent shown, or what the list says when it has none to show. */
-const agentRows = (model: Model, h: AgentsViewBuilder): Html => {
+const agentRows = (model: Model, h: AgentsViewBuilder, itemHref?: ListInputs["itemHref"]): Html => {
   const shown = shownAgents(model)
 
   return shown.length === 0
     ? emptyList(model, h)
     : h.ul(
         [h.AriaLabel("Agents")],
-        shown.map((item) => agentRow(item, model, h))
+        shown.map((item) => agentRow(item, model, h, itemHref))
       )
 }
 
@@ -166,13 +168,14 @@ const noAgents = (model: Model, h: AgentsViewBuilder): Html =>
   })
 
 /** The tabs over the list, All and Needs setup, each with how many agents are on it once they are read. */
-const browseTabs = (model: Model, h: AgentsViewBuilder): Html => {
+const browseTabs = (model: Model, h: AgentsViewBuilder, tabHref?: ListInputs["tabHref"]): Html => {
   const listed = listedAgents(model)
   const tab = (tab: BrowseTab, label: string, count: number) => ({
     label,
     ...(model.isLoaded ? { count } : {}),
     isCurrent: model.browse.tab === tab,
-    onClick: Message.ChoseBrowseTab({ tab })
+    onClick: Message.ChoseBrowseTab({ tab }),
+    href: tabHref?.(tab)
   })
 
   return paneTabs(h, {
@@ -185,7 +188,7 @@ const browseTabs = (model: Model, h: AgentsViewBuilder): Html => {
  * The list, or what it says when the workspace has no agent; rows that stand in for it while the agents are read,
  * and why they could not be when they could not.
  */
-const listBody = (model: Model, h: AgentsViewBuilder): Html => {
+const listBody = (model: Model, h: AgentsViewBuilder, itemHref?: ListInputs["itemHref"]): Html => {
   if (isUnread(model)) {
     return unreadAgents(model, h)
   }
@@ -194,7 +197,7 @@ const listBody = (model: Model, h: AgentsViewBuilder): Html => {
     return loadingRows(h, { label: "Loading agents…", markSize: "md" })
   }
 
-  return listedAgents(model).length === 0 ? noAgents(model, h) : agentRows(model, h)
+  return listedAgents(model).length === 0 ? noAgents(model, h) : agentRows(model, h, itemHref)
 }
 
 /** Whether the list has agents to search and label, which is when it has a toolbar. */
@@ -204,7 +207,12 @@ const hasAgentList = (model: Model): boolean => model.isLoaded && listedAgents(m
  * The name of the workspace, which a phone shows under the title, and the width of the window, which a phone has the
  * button to add an agent say Add for.
  */
-export type ListInputs = Readonly<{ workspaceName: string; viewport: Viewport }>
+export type ListInputs = Readonly<{
+  workspaceName: string
+  viewport: Viewport
+  itemHref?: ((id: Identity.AgentId) => string | undefined) | undefined
+  tabHref?: ((tab: BrowseTab) => string | undefined) | undefined
+}>
 
 /** The button to add an agent, for a person who may, which is called Add where there is no room for more. */
 const addActions = (model: Model, viewport: Viewport, h: AgentsViewBuilder): ReadonlyArray<Html> =>
@@ -215,28 +223,29 @@ const addActions = (model: Model, viewport: Viewport, h: AgentsViewBuilder): Rea
  * one for a person who may, which opens the dialog `dialogView` renders, a toolbar with a search that narrows the tab
  * by name, and a row for each agent, which picking opens as its own page.
  */
-export const view = AgentsBlock.makeView.withInputs<ListInputs>((model, { workspaceName, viewport }, h) =>
-  pane(h, {
-    variant: "main",
-    label: "Agents",
-    header: {
-      title: "Agents",
-      icon: "mark-agents",
-      phoneContext: workspaceName,
-      actions: addActions(model, viewport, h),
-      tabs: browseTabs(model, h)
-    },
-    ...(hasAgentList(model) ? { toolbar: agentToolbar(model, h) } : {}),
-    body: [
-      paneColumn(
-        h,
-        [
-          isUnread(model) ? h.empty : notice(h, model.notice),
-          mayCreate(model) ? integrationsView(model, h) : h.empty,
-          listBody(model, h)
-        ],
-        { isWide: true }
-      )
-    ]
-  })
+export const view = AgentsBlock.makeView.withInputs<ListInputs>(
+  (model, { workspaceName, viewport, itemHref, tabHref }, h) =>
+    pane(h, {
+      variant: "main",
+      label: "Agents",
+      header: {
+        title: "Agents",
+        icon: "mark-agents",
+        phoneContext: workspaceName,
+        actions: addActions(model, viewport, h),
+        tabs: browseTabs(model, h, tabHref)
+      },
+      ...(hasAgentList(model) ? { toolbar: agentToolbar(model, h) } : {}),
+      body: [
+        paneColumn(
+          h,
+          [
+            isUnread(model) ? h.empty : notice(h, model.notice),
+            mayCreate(model) ? integrationsView(model, h) : h.empty,
+            listBody(model, h, itemHref)
+          ],
+          { isWide: true }
+        )
+      ]
+    })
 )

@@ -67,8 +67,11 @@ export const Navigate = ApplicationDefinition.command("Navigate", {
   handler: function* () {
     return ({ url, replace }) =>
       Effect.gen(function* () {
-        if (replace) yield* Navigation.replaceUrl(url)
-        else yield* Navigation.pushUrl(url)
+        const targetUrl = new URL(url, window.location.href)
+        if (targetUrl.href !== window.location.href) {
+          if (replace) yield* Navigation.replaceUrl(url)
+          else yield* Navigation.pushUrl(url)
+        }
         yield* Effect.sync(() => {
           const hash = new URL(url, window.location.href).hash
           if (hash === "") return

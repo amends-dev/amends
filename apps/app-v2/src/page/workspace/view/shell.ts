@@ -11,6 +11,7 @@ import { dialogView as connectionsDialogView } from "../../../feature/connection
 import { view as searchView } from "../../../feature/search/view.ts"
 import { accountView as settingsAccountView } from "../../../feature/settings/view/account.ts"
 import { dialogView as settingsDialogView } from "../../../feature/settings/view/dialog.ts"
+import { Destination, type DestinationHref, home } from "../../../route.ts"
 import {
   ActionsBinding,
   AgentsBinding,
@@ -33,6 +34,7 @@ import { sidebarView } from "./sidebar.ts"
  * which decides how the search's shortcut is written.
  */
 export type ViewInputs = Readonly<{
+  destinationHref?: DestinationHref | undefined
   email: string
   appearance: Appearance
   now: DateTime.Utc
@@ -40,23 +42,26 @@ export type ViewInputs = Readonly<{
 }>
 
 /** The destinations of the rail, as the open workspace shows them. */
-const railItems = (model: Model) => [
+const railItems = (model: Model, destinationHref?: DestinationHref) => [
   {
     icon: "mark-home" as const,
     label: "Home",
     isCurrent: Open.isAnyOf(["Home"])(model.open),
+    href: destinationHref?.(home()),
     onClick: Message.ClickedHome()
   },
   {
     icon: "mark-agents" as const,
     label: "Agents",
     isCurrent: Open.isAnyOf(["Agents", "Agent"])(model.open),
+    href: destinationHref?.(Destination.Agents({ tab: model.agents.browse.tab })),
     onClick: Message.ClickedAgents()
   },
   {
     icon: "mark-connections" as const,
     label: "Connections",
     isCurrent: Open.isAnyOf(["Connections", "Connection", "Channels"])(model.open),
+    href: destinationHref?.(Destination.Connections({ tab: model.connections.browse.tab })),
     onClick: Message.ClickedConnections()
   }
 ]
@@ -77,14 +82,15 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
   return shell(h, {
     viewport: model.viewport,
     rail: rail(h, {
-      brand: { label: "Amends home", onClick: Message.ClickedHome() },
-      items: railItems(model),
+      brand: { label: "Amends home", onClick: Message.ClickedHome(), href: inputs.destinationHref?.(home()) },
+      items: railItems(model, inputs.destinationHref),
       search: { label: "Search", onClick: Message.ClickedSearch() },
       footer: [
         {
           icon: "mark-settings",
           label: "Settings",
           isCurrent: Open.isAnyOf(["Settings"])(model.open),
+          href: inputs.destinationHref?.(Destination.Settings({ page: "Workspace", memberId: Option.none() })),
           onClick: Message.ClickedSettings()
         }
       ],
@@ -97,8 +103,8 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
         })
       )
     }),
-    sidebar: sidebarView(model, inputs.isApplePlatform, h),
-    main: mainView(model, now, h),
+    sidebar: sidebarView(model, inputs.isApplePlatform, h, inputs.destinationHref),
+    main: mainView(model, now, h, inputs.destinationHref),
     ...(Option.isSome(aside) ? { aside: aside.value } : {}),
     notices: h.block(ActionsBinding.embedView({ slotId: "actions", model: model.actions, view: actionsView })),
     menu: {

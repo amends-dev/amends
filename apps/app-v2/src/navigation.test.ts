@@ -1,4 +1,4 @@
-import { GroupId } from "@amends-dev/core/group"
+import { Group, GroupId } from "@amends-dev/core/group"
 import { ThreadId } from "@amends-dev/core/thread"
 import { WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
@@ -7,11 +7,15 @@ import * as Url from "foldkit/url"
 import { membership, now, session } from "../test/fixtures.ts"
 import { Navigate } from "./command.ts"
 import { SignInBinding, WorkspaceBinding, WorkspacesBinding } from "./composition.ts"
+import { UnsentConversationBlock } from "./feature/unsentConversation/block.ts"
 import { init } from "./init.ts"
 import { Message } from "./message.ts"
 import { type Model, Page } from "./model.ts"
 import { SignInBlock } from "./page/signIn/block.ts"
 import { WorkspaceBlock } from "./page/workspace/block.ts"
+import { HomeBinding } from "./page/workspace/composition.ts"
+import { UnsentBinding } from "./page/workspace/home/composition.ts"
+import { Open as HomeOpen } from "./page/workspace/home/definition.ts"
 import { destinationOf } from "./page/workspace/navigation.ts"
 import { WorkspacesBlock } from "./page/workspaces/block.ts"
 import { Destination, HomeDestination, Route, fromUrl, href } from "./route.ts"
@@ -59,7 +63,9 @@ const fromWorkspace = (model: Model, message: typeof WorkspaceBlock.Message.Type
 const visit = (model: Model, path: string) => update(model, Message.ChangedUrl({ url: url(path) }))
 const groupId = GroupId.GroupId.make("group/one")
 const threadId = ThreadId.ThreadId.make("thread/one")
-const group = Destination.Home({ destination: HomeDestination.Group({ groupId, threadId: Option.some(threadId) }) })
+const group = Destination.Home({
+  destination: HomeDestination.Group({ groupId, threadId: Option.some(threadId), tab: "Threads" })
+})
 
 // Assertions inspect the completed root update, so they include nested policies and keyed child delivery.
 describe("restoring URL destinations", () => {
@@ -122,7 +128,8 @@ describe("restoring URL destinations", () => {
       Destination.Channels(),
       Destination.Home({ destination: HomeDestination.Triage() }),
       Destination.Home({ destination: HomeDestination.Tasks() }),
-      Destination.Home({ destination: HomeDestination.Groups() }),
+      Destination.Home({ destination: HomeDestination.Groups({ tab: "Yours" }) }),
+      Destination.Home({ destination: HomeDestination.Groups({ tab: "Discover" }) }),
       Destination.Home({ destination: HomeDestination.Conversation({ memberIds: [membership.member.id] }) }),
       group,
       Destination.Home({ destination: HomeDestination.Inbox({ tab: "All", selected: Option.none() }) })
@@ -133,6 +140,61 @@ describe("restoring URL destinations", () => {
       expect(navigateCommands(result)).toEqual([])
       model = result.model
     }
+  })
+
+  it("restores a group tab without remounting its loaded thread or composer", () => {
+    const started = loadDirectory(init(flags, url(workspaceHref(group))).model).model
+    const before = Option.getOrThrow(opened(started)).model.home.open
+    const tasks = Destination.Home({
+      destination: HomeDestination.Group({ groupId, threadId: Option.some(threadId), tab: "Tasks" })
+    })
+    const changed = visit(started, workspaceHref(tasks))
+    const after = Option.getOrThrow(opened(changed.model)).model.home.open
+    expect(currentDestination(changed.model)).toEqual(tasks)
+    if (!HomeOpen.isAnyOf(["Group"])(before) || !HomeOpen.isAnyOf(["Group"])(after))
+      throw new Error("Expected an open group")
+    expect(Option.getOrThrow(after.model.thread).model).toEqual(Option.getOrThrow(before.model.thread).model)
+    expect(after.model.threads.composer).toEqual(before.model.threads.composer)
+    expect(changed.commands ?? []).toEqual([])
+    expect(navigateCommands(changed)).toEqual([])
+  })
+
+  it("dismisses an open search when browser history changes destination", () => {
+    const started = loadDirectory(init(flags, url(workspaceHref(group))).model).model
+    const searching = update(started, Message.PressedSearchKey()).model
+    expect(Option.getOrThrow(opened(searching)).model.search.dialog.isOpen).toBe(true)
+    const changed = visit(searching, workspaceHref(Destination.Agents({ tab: "All" }))).model
+    expect(Option.getOrThrow(opened(changed)).model.search.dialog.isOpen).toBe(false)
+  })
+
+  it("replaces a draft conversation URL when its existing group is found", () => {
+    const destination = Destination.Home({
+      destination: HomeDestination.Conversation({ memberIds: [membership.member.id] })
+    })
+    const started = loadDirectory(init(flags, url(workspaceHref(destination))).model).model
+    const workspace = Option.getOrThrow(opened(started)).model
+    if (!HomeOpen.isAnyOf(["Unsent"])(workspace.home.open)) throw new Error("Expected an unsent conversation")
+    const unsent = workspace.home.open.model
+    const found = UnsentBinding.embedView({
+      key: Group.directKey(unsent.memberIds),
+      slotId: "unsent",
+      model: unsent,
+      view: UnsentConversationBlock.makeView((_model, h) => h.empty)
+    }).toParentMessage(UnsentConversationBlock.Message.ReceivedConversation({ groupId: Option.some(groupId) }))
+    const home = HomeBinding.embedView({
+      slotId: "home",
+      model: workspace.home,
+      viewInputs: { now, workspaceName: workspace.name }
+    }).toParentMessage(found)
+    const result = update(started, fromWorkspace(started, home))
+    expect(navigateCommands(result)).toEqual([
+      {
+        url: workspaceHref(
+          Destination.Home({ destination: HomeDestination.Group({ groupId, threadId: Option.none(), tab: "Threads" }) })
+        ),
+        replace: true
+      }
+    ])
   })
 
   it("records a visible destination change once and ignores its URL echo", () => {

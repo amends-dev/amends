@@ -1,6 +1,7 @@
 /** The main pane of the workspace’s open destination. */
 
 import type * as DateTime from "effect/DateTime"
+import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { agentView } from "../../../feature/agents/view/detail.ts"
 import { view as agentsView } from "../../../feature/agents/view/list.ts"
@@ -9,6 +10,7 @@ import { connectionView } from "../../../feature/connections/view/detail.ts"
 import { view as connectionsView } from "../../../feature/connections/view/list.ts"
 import { membersView as settingsMembersView } from "../../../feature/settings/view/members.ts"
 import { view as settingsWorkspaceView } from "../../../feature/settings/view/workspace.ts"
+import { Destination, type DestinationHref } from "../../../route.ts"
 import {
   AgentsBinding,
   ChannelsBinding,
@@ -24,7 +26,12 @@ import { view as homeView } from "../home/view/main.ts"
  * The main pane: the destination the person opened. Home and the settings' members page are given the time now, and
  * Home the workspace's name.
  */
-export const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Html =>
+export const mainView = (
+  model: Model,
+  now: DateTime.Utc,
+  h: WorkspaceViewBuilder,
+  destinationHref?: DestinationHref
+): Html =>
   Open.match(model.open, {
     Home: () =>
       h.block(
@@ -32,7 +39,11 @@ export const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilde
           slotId: "home",
           model: model.home,
           view: homeView,
-          viewInputs: { now, workspaceName: nameOf(model) }
+          viewInputs: {
+            now,
+            workspaceName: nameOf(model),
+            destinationHref: (destination) => destinationHref?.(Destination.Home({ destination }))
+          }
         })
       ),
     Connections: () =>
@@ -41,7 +52,12 @@ export const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilde
           slotId: "connections",
           model: model.connections,
           view: connectionsView,
-          viewInputs: { workspaceName: nameOf(model), viewport: model.viewport }
+          viewInputs: {
+            workspaceName: nameOf(model),
+            viewport: model.viewport,
+            itemHref: (connectionId) => destinationHref?.(Destination.Connection({ connectionId })),
+            tabHref: (tab) => destinationHref?.(Destination.Connections({ tab }))
+          }
         })
       ),
     Connection: ({ connectionId }) =>
@@ -59,7 +75,12 @@ export const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilde
           slotId: "agents",
           model: model.agents,
           view: agentsView,
-          viewInputs: { workspaceName: nameOf(model), viewport: model.viewport }
+          viewInputs: {
+            workspaceName: nameOf(model),
+            viewport: model.viewport,
+            itemHref: (agentId) => destinationHref?.(Destination.Agent({ agentId })),
+            tabHref: (tab) => destinationHref?.(Destination.Agents({ tab }))
+          }
         })
       ),
     Agent: ({ agentId }) =>
@@ -85,7 +106,13 @@ export const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilde
               slotId: "settings-members",
               model: model.settings,
               view: settingsMembersView,
-              viewInputs: { now, viewport: model.viewport, openMemberId: openMemberId(model) }
+              viewInputs: {
+                now,
+                viewport: model.viewport,
+                openMemberId: openMemberId(model),
+                memberHref: (memberId) =>
+                  destinationHref?.(Destination.Settings({ page: "Members", memberId: Option.some(memberId) }))
+              }
             })
           ),
     Channels: () =>

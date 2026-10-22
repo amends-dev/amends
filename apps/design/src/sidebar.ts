@@ -17,6 +17,7 @@ import {
   type TaskStatusShape,
   taskStatus
 } from "./mark.ts"
+import { navigationTarget } from "./navigation.ts"
 
 const sidebarColumn = "flex w-66 max-w-[calc(100vw-7.25rem)] flex-none flex-col overflow-hidden bg-panel"
 
@@ -326,29 +327,20 @@ export const sidebarHeader = <Message, Requirements>(
 
 const renderSectionLabel = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ label: string; onTitleClick?: Message; isTitleCurrent?: boolean }>
+  config: Readonly<{ label: string; onTitleClick?: Message; titleHref?: string | undefined; isTitleCurrent?: boolean }>
 ): Html => {
   const { onTitleClick } = config
 
   return h.h2(
     [h.Class(sectionLabel)],
     [
-      onTitleClick === undefined
+      onTitleClick === undefined && config.titleHref === undefined
         ? config.label
-        : Button.view(
-            {
-              onClick: onTitleClick,
-              toView: (attributes) =>
-                h.button(
-                  [
-                    ...attributes.button,
-                    ...(config.isTitleCurrent === true ? [h.AriaCurrent("page")] : []),
-                    h.Class(sectionTitleButton)
-                  ],
-                  [config.label]
-                )
-            },
-            h
+        : navigationTarget(
+            h,
+            { onClick: onTitleClick, href: config.titleHref },
+            [...(config.isTitleCurrent === true ? [h.AriaCurrent("page")] : []), h.Class(sectionTitleButton)],
+            [config.label]
           )
     ]
   )
@@ -370,6 +362,7 @@ export const sidebarSection = <Message, Requirements>(
   config: Readonly<{
     label?: string
     onTitleClick?: Message
+    titleHref?: string | undefined
     isTitleCurrent?: boolean
     actions?: ReadonlyArray<Html>
     children: ReadonlyArray<Html>
@@ -436,6 +429,7 @@ export const sidebarItem = <Message, Requirements>(
     isUnread?: boolean
     isCurrent: boolean
     onClick: Message
+    href?: string | undefined
     children?: ReadonlyArray<SidebarSubItem<Message>>
   }>
 ): Html => {
@@ -445,23 +439,18 @@ export const sidebarItem = <Message, Requirements>(
   return h.li(
     [],
     [
-      Button.view(
-        {
-          onClick: config.onClick,
-          toView: (attributes) =>
-            h.button(
-              [
-                ...attributes.button,
-                h.AriaLabel(itemName(config)),
-                ...(description === undefined ? [] : [h.AriaDescription(description)]),
-                ...(config.isCurrent ? [h.AriaCurrent("page")] : []),
-                h.Class(itemRow)
-              ],
-              [renderItemLeading(h, config), h.span([h.Class(labelLook)], [config.label]), ...renderItemEnd(h, config)]
-            )
-        },
-        h
+      navigationTarget(
+        h,
+        config,
+        [
+          h.AriaLabel(itemName(config)),
+          ...(description === undefined ? [] : [h.AriaDescription(description)]),
+          ...(config.isCurrent ? [h.AriaCurrent("page")] : []),
+          h.Class(itemRow)
+        ],
+        [renderItemLeading(h, config), h.span([h.Class(labelLook)], [config.label]), ...renderItemEnd(h, config)]
       ),
+
       config.children === undefined || config.children.length === 0
         ? h.empty
         : h.ul(

@@ -57,8 +57,8 @@ and a URL event restores the destination without recording another.
 | Path                                                         | Selection                                                                                                                   |
 | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
 | `inbox`                                                      | Unread activity; `?tab=all` selects All. An open notification retains its notification, group, and thread IDs in the query. |
-| `triage`, `tasks`, `groups`                                  | Home’s lists.                                                                                                               |
-| `groups/:groupId`                                            | A group; append `/threads/:threadId` to open its thread.                                                                    |
+| `triage`, `tasks`, `groups`                                  | Home’s lists; `groups?tab=discover` selects public groups to join.                                                          |
+| `groups/:groupId`                                            | A group; append `/threads/:threadId` to open its thread. `?tab=tasks` selects its Tasks tab.                                |
 | `conversations/new?member=:memberId`                         | A conversation before its first message; repeat `member` for multiple recipients.                                           |
 | `agents`, `agents/:agentId`                                  | Browse or open an agent; `?tab=needs-setup` selects the filtered list.                                                      |
 | `connections`, `connections/:connectionId`                   | Browse or open a connection; `?tab=models` (or another capability) selects a list tab.                                      |
@@ -66,7 +66,17 @@ and a URL event restores the destination without recording another.
 | `settings`, `settings/members`, `settings/members/:memberId` | Workspace settings, members, and an open member.                                                                            |
 
 IDs are encoded as path segments or query values. A bare workspace URL opens its inbox.
-Search text, task filters, dialogs, form drafts, and turn logs remain local UI state.
+Search text, task filters, dialogs, form drafts, and turn logs remain local UI state. Restoring
+another destination closes dismissible overlays; a submitted form retains its existing busy
+policy. Restoring a URL within the same group retains its loaded data and draft. When a
+conversation resolves from its temporary recipient URL to an existing group, history replaces
+that URL so Back does not get stuck reopening it.
+
+The picker, rail, sidebar destinations, browse rows, and destination tabs expose native links.
+Page composition supplies URL callbacks to feature views; standalone consumers can omit them
+and keep the Blocks’ action messages. Modified clicks open another tab without moving the
+current one. Repeated navigation to the same URL adds no duplicate history entry. Fragments
+such as the skip link focus their target without resetting the destination.
 
 A deep link survives sign-in. The root resolves membership through the account’s HTTP workspace
 list before opening a store, applying the latest destination if navigation changed during that
@@ -263,7 +273,6 @@ it does not implement the following product work:
 
 | Area                     | Current gap                                                                                                                                                |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Navigation controls      | Destination changes have URLs; the existing navigation controls still render as buttons. Link semantics and modified-click behavior are a follow-up.       |
 | Groups                   | No public-group preview before joining, or visibility changes after creation.                                                                              |
 | Other workspace features | Reactions, a Files tab, notification preferences, and task keys are not implemented in the app. Establish the supporting contracts before adding their UI. |
 | Original discussion      | Core accepts `Thread.origin` and the pending-action projection preserves it; the app has no flow that supplies it or links back to that discussion.        |

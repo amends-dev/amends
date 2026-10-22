@@ -6,7 +6,7 @@ import { sidebarEmpty, sidebarItem, sidebarSection, sidebarSections } from "@ame
 import * as Option from "effect/Option"
 import { areIntegrationsListed, connectionItemsGiving } from "../../../data/connections.ts"
 import { ConnectionsBlock } from "../block.ts"
-import { mayAdd, Message, type Model } from "../definition.ts"
+import { type ConnectionsTab, mayAdd, Message, type Model } from "../definition.ts"
 import { addLabel, capabilityLabels, connectionStatus } from "./wording.ts"
 
 /** The sections of the sidebar that list connections, one for each thing a connection can give the workspace. */
@@ -17,6 +17,9 @@ const capabilitySections = ["models", "tools", "sandboxes", "harnesses"] as cons
  * whose page it shows instead, if one; and whether the channels are, which marks the Channels title current.
  */
 export type SidebarInputs = Readonly<{
+  itemHref?: ((id: ConnectionContract.ConnectionId) => string | undefined) | undefined
+  tabHref?: ((tab: ConnectionsTab) => string | undefined) | undefined
+  channelsHref?: string | undefined
   isListOpen: boolean
   openConnectionId: Option.Option<ConnectionContract.ConnectionId>
   isChannelsOpen: boolean
@@ -35,7 +38,7 @@ const isReadForSections = (model: Model): boolean => model.isLoaded && areIntegr
  * the integrations are read.
  */
 export const sidebarView = ConnectionsBlock.makeView.withInputs<SidebarInputs>(
-  (model, { isListOpen, openConnectionId, isChannelsOpen }, h) =>
+  (model, { isListOpen, openConnectionId, isChannelsOpen, itemHref, tabHref, channelsHref }, h) =>
     sidebarSections(h, [
       ...capabilitySections.map((capability) => {
         const listed = connectionItemsGiving(model, capability)
@@ -45,6 +48,7 @@ export const sidebarView = ConnectionsBlock.makeView.withInputs<SidebarInputs>(
         return sidebarSection(h, {
           label: title,
           onTitleClick: openList,
+          titleHref: tabHref?.(capability),
           isTitleCurrent: isListOpen && model.browse.tab === capability,
           actions: [
             iconButton(
@@ -76,7 +80,8 @@ export const sidebarView = ConnectionsBlock.makeView.withInputs<SidebarInputs>(
                     label: item.connection.name,
                     isPending: item.pending,
                     isCurrent: Option.contains(openConnectionId, item.connection.id),
-                    onClick: Message.ClickedConnection({ connectionId: item.connection.id })
+                    onClick: Message.ClickedConnection({ connectionId: item.connection.id }),
+                    href: itemHref?.(item.connection.id)
                   })
                 )
         })
@@ -84,6 +89,7 @@ export const sidebarView = ConnectionsBlock.makeView.withInputs<SidebarInputs>(
       sidebarSection(h, {
         label: "Channels",
         onTitleClick: Message.ClickedBrowseChannels(),
+        titleHref: channelsHref,
         isTitleCurrent: isChannelsOpen,
         actions: [
           iconButton(

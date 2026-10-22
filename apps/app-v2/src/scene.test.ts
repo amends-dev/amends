@@ -38,10 +38,12 @@ import { type Model, Page } from "./model.ts"
 import { SignInBlock } from "./page/signIn/block.ts"
 import { SendCode } from "./page/signIn/command.ts"
 import { WorkspaceBlock } from "./page/workspace/block.ts"
+import { LoadIntegrations } from "./page/workspace/command.ts"
 import { Open as HomeOpen } from "./page/workspace/home/definition.ts"
 import { WorkspacesBlock } from "./page/workspaces/block.ts"
+import { LoadWorkspaces } from "./page/workspaces/command.ts"
 import { Workspaces } from "./page/workspaces/definition.ts"
-import { Route } from "./route.ts"
+import { Route, Destination } from "./route.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
@@ -162,6 +164,36 @@ const withInbox = inWorkspaceChanged((workspace) =>
 )
 
 describe("the app", () => {
+  it("shows an unknown address as a page with a way back to the picker", () => {
+    scene(
+      { update, view },
+      given({ ...choosing, route: Route.NotFound({ path: "/missing" }) }),
+      expect(role("heading", { name: "Page not found", level: 1 })).toExist(),
+      click(role("button", { name: "Go to workspaces" })),
+      Command.resolve(Navigate, Message.CompletedNavigation()),
+      expect(role("heading", { name: "Choose a workspace", level: 1 })).toExist()
+    )
+  })
+
+  it("keeps an unreachable destination and opens it when retry resolves membership", () => {
+    const route = Route.Workspace({
+      workspaceId: membership.workspace.id,
+      destination: Destination.Agents({ tab: "All" })
+    })
+    scene(
+      { update, view },
+      given({ ...askingHost(Workspaces.Unreachable()), route }),
+      expect(role("heading", { name: "Can’t reach the host", level: 1 })).toExist(),
+      click(role("button", { name: "Try again" })),
+      Command.resolve(
+        LoadWorkspaces,
+        WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership], invitations: [] })
+      ),
+      Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
+      expect(role("main", { name: "Agents" })).toExist()
+    )
+  })
+
   it("shows the sign-in form under the brand while signed out, and asks for a code to the address entered", () => {
     scene(
       { update, view },
@@ -225,7 +257,7 @@ describe("the app", () => {
       expect(within(role("banner"), text("alice@example.com"))).toExist(),
       expect(within(role("banner"), role("button", { name: "Sign out" }))).toExist(),
       expect(within(role("main"), role("heading", { name: "Choose a workspace", level: 1 }))).toExist(),
-      expect(within(role("main"), role("button", { name: "Studio" }))).toExist()
+      expect(within(role("main"), role("link", { name: "Studio" }))).toExist()
     )
   })
 
@@ -385,7 +417,7 @@ describe("the app", () => {
       ...chooseMenuItem(AccountMenu, "Workspace settings"),
       Command.resolve(Navigate, Message.CompletedNavigation()),
       expect(role("main", { name: "Workspace" })).toExist(),
-      expect(within(role("navigation", { name: "Studio" }), role("button", { name: "Workspace" }))).toHaveAttr(
+      expect(within(role("navigation", { name: "Studio" }), role("link", { name: "Workspace" }))).toHaveAttr(
         "aria-current",
         "page"
       )
