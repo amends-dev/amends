@@ -243,6 +243,13 @@ person's store of the workspace, writes actions to it, and reports facts about i
 parent, so it embeds wherever those identities are known. `feature/` holds the features and `page/`
 the pages that compose them; the root composes the pages.
 
+The workspace’s `view/shell.ts` composes its rail, notices, and dialogs with `view/sidebar.ts`,
+`view/main.ts`, and `view/aside.ts`. Home keeps its main destination, sidebar, thread pane, and
+overlays under its own `view/`. The workspace picker separates its listing and create/join dialog
+from `view/main.ts`. Each page still owns one state machine and its default view; these surface
+modules render through the page’s existing builder and bindings. The root crash screen lives in
+`view/crash.ts`.
+
 `data/` holds shared record shapes and queries: connection capabilities and integration loading state,
 agent activity, permission checks, workspace ownership and role choices, member and group names, search normalization,
 task state decisions, and message text used by search and the store. These modules depend only on
@@ -1568,7 +1575,7 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   workspace's view the time now beside the email, as a view input and not a message, and the page
   gives it on to the inbox and the open group, the destinations that show ages and days; the workspace
   list's view takes it too, for when each invitation closes. `entry.ts` assembles the application over `services.ts`, which supplies the stores, the
-  session, and the browser's services beneath them, and keeps the keys of an input method from the page's handlers (`inputMethod.ts`), and gives it `crash.ts`'s view for when it stops on an unexpected
+  session, and the browser's services beneath them, and keeps the keys of an input method from the page's handlers (`inputMethod.ts`), and gives it `view/crash.ts`'s view for when it stops on an unexpected
   error: apps/ui's crash screen, outside the session, so with the brand alone in its header, the state art of something
   that came apart, "Something went wrong", what happened, and a primary Reload. Foldkit draws it after it has stopped
   dispatching, so its builder has no message to send, and Reload is a link to the page's own address, which loads the page
@@ -1734,7 +1741,7 @@ with the error rather than leaving the replica silently behind.
 browser's storage. Each Block's tests sit beside it. The commands that call the host are run over a client that answers
 what a test names, which can be that its call dies, and the message they end in is given to the form's update, to show
 it leaves its sending state with the general failure. `appearance.test.ts` runs the script of `index.html` against the
-key `keepAppearance` keeps, to show the two agree. `crash.test.ts` renders the crash view: the heading and its words, the
+key `keepAppearance` keeps, to show the two agree. `view/crash.test.ts` renders the crash view: the heading and its words, the
 state art, the brand alone in the header, and Reload as a link to the page's own address:
 
 - `feature/composer/block.scene.test.ts` embeds the same Block with a plain HTML view and the Amends view. Both

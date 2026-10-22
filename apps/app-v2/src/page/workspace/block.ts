@@ -3,7 +3,7 @@ import { WorkspaceComposition } from "./composition.ts"
 import { Message } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { view } from "./view.ts"
+import { view } from "./view/shell.ts"
 
 const WorkspaceBlockValue = WorkspaceComposition.assembleBlock({
   init,

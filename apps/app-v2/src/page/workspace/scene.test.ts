@@ -109,7 +109,7 @@ import { Message, Open, OutMessage } from "./definition.ts"
 import { Open as HomeOpen } from "./home/definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { view } from "./view.ts"
+import { view } from "./view/shell.ts"
 
 const { workspace, member } = membership
 

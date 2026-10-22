@@ -64,7 +64,10 @@ import { HomeBlock } from "./block.ts"
 import { Open, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { dialogView, profileCardView, sidebarView, threadView, view } from "./view.ts"
+import { view } from "./view/main.ts"
+import { dialogView, profileCardView } from "./view/overlay.ts"
+import { sidebarView } from "./view/sidebar.ts"
+import { threadView } from "./view/thread.ts"
 
 const { workspace, member } = membership
 

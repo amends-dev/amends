@@ -93,7 +93,7 @@ import { type AppAccountEntry, Message, Open, OutMessage, openMemberId } from ".
 import { HomeBlock } from "./home/block.ts"
 import { GroupBinding, GroupsBinding, InboxBinding, ProfileCardBinding, TasksBinding } from "./home/composition.ts"
 import { isThreadOpen, Open as HomeOpen } from "./home/definition.ts"
-import { view as homeView } from "./home/view.ts"
+import { view as homeView } from "./home/view/main.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
