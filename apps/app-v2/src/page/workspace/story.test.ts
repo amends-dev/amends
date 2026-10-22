@@ -257,7 +257,7 @@ const fromGroups = (message: typeof GroupsBlock.Message.Type) =>
     GroupsBinding.embedView({
       slotId: "groups",
       model: opened.home.groups,
-      viewInputs: { openThread: Option.none(), isBrowsing: false, unsentWith: Option.none() }
+      view: GroupsBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 
@@ -284,12 +284,20 @@ const fromProfileCard = (message: typeof ProfileCardBlock.Message.Type) =>
 /** What the tasks report, as Home and then the workspace receive it. */
 const fromTasks = (message: typeof TasksBlock.Message.Type) =>
   fromHome(
-    TasksBinding.embedView({ slotId: "tasks", model: opened.home.tasks, viewInputs: { now } }).toParentMessage(message)
+    TasksBinding.embedView({
+      slotId: "tasks",
+      model: opened.home.tasks,
+      view: TasksBlock.makeView((_model, h) => h.empty)
+    }).toParentMessage(message)
   )
 
 /** What the search reports, as the workspace receives it. */
 const fromSearch = (message: typeof SearchBlock.Message.Type) =>
-  SearchBinding.embedView({ slotId: "search", model: opened.search }).toParentMessage(message)
+  SearchBinding.embedView({
+    slotId: "search",
+    model: opened.search,
+    view: SearchBlock.makeView((_model, h) => h.empty)
+  }).toParentMessage(message)
 
 /** What the connections report, as the workspace receives it. */
 const fromConnections = (message: typeof ConnectionsBlock.Message.Type) =>
@@ -317,7 +325,11 @@ const fromSettings = (message: typeof SettingsBlock.Message.Type) =>
 
 /** What the channels report, as the workspace receives it. */
 const fromChannels = (message: typeof ChannelsBlock.Message.Type) =>
-  ChannelsBinding.embedView({ slotId: "channels", model: opened.channels }).toParentMessage(message)
+  ChannelsBinding.embedView({
+    slotId: "channels",
+    model: opened.channels,
+    view: ChannelsBlock.makeView((_model, h) => h.empty)
+  }).toParentMessage(message)
 
 /** What the navigation drawer's dialog reports, as the workspace receives it. */
 const fromMenu = (message: typeof DialogBlock.Message.Type) =>

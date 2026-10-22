@@ -22,7 +22,6 @@ import { Identity } from "@amends-dev/core/identity"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { ThreadId } from "@amends-dev/core/thread"
 import { Member, MemberId, MemberPermissions, WorkspaceId } from "@amends-dev/core/workspace"
-import type { Choice } from "@amends-dev/design/control"
 import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import * as Result from "effect/Result"
@@ -34,6 +33,7 @@ import * as AgentSetup from "../../agentSetup.ts"
 import { AgentItem } from "../../data/agents.ts"
 import {
   connectionNameIn,
+  findConnection,
   ConnectionItem,
   connectionItemsGiving,
   findIntegration,
@@ -361,10 +361,6 @@ export const modelProblem = (model: Pick<Model, "offered">, setup: AgentSetup.Dr
     ? Option.some("This connection offers only the models it lists.")
     : Option.none()
 
-/** The connection `connectionId` among the workspace's, while it is one. */
-const connectionOf = (model: Pick<Model, "connections">, connectionId: string): Option.Option<ConnectionItem> =>
-  Option.fromUndefinedOr(model.connections.find(({ connection }) => connection.id === connectionId))
-
 /** Why `setup` can't have no sandbox: the harness it names works only in one. */
 export const sandboxProblem = (
   model: Pick<Model, "connections" | "integrations">,
@@ -372,7 +368,7 @@ export const sandboxProblem = (
 ): Option.Option<string> =>
   setup.harness === "" || setup.sandbox !== ""
     ? Option.none()
-    : Option.flatMap(connectionOf(model, setup.harness), ({ connection }) =>
+    : Option.flatMap(findConnection(model, setup.harness), ({ connection }) =>
         Option.exists(findIntegration(model, connection.integration), ({ requiresSandbox }) => requiresSandbox)
           ? Option.some(`${connection.name} works only in a sandbox. Choose one.`)
           : Option.none()
@@ -451,56 +447,6 @@ export const failureMessage = ({ action, reason }: Failure): string =>
     Invalid: () => invalidMessages[action],
     Incomplete: () => "This setup can’t be saved as it is. Change what’s marked, then try again.",
     Unwritable: () => unwritableMessages[action]
-  })
-
-/**
- * The connections that give `capability` as the choices of a select, each with what `describe` says of its
- * integration, and, when `current` names one that does not give it, that connection too, listed as unavailable:
- * a connection the agent names that was removed or whose integration is not installed stays chosen, and says so.
- */
-export const connectionChoices = (
-  model: Pick<Model, "connections" | "integrations">,
-  capability: Integration.Capability,
-  current: string,
-  describe: (integration: Connection.IntegrationView) => string
-): ReadonlyArray<Choice<string>> => {
-  const giving = connectionItemsGiving(model, capability)
-  const choices = giving.map(({ connection }): Choice<string> => [
-    connection.id,
-    connection.name,
-    Option.match(findIntegration(model, connection.integration), {
-      onNone: () => ({}),
-      onSome: (integration) => ({ description: describe(integration) })
-    })
-  ])
-
-  return current === "" || giving.some(({ connection }) => connection.id === current)
-    ? choices
-    : [...choices, unavailableChoice(model, current)]
-}
-
-/** The connection `connectionId`, which does not give what a select asks for, as a choice that can't be chosen. */
-const unavailableChoice = (model: Pick<Model, "connections" | "integrations">, connectionId: string): Choice<string> =>
-  Option.match(connectionOf(model, connectionId), {
-    onNone: () => [
-      connectionId,
-      "Removed connection",
-      { description: "This connection was removed.", isDisabled: true }
-    ],
-    onSome: ({ connection }) => [
-      connectionId,
-      connection.name,
-      {
-        ...(areIntegrationsListed(model)
-          ? {
-              description: Option.isSome(findIntegration(model, connection.integration))
-                ? "Its integration doesn’t give this."
-                : "Its integration isn’t installed on this host."
-            }
-          : {}),
-        isDisabled: true
-      }
-    ]
   })
 
 /** A role a new agent may start with, and whether the person may give it. */

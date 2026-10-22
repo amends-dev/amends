@@ -30,9 +30,8 @@ import { defineTaggedUnion } from "foldkit/schema"
 import { modifyFields } from "foldkit/struct"
 import { MembersComboboxBlock } from "../../control/memberPicker.ts"
 import { activityOfAgent, AgentItem } from "../../data/agents.ts"
-import { groupName, isJoinable } from "../../data/groups.ts"
+import { groupName, isJoinable, conversationAmong } from "../../data/groups.ts"
 import { foldAccents } from "../../data/search.ts"
-import { conversationAmong } from "./conversation.ts"
 
 /** A group the person can see, whether it is still being created, and how many members it has. */
 export const GroupItem = Schema.Struct({ group: Group.Group, pending: Schema.Boolean, members: Schema.Int })

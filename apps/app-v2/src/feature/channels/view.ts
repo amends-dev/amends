@@ -17,7 +17,8 @@ import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { connectionsGiving, Integrations } from "../../data/connections.ts"
 import { channelTarget, may, workspaceTarget } from "../../permissions.ts"
-import { ChannelsComposition, type ChannelsViewBuilder } from "./composition.ts"
+import { ChannelsBlock } from "./block.ts"
+import type { ChannelsViewBuilder } from "./composition.ts"
 import { type ChannelItem, destinations, Form, groupNameOf, Message, type Model } from "./definition.ts"
 
 /** The form open among the channels. */
@@ -110,7 +111,7 @@ const integrationsView = (model: Model, h: ChannelsViewBuilder): Html =>
   })
 
 /** The workspace's channels, the form open among them, and adding one, for a person who may. */
-export const view = ChannelsComposition.makeView((model, h) => {
+export const view = ChannelsBlock.makeView((model, h) => {
   const mayAdd =
     Option.isNone(model.form) && may(model.grants, ChannelPermissions.Create, workspaceTarget(model.workspaceId))
   return pane(h, {

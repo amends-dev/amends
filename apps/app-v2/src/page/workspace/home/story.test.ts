@@ -12,7 +12,6 @@ import {
   design,
   general,
   notificationOf,
-  now,
   opening,
   reply,
   scout,
@@ -70,7 +69,7 @@ const fromGroups = (message: typeof GroupsBlock.Message.Type) =>
   GroupsBinding.embedView({
     slotId: "groups",
     model: opened.groups,
-    viewInputs: { openThread: Option.none(), isBrowsing: false, unsentWith: Option.none() }
+    view: GroupsBlock.makeView((_model, h) => h.empty)
   }).toParentMessage(message)
 
 /** What the inbox reports, as Home receives it. */
@@ -116,7 +115,11 @@ const fromInboxThread = (message: typeof ThreadBlock.Message.Type) =>
 
 /** What the tasks report, as Home receives it. */
 const fromTasks = (message: typeof TasksBlock.Message.Type) =>
-  TasksBinding.embedView({ slotId: "tasks", model: opened.tasks, viewInputs: { now } }).toParentMessage(message)
+  TasksBinding.embedView({
+    slotId: "tasks",
+    model: opened.tasks,
+    view: TasksBlock.makeView((_model, h) => h.empty)
+  }).toParentMessage(message)
 
 /** What the side pane's dialog reports, as Home receives it. */
 const fromAside = (message: typeof DialogBlock.Message.Type) =>
@@ -841,7 +844,7 @@ describe("home", () => {
         key: Group.directKey([bob.id]),
         slotId: "unsent",
         model: unsentWithBob,
-        viewInputs: { workspaceName: "Studio" }
+        view: UnsentConversationBlock.makeView((_model, h) => h.empty)
       }).toParentMessage(message)
 
     /** The draft of the first message to Bob read, as the conversation not started opens. */

@@ -7,9 +7,9 @@ import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
+import { conversationAmong } from "../../data/groups.ts"
 import type * as Store from "../../store/Store.ts"
 import * as Stores from "../../store/Stores.ts"
-import { conversationAmong } from "../groups/conversation.ts"
 import { Message, UnsentConversationDefinition } from "./definition.ts"
 
 /**

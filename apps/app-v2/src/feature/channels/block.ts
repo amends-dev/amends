@@ -5,19 +5,19 @@ import { Message } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
-import { view } from "./view.ts"
 
-const ChannelsBlockValue = ChannelsComposition.assembleBlock({
+const implementation = {
   init,
   update,
-  view,
   subscriptions,
   operations: {
     informReceivedIntegrations: Message.ReceivedIntegrations,
     informFailedLoadIntegrations: Message.FailedLoadIntegrations
   },
   EffectsLayer: Layer.merge(EffectsLayer, subscriptions.layer)
-})
+}
+
+const ChannelsBlockValue = ChannelsComposition.assembleBlock<typeof implementation>(implementation)
 type ChannelsBlockType = typeof ChannelsBlockValue
 export interface ChannelsBlock extends ChannelsBlockType {}
 export const ChannelsBlock: ChannelsBlock = ChannelsBlockValue

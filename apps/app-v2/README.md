@@ -269,14 +269,15 @@ would work through the whole structure of the Block and of everything it binds a
 named contracts alongside the declaration patches described above; removing one requires checking
 the complete app, including the workspace's sibling policies.
 
-The composer, profile card, connections, agents, settings, group, thread list, thread, inbox, task,
-and turns Blocks assemble without default views. Their
-`block.ts` files assemble behavior without importing a view. Views use the completed Block's
-`makeView`, and parents select them explicitly with `Binding.embedView({ view, ... })`. The
-composer's `definition.ts` also holds its empty composition. The profile card keeps agent
-readiness and activity in its model; its view chooses status wording and logo motions through
-`view/agents.ts`. These remain browser features with commands, mounts, and store subscriptions.
-Other features still assemble their default views; they have not yet adopted this boundary.
+Every feature Block assembles without a default view. Its `block.ts` imports behavior only;
+views use the completed Block's `makeView`, and parents select them explicitly with
+`Binding.embedView({ view, ... })`. Pages still assemble their own default views at the application
+edge. The composer's `definition.ts` also holds its empty composition. The profile card keeps
+agent readiness and activity in its model; its view chooses status wording and logo motions
+through `view/agents.ts`. These remain browser features with commands, mounts, and subscriptions.
+`bun run check:packages` rejects view or design-renderer imports in feature assembly, definitions,
+composition, initialization, updates, commands, and subscriptions, including type-only imports.
+The shared viewport schema is allowed because it carries the responsive layout contract.
 
 A feature with several surfaces keeps them under `view/`. Connections and agents each have
 `sidebar.ts`, `list.ts`, `detail.ts`, and `dialog.ts`. Settings has `workspace.ts`, `members.ts`,
@@ -776,7 +777,7 @@ turns feature's existing `log.ts` presentation module.
   is, whoever else is in the workspace: with nobody else its dialog, "New message", has no one to choose, "Everyone in
   the workspace is here.", and Start conversation stays disabled.
   A conversation's row is marked by the member it is with, in their tone as `memberMark` gives it, neutral for a
-  person and lilac for an agent (`conversationMark` in `conversation.ts`), where it had their first letter alone.
+  person and lilac for an agent (`conversationMark` in `view/groups.ts`), where it had their first letter alone.
   A conversation with several people, which core allows a direct group to be, has no one's mark to wear and `apps/ui`
   draws none, so its row has one of its own: the first letters of the names of the first two on the neutral tone, and
   all of the names as its label. A conversation with one agent says how the agent stands and what it is doing as the
@@ -2278,8 +2279,8 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   in one thread from its turns, by state and oldest first, and the most pressing state of a group's
   turns, whichever agents they are of, and `view/agents.ts`: their wording and logo motions, and the patch of an agent that needs setup, with why, or is
   at work, with where, and none while it is idle or its change is on its way, and the words and motion of its logo,
-  and `feature/groups/conversation.ts`: whom a conversation is with, which conversation is with exactly some members,
-  and its mark, one member's in their tone, or the first letters of two names, or the letters of an ID before the
+  and `data/groups.ts`: whom a conversation is with and which conversation is with exactly some members,
+  and `view/groups.ts`: its mark, one member's in their tone, or the first letters of two names, or the letters of an ID before the
   members are read. `Drafts`'
   tests keep a draft for each place, including a conversation's by its people, the last one written, through being closed and opened again.
 

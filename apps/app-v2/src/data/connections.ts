@@ -40,7 +40,7 @@ export const findIntegration = (
 /** The connection `connectionId`, while the workspace has it. */
 export const findConnection = (
   data: Pick<ConnectionData, "connections">,
-  connectionId: ConnectionContract.ConnectionId
+  connectionId: string
 ): Option.Option<ConnectionItem> =>
   Option.fromUndefinedOr(data.connections.find(({ connection }) => connection.id === connectionId))
 

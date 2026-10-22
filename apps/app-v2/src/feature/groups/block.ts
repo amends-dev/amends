@@ -5,19 +5,19 @@ import { Message } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
-import { view } from "./view.ts"
 
-const GroupsBlockValue = GroupsComposition.assembleBlock({
+const implementation = {
   init,
   update,
-  view,
   subscriptions,
   operations: {
     informOpenGroup: Message.InformedOfOpenGroup,
     requestConversationWith: Message.RequestedConversationWith
   },
   EffectsLayer: Layer.merge(EffectsLayer, subscriptions.layer)
-})
+}
+
+const GroupsBlockValue = GroupsComposition.assembleBlock<typeof implementation>(implementation)
 type GroupsBlockType = typeof GroupsBlockValue
 export interface GroupsBlock extends GroupsBlockType {}
 export const GroupsBlock: GroupsBlock = GroupsBlockValue

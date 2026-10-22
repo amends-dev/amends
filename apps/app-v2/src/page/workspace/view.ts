@@ -6,14 +6,17 @@ import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import type { Appearance } from "../../appearance.ts"
+import { view as actionsView } from "../../feature/actions/view.ts"
 import { agentView } from "../../feature/agents/view/detail.ts"
 import { dialogView as agentsDialogView } from "../../feature/agents/view/dialog.ts"
 import { view as agentsView } from "../../feature/agents/view/list.ts"
 import { sidebarView as agentsSidebarView } from "../../feature/agents/view/sidebar.ts"
+import { view as channelsView } from "../../feature/channels/view.ts"
 import { connectionView } from "../../feature/connections/view/detail.ts"
 import { dialogView as connectionsDialogView } from "../../feature/connections/view/dialog.ts"
 import { view as connectionsView } from "../../feature/connections/view/list.ts"
 import { sidebarView as connectionsSidebarView } from "../../feature/connections/view/sidebar.ts"
+import { view as searchView } from "../../feature/search/view.ts"
 import { accountView as settingsAccountView } from "../../feature/settings/view/account.ts"
 import { dialogView as settingsDialogView } from "../../feature/settings/view/dialog.ts"
 import { memberView as settingsMemberView } from "../../feature/settings/view/member.ts"
@@ -246,7 +249,8 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
               viewInputs: { now, viewport: model.viewport, openMemberId: openMemberId(model) }
             })
           ),
-    Channels: () => h.block(ChannelsBinding.embedView({ slotId: "channels", model: model.channels }))
+    Channels: () =>
+      h.block(ChannelsBinding.embedView({ slotId: "channels", model: model.channels, view: channelsView }))
   })
 
 /** How a dialog is drawn, given what it publishes. */
@@ -349,7 +353,7 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
     sidebar: sidebarView(model, inputs, h),
     main: mainView(model, now, h),
     ...(Option.isSome(aside) ? { aside: aside.value } : {}),
-    notices: h.block(ActionsBinding.embedView({ slotId: "actions", model: model.actions })),
+    notices: h.block(ActionsBinding.embedView({ slotId: "actions", model: model.actions, view: actionsView })),
     menu: {
       id: model.menu.id,
       onOpen: Message.ClickedMenu(),
@@ -383,7 +387,7 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
           viewInputs: { now }
         })
       ),
-      h.block(SearchBinding.embedView({ slotId: "search", model: model.search }))
+      h.block(SearchBinding.embedView({ slotId: "search", model: model.search, view: searchView }))
     ]
   })
 })

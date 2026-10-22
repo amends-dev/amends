@@ -21,22 +21,16 @@ import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { type ActivityState, stateInGroup, type AgentItem, readinessOfAgent } from "../../data/agents.ts"
-import { groupName } from "../../data/groups.ts"
+import { groupName, soleOtherIn } from "../../data/groups.ts"
 import { may, workspaceTarget } from "../../permissions.ts"
 import { motionOfState, stateWord, sidebarActivity, statusOfAgent } from "../../view/agents.ts"
 import { pluralize } from "../../view/counts.ts"
-import { visibilityHint } from "../../view/groups.ts"
+import { visibilityHint, conversationMark } from "../../view/groups.ts"
 import { includedHint, pickerPeople, pickerPeopleChosen, youInPicker } from "../../view/memberPicker.ts"
 import { memberMark } from "../../view/members.ts"
 import { statusLabel, statusShape } from "../../view/tasks.ts"
-import {
-  DialogBinding,
-  GroupsComposition,
-  type GroupsViewBuilder,
-  MembersBinding,
-  VisibilityBinding
-} from "./composition.ts"
-import { conversationMark, soleOtherIn } from "./conversation.ts"
+import { GroupsBlock } from "./block.ts"
+import { DialogBinding, type GroupsViewBuilder, MembersBinding, VisibilityBinding } from "./composition.ts"
 import {
   activityOfAgentHere,
   type BrowseTab,
@@ -312,60 +306,58 @@ const teamRows = (
  * person belongs to and is current while it shows; Browse groups opens it on the teams they may join. The buttons that
  * start a team or a conversation open the dialog `dialogView` renders.
  */
-export const view = GroupsComposition.makeView.withInputs<ViewInputs>(
-  (model, { openThread, isBrowsing, unsentWith }, h) => {
-    const own = yours(model)
-    const teams = own.filter(({ group }) => group.kind === "Team")
-    const conversations = own.filter(({ group }) => group.kind !== "Team")
+export const view = GroupsBlock.makeView.withInputs<ViewInputs>((model, { openThread, isBrowsing, unsentWith }, h) => {
+  const own = yours(model)
+  const teams = own.filter(({ group }) => group.kind === "Team")
+  const conversations = own.filter(({ group }) => group.kind !== "Team")
 
-    return sidebarSections(h, [
-      notice(h, model.notice),
-      sidebarSection(h, {
-        label: "Groups",
-        onTitleClick: Message.ClickedGroupsTitle(),
-        isTitleCurrent: isBrowsing,
-        actions: [
-          iconButton(
-            h,
-            { icon: "mark-search", label: "Browse groups", onClick: Message.ClickedBrowse() },
-            { size: "compact" }
-          ),
-          ...(mayCreateTeam(model)
-            ? [
-                iconButton(
-                  h,
-                  { icon: "mark-new", label: "Create group", onClick: Message.ClickedNewTeam() },
-                  { size: "compact" }
-                )
-              ]
-            : [])
-        ],
-        children: teamRows(teams, model, openThread, h)
-      }),
-      sidebarSection(h, {
-        label: "Direct messages",
-        actions: [
-          iconButton(
-            h,
-            { icon: "mark-new", label: "New message", onClick: Message.ClickedNewConversation() },
-            { size: "compact" }
-          )
-        ],
-        children: [
-          ...conversations.map((item) => groupRow(item, model, openThread, h)),
-          ...teammates(model).map((member) => teammateRow(member, model, unsentWith, h))
-        ]
-      })
-    ])
-  }
-)
+  return sidebarSections(h, [
+    notice(h, model.notice),
+    sidebarSection(h, {
+      label: "Groups",
+      onTitleClick: Message.ClickedGroupsTitle(),
+      isTitleCurrent: isBrowsing,
+      actions: [
+        iconButton(
+          h,
+          { icon: "mark-search", label: "Browse groups", onClick: Message.ClickedBrowse() },
+          { size: "compact" }
+        ),
+        ...(mayCreateTeam(model)
+          ? [
+              iconButton(
+                h,
+                { icon: "mark-new", label: "Create group", onClick: Message.ClickedNewTeam() },
+                { size: "compact" }
+              )
+            ]
+          : [])
+      ],
+      children: teamRows(teams, model, openThread, h)
+    }),
+    sidebarSection(h, {
+      label: "Direct messages",
+      actions: [
+        iconButton(
+          h,
+          { icon: "mark-new", label: "New message", onClick: Message.ClickedNewConversation() },
+          { size: "compact" }
+        )
+      ],
+      children: [
+        ...conversations.map((item) => groupRow(item, model, openThread, h)),
+        ...teammates(model).map((member) => teammateRow(member, model, unsentWith, h))
+      ]
+    })
+  ])
+})
 
 /**
  * The dialog for what the person is starting, a team or a conversation, which the page lends the shell: it
  * renders its `dialog` element, with nothing in it while it is closed, wherever the page puts the buttons that
  * open it, the sidebar's and the browse page's, whether or not the sidebar is on the page.
  */
-export const dialogView = GroupsComposition.makeView((model, h) =>
+export const dialogView = GroupsBlock.makeView((model, h) =>
   h.block(
     DialogBinding.embedView({
       slotId: "starting",
@@ -479,7 +471,7 @@ const browseTab = (model: Model, tab: BrowseTab, label: string, items: ReadonlyA
  * empty, being read, or could not be too, and a row for each team, to open, with Join on those they may join. A join
  * that could not be kept says why over the list. The button opens the dialog `dialogView` renders.
  */
-export const browseView = GroupsComposition.makeView((model, h) => {
+export const browseView = GroupsBlock.makeView((model, h) => {
   const { tab, query } = model.browse
   const shown = matching(model, listedOn(model, tab), query)
 

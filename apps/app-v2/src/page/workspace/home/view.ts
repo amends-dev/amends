@@ -6,7 +6,7 @@ import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { view as groupView } from "../../../feature/group/view/main.ts"
 import { threadView as groupThreadView } from "../../../feature/group/view/thread.ts"
-import { browseView, dialogView as groupsDialogView } from "../../../feature/groups/view.ts"
+import { browseView, dialogView as groupsDialogView, view as groupsView } from "../../../feature/groups/view.ts"
 import { waitingCount } from "../../../feature/inbox/definition.ts"
 import { view as inboxView } from "../../../feature/inbox/view/list.ts"
 import { threadView as inboxThreadView } from "../../../feature/inbox/view/thread.ts"
@@ -14,6 +14,7 @@ import { openTriggerIdOf } from "../../../feature/profileCard/definition.ts"
 import { view as memberProfileView } from "../../../feature/profileCard/view.ts"
 import { triageCount } from "../../../feature/tasks/definition.ts"
 import { tasksView, triageView } from "../../../feature/tasks/view.ts"
+import { view as unsentConversationView } from "../../../feature/unsentConversation/view.ts"
 import {
   AsideBinding,
   GroupBinding,
@@ -71,7 +72,8 @@ export const view = HomeComposition.makeView.withInputs<ViewInputs>((model, { no
           key: Group.directKey(unsent.memberIds),
           slotId: "unsent",
           model: unsent,
-          viewInputs: { workspaceName }
+          viewInputs: { workspaceName },
+          view: unsentConversationView
         })
       )
   })
@@ -118,7 +120,8 @@ export const sidebarView = HomeComposition.makeView((model, h) => {
           })),
           isBrowsing: Open.isAnyOf(["Groups"])(model.open),
           unsentWith: unsentMemberId(model)
-        }
+        },
+        view: groupsView
       })
     )
   ])

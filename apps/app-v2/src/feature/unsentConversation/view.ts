@@ -2,7 +2,8 @@ import { notice } from "@amends-dev/design/control"
 import { pane, paneColumn } from "@amends-dev/design/pane"
 import { view as composerView } from "../composer/view.ts"
 import { welcome } from "../threads/view/list.ts"
-import { ComposerBinding, UnsentConversationComposition } from "./composition.ts"
+import { UnsentConversationBlock } from "./block.ts"
+import { ComposerBinding } from "./composition.ts"
 import { nameOf } from "./definition.ts"
 
 /** The workspace's name, which a phone shows under the conversation's title. */
@@ -13,7 +14,7 @@ export type ViewInputs = Readonly<{ workspaceName: string }>
  * conversation is, with the welcome a conversation with nothing said in it has, and the composer of its first message
  * in the footer, named "Message Bob" or "Message Bob, Carol" while it is empty.
  */
-export const view = UnsentConversationComposition.makeView.withInputs<ViewInputs>((model, { workspaceName }, h) => {
+export const view = UnsentConversationBlock.makeView.withInputs<ViewInputs>((model, { workspaceName }, h) => {
   const name = nameOf(model)
 
   return pane(h, {

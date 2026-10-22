@@ -469,7 +469,7 @@ describe("the app", () => {
           GroupsBinding.embedView({
             slotId: "groups",
             model: workspaceModel.home.groups,
-            viewInputs: { openThread: Option.none(), isBrowsing: false, unsentWith: Option.none() }
+            view: GroupsBlock.makeView((_model, h) => h.empty)
           }).toParentMessage(GroupsBlock.Message.ClickedGroup({ groupId }))
         )
       ),

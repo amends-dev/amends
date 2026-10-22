@@ -38,7 +38,6 @@ import { DialogBinding } from "./composition.ts"
 import {
   type Adding,
   checkSetup,
-  connectionChoices,
   failureMessage,
   findAgentName,
   findCreatedAgent,
@@ -64,6 +63,7 @@ import {
 } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
+import { connectionChoices } from "./view/setupFields.ts"
 
 const { workspace, member: alice } = membership
 const asMember = { workspaceId: workspace.id, memberId: alice.id }

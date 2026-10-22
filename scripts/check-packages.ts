@@ -137,6 +137,20 @@ for await (const path of new Bun.Glob("apps/{icons,ui,app-v2,markdown}/{src,test
   }
   for (const dependency of dependencies) {
     const target = dependency.startsWith(".") ? resolve(root, dirname(path), dependency) : dependency
+    if (
+      /^apps\/app-v2\/src\/feature\/[^/]+\/(block|definition|composition|init|update|command|subscription)\.ts$/.test(
+        path
+      )
+    ) {
+      const isView =
+        target.startsWith(resolve(root, "apps/app-v2/src") + "/") &&
+        (target.includes("/view/") || target.endsWith("/view.ts"))
+      const isDesignRenderer =
+        (dependency === "@amends-dev/design" || dependency.startsWith("@amends-dev/design/")) &&
+        dependency !== "@amends-dev/design/viewport"
+      if (isView || isDesignRenderer)
+        errors.push(`${path}: feature behavior must not import views or design renderers (${dependency}).`)
+    }
     if (path.startsWith("apps/markdown/src/") && !path.endsWith(".test.ts")) {
       const isOwnSource = dependency.startsWith(".") && target.startsWith(resolve(root, "apps/markdown/src") + "/")
       if (!(isOwnSource || dependency === "marked" || dependency === "effect" || dependency.startsWith("effect/")))
@@ -211,6 +225,6 @@ if (errors.length > 0) {
   process.exitCode = 1
 } else {
   console.log(
-    `Checked ${packages.length} shared packages, ${published.length} published packages' lines, icons/ui/markdown/app-data import boundaries, and site styles.`
+    `Checked ${packages.length} shared packages, ${published.length} published packages' lines, icons/ui/markdown/app import boundaries, and site styles.`
   )
 }

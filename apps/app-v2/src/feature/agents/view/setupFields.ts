@@ -5,15 +5,22 @@
  * marked it or the setup shows it already, is marked beside its field.
  */
 
+import type { Integration } from "@amends-dev/connection"
 import type { Agent } from "@amends-dev/core/agent"
+import type { Connection } from "@amends-dev/core/connection"
 import { type Choice, choiceSelect, field, textarea } from "@amends-dev/design/control"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import type * as AgentSetup from "../../../agentSetup.ts"
-import { Integrations, connectionItemsGiving } from "../../../data/connections.ts"
+import {
+  Integrations,
+  connectionItemsGiving,
+  findConnection,
+  findIntegration,
+  areIntegrationsListed
+} from "../../../data/connections.ts"
 import type { AgentsViewBuilder } from "../composition.ts"
 import {
-  connectionChoices,
   listedModelOf,
   Message,
   type Model,
@@ -249,3 +256,53 @@ export const setupFields = (h: AgentsViewBuilder, model: Model, config: SetupFie
     })
   ]
 }
+
+/**
+ * The connections that give `capability` as the choices of a select, each with what `describe` says of its
+ * integration, and, when `current` names one that does not give it, that connection too, listed as unavailable:
+ * a connection the agent names that was removed or whose integration is not installed stays chosen, and says so.
+ */
+export const connectionChoices = (
+  model: Pick<Model, "connections" | "integrations">,
+  capability: Integration.Capability,
+  current: string,
+  describe: (integration: Connection.IntegrationView) => string
+): ReadonlyArray<Choice<string>> => {
+  const giving = connectionItemsGiving(model, capability)
+  const choices = giving.map(({ connection }): Choice<string> => [
+    connection.id,
+    connection.name,
+    Option.match(findIntegration(model, connection.integration), {
+      onNone: () => ({}),
+      onSome: (integration) => ({ description: describe(integration) })
+    })
+  ])
+
+  return current === "" || giving.some(({ connection }) => connection.id === current)
+    ? choices
+    : [...choices, unavailableChoice(model, current)]
+}
+
+/** The connection `connectionId`, which does not give what a select asks for, as a choice that can't be chosen. */
+const unavailableChoice = (model: Pick<Model, "connections" | "integrations">, connectionId: string): Choice<string> =>
+  Option.match(findConnection(model, connectionId), {
+    onNone: () => [
+      connectionId,
+      "Removed connection",
+      { description: "This connection was removed.", isDisabled: true }
+    ],
+    onSome: ({ connection }) => [
+      connectionId,
+      connection.name,
+      {
+        ...(areIntegrationsListed(model)
+          ? {
+              description: Option.isSome(findIntegration(model, connection.integration))
+                ? "Its integration doesn’t give this."
+                : "Its integration isn’t installed on this host."
+            }
+          : {}),
+        isDisabled: true
+      }
+    ]
+  })
