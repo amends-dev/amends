@@ -5,7 +5,7 @@ import { MemberId } from "@amends-dev/core/workspace"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { focusMembersInput } from "../../memberPicker.ts"
+import { focusMembersInput } from "../../control/memberPicker.ts"
 import * as Stores from "../../store/Stores.ts"
 import { admitMembersId, GroupDefinition, Message } from "./definition.ts"
 

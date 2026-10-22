@@ -1,45 +1,13 @@
-/**
- * What a list of tasks is narrowed by besides the letters the person types: where each task stands and whom it is
- * assigned to, each chosen from a menu in the list's toolbar. A group's Tasks tab and the workspace's Triage and Tasks
- * share them.
- */
+/** Labels, marks, and renderers for task filter and assignee menus. */
 
-import { Task } from "@amends-dev/core/task"
-import { type Member, MemberId } from "@amends-dev/core/workspace"
+import type { Task } from "@amends-dev/core/task"
+import type { Member, MemberId } from "@amends-dev/core/workspace"
 import { type ChoiceMenuChoice, choiceMenu, type MenuConfig, type PropertyChoice } from "@amends-dev/design/menu"
-import * as Menu from "@foldkit/ui/menu"
-import * as Schema from "effect/Schema"
 import type { Html, HtmlBuilder } from "foldkit/html"
-import { defineTaggedUnion } from "foldkit/schema"
-import { memberName } from "./data/members.ts"
-import { memberMark } from "./view/members.ts"
-import { statusLabel } from "./view/tasks.ts"
-
-/** Which tasks a list keeps by where they stand: every one, or those in one status. */
-export const TaskStatusFilter = Schema.Literals(["All", ...Task.Status.literals])
-export type TaskStatusFilter = typeof TaskStatusFilter.Type
-
-/**
- * Which tasks a list keeps by who they are assigned to: any, those assigned to no one, or those assigned to one member.
- */
-export const AssigneeFilter = defineTaggedUnion({
-  Anyone: {},
-  Unassigned: {},
-  Member: { memberId: MemberId.MemberId }
-})
-export type AssigneeFilter = typeof AssigneeFilter.Type
-
-/**
- * What the assignee menu reports a choice by: `Anyone`, `Unassigned`, or `Member:` and the member's ID, which no
- * word of the menu can be mistaken for.
- */
-export type AssigneeChoice = "Anyone" | "Unassigned" | `Member:${string}`
-
-/** The menu that chooses the status a list is narrowed to. */
-export const StatusFilterMenu = Menu.create<TaskStatusFilter>()
-
-/** The menu that chooses whom tasks are assigned to: to narrow a list of them, or to assign one. */
-export const AssigneeMenu = Menu.create<AssigneeChoice>()
+import { AssigneeFilter, assigneeChoiceOf, type AssigneeChoice, type TaskStatusFilter } from "../control/taskFilter.ts"
+import { memberName } from "../data/members.ts"
+import { memberMark } from "./members.ts"
+import { statusLabel } from "./tasks.ts"
 
 /** The statuses a list of tasks narrows to: any, then each of `statuses` as the person reads it. */
 export const statusChoices = (
@@ -48,35 +16,6 @@ export const statusChoices = (
   ["All", "Any status"],
   ...statuses.map((status) => [status, statusLabel[status]] as const)
 ]
-
-const memberChoicePrefix = "Member:"
-
-/** What the assignee menu calls the choice of `filter`. */
-export const assigneeChoiceOf = (filter: AssigneeFilter): AssigneeChoice =>
-  AssigneeFilter.match(filter, {
-    Anyone: (): AssigneeChoice => "Anyone",
-    Unassigned: (): AssigneeChoice => "Unassigned",
-    Member: ({ memberId }): AssigneeChoice => `${memberChoicePrefix}${memberId}`
-  })
-
-/** The filter the assignee menu's `choice` stands for. */
-export const assigneeFilterOf = (choice: AssigneeChoice): AssigneeFilter =>
-  choice === "Anyone"
-    ? AssigneeFilter.Anyone()
-    : choice === "Unassigned"
-      ? AssigneeFilter.Unassigned()
-      : AssigneeFilter.Member({ memberId: MemberId.MemberId.make(choice.slice(memberChoicePrefix.length)) })
-
-/**
- * Whom the assignee menu's `choice` assigns a task to: the member it names, or no one. Anyone, which only narrows a
- * list, is not a choice of whom to assign, and assigns no one.
- */
-export const assigneeOfChoice = (choice: AssigneeChoice): MemberId.MemberId | null =>
-  AssigneeFilter.match(assigneeFilterOf(choice), {
-    Anyone: () => null,
-    Unassigned: () => null,
-    Member: ({ memberId }) => memberId
-  })
 
 const byName = (left: Member.Member, right: Member.Member): number =>
   left.name.localeCompare(right.name) || (left.id < right.id ? -1 : 1)
@@ -128,14 +67,6 @@ export const assigneeProperties = (
     ...(assignee === null || listed.some(({ id }) => id === assignee) ? [] : [choiceOf(assignee)])
   ]
 }
-
-/** Whether a task assigned to `assignee` is one `filter` keeps. */
-export const isAssignedTo = (filter: AssigneeFilter, assignee: MemberId.MemberId | null): boolean =>
-  AssigneeFilter.match(filter, {
-    Anyone: () => true,
-    Unassigned: () => assignee === null,
-    Member: ({ memberId }) => assignee === memberId
-  })
 
 /**
  * A menu that narrows a list by `kind`, "Status" or "Assignee": its button says the kind while the choice is

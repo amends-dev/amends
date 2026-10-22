@@ -8,7 +8,7 @@ import { Command, click, expect, given, role, scene, selector, text, within } fr
 import { modifyFields } from "foldkit/struct"
 import { bob, general, membership, scout, task } from "../../../test/fixtures.ts"
 import { chooseFromMenu, closeMenu, openMenu } from "../../../test/menu.ts"
-import { AssigneeMenu } from "../../taskFilter.ts"
+import { AssigneeMenu } from "../../control/taskFilter.ts"
 import { CreateTask, UpdateTask } from "./command.ts"
 import { Message, PriorityMenu, StatusMenu } from "./definition.ts"
 import { init } from "./init.ts"

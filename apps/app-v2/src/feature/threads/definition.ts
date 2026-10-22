@@ -20,10 +20,16 @@ import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
+import {
+  AssigneeFilter,
+  AssigneeMenu,
+  isAssignedTo,
+  StatusFilterMenu,
+  TaskStatusFilter
+} from "../../control/taskFilter.ts"
 import { AgentAtWork } from "../../data/agents.ts"
 import { isOpen } from "../../data/tasks.ts"
 import { threadContains } from "../../data/threads.ts"
-import { AssigneeFilter, AssigneeMenu, isAssignedTo, StatusFilterMenu, TaskStatusFilter } from "../../taskFilter.ts"
 import { isStackedUnder, type Stackable } from "../../view/messages.ts"
 import { type Day, groupByDay } from "../../view/time.ts"
 import { ComposerBlock } from "../composer/block.ts"

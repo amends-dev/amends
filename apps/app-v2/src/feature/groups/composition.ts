@@ -3,7 +3,7 @@ import * as Option from "effect/Option"
 import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
-import { MembersComboboxBlock } from "../../memberPicker.ts"
+import { MembersComboboxBlock } from "../../control/memberPicker.ts"
 import {
   GroupsDefinition,
   type Model,

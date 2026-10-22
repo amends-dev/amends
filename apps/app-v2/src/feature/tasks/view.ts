@@ -7,9 +7,9 @@ import { taskHeadings, taskListEmpty } from "@amends-dev/design/taskList"
 import type * as DateTime from "effect/DateTime"
 import type { Html } from "foldkit/html"
 import { isOpen } from "../../data/tasks.ts"
-import { assigneeFilterMenu, statusChoices, statusFilterMenu } from "../../taskFilter.ts"
-import { noTasksMatch, taskRows } from "../../taskList.ts"
 import { pluralize } from "../../view/counts.ts"
+import { assigneeFilterMenu, statusChoices, statusFilterMenu } from "../../view/taskFilter.ts"
+import { noTasksMatch, taskRows } from "../../view/taskList.ts"
 import { AssigneeBinding, StatusBinding, TasksComposition, type TasksViewBuilder } from "./composition.ts"
 import {
   isFiltered,

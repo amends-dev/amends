@@ -17,9 +17,15 @@ import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { modifyFields } from "foldkit/struct"
+import {
+  AssigneeFilter,
+  AssigneeMenu,
+  isAssignedTo,
+  StatusFilterMenu,
+  TaskStatusFilter
+} from "../../control/taskFilter.ts"
 import { isOpen } from "../../data/tasks.ts"
 import { threadContains } from "../../data/threads.ts"
-import { AssigneeFilter, AssigneeMenu, isAssignedTo, StatusFilterMenu, TaskStatusFilter } from "../../taskFilter.ts"
 
 /**
  * A task, the thread that tracks it with its opening message, the place its group is as a line says it, when the

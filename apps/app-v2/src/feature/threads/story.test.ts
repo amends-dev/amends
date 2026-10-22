@@ -8,16 +8,15 @@ import { Command, expectNoOutMessage, expectOutMessage, given, message, model, s
 import { modifyFields } from "foldkit/struct"
 import { bob, membership, now, opening, saying } from "../../../test/fixtures.ts"
 import { recordingStores } from "../../../test/recordingStores.ts"
-import * as Drafts from "../../store/Drafts.ts"
 import {
   AssigneeFilter,
   AssigneeMenu,
   assigneeChoiceOf,
-  assigneeChoices,
   StatusFilterMenu,
-  statusChoices,
   type TaskStatusFilter
-} from "../../taskFilter.ts"
+} from "../../control/taskFilter.ts"
+import * as Drafts from "../../store/Drafts.ts"
+import { assigneeChoices, statusChoices } from "../../view/taskFilter.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { SaveDraft } from "../composer/command.ts"
 import { ScrollThreadsToEnd, StartThread } from "./command.ts"

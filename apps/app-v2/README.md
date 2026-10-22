@@ -255,6 +255,12 @@ Tests sit beside the data or view module they exercise. The browser store remain
 and obtains plain text from `data/messages.ts`, without importing a design renderer.
 The former `seen.ts` module has been removed; consumers import each helper from its owner.
 
+`control/` holds the shared headless member combobox, task-filter schemas and menus, and
+picker focus behavior. It depends on Foldkit, Effect, shared packages, and app data or controls;
+`bun run check:packages` prevents it from importing design renderers, views, or features.
+`view/memberPicker.ts` and `view/taskFilter.ts` supply the choices, marks, labels, and renderers.
+The shared task list lives in `view/taskList.ts`.
+
 Each `block.ts` exports its completed Block under a name of its own: the assembled value stays
 private as `XBlockValue`, `type XBlockType = typeof XBlockValue` takes its type,
 `interface XBlock extends XBlockType {}` names that, and `XBlock` is the value, declared as the
@@ -396,7 +402,7 @@ across those surfaces.
   Priority, each a quiet menu under its caption, named "Status: Triage", "Assignee: Unassigned", and
   "Priority: No priority". The status shows its drawing (`statusShape`, the design's `taskStatus`),
   and its menu lists the six statuses, each with its drawing; the assignee shows the person's mark
-  and name, or the users icon and "Unassigned", and its menu (`AssigneeMenu`, from `taskFilter.ts`,
+  and name, or the users icon and "Unassigned", and its menu (`AssigneeMenu`, from `control/taskFilter.ts`,
   `assigneeProperties`) lists Unassigned, then each person the task can go to with their mark, and
   the current assignee by name alone when the person could not choose them, such as an agent they may
   not use. Priority is a third menu after Assignee, which `apps/ui`'s task pane has none of; Held and
@@ -541,7 +547,7 @@ across those surfaces.
   `GroupTasks` has it, of a search field, whose label is hidden and whose placeholder says "Search tasks…", beside a
   menu of the status (`StatusFilterMenu`), Any status or one by its name (`statusLabel`), named "Status: Any status",
   and a menu of whom a task is assigned to (`AssigneeMenu`), Anyone, Unassigned, then each member still in the
-  workspace by name with their mark at 22px, named "Assignee: Anyone", both the ones `taskFilter.ts` gives the
+  workspace by name with their mark at 22px, named "Assignee: Anyone", both the ones `control/taskFilter.ts` and `view/taskFilter.ts` gives the
   workspace's Triage and Tasks, whose buttons say Status and Assignee while they narrow to nothing, Unassigned for the
   tasks of no one, and the member's name for theirs, and, at its end, a menu of the order (`TaskSortMenu`), Latest activity, Newest, or Oldest,
   named "Sort: Latest activity", the last two by when the thread was created, and New task, which moves the focus to the composer in the
@@ -551,7 +557,7 @@ across those surfaces.
   has no message for the choice. A line says "Threads that track a task." with how many
   tasks the search, the status, and the assignee leave at its end, "12 tasks", over the labels of the columns, Task,
   Status, Assignee, and Activity, as `apps/ui`'s `GroupTasks` has them, and a row for each task, the design's
-  `taskList` (`taskList.ts`, which `feature/tasks` draws too): the status drawn at 1rem (`statusShape`), the
+  `taskList` (`view/taskList.ts`, which `feature/tasks` draws too): the status drawn at 1rem (`statusShape`), the
   thread's title or its opening's words (`threadWords`), in medium weight and quiet once the task is done or
   dismissed, the word for the status (`statusLabel`), the assignee as a 24px mark and name, or the people icon and
   "Unassigned", and how long ago the thread was last written in (`ageLabel`), or "Sending…" in its place while the
@@ -694,7 +700,7 @@ across those surfaces.
   radio group from `@foldkit/ui/radioGroup` that the Block binds as a child, with what the one chosen means under it,
   "Anyone in the workspace can find this group and join it." or "Only people added to this group can find it."; and
   the members, the design's `memberPicker` over a multi-select combobox from `@foldkit/ui/combobox`
-  (`MembersComboboxBlock` in `src/memberPicker.ts`, which every picker in the app binds). The picker offers the
+  (`MembersComboboxBlock` in `src/control/memberPicker.ts`, which every picker in the app binds). The picker offers the
   workspace's other active members, people and agents, with the person themself locked in it as "You", and a hint under
   it, "You're included automatically. Add others now or later.", which counts them once others are added, "3 members,
   including you.". Picking a member adds them as a chip and keeps the list open for the next; a chip's Remove button, named for the
@@ -915,7 +921,7 @@ across those surfaces.
   choosing from it sets the filter, so the Block has no message for the choice. The toolbar goes on with a line that says "Tasks in triage across your groups." or "Open tasks across your groups."
   with how many tasks the filters leave at its end, "12 tasks", over the labels of the columns,
   Task, Status, Assignee, and Activity, and a row for each, latest active first (`matching`): the same
-  row as the group's Tasks tab has (`taskList.ts`), with the place of the task's group, "#General", in quiet
+  row as the group's Tasks tab has (`view/taskList.ts`), with the place of the task's group, "#General", in quiet
   text after its title, since `apps/ui` has no list of several groups' tasks and this keeps its columns as they are,
   and "#General · To do · Alice · 10m ago" as its description. No row is drawn current, since opening a task opens its
   group, where the list is not shown. The
@@ -1583,19 +1589,18 @@ whichever agents they are of, which the sidebar's group rows move the logo as.
 feature's section and the groups feature's direct messages: `statusOfAgent` makes the patch on its mark (Needs setup,
 with `issueSentence` of the first thing in the way, or where it is at work, and nothing for an idle agent or one still
 on its way), and `sidebarActivity` the words and motion of its logo.
-`taskList.ts`, tasks as the design's `taskList`, with the status of each drawn and the assignee named, is the threads
+`view/taskList.ts`, tasks as the design's `taskList`, with the status of each drawn and the assignee named, is the threads
 feature's Tasks tab's and the tasks feature's, which adds the place of the group after each title, and holds the words
 the two say where the filters leave none (`noTasksMatch`).
-`taskFilter.ts`, what a list of tasks is narrowed to besides the letters typed, the status and the assignee, each
+`control/taskFilter.ts` and `view/taskFilter.ts`, what a list of tasks is narrowed to besides the letters typed, the status and the assignee, each
 chosen from a menu, is theirs too. The assignee is an `AssigneeFilter`: `Anyone`, `Unassigned`, or `Member` with the
 member's ID. The menu reports a choice as a string, `Anyone`, `Unassigned`, or `Member:` and the ID
 (`assigneeChoiceOf`, `assigneeFilterOf`), and `assigneeChoices` lists the members still in the workspace, by name, with
 the mark `view/members.ts` gives them (`memberMark`: their initials, lilac for an agent).
-`memberPicker.ts`, the choice of several workspace members over the design's `memberPicker`, is the Create group form's
-and the group settings' Add members: it holds the combobox Block every picker binds (`MembersComboboxBlock`), the members as the picker offers them, with
-their name, mark, and whether they are a person or an agent (`pickerPeople`), the person themself locked as "You"
-(`youInPicker`), the line under the field that counts who is in (`includedHint`), and the focus a picker takes back
-after a chip is removed (`focusMembersInput`).
+`control/memberPicker.ts` owns the combobox every picker binds (`MembersComboboxBlock`) and the focus
+it takes back after a chip is removed (`focusMembersInput`). `view/memberPicker.ts` supplies the Create group
+form and the group settings' Add members with the people as the picker offers them: their names, marks,
+and kind (`pickerPeople`), the person locked as "You" (`youInPicker`), and the count line (`includedHint`).
 
 ## The store
 

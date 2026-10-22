@@ -158,6 +158,25 @@ for await (const path of new Bun.Glob("apps/{icons,ui,app-v2,markdown}/{src,test
           `${path}: app data must depend only on shared packages, Markdown, Effect, and other data modules (${dependency}).`
         )
     }
+    if (path.startsWith("apps/app-v2/src/control/") && !path.endsWith(".test.ts")) {
+      const packageName = dependency.split("/").slice(0, 2).join("/")
+      const isLocalControlOrData =
+        dependency.startsWith(".") &&
+        ["control", "data"].some((folder) => target.startsWith(resolve(root, `apps/app-v2/src/${folder}`) + "/"))
+      if (
+        !(
+          isLocalControlOrData ||
+          dependency === "effect" ||
+          dependency.startsWith("effect/") ||
+          dependency === "foldkit" ||
+          dependency.startsWith("foldkit/") ||
+          dependency === "@foldkit/ui" ||
+          dependency.startsWith("@foldkit/ui/") ||
+          sharedNames.has(packageName)
+        )
+      )
+        errors.push(`${path}: app controls must not depend on design renderers, views, or features (${dependency}).`)
+    }
     const iconImport = dependency === "@amends-dev/icons" || dependency.startsWith("@amends-dev/icons/")
     if (
       path.startsWith("apps/icons/src/") &&

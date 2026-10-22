@@ -34,7 +34,7 @@ import {
   thread
 } from "../../../test/fixtures.ts"
 import { chooseFromMenu, chooseMenuItem, openMenu } from "../../../test/menu.ts"
-import { AssigneeFilter, AssigneeMenu, StatusFilterMenu } from "../../taskFilter.ts"
+import { AssigneeFilter, AssigneeMenu, StatusFilterMenu } from "../../control/taskFilter.ts"
 import { OutMessage, type TaskItem } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"

@@ -7,7 +7,7 @@ import { DateTime, Option } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import { modifyFields } from "foldkit/struct"
 import { bob, membership, now, opening, saying, task, thread } from "../../../test/fixtures.ts"
-import { AssigneeFilter } from "../../taskFilter.ts"
+import { AssigneeFilter } from "../../control/taskFilter.ts"
 import {
   isFiltered,
   matching,
