@@ -298,7 +298,7 @@ const fromConnections = (message: typeof ConnectionsBlock.Message.Type) =>
   ConnectionsBinding.embedView({
     slotId: "connections",
     model: opened.connections,
-    viewInputs: { workspaceName: "Studio", viewport: "Desktop" }
+    view: ConnectionsBlock.makeView((_model, h) => h.empty)
   }).toParentMessage(message)
 
 /** What the agents report, as the workspace receives it. */

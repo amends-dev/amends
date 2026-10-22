@@ -260,15 +260,19 @@ would work through the whole structure of the Block and of everything it binds a
 named contracts alongside the declaration patches described above; removing one requires checking
 the complete app, including the workspace's sibling policies.
 
-The composer is the first feature whose Block is assembled without a default view. Its
-`definition.ts` holds the definition and its empty composition, and `block.ts` assembles init,
-update, commands, and subscriptions without importing the view. `view.ts` uses
-`ComposerBlock.makeView` and the design's renderer. The thread, thread list, and unsent conversation
-select that view explicitly with `Binding.embedView({ view, ... })`. The profile card follows the
-same boundary: Home selects its view, and its model keeps agent readiness and activity rather
-than status wording or logo motions. Its view chooses those through `view/agents.ts`. Other
-features still assemble their default views; they have not yet adopted this boundary. The composer remains a browser
-feature: it uses viewport and selection behavior and the existing shared store services.
+The composer, profile card, and connections Blocks assemble without default views. Their
+`block.ts` files assemble behavior without importing a view. Views use the completed Block's
+`makeView`, and parents select them explicitly with `Binding.embedView({ view, ... })`. The
+composer's `definition.ts` also holds its empty composition. The profile card keeps agent
+readiness and activity in its model; its view chooses status wording and logo motions through
+`view/agents.ts`. These remain browser features with commands, mounts, and store subscriptions.
+Other features still assemble their default views; they have not yet adopted this boundary.
+
+A feature with several surfaces keeps them under `view/`. Connections has `sidebar.ts`,
+`list.ts`, `detail.ts`, and `dialog.ts`, each authored through `ConnectionsBlock.makeView`.
+The workspace imports the surface it embeds directly. Shared error displays live in
+`view/feedback.ts`, and the detail page and dialog share `view/settingsFields.ts`. The feature
+keeps one state machine and one dialog binding across those surfaces.
 
 - `feature/composer`: what the person writes at a place, a reply in a thread, a new thread in a
   group, or the first message of a conversation not yet started, kept as a draft in their browser until they send it. It reports what it sends, and that

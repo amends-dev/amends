@@ -12,12 +12,10 @@ import {
   sidebarView as agentsSidebarView,
   view as agentsView
 } from "../../feature/agents/view.ts"
-import {
-  connectionView,
-  dialogView as connectionsDialogView,
-  sidebarView as connectionsSidebarView,
-  view as connectionsView
-} from "../../feature/connections/view.ts"
+import { connectionView } from "../../feature/connections/view/detail.ts"
+import { dialogView as connectionsDialogView } from "../../feature/connections/view/dialog.ts"
+import { view as connectionsView } from "../../feature/connections/view/list.ts"
+import { sidebarView as connectionsSidebarView } from "../../feature/connections/view/sidebar.ts"
 import {
   accountView as settingsAccountView,
   dialogView as settingsDialogView,
