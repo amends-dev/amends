@@ -1817,7 +1817,7 @@ describe("a workspace", () => {
       expect(role("main", { name: "Workspace" })).toBeAbsent(),
       ...openMenu(AccountMenu, accountButton),
       click(role("menuitem", { name: "Workspace settings" })),
-      expectNoOutMessage(),
+      expectOutMessage(OutMessage.Navigated()),
       ...acknowledgeMenuClosed(AccountMenu),
       expect(role("menu")).toBeAbsent(),
       expect(role("main", { name: "Workspace" })).toExist(),

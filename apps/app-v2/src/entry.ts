@@ -8,6 +8,7 @@ import { EffectsLayer } from "./command.ts"
 import { ApplicationComposition } from "./composition.ts"
 import { Flags, flags } from "./flags.ts"
 import { init } from "./init.ts"
+import { Message } from "./message.ts"
 import { ApplicationLayer } from "./services.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
@@ -22,6 +23,10 @@ const application = ApplicationComposition.assembleApplication({
   EffectsLayer: Layer.mergeAll(EffectsLayer, subscriptions.layer),
   Flags,
   container: document.getElementById("root"),
+  routing: {
+    onUrlRequest: (request) => Message.ClickedLink({ request }),
+    onUrlChange: (url) => Message.ChangedUrl({ url })
+  },
   crash: { view: crashView },
   devTools: { Message: ApplicationComposition.Message }
 })

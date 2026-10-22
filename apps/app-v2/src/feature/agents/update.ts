@@ -167,7 +167,8 @@ export const update = AgentsComposition.makeUpdate((model, message) => {
         : { model },
     ClickedBrowse: () => ({ model, outMessage: OutMessage.RequestedBrowse() }),
     ChoseBrowseTab: ({ tab }) => ({
-      model: modifyFields(model, { browse: (browse) => modifyFields(browse, { tab: () => tab }) })
+      model: modifyFields(model, { browse: (browse) => modifyFields(browse, { tab: () => tab }) }),
+      outMessage: OutMessage.RequestedBrowse()
     }),
     TypedBrowseQuery: ({ query }) => ({
       model: modifyFields(model, { browse: (browse) => modifyFields(browse, { query: () => query }) })

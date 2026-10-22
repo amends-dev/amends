@@ -33,7 +33,9 @@ sign-in and credential-storage configuration.
 [Vite](vite.config.ts) proxies `/api`, including WebSocket connections, to `http://127.0.0.1:8787`
 and removes the `/api` prefix. The app uses `VITE_AMENDS_API_URL` when supplied at build time,
 otherwise `${window.location.origin}/api`. A deployment using the default must serve the API and
-sync WebSocket at that prefix.
+sync WebSocket at that prefix. It must also serve the app’s `index.html` for destination paths
+under `/workspaces/` (and unknown app paths), so a refresh or direct link can boot the app.
+Vite supplies this fallback during development.
 
 ```sh
 bun run --filter @amends-dev/app-v2 build
@@ -45,8 +47,33 @@ The build writes `apps/app-v2/dist`. It currently reports Vite's large-chunk war
 
 The root composes sign-in, the workspace picker, and the open workspace. The workspace page owns
 its rail destinations; Home composes the inbox, triage, tasks, groups, and an open conversation.
-Navigation currently lives in model state. Reloading with a kept session starts at the
-workspace picker.
+[Routes](src/route.ts) describe durable destinations independently of loaded feature models.
+The root uses Foldkit’s URL events and history commands; Workspace and Home restore selections
+through their child operations. Navigation reports from those pages record one history entry,
+and a URL event restores the destination without recording another.
+
+`/` opens the workspace picker. `/workspaces/:workspaceId/` accepts these destinations:
+
+| Path                                                         | Selection                                                                                                                   |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `inbox`                                                      | Unread activity; `?tab=all` selects All. An open notification retains its notification, group, and thread IDs in the query. |
+| `triage`, `tasks`, `groups`                                  | Home’s lists.                                                                                                               |
+| `groups/:groupId`                                            | A group; append `/threads/:threadId` to open its thread.                                                                    |
+| `conversations/new?member=:memberId`                         | A conversation before its first message; repeat `member` for multiple recipients.                                           |
+| `agents`, `agents/:agentId`                                  | Browse or open an agent; `?tab=needs-setup` selects the filtered list.                                                      |
+| `connections`, `connections/:connectionId`                   | Browse or open a connection; `?tab=models` (or another capability) selects a list tab.                                      |
+| `channels`                                                   | The workspace’s channels.                                                                                                   |
+| `settings`, `settings/members`, `settings/members/:memberId` | Workspace settings, members, and an open member.                                                                            |
+
+IDs are encoded as path segments or query values. A bare workspace URL opens its inbox.
+Search text, task filters, dialogs, form drafts, and turn logs remain local UI state.
+
+A deep link survives sign-in. The root resolves membership through the account’s HTTP workspace
+list before opening a store, applying the latest destination if navigation changed during that
+request. Unknown paths show Page not found; missing membership shows Workspace unavailable;
+an unreachable host offers retry while keeping the destination. Session expiry keeps that
+intent, while explicit sign-out replaces the current URL with `/`. Refresh and browser
+Back/Forward restore these same destinations.
 
 | Location            | Responsibility                                                                                           |
 | ------------------- | -------------------------------------------------------------------------------------------------------- |
@@ -163,7 +190,9 @@ also keeps an HTTP retry key until the form changes.
 An open store can read cached records and accept supported actions offline. Sign-in, the workspace
 picker, creating/joining workspaces, integration/model discovery, connection creation and key
 replacement/checks, and turn-log streaming require the host. A reload does not currently reopen
-a cached workspace directly because navigation starts at the HTTP-backed picker.
+a cached workspace while the host is unreachable: URL restoration still needs the HTTP directory
+to resolve the account’s workspace membership. Once open, navigation within that workspace uses
+the existing store.
 
 Sync reconnects in the background using a fresh remote after a disconnection. Presence and typing
 are live, not persisted replica data. Drafts stay in this browser and are not synced to another
@@ -212,6 +241,8 @@ bun run --filter @amends-dev/design build
 controls, and queries, with shared fixtures and integration suites under `test/`:
 
 - Stories check messages, models, commands, and outgoing messages.
+- Route tests cover encoded IDs, invalid paths, restoration after sign-in, late directory results,
+  keyed workspace isolation, and history changes without navigation loops.
 - Scenes check rendered HTML, interactions, focus, and accessibility attributes in happy-dom.
 - Command tests exercise API responses and failure handling. Store integration tests use an
   in-process HTTP/sync host and fake-indexeddb, including offline writes, reconnects, and rejections.
@@ -230,12 +261,12 @@ The [original rebuild PR](https://github.com/amends-dev/amends/pull/50) records 
 audit. The structural cleanup on this branch separates behavior, presentation, and store queries;
 it does not implement the following product work:
 
-| Area                     | Current gap                                                                                                                                                                         |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| URL navigation           | No destination URLs, deep links, or browser back/forward integration. Route-specific NotFound and WorkspaceUnavailable flows remain to be built. This is the next recommended step. |
-| Groups                   | No public-group preview before joining, or visibility changes after creation.                                                                                                       |
-| Other workspace features | Reactions, a Files tab, notification preferences, and task keys are not implemented in the app. Establish the supporting contracts before adding their UI.                          |
-| Original discussion      | Core accepts `Thread.origin` and the pending-action projection preserves it; the app has no flow that supplies it or links back to that discussion.                                 |
-| Turn logs                | No reply-draft phase/card. A failed HTTP log stream offers Try again rather than automatically reconnecting with a reconnecting state.                                              |
-| Rich-text editing        | WYSIWYG editing is a product/integration decision. The current toolbar edits Markdown; it has no active-format state or link-address dialog.                                        |
-| Foldkit upgrade          | The local preview patch and named Block interfaces remain necessary for this pinned build; an upstream replacement needs explicit verification.                                     |
+| Area                     | Current gap                                                                                                                                                |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Navigation controls      | Destination changes have URLs; the existing navigation controls still render as buttons. Link semantics and modified-click behavior are a follow-up.       |
+| Groups                   | No public-group preview before joining, or visibility changes after creation.                                                                              |
+| Other workspace features | Reactions, a Files tab, notification preferences, and task keys are not implemented in the app. Establish the supporting contracts before adding their UI. |
+| Original discussion      | Core accepts `Thread.origin` and the pending-action projection preserves it; the app has no flow that supplies it or links back to that discussion.        |
+| Turn logs                | No reply-draft phase/card. A failed HTTP log stream offers Try again rather than automatically reconnecting with a reconnecting state.                     |
+| Rich-text editing        | WYSIWYG editing is a product/integration decision. The current toolbar edits Markdown; it has no active-format state or link-address dialog.               |
+| Foldkit upgrade          | The local preview patch and named Block interfaces remain necessary for this pinned build; an upstream replacement needs explicit verification.            |

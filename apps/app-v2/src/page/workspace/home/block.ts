@@ -9,6 +9,7 @@ const HomeBlockValue = HomeComposition.assembleBlock({
   update,
   view,
   operations: {
+    requestDestination: Message.RequestedDestination,
     requestReset: Message.RequestedReset,
     requestOpenGroup: Message.RequestedOpenGroup,
     requestOpenThread: Message.RequestedOpenThread,

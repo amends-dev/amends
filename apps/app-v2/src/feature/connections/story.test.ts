@@ -251,7 +251,7 @@ describe("the connections", () => {
         expect(model.browse).toEqual({ tab: "tools", query: "" })
         expect(shownConnections(model).map(({ connection }) => connection.name)).toEqual(["Search"])
       }),
-      expectNoOutMessage(),
+      expectOutMessage(OutMessage.RequestedBrowse()),
       Command.expectNone()
     )
   })

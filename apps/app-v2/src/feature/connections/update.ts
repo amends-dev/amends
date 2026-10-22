@@ -331,7 +331,8 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
     ConfirmedRemoval: () => submitRemoval(model),
     CompletedFocusField: () => ({ model }),
     ChoseBrowseTab: ({ tab }) => ({
-      model: modifyFields(model, { browse: () => ({ tab, query: "" }) })
+      model: modifyFields(model, { browse: () => ({ tab, query: "" }) }),
+      outMessage: OutMessage.RequestedBrowse()
     }),
     TypedBrowseQuery: ({ query }) => ({
       model: modifyFields(model, { browse: (browse) => modifyFields(browse, { query: () => query }) })

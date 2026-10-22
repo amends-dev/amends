@@ -30,7 +30,7 @@ import {
   thread
 } from "../test/fixtures.ts"
 import { chooseMenuItem, openMenu } from "../test/menu.ts"
-import { KeepAppearance, ShowAppearance, SignOut } from "./command.ts"
+import { KeepAppearance, ShowAppearance, SignOut, Navigate } from "./command.ts"
 import { GroupBlock } from "./feature/group/block.ts"
 import { AccountMenu } from "./feature/settings/definition.ts"
 import { Message } from "./message.ts"
@@ -41,12 +41,14 @@ import { WorkspaceBlock } from "./page/workspace/block.ts"
 import { Open as HomeOpen } from "./page/workspace/home/definition.ts"
 import { WorkspacesBlock } from "./page/workspaces/block.ts"
 import { Workspaces } from "./page/workspaces/definition.ts"
+import { Route } from "./route.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
 const signedOut: Model = {
   page: Page.SignedOut({ signIn: SignInBlock.init("").model }),
+  route: Route.Workspaces(),
   appearance: "System",
   viewport: "Split",
   now,
@@ -65,6 +67,7 @@ const choosing: Model = {
     }),
     workspace: Option.none()
   }),
+  route: Route.Workspaces(),
   appearance: "System",
   viewport: "Split",
   now,
@@ -94,6 +97,7 @@ const inWorkspace: Model = {
         .model
     })
   }),
+  route: Route.Workspaces(),
   appearance: "System",
   viewport: "Split",
   now,
@@ -230,7 +234,8 @@ describe("the app", () => {
       { update, view },
       given(choosing),
       click(within(role("banner"), role("button", { name: "Sign out" }))),
-      Command.expectExact(SignOut()),
+      Command.expectExact(SignOut(), Navigate({ url: "/", replace: true })),
+      Command.resolve(Navigate, Message.CompletedNavigation()),
       Command.resolve(SignOut, Message.CompletedSignOut()),
       expect(role("heading", { name: "Sign in to amends" })).toExist(),
       expect(label("Email")).toHaveValue("alice@example.com")
@@ -324,7 +329,8 @@ describe("the app", () => {
       given(inWorkspace),
       ...openMenu(AccountMenu, accountButton),
       ...chooseMenuItem(AccountMenu, "Sign out"),
-      Command.expectExact(SignOut()),
+      Command.expectExact(SignOut(), Navigate({ url: "/", replace: true })),
+      Command.resolve(Navigate, Message.CompletedNavigation()),
       Command.resolve(SignOut, Message.CompletedSignOut()),
       expect(role("heading", { name: "Sign in to amends" })).toExist(),
       expect(label("Email")).toHaveValue("alice@example.com")
@@ -377,6 +383,7 @@ describe("the app", () => {
       expect(role("main", { name: "Workspace" })).toBeAbsent(),
       ...openMenu(AccountMenu, accountButton),
       ...chooseMenuItem(AccountMenu, "Workspace settings"),
+      Command.resolve(Navigate, Message.CompletedNavigation()),
       expect(role("main", { name: "Workspace" })).toExist(),
       expect(within(role("navigation", { name: "Studio" }), role("button", { name: "Workspace" }))).toHaveAttr(
         "aria-current",

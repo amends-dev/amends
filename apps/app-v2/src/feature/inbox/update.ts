@@ -37,7 +37,12 @@ export const update = InboxComposition.makeUpdate((model, message) => {
     ClickedTryAgain: () => ({
       model: modifyFields(model, { notice: () => Option.none(), reads: (reads) => reads + 1 })
     }),
-    ChoseTab: ({ tab }) => ({ model: modifyFields(model, { tab: () => tab }) }),
+    ChoseTab: ({ tab }) => ({ model: modifyFields(model, { tab: () => tab }), outMessage: OutMessage.ChangedTab() }),
+    RequestedTab: ({ tab }) => ({ model: modifyFields(model, { tab: () => tab, selected: () => Option.none() }) }),
+    RequestedSelection: ({ tab, notificationId, groupId, threadId }) =>
+      Update.combine(modifyFields(model, { tab: () => tab }), [
+        selectNotification(notificationId, groupId, threadId, messageOfNotification(model, notificationId))
+      ]),
     ClickedShowOlder: () => ({ model: modifyFields(model, { shown: (shown) => shown + pageSize }) }),
     ClickedOpen: ({ notificationId }) =>
       Option.match(threadOfNotification(model, notificationId), {

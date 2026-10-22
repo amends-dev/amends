@@ -35,6 +35,7 @@ import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { ReportedAccountEntry, workspaceName } from "../../feature/settings/definition.ts"
+import { Destination } from "../../route.ts"
 import { HomeBlock } from "./home/block.ts"
 
 /** The pages of the settings, each of which the sidebar lists: the workspace's own, and its members. */
@@ -121,6 +122,7 @@ export const Message = defineMessageUnion({
   ClickedMenu: {},
   ClickedSearch: {},
   RequestedSearch: {},
+  RequestedDestination: { destination: Destination },
   InformedOfViewport: { viewport: Viewport },
   ReceivedIntegrations: { integrations: Schema.Array(Connection.IntegrationView) },
   FailedLoadIntegrations: { error: Schema.String }
@@ -129,6 +131,7 @@ export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
   ClosedWorkspace: {},
+  Navigated: {},
   ChoseAccountEntry: { entry: AppAccountEntry }
 })
 export type OutMessage = typeof OutMessage.Type

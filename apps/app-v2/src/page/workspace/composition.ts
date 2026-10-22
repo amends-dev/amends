@@ -21,6 +21,7 @@ import { SearchBlock } from "../../feature/search/block.ts"
 import type { Destination } from "../../feature/search/definition.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { settingsToast } from "../../feature/settings/view/wording.ts"
+import { Destination as WorkspaceDestination } from "../../route.ts"
 import { LoadIntegrations } from "./command.ts"
 import { AppAccountEntry, type Model, Open, OutMessage, type SettingsPage, WorkspaceDefinition } from "./definition.ts"
 import { HomeBlock } from "./home/block.ts"
@@ -247,7 +248,14 @@ export const MenuBinding = WorkspaceDefinition.bindChild(DialogBlock, {
 export const AsideBinding = WorkspaceDefinition.bindChild(DialogBlock, {
   field: "aside",
   init: { contextToArgs: () => [{ id: "workspace-aside" }] },
-  outMessage: { fold: foldAsideOutMessage }
+  outMessage: {
+    fold: foldAsideOutMessage,
+    forward: DialogBlock.OutMessage.match({
+      Opened: () => undefined,
+      Closed: () => OutMessage.Navigated(),
+      CompletedClose: () => undefined
+    })
+  }
 })
 
 /** Open the side pane's dialog, where the window's width puts the side pane in one. */
@@ -266,31 +274,69 @@ const foldActionsOutMessage = ActionsBlock.OutMessage.match({
 export const ActionsBinding = WorkspaceDefinition.bindChild(ActionsBlock, {
   field: "actions",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { fold: foldActionsOutMessage }
+  outMessage: { fold: foldActionsOutMessage, forward: () => OutMessage.Navigated() }
 })
 
 export const SearchBinding = WorkspaceDefinition.bindChild(SearchBlock, {
   field: "search",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { fold: foldSearchOutMessage }
+  outMessage: { fold: foldSearchOutMessage, forward: () => OutMessage.Navigated() }
 })
 
 export const HomeBinding = WorkspaceDefinition.bindChild(HomeBlock, {
   field: "home",
   init: { contextToArgs: ({ workspaceId, memberId, viewport }) => [workspaceId, memberId, viewport] },
-  outMessage: { fold: foldHomeOutMessage }
+  outMessage: {
+    fold: foldHomeOutMessage,
+    forward: HomeBlock.OutMessage.match({
+      Navigated: () => OutMessage.Navigated(),
+      CreatedGroup: () => OutMessage.Navigated(),
+      OpenedAgent: () => OutMessage.Navigated(),
+      JoinedGroup: () => undefined,
+      OpenedPerson: () => undefined,
+      RequestedNameChange: () => undefined,
+      FollowedGroup: () => undefined,
+      UnfollowedGroup: () => undefined,
+      RequestedSearch: () => undefined
+    })
+  }
 })
 
 export const ConnectionsBinding = WorkspaceDefinition.bindChild(ConnectionsBlock, {
   field: "connections",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { fold: foldConnectionsOutMessage }
+  outMessage: {
+    fold: foldConnectionsOutMessage,
+    forward: ConnectionsBlock.OutMessage.match({
+      RequestedBrowse: () => OutMessage.Navigated(),
+      OpenedConnection: () => OutMessage.Navigated(),
+      RequestedChannels: () => OutMessage.Navigated(),
+      CreatedConnection: () => OutMessage.Navigated(),
+      RemovedConnection: () => OutMessage.Navigated(),
+      RequestedIntegrations: () => undefined,
+      SavedName: () => undefined,
+      SavedSettings: () => undefined,
+      ReplacedKey: () => undefined
+    })
+  }
 })
 
 export const AgentsBinding = WorkspaceDefinition.bindChild(AgentsBlock, {
   field: "agents",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { fold: foldAgentsOutMessage }
+  outMessage: {
+    fold: foldAgentsOutMessage,
+    forward: AgentsBlock.OutMessage.match({
+      RequestedBrowse: () => OutMessage.Navigated(),
+      OpenedAgent: () => OutMessage.Navigated(),
+      OpenedThread: () => OutMessage.Navigated(),
+      CreatedAgent: () => OutMessage.Navigated(),
+      RemovedAgent: () => OutMessage.Navigated(),
+      RequestedIntegrations: () => undefined,
+      SavedName: () => undefined,
+      SavedSetup: () => undefined
+    })
+  }
 })
 
 export const SettingsBinding = WorkspaceDefinition.bindChild(SettingsBlock, {
@@ -299,17 +345,17 @@ export const SettingsBinding = WorkspaceDefinition.bindChild(SettingsBlock, {
   outMessage: {
     /** The entries of the account menu that the app acts on are reported to it. */
     forward: SettingsBlock.OutMessage.match({
-      OpenedMember: () => undefined,
-      ClosedMember: () => undefined,
+      OpenedMember: () => OutMessage.Navigated(),
+      ClosedMember: () => OutMessage.Navigated(),
       RenamedWorkspace: () => undefined,
       RenamedSelf: () => undefined,
       ChangedRole: () => undefined,
-      RemovedMember: () => undefined,
+      RemovedMember: () => OutMessage.Navigated(),
       TransferredOwnership: () => undefined,
       InvitedMember: () => undefined,
       RevokedInvitation: () => undefined,
       ChoseAccountEntry: ({ entry }) =>
-        Schema.is(AppAccountEntry)(entry) ? OutMessage.ChoseAccountEntry({ entry }) : undefined
+        Schema.is(AppAccountEntry)(entry) ? OutMessage.ChoseAccountEntry({ entry }) : OutMessage.Navigated()
     }),
     fold: foldSettingsOutMessage
   }
@@ -320,6 +366,28 @@ export const ChannelsBinding = WorkspaceDefinition.bindChild(ChannelsBlock, {
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
   outMessage: { fold: ChannelsBlock.OutMessage.match({ RequestedIntegrations: () => loadIntegrationsAgain }) }
 })
+
+/** Restore a destination through the same child operations used by visible navigation. */
+export const showDestination = (destination: WorkspaceDestination) =>
+  WorkspaceDestination.match(destination, {
+    Home: ({ destination }) =>
+      Update.combine([
+        MenuBinding.requestClose(),
+        hideAside,
+        showHome,
+        HomeBinding.requestDestination({ destination })
+      ]),
+    Connections: ({ tab }) => Update.combine([goTo(showConnections), ConnectionsBinding.requestBrowseTab({ tab })]),
+    Connection: ({ connectionId }) => goTo(showConnection(connectionId)),
+    Agents: ({ tab }) => Update.combine([goTo(showAgents), AgentsBinding.requestBrowseTab({ tab })]),
+    Agent: ({ agentId }) => goTo(showAgent(agentId)),
+    Settings: ({ page, memberId }) =>
+      Update.combine([
+        goTo(showSettings(page)),
+        ...Option.toArray(Option.map(memberId, (id) => Update.combine([openMember(id), showAside])))
+      ]),
+    Channels: () => goTo(showChannels)
+  })
 
 export const WorkspaceComposition = WorkspaceDefinition.makeComposition({
   bindings: [

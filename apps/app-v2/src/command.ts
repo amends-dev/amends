@@ -8,6 +8,8 @@
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
+import * as Navigation from "foldkit/navigation"
 import * as Api from "./api.ts"
 import { Appearance, keepAppearance, showAppearance } from "./appearance.ts"
 import { ApplicationDefinition } from "./definition.ts"
@@ -59,4 +61,42 @@ export const KeepAppearance = ApplicationDefinition.command("KeepAppearance", {
   }
 })
 
-export const EffectsLayer = Layer.mergeAll(SignOut.layer, ShowAppearance.layer, KeepAppearance.layer)
+export const Navigate = ApplicationDefinition.command("Navigate", {
+  args: { url: Schema.String, replace: Schema.Boolean },
+  messages: [Message.CompletedNavigation],
+  handler: function* () {
+    return ({ url, replace }) =>
+      Effect.gen(function* () {
+        if (replace) yield* Navigation.replaceUrl(url)
+        else yield* Navigation.pushUrl(url)
+        yield* Effect.sync(() => {
+          const hash = new URL(url, window.location.href).hash
+          if (hash === "") return
+          try {
+            const target = document.getElementById(decodeURIComponent(hash.slice(1)))
+            target?.focus()
+            target?.scrollIntoView()
+          } catch {
+            /* A malformed fragment has no target. */
+          }
+        })
+        return Message.CompletedNavigation()
+      })
+  }
+})
+
+export const LoadExternal = ApplicationDefinition.command("LoadExternal", {
+  args: { href: Schema.String },
+  messages: [Message.CompletedNavigation],
+  handler: function* () {
+    return ({ href }) => Navigation.load(href).pipe(Effect.as(Message.CompletedNavigation()))
+  }
+})
+
+export const EffectsLayer = Layer.mergeAll(
+  SignOut.layer,
+  ShowAppearance.layer,
+  KeepAppearance.layer,
+  Navigate.layer,
+  LoadExternal.layer
+)

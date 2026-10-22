@@ -91,6 +91,13 @@ export const Message = defineMessageUnion({
   OpenedProfile: { memberId: Schema.String, triggerId: Schema.String },
   ClickedMarkAllSeen: {},
   RequestedCloseThread: {},
+  RequestedSelection: {
+    tab: Tab,
+    notificationId: Notification.NotificationId,
+    groupId: GroupId.GroupId,
+    threadId: ThreadId.ThreadId
+  },
+  RequestedTab: { tab: Tab },
   WroteAction: {},
   FailedWriteAction: { error: Schema.String },
   WroteAllSeen: {},
@@ -99,6 +106,7 @@ export const Message = defineMessageUnion({
 export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
+  ChangedTab: {},
   OpenedThread: {},
   ClosedThread: {},
   OpenedAgent: { agentId: Identity.AgentId },

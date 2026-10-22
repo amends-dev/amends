@@ -4,18 +4,23 @@
  */
 
 import { WorkspaceId } from "@amends-dev/core/workspace"
+import type * as WorkspaceDirectory from "@amends-dev/gateway/WorkspaceDirectory"
 import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
+import * as Update from "foldkit/update"
 import type { Appearance } from "./appearance.ts"
-import { KeepAppearance, ShowAppearance, SignOut } from "./command.ts"
+import { KeepAppearance, ShowAppearance, SignOut, Navigate } from "./command.ts"
 import { ApplicationDefinition } from "./definition.ts"
 import { type Model, Page } from "./model.ts"
 import { SignInBlock } from "./page/signIn/block.ts"
 import { WorkspaceBlock } from "./page/workspace/block.ts"
 import type { AppAccountEntry } from "./page/workspace/definition.ts"
+import { destinationOf } from "./page/workspace/navigation.ts"
 import { WorkspacesBlock } from "./page/workspaces/block.ts"
+import { Workspaces } from "./page/workspaces/definition.ts"
+import { type Destination, Route, href, home, destinationPath, sameRoute } from "./route.ts"
 
 type SignedIn = Extract<Page, { readonly _tag: "SignedIn" }>
 
@@ -54,8 +59,12 @@ const signOutWithNotice = (notice: string | undefined) =>
   ApplicationDefinition.step((model: Model) =>
     SignInBinding.init({
       args: [Page.matchOrElse(model.page, { SignedIn: ({ account }) => account.email }, () => ""), notice],
-      toParentModel: (signIn) => modifyFields(model, { page: () => Page.SignedOut({ signIn }) }),
-      commands: [SignOut()]
+      toParentModel: (signIn) =>
+        modifyFields(model, {
+          page: () => Page.SignedOut({ signIn }),
+          route: (route) => (notice === undefined ? Route.Workspaces() : route)
+        }),
+      commands: [SignOut(), ...(notice === undefined ? [Navigate({ url: "/", replace: true })] : [])]
     })
   )
 
@@ -67,9 +76,9 @@ export const signOut = signOutWithNotice(undefined)
 /** A session the host no longer knows ends as signing out does, and says so over the form. */
 export const endSession = signOutWithNotice("Your session has ended. Sign in again.")
 
-const foldWorkspacesOutMessage = WorkspacesBlock.OutMessage.match({
-  EndedSession: () => endSession,
-  OpenedWorkspace: ({ membership }) =>
+/** Open only a workspace the directory resolved for this account. */
+const openWorkspace = (membership: WorkspaceDirectory.Membership, destination: Destination) =>
+  Update.combine([
     ApplicationDefinition.step((model: Model) =>
       WorkspaceBinding.init({
         key: membership.workspace.id,
@@ -81,7 +90,48 @@ const foldWorkspacesOutMessage = WorkspacesBlock.OutMessage.match({
             })
           )
       })
-    )
+    ),
+    WorkspaceBinding.requestDestination(membership.workspace.id, { destination })
+  ])
+
+/** Apply the latest URL, including when a directory request started for an older one. */
+export const restoreRoute = ApplicationDefinition.step((model: Model) => {
+  if (!Route.isAnyOf(["Workspace"])(model.route) || !Page.isAnyOf(["SignedIn"])(model.page))
+    return ApplicationDefinition.stepNoop()
+  const { workspaceId, destination } = model.route
+  const opened = model.page.workspace
+  if (Option.isSome(opened) && opened.value.workspaceId === workspaceId) {
+    return destinationPath(destinationOf(opened.value.model)) === destinationPath(destination)
+      ? ApplicationDefinition.stepNoop()
+      : WorkspaceBinding.requestDestination(workspaceId, { destination })
+  }
+  return Workspaces.matchOrElse(
+    model.page.workspaces.workspaces,
+    {
+      Loaded: ({ memberships }) => {
+        const membership = memberships.find(({ workspace }) => workspace.id === workspaceId)
+        return membership === undefined ? ApplicationDefinition.stepNoop() : openWorkspace(membership, destination)
+      }
+    },
+    () => ApplicationDefinition.stepNoop()
+  )
+})
+
+/** Record a user navigation once; Foldkit's ensuing URL event observes the same route. */
+export const navigate = (route: Route, replace = false) =>
+  ApplicationDefinition.step((model: Model) => ({
+    model: modifyFields(model, { route: () => route }),
+    commands: sameRoute(model.route, route) ? [] : [Navigate({ url: href(route), replace })]
+  }))
+
+const foldWorkspacesOutMessage = WorkspacesBlock.OutMessage.match({
+  EndedSession: () => endSession,
+  ListedWorkspaces: () => restoreRoute,
+  OpenedWorkspace: ({ membership }) =>
+    Update.combine([
+      navigate(Route.Workspace({ workspaceId: membership.workspace.id, destination: home() })),
+      openWorkspace(membership, home())
+    ])
 })
 
 export const WorkspacesBinding = ApplicationDefinition.bindChild(WorkspacesBlock, {
@@ -100,9 +150,12 @@ const chooseAppearance = (appearance: Appearance) =>
   }))
 
 /** Leave the open workspace for the list of the person's workspaces. */
-const closeWorkspace = ApplicationDefinition.step((model: Model) => ({
-  model: atSignedIn(model, (page) => modifyFields(page, { workspace: () => Option.none() }))
-}))
+export const closeWorkspace = Update.combine([
+  navigate(Route.Workspaces()),
+  ApplicationDefinition.step((model: Model) => ({
+    model: atSignedIn(model, (page) => modifyFields(page, { workspace: () => Option.none() }))
+  }))
+])
 
 /**
  * What choosing an entry of the account menu does: an Appearance is shown and kept, another workspace is the list of
@@ -125,6 +178,21 @@ const foldWorkspaceOutMessage = (
 ) =>
   WorkspaceBlock.OutMessage.match(outMessage, {
     ClosedWorkspace: () => closeWorkspace,
+    Navigated: () =>
+      ApplicationDefinition.step((model: Model) =>
+        Page.matchOrElse(
+          model.page,
+          {
+            SignedIn: ({ workspace }) =>
+              Option.match(workspace, {
+                onNone: () => ApplicationDefinition.stepNoop(),
+                onSome: ({ workspaceId, model: workspace }) =>
+                  navigate(Route.Workspace({ workspaceId, destination: destinationOf(workspace) }))
+              })
+          },
+          () => ApplicationDefinition.stepNoop()
+        )
+      ),
     ChoseAccountEntry: ({ entry }) => chooseAccountEntry(entry)
   })
 

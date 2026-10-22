@@ -10,6 +10,7 @@ const WorkspaceBlockValue = WorkspaceComposition.assembleBlock({
   update,
   view,
   operations: {
+    requestDestination: Message.RequestedDestination,
     informViewport: Message.InformedOfViewport,
     requestSearch: Message.RequestedSearch
   },

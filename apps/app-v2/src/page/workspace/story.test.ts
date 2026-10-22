@@ -551,7 +551,7 @@ describe("a workspace", () => {
       given(opened),
       message(Message.ClickedMembers()),
       message(choseAccountEntry("WorkspaceSettings")),
-      expectNoOutMessage(),
+      expectOutMessage(OutMessage.Navigated()),
       model((model) => {
         expect(Open.matchOrElse(model.open, { Settings: ({ page }) => page }, () => undefined)).toBe("Workspace")
       }),
