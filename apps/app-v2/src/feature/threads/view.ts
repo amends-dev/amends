@@ -20,13 +20,12 @@ import { taskHeadings, taskListEmpty } from "@amends-dev/design/taskList"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html, HtmlBuilder } from "foldkit/html"
-import { workingLabel } from "../../agentActivity.ts"
+import { memberName } from "../../data/members.ts"
 import {
   authorMemberId,
   authorName,
   initials,
   isAuthorAgent,
-  memberName,
   pluralize,
   repliesLabel,
   shortTimeOf,
@@ -40,6 +39,7 @@ import {
 } from "../../seen.ts"
 import { assigneeFilterMenu, statusChoices, statusFilterMenu } from "../../taskFilter.ts"
 import { noTasksMatch, taskRows } from "../../taskList.ts"
+import { workingLabel } from "../../view/agents.ts"
 import type { OfferedSlashCommand } from "../composer/definition.ts"
 import { view as composerInputView } from "../composer/view.ts"
 import {

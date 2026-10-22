@@ -10,7 +10,7 @@ import { type Choice, choiceSelect, field, textarea } from "@amends-dev/design/c
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import type * as AgentSetup from "../../agentSetup.ts"
-import { Integrations, connectionItemsGiving } from "../connections/definition.ts"
+import { Integrations, connectionItemsGiving } from "../../data/connections.ts"
 import type { AgentsViewBuilder } from "./composition.ts"
 import {
   connectionChoices,

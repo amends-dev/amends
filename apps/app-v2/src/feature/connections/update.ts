@@ -4,6 +4,7 @@ import * as Option from "effect/Option"
 import * as Result from "effect/Result"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
+import { findConnection, findIntegration, Integrations, integrationOf } from "../../data/connections.ts"
 import * as SettingsForm from "../../settingsForm.ts"
 import {
   AddConnection,
@@ -26,11 +27,7 @@ import {
   ConnectionsDefinition,
   type Edit,
   type Failure,
-  findConnection,
   findEdit,
-  findIntegration,
-  Integrations,
-  integrationOf,
   integrationsToAdd,
   isNameChanged,
   isSettingsChanged,
@@ -504,10 +501,10 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
     ReceivedMembers: ({ members }) => ({ model: modifyFields(model, { members: () => members }) }),
     ReceivedGrants: ({ grants }) => ({ model: modifyFields(model, { grants: () => grants }) }),
     ReceivedIntegrations: ({ integrations }) => ({
-      model: modifyFields(model, { integrations: () => Integrations.Loaded({ integrations }) })
+      model: modifyFields(model, { integrations: () => Integrations.cases.Loaded.make({ integrations }) })
     }),
     FailedLoadIntegrations: ({ error }) => ({
-      model: modifyFields(model, { integrations: () => Integrations.Failed({ error }) })
+      model: modifyFields(model, { integrations: () => Integrations.cases.Failed.make({ error }) })
     }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
     ClickedRetry: () => ({
@@ -516,7 +513,7 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
     ClickedReloadIntegrations: () =>
       Integrations.isAnyOf(["Failed"])(model.integrations)
         ? {
-            model: modifyFields(model, { integrations: () => Integrations.Loading() }),
+            model: modifyFields(model, { integrations: () => Integrations.cases.Loading.make({}) }),
             outMessage: OutMessage.RequestedIntegrations()
           }
         : { model },

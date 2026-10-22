@@ -3,20 +3,8 @@ import { ThreadId } from "@amends-dev/core/thread"
 import { MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Option } from "effect"
-import { bob, conversationWithBob, design, general, membership, now, scout, turnOf } from "../test/fixtures.ts"
-import {
-  activityLabel,
-  activityOf,
-  activityStateOf,
-  agentsAtWork,
-  motionOfState,
-  placesLine,
-  stateInGroup,
-  stateWord,
-  turnLabel,
-  turnsUnderWay,
-  workingLabel
-} from "./agentActivity.ts"
+import { bob, conversationWithBob, design, general, membership, now, scout, turnOf } from "../../test/fixtures.ts"
+import { activityOf, activityStateOf, agentsAtWork, stateInGroup, turnsUnderWay } from "./agents.ts"
 
 const { member } = membership
 const scoutId = Identity.AgentId.make("agent-1")
@@ -42,19 +30,6 @@ describe("the state of a turn", () => {
     expect(activityStateOf("completed")).toEqual(Option.none())
     expect(activityStateOf("failed")).toEqual(Option.none())
     expect(activityStateOf("cancelled")).toEqual(Option.none())
-  })
-
-  it("is told in a word, and moves the logo as it does: threaded while queued, lit while working, tugged while stopping", () => {
-    expect(stateWord).toEqual({ queued: "Queued", working: "Working", stopping: "Stopping" })
-    expect(motionOfState).toEqual({ queued: "thread", working: "working", stopping: "tug" })
-  })
-})
-
-describe("what a line says of an agent at work", () => {
-  it("is the agent's name and its state in a word of its own, as a line says it", () => {
-    expect(workingLabel("Yumi", "working")).toBe("Yumi working")
-    expect(workingLabel("Atlas", "queued")).toBe("Atlas queued")
-    expect(workingLabel("Scout", "stopping")).toBe("Scout stopping")
   })
 })
 
@@ -237,25 +212,5 @@ describe("the state of a group's turns", () => {
         general.id
       )
     ).toEqual(Option.none())
-  })
-})
-
-describe("the words for what an agent is doing", () => {
-  it("name one place as it is, and more than one by the first and how many follow", () => {
-    expect(placesLine([])).toBe("")
-    expect(placesLine(["#general"])).toBe("#general")
-    expect(placesLine(["#general", "#design"])).toBe("#general + 1 more")
-    expect(placesLine(["#general", "#design", "Bob"])).toBe("#general + 2 more")
-  })
-
-  it("say the state in the places, or the state alone while no place is read", () => {
-    expect(activityLabel({ state: "working", places: ["#general"] })).toBe("Working in #general")
-    expect(activityLabel({ state: "queued", places: ["#general", "#design"] })).toBe("Queued in #general + 1 more")
-    expect(activityLabel({ state: "stopping", places: [] })).toBe("Stopping")
-  })
-
-  it("say a turn's state in its place", () => {
-    expect(turnLabel({ state: "queued", place: Option.some("#design") })).toBe("Queued in #design")
-    expect(turnLabel({ state: "working", place: Option.none() })).toBe("Working")
   })
 })

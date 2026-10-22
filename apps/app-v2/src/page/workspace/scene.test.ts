@@ -68,6 +68,7 @@ import {
 } from "../../../test/fixtures.ts"
 import { pickerEnded, pickerReady } from "../../../test/memberPickerSteps.ts"
 import { acknowledgeMenuClosed, chooseMenuItem, closeMenu, openMenu } from "../../../test/menu.ts"
+import { Integrations } from "../../data/connections.ts"
 import { ActionsBlock } from "../../feature/actions/block.ts"
 import { Dismiss, ExpireConfirmation } from "../../feature/actions/command.ts"
 import { Offer } from "../../feature/actions/definition.ts"
@@ -87,7 +88,7 @@ import {
   RenameConnection,
   ReplaceConnectionKey
 } from "../../feature/connections/command.ts"
-import { Integrations, Written as ConnectionWritten } from "../../feature/connections/definition.ts"
+import { Written as ConnectionWritten } from "../../feature/connections/definition.ts"
 import { GroupBlock } from "../../feature/group/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { CreateTeam, JoinGroup } from "../../feature/groups/command.ts"
@@ -392,7 +393,7 @@ const withTasks = atHome(opened, (home) =>
 const asOwner = modifyFields(opened, {
   connections: (connections) =>
     modifyFields(connections, {
-      integrations: () => Integrations.Loaded({ integrations: [testApi] }),
+      integrations: () => Integrations.cases.Loaded.make({ integrations: [testApi] }),
       grants: () => GrantResolver.grantsOf([aliceOwns], (roleId) => roles.find(({ id }) => id === roleId))
     })
 })
@@ -411,7 +412,9 @@ const withChannel = modifyFields(opened, {
   channels: (channels) =>
     modifyFields(channels, {
       integrations: () =>
-        Integrations.Loaded({ integrations: [integrationGiving("test-channels", "Test channels", ["channels"])] }),
+        Integrations.cases.Loaded.make({
+          integrations: [integrationGiving("test-channels", "Test channels", ["channels"])]
+        }),
       connections: () => [{ connection: keylessConnection("channels-1", "test-channels", "Chat"), pending: false }],
       groups: () => [general],
       memberships: () => [aliceInGeneral],
@@ -450,7 +453,7 @@ const withSearchConnection = modifyFields(opened, {
     modifyFields(connections, {
       isLoaded: () => true,
       integrations: () =>
-        Integrations.Loaded({
+        Integrations.cases.Loaded.make({
           integrations: [integrationGiving("test-models", "Test models", ["models"]), searchApi]
         }),
       grants: () => grantsOf([aliceOwns]),
@@ -467,7 +470,7 @@ const withAgent = modifyFields(opened, {
       members: () => [member, bob, scout],
       connections: () => [{ connection: models, pending: false }],
       integrations: () =>
-        Integrations.Loaded({ integrations: [integrationGiving("test-models", "Test models", ["models"])] }),
+        Integrations.cases.Loaded.make({ integrations: [integrationGiving("test-models", "Test models", ["models"])] }),
       roles: () => roles,
       workspace: () => Option.some({ workspace, pending: false }),
       grants: () => grantsOf([aliceOwns])
@@ -553,7 +556,8 @@ describe("a workspace", () => {
         modifyFields(opened, {
           connections: (connections) =>
             modifyFields(connections, {
-              integrations: () => Integrations.Failed({ error: "The host could not be reached. Try again." }),
+              integrations: () =>
+                Integrations.cases.Failed.make({ error: "The host could not be reached. Try again." }),
               grants: () => grantsOf([aliceOwns])
             })
         })
@@ -1064,7 +1068,7 @@ describe("a workspace", () => {
         modifyFields(connections, {
           isLoaded: () => true,
           integrations: () =>
-            Integrations.Loaded({
+            Integrations.cases.Loaded.make({
               integrations: [integrationGiving("test-models", "Test models", ["models", "tools"])]
             }),
           connections: () => [{ connection: keylessConnection("models-1", "test-models", "Hosted"), pending: false }],
@@ -1099,7 +1103,7 @@ describe("a workspace", () => {
         modifyFields(connections, {
           isLoaded: () => true,
           integrations: () =>
-            Integrations.Loaded({
+            Integrations.cases.Loaded.make({
               integrations: [integrationGiving("test-models", "Test models", ["models", "tools"])]
             }),
           connections: () => [{ connection: hosted, pending: false }],

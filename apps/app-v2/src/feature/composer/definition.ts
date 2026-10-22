@@ -14,8 +14,8 @@ import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
+import { foldAccents } from "../../data/search.ts"
 import { PickedMention, type Written } from "../../mentions.ts"
-import { foldAccents } from "../../seen.ts"
 import * as Drafts from "../../store/Drafts.ts"
 
 /** What the list being picked from holds: the people a mention may mean, or the slash commands a draft may run. */

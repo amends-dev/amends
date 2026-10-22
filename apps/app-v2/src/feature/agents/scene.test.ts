@@ -54,8 +54,8 @@ import {
   turnOf
 } from "../../../test/fixtures.ts"
 import { panelIs } from "../../../test/panelSize.ts"
+import { Integrations } from "../../data/connections.ts"
 import { calendarDate } from "../../seen.ts"
-import { Integrations } from "../connections/definition.ts"
 import { AgentsBlock } from "./block.ts"
 import { ConfigureAgent, CreateAgent, LoadModels, RemoveAgent, RenameAgent } from "./command.ts"
 import { Message, type Model, OfferedModels, OutMessage, Reason, Written } from "./definition.ts"
@@ -118,7 +118,7 @@ const opened: Model = {
   agents: [{ agent: scoutAgent, pending: false }],
   members: [alice, bob, scout],
   connections: [models, harness, sandbox].map((connection) => ({ connection, pending: false })),
-  integrations: Integrations.Loaded({
+  integrations: Integrations.cases.Loaded.make({
     integrations: [modelsIntegration, harnessIntegration, sandboxIntegration]
   }),
   roles,
@@ -597,7 +597,7 @@ describe("the agents", () => {
       { update, view: listView },
       given(
         modifyFields(opened, {
-          integrations: () => Integrations.Failed({ error: "The host could not be reached. Try again." })
+          integrations: () => Integrations.cases.Failed.make({ error: "The host could not be reached. Try again." })
         })
       ),
       expect(text("The host could not be reached. Try again.")).toExist(),

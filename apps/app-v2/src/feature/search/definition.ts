@@ -20,7 +20,7 @@ import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
-import { foldAccents } from "../../seen.ts"
+import { foldAccents } from "../../data/search.ts"
 
 /** A page the person can go to, as the rail or the account menu does, in the order `apps/ui`'s Go to lists them. */
 export const Destination = Schema.Literals(["Inbox", "Agents", "Connections", "Settings"])

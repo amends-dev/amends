@@ -1,22 +1,20 @@
-/**
- * What an agent is doing, read from its turns: each turn it has under way, in what state and in which group, and, of
- * those, the agent's own activity: its most pressing state and each place it is at work. An agent with no turn under
- * way is idle. The agents list, the sidebar, and an agent's page show it, a group's threads show which agents are at
- * work in each, and the sidebar's group rows move the logo while any agent is at work in the group.
- */
+/** Shared agent records and activity derived from their turns. */
 
 import type { Group, GroupId } from "@amends-dev/core/group"
 import type { Identity } from "@amends-dev/core/identity"
-import type { ReplicaRecord } from "@amends-dev/core/replica"
+import { ReplicaRecord } from "@amends-dev/core/replica"
 import type { ThreadId } from "@amends-dev/core/thread"
 import type { Turn, TurnId } from "@amends-dev/core/turn"
 import { type Member, MemberId } from "@amends-dev/core/workspace"
-import type { LogoMotion } from "@amends-dev/design/logo"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
-import { placeName } from "./seen.ts"
+import { placeName } from "./groups.ts"
+
+/** An agent of the workspace, and whether a change to it is on its way. Its name and role are its member's. */
+export const AgentItem = Schema.Struct({ agent: ReplicaRecord.Agent, pending: Schema.Boolean })
+export type AgentItem = typeof AgentItem.Type
 
 /** Where a turn under way stands: waiting to start, working, or stopping as asked. */
 export const ActivityState = Schema.Literals(["queued", "working", "stopping"])
@@ -35,25 +33,6 @@ const stateOfStatus: Readonly<Partial<Record<Turn.Status, ActivityState>>> = {
 /** The state a turn in `status` is in while it is under way, none once it finished. */
 export const activityStateOf = (status: Turn.Status): Option.Option<ActivityState> =>
   Option.fromUndefinedOr(stateOfStatus[status])
-
-/** A state in a word, such as "Working". */
-export const stateWord: Readonly<Record<ActivityState, string>> = {
-  queued: "Queued",
-  working: "Working",
-  stopping: "Stopping"
-}
-
-/** A state in a word within a line, such as "working": "Yumi working". */
-export const workingLabel = (name: string, state: ActivityState): string => `${name} ${stateWord[state].toLowerCase()}`
-
-/**
- * How the logo moves for a state: the thread drawn through while it waits, the stitches lit at work, the patch tugged.
- */
-export const motionOfState: Readonly<Record<ActivityState, LogoMotion>> = {
-  queued: "thread",
-  working: "working",
-  stopping: "tug"
-}
 
 /**
  * A turn under way: which, in what state, and where: the thread it works in and its group, and the group's place once
@@ -151,17 +130,21 @@ export const stateInGroup = (
   return Option.fromUndefinedOr(mostPressingFirst.find((state) => statesHere.includes(state)))
 }
 
-/** Where an agent is at work, as a line: "#general", or "#general + 1 more". */
-export const placesLine = (places: ReadonlyArray<string>): string =>
-  places.length > 1 ? `${places[0]} + ${places.length - 1} more` : (places[0] ?? "")
+/** Records used to derive an agent's current work. */
+export interface AgentActivitySource {
+  readonly memberId: MemberId.MemberId
+  readonly turns: ReadonlyArray<ReplicaRecord.Turn>
+  readonly groups: ReadonlyArray<Group.Group>
+  readonly members: ReadonlyArray<Member.Member>
+}
 
 /**
- * What an agent is doing in words, as its mark says it: "Working in #general", or only "Working" while no place is
- * read.
+ * The turns of the agent that are under way, the most pressing first, each in the group it is in as the person names
+ * it. An agent still on its way has none.
  */
-export const activityLabel = ({ state, places }: AgentActivity): string =>
-  places.length === 0 ? stateWord[state] : `${stateWord[state]} in ${placesLine(places)}`
+export const turnsOfAgent = (source: AgentActivitySource, { agent, pending }: AgentItem) =>
+  pending ? [] : turnsUnderWay(agent.id, source.turns, source.groups, source.members, source.memberId)
 
-/** What a turn under way is doing in words, as the agent's page lists it: "Queued in #design". */
-export const turnLabel = ({ state, place }: Pick<TurnUnderWay, "state" | "place">): string =>
-  Option.match(place, { onNone: () => stateWord[state], onSome: (place) => `${stateWord[state]} in ${place}` })
+/** What the agent is doing, from its turns under way: nothing while it is idle. */
+export const activityOfAgent = (source: AgentActivitySource, item: AgentItem): Option.Option<AgentActivity> =>
+  activityOf(turnsOfAgent(source, item))

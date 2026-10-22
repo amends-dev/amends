@@ -1,7 +1,7 @@
 import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Option from "effect/Option"
+import { Integrations } from "../../data/connections.ts"
 import { ConnectionsComposition } from "./composition.ts"
-import { Integrations } from "./definition.ts"
 
 /**
  * The connections before they are read, and before the page has listed the integrations the host installs, nothing
@@ -15,7 +15,7 @@ export const init = ConnectionsComposition.makeInit(
       connections: [],
       isLoaded: false,
       members: [],
-      integrations: Integrations.Loading(),
+      integrations: Integrations.cases.Loading.make({}),
       grants: [],
       browse: { tab: "all" as const, query: "" },
       adding: Option.none(),

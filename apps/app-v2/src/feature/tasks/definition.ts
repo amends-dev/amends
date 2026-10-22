@@ -17,7 +17,8 @@ import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { modifyFields } from "foldkit/struct"
-import { isOpen, threadContains } from "../../seen.ts"
+import { isOpen } from "../../data/tasks.ts"
+import { threadContains } from "../../seen.ts"
 import { AssigneeFilter, AssigneeMenu, isAssignedTo, StatusFilterMenu, TaskStatusFilter } from "../../taskFilter.ts"
 
 /**

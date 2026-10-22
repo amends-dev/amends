@@ -42,6 +42,7 @@ import {
   searchApi
 } from "../../../test/fixtures.ts"
 import { panelIs } from "../../../test/panelSize.ts"
+import { Integrations } from "../../data/connections.ts"
 import { calendarDate } from "../../seen.ts"
 import { ConnectionsBlock } from "./block.ts"
 import {
@@ -53,7 +54,7 @@ import {
   RenameConnection,
   ReplaceConnectionKey
 } from "./command.ts"
-import { Integrations, Message, type Model, OutMessage, Written } from "./definition.ts"
+import { Message, type Model, OutMessage, Written } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
@@ -88,7 +89,8 @@ const phoneListView = withViewInputs(view, { workspaceName: workspace.name, view
 const opened: Model = modifyFields(init(workspace.id, member.id).model, {
   isLoaded: () => true,
   members: () => [member, bob],
-  integrations: () => Integrations.Loaded({ integrations: [modelsApi, searchApi, sandboxApi, harnessApi, chatApi] }),
+  integrations: () =>
+    Integrations.cases.Loaded.make({ integrations: [modelsApi, searchApi, sandboxApi, harnessApi, chatApi] }),
   grants: () => ownerGrants
 })
 
@@ -140,7 +142,7 @@ describe("the connections list", () => {
     )
     scene(
       { update, view: listView },
-      given(modifyFields(withSeveral, { integrations: () => Integrations.Loading() })),
+      given(modifyFields(withSeveral, { integrations: () => Integrations.cases.Loading.make({}) })),
       expect(role("tab", { name: "All" })).toHaveAttr("aria-description", "5"),
       expect(role("tab", { name: "Models" })).not.toHaveAttr("aria-description")
     )
@@ -155,7 +157,7 @@ describe("the connections list", () => {
       given(
         modifyFields(withSeveral, {
           integrations: () =>
-            Integrations.Loaded({
+            Integrations.cases.Loaded.make({
               integrations: [integrationGiving("anthropic", "Anthropic", ["models", "tools"], ["apiKey"]), searchApi]
             }),
           connections: () => [team, gone].map((connection) => ({ connection, pending: false }))
@@ -247,7 +249,7 @@ describe("the connections list", () => {
       { update, view: listView },
       given(
         modifyFields(withSeveral, {
-          integrations: () => Integrations.Loading(),
+          integrations: () => Integrations.cases.Loading.make({}),
           grants: () => memberGrants
         })
       ),
@@ -412,7 +414,7 @@ describe("the connections list", () => {
       { update, view: listView },
       given(
         modifyFields(withSeveral, {
-          integrations: () => Integrations.Failed({ error: "The host could not be reached. Try again." })
+          integrations: () => Integrations.cases.Failed.make({ error: "The host could not be reached. Try again." })
         })
       ),
       expect(text("The host could not be reached. Try again.")).toExist(),
@@ -426,7 +428,7 @@ describe("the connections list", () => {
       given(
         modifyFields(withSeveral, {
           grants: () => memberGrants,
-          integrations: () => Integrations.Failed({ error: "The host could not be reached. Try again." })
+          integrations: () => Integrations.cases.Failed.make({ error: "The host could not be reached. Try again." })
         })
       ),
       expect(text("The host could not be reached. Try again.")).toBeAbsent()
@@ -459,7 +461,7 @@ describe("the connections' sections of the sidebar", () => {
 
   /** The connections and the integrations read: one connection that gives models and tools, and one a sandbox. */
   const withHosted: Model = modifyFields(opened, {
-    integrations: () => Integrations.Loaded({ integrations: [hostedBy, sandboxApi] }),
+    integrations: () => Integrations.cases.Loaded.make({ integrations: [hostedBy, sandboxApi] }),
     connections: () => [hosted, machine].map((connection) => ({ connection, pending: false }))
   })
 
@@ -487,7 +489,9 @@ describe("the connections' sections of the sidebar", () => {
     )
     scene(
       { update, view: sidebar() },
-      given(modifyFields(withHosted, { integrations: () => Integrations.Loaded({ integrations: [sandboxApi] }) })),
+      given(
+        modifyFields(withHosted, { integrations: () => Integrations.cases.Loaded.make({ integrations: [sandboxApi] }) })
+      ),
       expect(role("button", { name: "Hosted" })).toBeAbsent(),
       expect(role("button", { name: "This machine" })).toExist()
     )
@@ -502,7 +506,7 @@ describe("the connections' sections of the sidebar", () => {
     )
     scene(
       { update, view: sidebar() },
-      given(modifyFields(withHosted, { integrations: () => Integrations.Loading() })),
+      given(modifyFields(withHosted, { integrations: () => Integrations.cases.Loading.make({}) })),
       expectAll(emptied).toHaveCount(0)
     )
     scene(
@@ -1200,8 +1204,8 @@ describe("adding a connection", () => {
     )
     for (const hidden of [
       modifyFields(withSeveral, { grants: () => memberGrants }),
-      modifyFields(withSeveral, { integrations: () => Integrations.Loading() }),
-      modifyFields(withSeveral, { integrations: () => Integrations.Failed({ error: "Unreachable." }) })
+      modifyFields(withSeveral, { integrations: () => Integrations.cases.Loading.make({}) }),
+      modifyFields(withSeveral, { integrations: () => Integrations.cases.Failed.make({ error: "Unreachable." }) })
     ]) {
       scene(
         { update, view: listView },
@@ -1301,7 +1305,9 @@ describe("adding a connection", () => {
     )
     scene(
       { update, view: withDialog(sidebar) },
-      given(modifyFields(withSeveral, { integrations: () => Integrations.Loaded({ integrations: [searchApi] }) })),
+      given(
+        modifyFields(withSeveral, { integrations: () => Integrations.cases.Loaded.make({ integrations: [searchApi] }) })
+      ),
       click(role("button", { name: "Add model connection" })),
       ...dialogOpened(),
       inside(
@@ -1313,7 +1319,9 @@ describe("adding a connection", () => {
     )
     scene(
       { update, view: withDialog(sidebar) },
-      given(modifyFields(withSeveral, { integrations: () => Integrations.Loaded({ integrations: [searchApi] }) })),
+      given(
+        modifyFields(withSeveral, { integrations: () => Integrations.cases.Loaded.make({ integrations: [searchApi] }) })
+      ),
       click(role("button", { name: "Add harness connection" })),
       ...dialogOpened(),
       inside(
@@ -1713,7 +1721,7 @@ describe("replacing a connection's key", () => {
     )
     for (const hidden of [
       modifyFields(withSearch, { grants: () => memberGrants }),
-      modifyFields(withSearch, { integrations: () => Integrations.Loading() }),
+      modifyFields(withSearch, { integrations: () => Integrations.cases.Loading.make({}) }),
       modifyFields(withSearch, {
         connections: () => [{ connection: connectionTo("connection-2", "search-api", "Search tools"), pending: false }]
       })

@@ -34,7 +34,7 @@ import {
   roleOf,
   support
 } from "../../../test/fixtures.ts"
-import { Integrations } from "../connections/definition.ts"
+import { Integrations } from "../../data/connections.ts"
 import { ChannelsBlock } from "./block.ts"
 import { CreateChannel, RedirectChannel, RemoveChannel } from "./command.ts"
 import { Message, type Model, OutMessage } from "./definition.ts"
@@ -55,7 +55,7 @@ const providers = keylessConnection("models-1", "test-models", "Models")
 
 /** The workspace as its owner reads it, with no channel yet: two connections, one giving channels, and two groups, one hers. */
 const opened: Model = modifyFields(init(workspace.id, member.id).model, {
-  integrations: () => Integrations.Loaded({ integrations: [channelsIntegration, modelsIntegration] }),
+  integrations: () => Integrations.cases.Loaded.make({ integrations: [channelsIntegration, modelsIntegration] }),
   connections: () => [
     { connection: chat, pending: false },
     { connection: providers, pending: false }
@@ -259,7 +259,7 @@ describe("the channels", () => {
       { update, view },
       given(
         modifyFields(opened, {
-          integrations: () => Integrations.Failed({ error: "The host could not be reached. Try again." })
+          integrations: () => Integrations.cases.Failed.make({ error: "The host could not be reached. Try again." })
         })
       ),
       expect(text("The host could not be reached. Try again.")).toExist(),

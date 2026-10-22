@@ -1,6 +1,6 @@
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
-import { Integrations } from "../connections/definition.ts"
+import { Integrations } from "../../data/connections.ts"
 import { CreateChannel, RedirectChannel, RemoveChannel } from "./command.ts"
 import { ChannelsComposition } from "./composition.ts"
 import { findChannel, Form, Message, type Model, OutMessage, whatFormLacks } from "./definition.ts"
@@ -58,16 +58,16 @@ export const update = ChannelsComposition.makeUpdate((model, message) => {
     ReceivedMembers: ({ members }) => ({ model: modifyFields(model, { members: () => members }) }),
     ReceivedGrants: ({ grants }) => ({ model: modifyFields(model, { grants: () => grants }) }),
     ReceivedIntegrations: ({ integrations }) => ({
-      model: modifyFields(model, { integrations: () => Integrations.Loaded({ integrations }) })
+      model: modifyFields(model, { integrations: () => Integrations.cases.Loaded.make({ integrations }) })
     }),
     FailedLoadIntegrations: ({ error }) => ({
-      model: modifyFields(model, { integrations: () => Integrations.Failed({ error }) })
+      model: modifyFields(model, { integrations: () => Integrations.cases.Failed.make({ error }) })
     }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
     ClickedReloadIntegrations: () =>
       Integrations.isAnyOf(["Failed"])(model.integrations)
         ? {
-            model: modifyFields(model, { integrations: () => Integrations.Loading() }),
+            model: modifyFields(model, { integrations: () => Integrations.cases.Loading.make({}) }),
             outMessage: OutMessage.RequestedIntegrations()
           }
         : { model },

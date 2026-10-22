@@ -16,28 +16,28 @@ import {
   scout,
   thread
 } from "../test/fixtures.ts"
+import { connectionNameIn } from "./data/connections.ts"
+import { placeName } from "./data/groups.ts"
+import { isAgent } from "./data/members.ts"
+import { foldAccents } from "./data/search.ts"
+import { isOpen } from "./data/tasks.ts"
 import {
   ageLabel,
   authorMemberId,
   calendarDate,
-  connectionNameIn,
   dayLabel,
   dayOf,
   expiryInDaysLabel,
   expiryLabel,
-  foldAccents,
   fullTimeOf,
   groupByDay,
   groupMark,
   initials,
-  isAgent,
   isAuthorAgent,
-  isOpen,
   isStackedUnder,
   memberMark,
   messageText,
   messageWords,
-  placeName,
   pluralize,
   reasonSubtitle,
   repliesLabel,

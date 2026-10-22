@@ -34,7 +34,9 @@ import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import type { Appearance } from "../../appearance.ts"
-import { initials, isAgent, memberMark } from "../../seen.ts"
+import { isAgent } from "../../data/members.ts"
+import { givableRoles } from "../../data/workspace.ts"
+import { initials, memberMark } from "../../seen.ts"
 import { SelectOnFocus } from "./command.ts"
 import {
   AccountBinding,
@@ -50,7 +52,6 @@ import {
   Entering,
   type Failure,
   findMember,
-  givableRoles,
   invitationHistory,
   invitationStatus,
   isChangingRole,

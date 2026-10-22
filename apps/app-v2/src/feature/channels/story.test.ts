@@ -14,7 +14,7 @@ import {
   membership,
   support
 } from "../../../test/fixtures.ts"
-import { connectionsGiving, Integrations } from "../connections/definition.ts"
+import { connectionsGiving, Integrations } from "../../data/connections.ts"
 import { CreateChannel, RedirectChannel, RemoveChannel } from "./command.ts"
 import { destinations, Form, groupNameOf, Message, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
@@ -74,22 +74,24 @@ describe("the channels", () => {
       update,
       given(listed),
       model((model) => {
-        expect(model.integrations).toEqual(Integrations.Loading())
+        expect(model.integrations).toEqual(Integrations.cases.Loading.make({}))
       }),
       message(Message.FailedLoadIntegrations({ error: "The host could not be reached. Try again." })),
       model((model) => {
-        expect(model.integrations).toEqual(Integrations.Failed({ error: "The host could not be reached. Try again." }))
+        expect(model.integrations).toEqual(
+          Integrations.cases.Failed.make({ error: "The host could not be reached. Try again." })
+        )
       }),
       // Trying again shows they are loading and asks the page to list them again.
       message(Message.ClickedReloadIntegrations()),
       expectOutMessage(OutMessage.RequestedIntegrations()),
       Command.expectNone(),
       model((model) => {
-        expect(model.integrations).toEqual(Integrations.Loading())
+        expect(model.integrations).toEqual(Integrations.cases.Loading.make({}))
       }),
       message(Message.ReceivedIntegrations({ integrations: [channelsIntegration] })),
       model((model) => {
-        expect(model.integrations).toEqual(Integrations.Loaded({ integrations: [channelsIntegration] }))
+        expect(model.integrations).toEqual(Integrations.cases.Loaded.make({ integrations: [channelsIntegration] }))
       }),
       // Asking again once they are loaded asks nothing.
       message(Message.ClickedReloadIntegrations()),

@@ -1,6 +1,6 @@
 import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Option from "effect/Option"
-import { Integrations } from "../connections/definition.ts"
+import { Integrations } from "../../data/connections.ts"
 import { ChannelsComposition } from "./composition.ts"
 import { Model } from "./definition.ts"
 
@@ -12,7 +12,7 @@ export const init = ChannelsComposition.makeInit(
       memberId,
       channels: [],
       connections: [],
-      integrations: Integrations.Loading(),
+      integrations: Integrations.cases.Loading.make({}),
       groups: [],
       memberships: [],
       members: [],

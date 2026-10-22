@@ -23,7 +23,8 @@ import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
-import { authorMark, authorMemberId, authorName, type Day, groupByDay, messageText, placeName } from "../../seen.ts"
+import { placeName } from "../../data/groups.ts"
+import { authorMark, authorMemberId, authorName, type Day, groupByDay, messageText } from "../../seen.ts"
 import { ThreadBlock } from "../thread/block.ts"
 
 /**

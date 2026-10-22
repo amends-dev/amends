@@ -38,6 +38,7 @@ import {
   testApi,
   thread
 } from "../../../test/fixtures.ts"
+import { Integrations } from "../../data/connections.ts"
 import { ActionsBlock } from "../../feature/actions/block.ts"
 import { ExpireConfirmation } from "../../feature/actions/command.ts"
 import { Offer } from "../../feature/actions/definition.ts"
@@ -49,12 +50,7 @@ import { ComposerBlock } from "../../feature/composer/block.ts"
 import { ReadDraft, SaveDraft } from "../../feature/composer/command.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { CheckConnection } from "../../feature/connections/command.ts"
-import {
-  Adding,
-  Integrations,
-  startConfiguring,
-  Written as ConnectionWritten
-} from "../../feature/connections/definition.ts"
+import { Adding, startConfiguring, Written as ConnectionWritten } from "../../feature/connections/definition.ts"
 import { GroupBlock } from "../../feature/group/block.ts"
 import { FollowGroup, UnfollowGroup } from "../../feature/group/command.ts"
 import { ThreadBinding as GroupThreadBinding, ThreadsBinding } from "../../feature/group/composition.ts"
@@ -192,7 +188,7 @@ const openConnectionsDialog = (model: typeof opened) =>
 const readConnections = (connections: typeof opened.connections) =>
   modifyFields(connections, {
     isLoaded: () => true,
-    integrations: () => Integrations.Loaded({ integrations: [searchApi] }),
+    integrations: () => Integrations.cases.Loaded.make({ integrations: [searchApi] }),
     grants: () => grantsOf([aliceOwns]),
     connections: () => [{ connection: searchConnection, pending: false }]
   })
@@ -1065,11 +1061,17 @@ describe("a workspace", () => {
       update,
       given(opened),
       model((model) => {
-        expect(integrationsOf(model)).toEqual([Integrations.Loading(), Integrations.Loading(), Integrations.Loading()])
+        expect(integrationsOf(model)).toEqual([
+          Integrations.cases.Loading.make({}),
+          Integrations.cases.Loading.make({}),
+          Integrations.cases.Loading.make({})
+        ])
       }),
       message(Message.ReceivedIntegrations({ integrations: [testApi] })),
       model((model) => {
-        expect(integrationsOf(model)).toEqual(Array(3).fill(Integrations.Loaded({ integrations: [testApi] })))
+        expect(integrationsOf(model)).toEqual(
+          Array(3).fill(Integrations.cases.Loaded.make({ integrations: [testApi] }))
+        )
       })
     )
   })
@@ -1080,7 +1082,7 @@ describe("a workspace", () => {
       given(opened),
       message(Message.FailedLoadIntegrations({ error: unreachable })),
       model((model) => {
-        expect(integrationsOf(model)).toEqual(Array(3).fill(Integrations.Failed({ error: unreachable })))
+        expect(integrationsOf(model)).toEqual(Array(3).fill(Integrations.cases.Failed.make({ error: unreachable })))
       })
     )
   })
@@ -1099,7 +1101,9 @@ describe("a workspace", () => {
         Command.expectExact(LoadIntegrations({ workspaceId })),
         Command.resolve(LoadIntegrations, Message.ReceivedIntegrations({ integrations: [testApi] })),
         model((model) => {
-          expect(integrationsOf(model)).toEqual(Array(3).fill(Integrations.Loaded({ integrations: [testApi] })))
+          expect(integrationsOf(model)).toEqual(
+            Array(3).fill(Integrations.cases.Loaded.make({ integrations: [testApi] }))
+          )
         })
       )
     }

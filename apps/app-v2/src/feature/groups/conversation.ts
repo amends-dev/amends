@@ -8,7 +8,8 @@ import type { Member, MemberId } from "@amends-dev/core/workspace"
 import type { MarkContent } from "@amends-dev/design/mark"
 import * as Array from "effect/Array"
 import * as Option from "effect/Option"
-import { initials, memberMark, memberName } from "../../seen.ts"
+import { memberName } from "../../data/members.ts"
+import { initials, memberMark } from "../../seen.ts"
 
 /** The members of `group` other than the person `self`, by their IDs. */
 export const othersIn = (group: Group.Direct, self: MemberId.MemberId): ReadonlyArray<MemberId.MemberId> =>

@@ -9,7 +9,7 @@
  * list or the agent's page for, and confirms. An agent's role is its membership's, in the settings. The workspace page
  * lists the host's integrations once and informs the Block of them, which say what each connection gives, and a model
  * connection lists its models over HTTP as a setup chooses it. What an agent is doing is read from the turns the store
- * holds (see `agentActivity.ts`), and the person picks one of an agent's turns on its page to open its thread, which
+ * holds (see `data/agents.ts`), and the person picks one of an agent's turns on its page to open its thread, which
  * the page does in Home.
  */
 
@@ -30,16 +30,19 @@ import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
-import { activityOf, type AgentActivity, turnsUnderWay } from "../../agentActivity.ts"
 import * as AgentSetup from "../../agentSetup.ts"
+import { AgentItem } from "../../data/agents.ts"
+import {
+  connectionNameIn,
+  ConnectionItem,
+  connectionItemsGiving,
+  findIntegration,
+  Integrations,
+  areIntegrationsListed
+} from "../../data/connections.ts"
+import { foldAccents } from "../../data/search.ts"
+import { givableRoles, WorkspaceItem } from "../../data/workspace.ts"
 import { may, memberTarget, workspaceTarget } from "../../permissions.ts"
-import { connectionNameIn, foldAccents } from "../../seen.ts"
-import { ConnectionItem, connectionItemsGiving, findIntegration, Integrations } from "../connections/definition.ts"
-import { givableRoles, WorkspaceItem } from "../settings/definition.ts"
-
-/** An agent of the workspace, and whether a change to it is on its way. Its name and role are its member's. */
-export const AgentItem = Schema.Struct({ agent: ReplicaRecord.Agent, pending: Schema.Boolean })
-export type AgentItem = typeof AgentItem.Type
 
 /** What the person asks of the agents: adding one, renaming one, setting one up again, and removing one. */
 export const AgentAction = Schema.Literals(["Create", "Rename", "Configure", "Remove"])
@@ -276,10 +279,6 @@ export const mayConfigure = (model: Pick<Model, "workspaceId" | "grants">, agent
 export const mayRemove = (model: Pick<Model, "workspaceId" | "grants">, agent: AgentItem["agent"]): boolean =>
   may(model.grants, MemberPermissions.Remove, memberTarget(model.workspaceId, agent.memberId))
 
-/** Whether the host has listed its integrations, which say what each connection gives. */
-const areIntegrationsListed = (model: Pick<Model, "integrations">): boolean =>
-  Integrations.isAnyOf(["Loaded"])(model.integrations)
-
 /** Whether the person may create agents. */
 export const mayCreate = (model: Pick<Model, "workspaceId" | "grants">): boolean =>
   may(model.grants, AgentPermissions.Create, workspaceTarget(model.workspaceId))
@@ -290,21 +289,6 @@ export const mayCreate = (model: Pick<Model, "workspaceId" | "grants">): boolean
  */
 export const mayAdd = (model: Pick<Model, "workspaceId" | "grants" | "integrations">): boolean =>
   mayCreate(model) && areIntegrationsListed(model)
-
-/**
- * The turns of the agent that are under way, the most pressing first, each in the group it is in as the person names
- * it. An agent still on its way has none.
- */
-export const turnsOfAgent = (
-  model: Pick<Model, "turns" | "groups" | "members" | "memberId">,
-  { agent, pending }: AgentItem
-) => (pending ? [] : turnsUnderWay(agent.id, model.turns, model.groups, model.members, model.memberId))
-
-/** What the agent is doing, from its turns under way: nothing while it is idle. */
-export const activityOfAgent = (
-  model: Pick<Model, "turns" | "groups" | "members" | "memberId">,
-  item: AgentItem
-): Option.Option<AgentActivity> => activityOf(turnsOfAgent(model, item))
 
 /** The name of the agent, its membership's, or "An agent" while the members are not read. */
 export const nameOfAgent = (model: Pick<Model, "members">, agent: AgentItem["agent"]): string =>

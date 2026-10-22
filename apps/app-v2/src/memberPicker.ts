@@ -9,7 +9,8 @@ import type { PickerPerson } from "@amends-dev/design/members"
 import { Multi, inputId } from "@foldkit/ui/combobox"
 import * as Effect from "effect/Effect"
 import * as Dom from "foldkit/dom"
-import { isAgent, memberMark, pluralize } from "./seen.ts"
+import { isAgent } from "./data/members.ts"
+import { memberMark, pluralize } from "./seen.ts"
 
 /** The headless combobox every members picker binds, whose values are the IDs of members. */
 export const MembersComboboxBlock = Multi.create()

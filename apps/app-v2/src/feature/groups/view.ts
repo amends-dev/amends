@@ -20,12 +20,12 @@ import { sidebarEmpty, sidebarItem, sidebarSection, sidebarSections } from "@ame
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { type ActivityState, motionOfState, stateInGroup, stateWord } from "../../agentActivity.ts"
-import { sidebarActivity, statusOfAgent } from "../../agentStanding.ts"
+import { type ActivityState, stateInGroup, type AgentItem } from "../../data/agents.ts"
+import { groupName } from "../../data/groups.ts"
 import { includedHint, pickerPeople, pickerPeopleChosen, youInPicker } from "../../memberPicker.ts"
 import { may, workspaceTarget } from "../../permissions.ts"
-import { groupName, memberMark, pluralize, statusLabel, statusShape, visibilityHint } from "../../seen.ts"
-import type { AgentItem } from "../agents/definition.ts"
+import { memberMark, pluralize, statusLabel, statusShape, visibilityHint } from "../../seen.ts"
+import { motionOfState, stateWord, sidebarActivity, statusOfAgent } from "../../view/agents.ts"
 import {
   DialogBinding,
   GroupsComposition,

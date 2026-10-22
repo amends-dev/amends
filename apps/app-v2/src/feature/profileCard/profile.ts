@@ -6,9 +6,9 @@ import type { ReplicaRecord } from "@amends-dev/core/replica"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
 import type { Profile } from "@amends-dev/design/profile"
 import * as Option from "effect/Option"
-import { activityOf, motionOfState, turnsUnderWay } from "../../agentActivity.ts"
-import { statusOfAgent } from "../../agentStanding.ts"
+import { activityOf, turnsUnderWay } from "../../data/agents.ts"
 import { initials } from "../../seen.ts"
+import { motionOfState, statusOfAgent } from "../../view/agents.ts"
 import type { MemberProfile } from "./definition.ts"
 
 /** An agent of the workspace, and whether a change to it is on its way. */

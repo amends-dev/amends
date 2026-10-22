@@ -25,23 +25,29 @@ import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import {
-  activityLabel,
   type AgentActivity,
+  type TurnUnderWay,
+  activityOfAgent,
+  type AgentItem,
+  turnsOfAgent
+} from "../../data/agents.ts"
+import { Integrations } from "../../data/connections.ts"
+import { memberName } from "../../data/members.ts"
+import { calendarDate } from "../../seen.ts"
+import {
+  activityLabel,
   motionOfState,
   placesLine,
   stateWord,
   turnLabel,
-  type TurnUnderWay
-} from "../../agentActivity.ts"
-import { issueSentence, sidebarActivity, statusOfAgent } from "../../agentStanding.ts"
-import { calendarDate, memberName } from "../../seen.ts"
-import { Integrations } from "../connections/definition.ts"
+  issueSentence,
+  sidebarActivity,
+  statusOfAgent
+} from "../../view/agents.ts"
 import { AgentsComposition, type AgentsViewBuilder, DialogBinding } from "./composition.ts"
 import {
-  activityOfAgent,
   type Adding,
   type AgentAction,
-  type AgentItem,
   type BrowseTab,
   connectionName,
   type Edit,
@@ -66,8 +72,7 @@ import {
   SetupTarget,
   setupDraftOf,
   shownAgents,
-  startingRoles,
-  turnsOfAgent
+  startingRoles
 } from "./definition.ts"
 import { setupFields } from "./setupFields.ts"
 

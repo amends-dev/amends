@@ -1,16 +1,44 @@
-/**
- * How an agent stands and what it is doing, as a row of the sidebar says it: the patch on its mark, and the words and
- * the motion of its logo. The agents' section and the direct messages with an agent draw the same.
- */
+/** Agent labels, marks, and animation choices shared by views. */
 
 import { Agent } from "@amends-dev/core/agent"
-import type { ReplicaRecord } from "@amends-dev/core/replica"
+import type { LogoMotion } from "@amends-dev/design/logo"
 import type { MarkStatus } from "@amends-dev/design/mark"
 import * as Option from "effect/Option"
-import { activityLabel, type AgentActivity, motionOfState } from "./agentActivity.ts"
+import type { ActivityState, AgentActivity, AgentItem, TurnUnderWay } from "../data/agents.ts"
 
-/** An agent of the workspace, and whether a change to it is on its way. */
-type StoredAgent = Readonly<{ agent: ReplicaRecord.Agent; pending: boolean }>
+/** A state in a word, such as "Working". */
+export const stateWord: Readonly<Record<ActivityState, string>> = {
+  queued: "Queued",
+  working: "Working",
+  stopping: "Stopping"
+}
+
+/** A state in a word within a line, such as "working": "Yumi working". */
+export const workingLabel = (name: string, state: ActivityState): string => `${name} ${stateWord[state].toLowerCase()}`
+
+/**
+ * How the logo moves for a state: the thread drawn through while it waits, the stitches lit at work, the patch tugged.
+ */
+export const motionOfState: Readonly<Record<ActivityState, LogoMotion>> = {
+  queued: "thread",
+  working: "working",
+  stopping: "tug"
+}
+
+/** Where an agent is at work, as a line: "#general", or "#general + 1 more". */
+export const placesLine = (places: ReadonlyArray<string>): string =>
+  places.length > 1 ? `${places[0]} + ${places.length - 1} more` : (places[0] ?? "")
+
+/**
+ * What an agent is doing in words, as its mark says it: "Working in #general", or only "Working" while no place is
+ * read.
+ */
+export const activityLabel = ({ state, places }: AgentActivity): string =>
+  places.length === 0 ? stateWord[state] : `${stateWord[state]} in ${placesLine(places)}`
+
+/** What a turn under way is doing in words, as the agent's page lists it: "Queued in #design". */
+export const turnLabel = ({ state, place }: Pick<TurnUnderWay, "state" | "place">): string =>
+  Option.match(place, { onNone: () => stateWord[state], onSome: (place) => `${stateWord[state]} in ${place}` })
 
 /** Why an agent can't run, as a sentence. */
 export const issueSentence = (issue: Agent.Issue): string =>
@@ -29,7 +57,7 @@ export const issueSentence = (issue: Agent.Issue): string =>
  * once it has it.
  */
 export const statusOfAgent = (
-  { agent, pending }: StoredAgent,
+  { agent, pending }: AgentItem,
   activity: Option.Option<AgentActivity>
 ): MarkStatus | undefined =>
   pending

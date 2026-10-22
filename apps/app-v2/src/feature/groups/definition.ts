@@ -28,9 +28,10 @@ import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
 import { modifyFields } from "foldkit/struct"
+import { activityOfAgent, AgentItem } from "../../data/agents.ts"
+import { groupName, isJoinable } from "../../data/groups.ts"
+import { foldAccents } from "../../data/search.ts"
 import { MembersComboboxBlock } from "../../memberPicker.ts"
-import { foldAccents, groupName, isJoinable } from "../../seen.ts"
-import { activityOfAgent, AgentItem } from "../agents/definition.ts"
 import { conversationAmong } from "./conversation.ts"
 
 /** A group the person can see, whether it is still being created, and how many members it has. */

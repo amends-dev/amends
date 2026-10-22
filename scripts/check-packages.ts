@@ -109,8 +109,8 @@ for await (const path of new Bun.Glob("apps/site/src/**/*.{astro,ts,tsx}").scan(
   }
 }
 
-// UI owns presentation, and icons are drawings alone.
-for await (const path of new Bun.Glob("apps/{icons,ui}/{src,test,.storybook}/**/*.{ts,tsx}").scan({
+// UI owns presentation, icons are drawings alone, and app data is independent of feature Blocks and views.
+for await (const path of new Bun.Glob("apps/{icons,ui,app-v2}/{src,test,.storybook}/**/*.{ts,tsx}").scan({
   cwd: root
 })) {
   const source = await Bun.file(`${root}/${path}`).text()
@@ -137,6 +137,16 @@ for await (const path of new Bun.Glob("apps/{icons,ui}/{src,test,.storybook}/**/
   }
   for (const dependency of dependencies) {
     const target = dependency.startsWith(".") ? resolve(root, dirname(path), dependency) : dependency
+    if (path.startsWith("apps/app-v2/src/data/") && !path.endsWith(".test.ts")) {
+      const packageName = dependency.split("/").slice(0, 2).join("/")
+      const isDataModule = dependency.startsWith(".") && target.startsWith(resolve(root, "apps/app-v2/src/data") + "/")
+      if (
+        !(isDataModule || dependency === "effect" || dependency.startsWith("effect/") || sharedNames.has(packageName))
+      )
+        errors.push(
+          `${path}: app data must depend only on shared packages, Effect, and other data modules (${dependency}).`
+        )
+    }
     const iconImport = dependency === "@amends-dev/icons" || dependency.startsWith("@amends-dev/icons/")
     if (
       path.startsWith("apps/icons/src/") &&
@@ -171,6 +181,6 @@ if (errors.length > 0) {
   process.exitCode = 1
 } else {
   console.log(
-    `Checked ${packages.length} shared packages, ${published.length} published packages' lines, icons/ui import boundaries, and site styles.`
+    `Checked ${packages.length} shared packages, ${published.length} published packages' lines, icons/ui/app-data import boundaries, and site styles.`
   )
 }

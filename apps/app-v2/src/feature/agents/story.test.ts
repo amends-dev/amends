@@ -30,8 +30,9 @@ import {
   turnOf
 } from "../../../test/fixtures.ts"
 import { type Draft, empty } from "../../agentSetup.ts"
-import { connectionsGiving, Integrations } from "../connections/definition.ts"
-import { givableRoles } from "../settings/definition.ts"
+import { activityOfAgent, turnsOfAgent } from "../../data/agents.ts"
+import { connectionsGiving, Integrations } from "../../data/connections.ts"
+import { givableRoles } from "../../data/workspace.ts"
 import { ConfigureAgent, CreateAgent, LoadModels, RemoveAgent, RenameAgent } from "./command.ts"
 import { DialogBinding } from "./composition.ts"
 import {
@@ -42,7 +43,6 @@ import {
   findAgentName,
   findCreatedAgent,
   isAddingReady,
-  activityOfAgent,
   isDialogBusy,
   isNameChanged,
   isSetupChanged,
@@ -60,7 +60,6 @@ import {
   SetupTarget,
   shownAgents,
   startingRoles,
-  turnsOfAgent,
   Written
 } from "./definition.ts"
 import { init } from "./init.ts"
@@ -109,7 +108,9 @@ const opened = {
   ...listed,
   ...agentsOf(alice.id, [aliceOwns]),
   isLoaded: true,
-  integrations: Integrations.Loaded({ integrations: [modelsIntegration, harnessIntegration, sandboxIntegration] })
+  integrations: Integrations.cases.Loaded.make({
+    integrations: [modelsIntegration, harnessIntegration, sandboxIntegration]
+  })
 }
 
 const agentMember = (id: string, agentId: string, name: string) =>
@@ -206,23 +207,25 @@ describe("the agents", () => {
       update,
       given(listed),
       model((model) => {
-        expect(model.integrations).toEqual(Integrations.Loading())
+        expect(model.integrations).toEqual(Integrations.cases.Loading.make({}))
       }),
       message(Message.FailedLoadIntegrations({ error: "The host could not be reached. Try again." })),
       model((model) => {
-        expect(model.integrations).toEqual(Integrations.Failed({ error: "The host could not be reached. Try again." }))
+        expect(model.integrations).toEqual(
+          Integrations.cases.Failed.make({ error: "The host could not be reached. Try again." })
+        )
       }),
       // Trying again shows they are loading and asks the page to list them again.
       message(Message.ClickedReloadIntegrations()),
       expectOutMessage(OutMessage.RequestedIntegrations()),
       Command.expectNone(),
       model((model) => {
-        expect(model.integrations).toEqual(Integrations.Loading())
+        expect(model.integrations).toEqual(Integrations.cases.Loading.make({}))
       }),
       message(integrations),
       model((model) => {
         expect(model.integrations).toEqual(
-          Integrations.Loaded({ integrations: [modelsIntegration, harnessIntegration, sandboxIntegration] })
+          Integrations.cases.Loaded.make({ integrations: [modelsIntegration, harnessIntegration, sandboxIntegration] })
         )
       }),
       // Asking again once they are loaded asks nothing.
@@ -1470,7 +1473,7 @@ describe("the setup of an agent", () => {
     )
     // It can't tell until the host has listed them.
     expect(
-      problemsOf({ ...withOffered, integrations: Integrations.Loading() }, { ...setup, harness: "gone-1" })
+      problemsOf({ ...withOffered, integrations: Integrations.cases.Loading.make({}) }, { ...setup, harness: "gone-1" })
     ).toEqual([])
     // A connection that gives something else than the part needs is no more available than one that is gone.
     expect(problemsOf(withOffered, { ...setup, sandbox: modelsId }).map(({ field }) => field)).toEqual(["Sandbox"])
@@ -1491,7 +1494,7 @@ describe("the setup of an agent", () => {
   it("marks the sandbox a harness that works only in one needs", () => {
     const sandboxed = {
       ...withOffered,
-      integrations: Integrations.Loaded({
+      integrations: Integrations.cases.Loaded.make({
         integrations: [modelsIntegration, { ...harnessIntegration, requiresSandbox: true }, sandboxIntegration]
       })
     }
@@ -1529,7 +1532,12 @@ describe("the setup of an agent", () => {
     ).toEqual([vertex.id, "Vertex", { description: "Its integration isn’t installed on this host.", isDisabled: true }])
     // Until the host lists its integrations, it does not say so.
     expect(
-      connectionChoices({ ...opened, integrations: Integrations.Loading() }, "harnesses", modelsId, ({ name }) => name)
+      connectionChoices(
+        { ...opened, integrations: Integrations.cases.Loading.make({}) },
+        "harnesses",
+        modelsId,
+        ({ name }) => name
+      )
     ).toEqual([[modelsId, "Models", { isDisabled: true }]])
   })
 

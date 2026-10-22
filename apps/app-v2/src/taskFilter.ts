@@ -11,7 +11,8 @@ import * as Menu from "@foldkit/ui/menu"
 import * as Schema from "effect/Schema"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineTaggedUnion } from "foldkit/schema"
-import { memberMark, memberName, statusLabel } from "./seen.ts"
+import { memberName } from "./data/members.ts"
+import { memberMark, statusLabel } from "./seen.ts"
 
 /** Which tasks a list keeps by where they stand: every one, or those in one status. */
 export const TaskStatusFilter = Schema.Literals(["All", ...Task.Status.literals])

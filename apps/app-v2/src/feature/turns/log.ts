@@ -12,7 +12,7 @@ import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { defineTaggedUnion } from "foldkit/schema"
-import { connectionNameIn } from "../../seen.ts"
+import { connectionNameIn } from "../../data/connections.ts"
 import type { TurnItem } from "./definition.ts"
 
 /** Why a turn stopped: the person asked, its agent stopped taking part in the thread, or its task changed. */

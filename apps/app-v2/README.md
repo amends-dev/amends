@@ -243,6 +243,15 @@ person's store of the workspace, writes actions to it, and reports facts about i
 parent, so it embeds wherever those identities are known. `feature/` holds the features and `page/`
 the pages that compose them; the root composes the pages.
 
+`data/` holds shared record shapes and queries: connection capabilities and integration loading state,
+agent activity, workspace ownership and role choices, member and group names, search normalization,
+and task state decisions. These modules depend only on shared packages, Effect, and each other;
+`bun run check:packages` enforces that boundary, including type-only imports. Features import these
+modules directly instead of obtaining shared records from another feature's Block definition.
+`view/agents.ts` maps agent data to labels, marks, and logo motions. Its tests sit beside it, and
+the activity tests sit in `data/agents.test.ts`. The browser store remains in `store/`; other
+presentation helpers in `seen.ts` have not yet been reorganized.
+
 Each `block.ts` exports its completed Block under a name of its own: the assembled value stays
 private as `XBlockValue`, `type XBlockType = typeof XBlockValue` takes its type,
 `interface XBlock extends XBlockType {}` names that, and `XBlock` is the value, declared as the
@@ -498,7 +507,7 @@ feature: it uses viewport and selection behavior and the existing shared store s
   buttons open the thread, say whether it is open (`aria-expanded`), and are described by its words (`threadWords`).
   After the count, or after "Reply in thread", come what is going on in the thread: the agents at work in it, "Yumi
   working", "Atlas queued", or "Scout stopping" (`ThreadItem.working`, read from the thread's turns that are queued,
-  running, or being stopped: `agentsAtWork` and `workingLabel` in `agentActivity.ts`), and who types in it besides the
+  running, or being stopped: `agentsAtWork` in `data/agents.ts` and `workingLabel` in `view/agents.ts`), and who types in it besides the
   person, "Ada is typing…" (`typingNames` and `typingLine`, from the `present` the group's Block reads and gives
   `view`); the thread open is the current row. The list has the id `group-threads-` and the group's (`threadsListId`) and
   rests against the composer while the pane shows a conversation (`showsConversation`: the Threads tab, read, with any
@@ -743,7 +752,7 @@ feature: it uses viewport and selection behavior and the existing shared store s
   A conversation with several people, which core allows a direct group to be, has no one's mark to wear and `apps/ui`
   draws none, so its row has one of its own: the first letters of the names of the first two on the neutral tone, and
   all of the names as its label. A conversation with one agent says how the agent stands and what it is doing as the
-  Agents section does, by the same functions (`statusOfAgent` and `sidebarActivity` in `agentStanding.ts`): a patch
+  Agents section does, by the same functions (`statusOfAgent` and `sidebarActivity` in `view/agents.ts`): a patch
   on the mark, "Scout, Needs setup", with why in a tooltip on hover, or, while it is at work, the logo moving at the
   end of the row and the patch saying where, "Scout, Working in #General", wherever the agent is at work rather than
   only in the conversation, as `apps/ui`'s direct message rows take the agent's activity from its status; the count
@@ -1546,20 +1555,20 @@ if the person was near the end, less than 80px of it (`nearEnd`, `isNearEnd`) be
 message to the middle of the pane. Typing and the agents at work are not followed as the end moves, as in `apps/ui`, which
 follows only as its entries are counted; a note of who types may sit just below the view until the person scrolls.
 `settingsForm.ts`, an integration's settings form as the person fills it in, is the connections
-feature's, and `agentSetup.ts`, an agent's setup as the person fills it in, is the agents feature's, as is
-`agentActivity.ts`, what an agent is doing, read from its turns. A turn that is queued, running, or being
+feature's, and `agentSetup.ts`, an agent's setup as the person fills it in, is the agents feature's.
+`data/agents.ts` derives an agent's activity from its turns, shared by the store and feature Blocks. A turn that is queued, running, or being
 stopped is under way, as Queued, Working, or Stopping, and a turn that finished is not (`activityStateOf`);
 `turnsUnderWay` lists an agent's, the most pressing first (working, then stopping, then queued) and the oldest
 first within a state, each with its group and thread, which open it, and the place its group is named by, as the
 person reads it (`placeName`), or none while the store lacks the group; `activityOf` takes the most pressing state and each place once, and none for an agent
-with no turn, which is idle. `placesLine`, `activityLabel`, and `turnLabel` say them in words, "#general + 1 more" and
+with no turn, which is idle. In `view/agents.ts`, `placesLine`, `activityLabel`, and `turnLabel` say them in words, "#general + 1 more" and
 "Working in #general", and `motionOfState` says how the logo moves for each: threaded, lit, or tugged. The Block
 reads the turns under way and the groups through its `ReadActivity` subscription, apart from the agents.
 `agentsAtWork` lists, from one thread's turns, the agents with a turn under way there, each by its membership and the
 state of its turn, the oldest turn first, which the store gives a group's thread list as `working`, and `workingLabel`
 says one in a line with its agent's name, "Yumi working". `stateInGroup` takes the most pressing state among the turns under way in one group,
 whichever agents they are of, which the sidebar's group rows move the logo as.
-`agentStanding.ts`, how an agent stands and what it is doing as a row of the sidebar says it, is shared by the agents
+`view/agents.ts`, how an agent stands and what it is doing as a row of the sidebar says it, is shared by the agents
 feature's section and the groups feature's direct messages: `statusOfAgent` makes the patch on its mark (Needs setup,
 with `issueSentence` of the first thing in the way, or where it is at work, and nothing for an idle agent or one still
 on its way), and `sidebarActivity` the words and motion of its logo.
@@ -1661,7 +1670,7 @@ after a chip is removed (`focusMembersInput`).
   the opening's words; the active members other than the person; and the active members that are agents, each with
   its agent ID. A thread whose group the replica lacks is left out, since it could not be opened, and so is one whose
   only words are a deleted message's. The store lists them in the order of the records and applies no limit, and does
-  not match: the search ranks them (`foldAccents` in `seen.ts`, which the composer's list of members compares names
+  not match: the search ranks them (`foldAccents` in `data/search.ts`, which the composer's list of members compares names
   with too, folds what is typed and the names to compare).
 - The host's sync server is the event log's remote, through `SyncClient`. The store registers the
   browser's sync key over HTTP, then connects, in the background and again until both succeed, so
@@ -2230,17 +2239,17 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   with someone who is gone, kept, a thread by its title or its opening's words and shown by its title, a mention in an
   opening as the member's current name and the syntax of its markdown not read, no thread without words or without its
   group, the active members but the person, the active agents, and every one in the order of the records,
-  and `seen.ts`: the text folded to lower case without accents, the initials of a name, the time of day, the
+  and the shared data and view helpers: search text normalized by `data/search.ts`, member and group names and task state decisions in `data/`, and the initials of a name, the time of day, the
   full date and time of a moment, the start of a day in the person's own time zone, and the labels of a day, of when a message was, and of how long ago it was, from
   times fixed on the clock of the machine the tests run on, and of when an invitation expires, in days rounded up
   and once it has, and of how many replies a thread has, and of who types in a thread, by name and not the person, and of which messages stack under the one before, within five minutes by the same author and not beside a thread with replies, and of whether an author is an agent, and the short time of day, and a count with the word for one or many, whether a thread's title or opening has the letters searched for, and which statuses leave a task open, and the text of a message and of a thread's row as markdown with the members its mentions may name, and the words of a message and of a thread's row without that markdown's syntax,
   a mention as "@" and the member's current name or the name it recorded, a title as written, and `settingsForm.ts`: the fields an
   integration's form gives, a draft from its defaults or a connection's settings, and the settings a
-  draft makes, and `agentSetup.ts`: an agent's draft, and the configuration a draft makes, and `agentActivity.ts`:
+  draft makes, and `agentSetup.ts`: an agent's draft, and the configuration a draft makes, and `data/agents.ts`:
   the state of a turn in each status, the turns under way of an agent, ordered, named by place, and carrying the group and the thread each works in, its activity
-  from them, idle or by the most pressing state and each place once, and the words for them, and the agents at work
-  in one thread from its turns, by state and oldest first, and their line, and the most pressing state of a group's
-  turns, whichever agents they are of, and `agentStanding.ts`: the patch of an agent that needs setup, with why, or is
+  from them, idle or by the most pressing state and each place once, and the agents at work
+  in one thread from its turns, by state and oldest first, and the most pressing state of a group's
+  turns, whichever agents they are of, and `view/agents.ts`: their wording and logo motions, and the patch of an agent that needs setup, with why, or is
   at work, with where, and none while it is idle or its change is on its way, and the words and motion of its logo,
   and `feature/groups/conversation.ts`: whom a conversation is with, which conversation is with exactly some members,
   and its mark, one member's in their tone, or the first letters of two names, or the letters of an ID before the

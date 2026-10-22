@@ -6,7 +6,7 @@ import * as Result from "effect/Result"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import * as AgentSetup from "../../agentSetup.ts"
-import { Integrations } from "../connections/definition.ts"
+import { Integrations } from "../../data/connections.ts"
 import { ConfigureAgent, CreateAgent, LoadModels, RemoveAgent, RenameAgent } from "./command.ts"
 import { AgentsComposition, DialogBinding, leaveDialog } from "./composition.ts"
 import {
@@ -407,10 +407,10 @@ export const update = AgentsComposition.makeUpdate((model, message) => {
       model: modifyFields(model, { turns: () => turns, groups: () => groups })
     }),
     ReceivedIntegrations: ({ integrations }) => ({
-      model: modifyFields(model, { integrations: () => Integrations.Loaded({ integrations }) })
+      model: modifyFields(model, { integrations: () => Integrations.cases.Loaded.make({ integrations }) })
     }),
     FailedLoadIntegrations: ({ error }) => ({
-      model: modifyFields(model, { integrations: () => Integrations.Failed({ error }) })
+      model: modifyFields(model, { integrations: () => Integrations.cases.Failed.make({ error }) })
     }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
     ClickedRetry: () => ({
@@ -419,7 +419,7 @@ export const update = AgentsComposition.makeUpdate((model, message) => {
     ClickedReloadIntegrations: () =>
       Integrations.isAnyOf(["Failed"])(model.integrations)
         ? {
-            model: modifyFields(model, { integrations: () => Integrations.Loading() }),
+            model: modifyFields(model, { integrations: () => Integrations.cases.Loading.make({}) }),
             outMessage: OutMessage.RequestedIntegrations()
           }
         : { model },

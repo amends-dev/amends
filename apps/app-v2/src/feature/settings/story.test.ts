@@ -16,6 +16,7 @@ import {
   roles,
   scout
 } from "../../../test/fixtures.ts"
+import { givableRoles } from "../../data/workspace.ts"
 import {
   ChangeRole,
   CopyWorkspaceId,
@@ -32,7 +33,6 @@ import {
   AccountEntry,
   AccountMenu,
   Entering,
-  givableRoles,
   invitationHistory,
   invitationStatus,
   isDialogBusy,

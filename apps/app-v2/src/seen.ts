@@ -13,9 +13,7 @@
 
 import type { Contact } from "@amends-dev/core/channel"
 import type { Group } from "@amends-dev/core/group"
-import { Identity } from "@amends-dev/core/identity"
 import type { Presence } from "@amends-dev/core/presence"
-import type { ReplicaRecord } from "@amends-dev/core/replica"
 import type { Task } from "@amends-dev/core/task"
 import { type Thread, type ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import type { Turn } from "@amends-dev/core/turn"
@@ -26,6 +24,9 @@ import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import { placeName } from "./data/groups.ts"
+import { isAgent } from "./data/members.ts"
+import { foldAccents } from "./data/search.ts"
 
 /** The uppercase first letters of the first two words of `name`, or of its first word alone. */
 export const initials = (name: string): string =>
@@ -216,51 +217,14 @@ export const visibilityHint: Readonly<Record<Group.Visibility, string>> = {
   Private: "Only people added to this group can find it."
 }
 
-/** Whether the member is an agent. */
-export const isAgent = (member: Member.Member): boolean => Identity.MemberReference.isAnyOf(["Agent"])(member.identity)
-
 /** A member's mark: their initials, on the agent's tone for an agent. */
 export const memberMark = (member: Member.Member): MarkContent => ({
   text: initials(member.name),
   tone: isAgent(member) ? "lilac" : "neutral"
 })
 
-/** `memberId` by their name among `members`, or their ID until names are read. */
-export const memberName = (members: ReadonlyArray<Member.Member>, memberId: MemberId.MemberId): string =>
-  members.find((member) => member.id === memberId)?.name ?? memberId
-
-/** What the connection `connectionId` is called among `connections`, or "Removed connection" once it is gone. */
-export const connectionNameIn = (
-  connections: ReadonlyArray<Pick<ReplicaRecord.Connection, "id" | "name">>,
-  connectionId: string
-): string => connections.find(({ id }) => id === connectionId)?.name ?? "Removed connection"
-
-/** The members `memberIds` by their names among `members`, as a conversation with them is named. */
-export const namesOf = (members: ReadonlyArray<Member.Member>, memberIds: ReadonlyArray<MemberId.MemberId>): string =>
-  memberIds.map((id) => memberName(members, id)).join(", ")
-
-/** A group's name: a team's own, or a conversation's other members than `self`, by their names. */
-export const groupName = (
-  group: Group.Group,
-  members: ReadonlyArray<Member.Member>,
-  self: MemberId.MemberId
-): string =>
-  group.kind === "Team"
-    ? group.name
-    : namesOf(
-        members,
-        group.memberIds.filter((id) => id !== self)
-      )
-
 /** What marks `group`, named `name`, in a list: a team's `#`, or a conversation's other members' initials. */
 export const groupMark = (group: Group.Group, name: string): string => (group.kind === "Team" ? "#" : initials(name))
-
-/** Where `group` is, as a line says it: a team as `#` and its name, a conversation by the others in it. */
-export const placeName = (
-  group: Group.Group,
-  members: ReadonlyArray<Member.Member>,
-  self: MemberId.MemberId
-): string => (group.kind === "Team" ? `#${group.name}` : groupName(group, members, self))
 
 /** What a side pane is about: a thread, or the task it tracks. */
 export type SideAbout = "Thread" | "Task"
@@ -421,12 +385,6 @@ export const threadWords = (
   members: ReadonlyArray<Member.Member>
 ): string => messageTextWords(threadText(thread, opening, members))
 
-/** Whether anyone in the workspace may join `group`: a public team. */
-export const isJoinable = (group: Group.Group): boolean => group.kind === "Team" && group.visibility === "Public"
-
-/** `text` in lower case with its accents taken off, so that "José" and "jose" are the same when searched for. */
-export const foldAccents = (text: string): string => text.normalize("NFD").replaceAll(/\p{M}/gu, "").toLowerCase()
-
 /**
  * Whether the thread's title, or its opening's words as the person reads them among `members`, contain `query`, in
  * any case, whatever the accents and the spaces around it; every thread for a query with no letters.
@@ -465,9 +423,6 @@ export const statusShape: Readonly<Record<Task.Status, TaskStatusShape>> = {
   done: "done",
   dismissed: "dismissed"
 }
-
-/** Whether a task in `status` is open: it is neither done nor dismissed. */
-export const isOpen = (status: Task.Status): boolean => status !== "done" && status !== "dismissed"
 
 /** A task's priority, as the person reads it. */
 export const priorityLabel: Readonly<Record<Task.Priority, string>> = {

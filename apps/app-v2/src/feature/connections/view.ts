@@ -25,32 +25,35 @@ import type { Viewport } from "@amends-dev/design/viewport"
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { calendarDate, memberName } from "../../seen.ts"
+import {
+  areIntegrationsListed,
+  type ConnectionItem,
+  connectionItemsGiving,
+  findConnection,
+  findIntegration,
+  Integrations,
+  integrationOf,
+  isUninstalled
+} from "../../data/connections.ts"
+import { memberName } from "../../data/members.ts"
+import { calendarDate } from "../../seen.ts"
 import * as SettingsForm from "../../settingsForm.ts"
 import { ConnectionsComposition, type ConnectionsViewBuilder, DialogBinding } from "./composition.ts"
 import {
   Adding,
-  areIntegrationsListed,
   Check,
   checkOf,
   type Choosing,
   type Configuring,
-  type ConnectionItem,
   type ConnectionsAction,
   type ConnectionsTab,
-  connectionItemsGiving,
   connectionsOnTab,
   type Edit,
   type Failure,
-  findConnection,
   findEdit,
-  findIntegration,
-  Integrations,
-  integrationOf,
   integrationsToAdd,
   isNameChanged,
   isSettingsChanged,
-  isUninstalled,
   mayAdd,
   mayCreate,
   mayManage,

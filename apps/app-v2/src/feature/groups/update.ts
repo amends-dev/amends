@@ -4,7 +4,7 @@ import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
-import { placeName } from "../../seen.ts"
+import { placeName } from "../../data/groups.ts"
 import { CreateTeam, FocusStartingMembers, JoinGroup, MarkGroupRead } from "./command.ts"
 import { DialogBinding, GroupsComposition, MembersBinding } from "./composition.ts"
 import {

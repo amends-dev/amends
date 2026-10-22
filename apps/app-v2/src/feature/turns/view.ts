@@ -18,7 +18,8 @@ import {
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { fullTimeOf, initials, memberName, timeOf } from "../../seen.ts"
+import { memberName } from "../../data/members.ts"
+import { fullTimeOf, initials, timeOf } from "../../seen.ts"
 import { TurnsComposition, type TurnsViewBuilder } from "./composition.ts"
 import {
   directs,

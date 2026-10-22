@@ -12,18 +12,10 @@ import type { RenderInfo } from "@foldkit/ui/dialog"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
+import { groupName, isJoinable } from "../../data/groups.ts"
+import { isAgent, memberName } from "../../data/members.ts"
 import { pickerPeople, pickerPeopleChosen } from "../../memberPicker.ts"
-import {
-  groupName,
-  initials,
-  isAgent,
-  isJoinable,
-  memberMark,
-  memberName,
-  pluralize,
-  sideSubtitle,
-  visibilityHint
-} from "../../seen.ts"
+import { initials, memberMark, pluralize, sideSubtitle, visibilityHint } from "../../seen.ts"
 import { aboutOf, hasTurnLog } from "../thread/definition.ts"
 import { followView, replyView, sidePane, turnLogView } from "../thread/view.ts"
 import { selfName, showsConversation } from "../threads/definition.ts"

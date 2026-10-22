@@ -5,8 +5,9 @@ import { mark, taskStatus } from "@amends-dev/design/mark"
 import { type PropertyChoice, propertyMenu } from "@amends-dev/design/menu"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
+import { memberName } from "../../data/members.ts"
 import { groupTarget, may, threadTarget } from "../../permissions.ts"
-import { memberMark, memberName, priorityLabel, statusLabel, statusShape } from "../../seen.ts"
+import { memberMark, priorityLabel, statusLabel, statusShape } from "../../seen.ts"
 import { AssigneeFilter, assigneeChoiceOf, assigneeProperties } from "../../taskFilter.ts"
 import {
   AssigneeBinding,
