@@ -1,43 +1,32 @@
+/** The inbox’s notification list and paging controls. */
+
 import { button, buttonRow, loadingLine, notice } from "@amends-dev/design/control"
 import { divider, messageList, notification } from "@amends-dev/design/message"
 import { pane, paneColumn, paneEmpty, paneTabs } from "@amends-dev/design/pane"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { reasonSubtitle, sideSubtitle } from "../../view/groups.ts"
-import { ageLabel } from "../../view/time.ts"
-import { aboutOf, hasTurnLog } from "../thread/definition.ts"
-import { followView, replyView, sidePane, turnLogView } from "../thread/view.ts"
-import { InboxComposition, type InboxViewBuilder, ThreadBinding } from "./composition.ts"
+import { ageLabel } from "../../../view/time.ts"
+import { InboxBlock } from "../block.ts"
+import type { InboxViewBuilder } from "../composition.ts"
 import {
-  byDay,
-  findGroup,
   hasOlderItems,
   type InboxItem,
   isSelected,
   isWaiting,
   Message,
   type Model,
-  notificationHeadline,
-  notificationPlace,
-  notificationText,
-  selectedReasonWords,
   shownItems,
   type Tab,
   waitingCount
-} from "./definition.ts"
+} from "../definition.ts"
+import { byDay, notificationHeadline, notificationPlace, notificationText } from "./notification.ts"
 
 /**
  * The time now, which the days the notifications came on and how long ago they came are read from, the workspace's
  * name, which a phone shows under the inbox's title, and the trigger whose member's card is open.
  */
 export type ViewInputs = Readonly<{ now: DateTime.Utc; workspaceName: string; openTriggerId: string | undefined }>
-
-/**
- * The time now, which the days the thread's messages were published on are read from, and the trigger whose member's
- * card is open.
- */
-export type ThreadViewInputs = Readonly<{ now: DateTime.Utc; openTriggerId: string | undefined }>
 
 /** What the body says when a tab has nothing to list; on Unread, with the way to see what was seen. */
 const nothingToList = (tab: Tab, h: InboxViewBuilder): Html =>
@@ -144,7 +133,7 @@ const notifications = (model: Model, inputs: Pick<ViewInputs, "now" | "openTrigg
  * workspace's name is under the title on phones. Mark all seen is in the header while any notification waits, dimmed
  * while the write that marks them is on its way.
  */
-export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, inputs, h) =>
+export const view = InboxBlock.makeView.withInputs<ViewInputs>((model, inputs, h) =>
   pane(h, {
     variant: "main",
     label: "Inbox",
@@ -175,71 +164,5 @@ export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, inp
         { isWide: true }
       )
     ]
-  })
-)
-
-/**
- * The thread of the notification the person opened as the side pane (see `sidePane`), a task's when it tracks one, with
- * the message the notification is about highlighted in it, the reason the notification came as its subtitle, such as
- * "Mention · #general", while the store holds the message, and the button that closes it, Close beside the title and
- * Back, named for the Inbox, before it on a phone; or, while the person follows the log of one of its turns, that log
- * in its place, beside the inbox; and nothing while no thread is open.
- */
-export const threadView = InboxComposition.makeView.withInputs<ThreadViewInputs>((model, { now, openTriggerId }, h) =>
-  Option.match(model.selected, {
-    onNone: () => h.empty,
-    onSome: (selected) => {
-      const group = findGroup(model, selected.groupId)
-
-      if (hasTurnLog(selected.model)) {
-        return h.block(
-          ThreadBinding.embedView({
-            key: selected.threadId,
-            slotId: "turn-log",
-            model: selected.model,
-            view: turnLogView,
-            viewInputs: { where: sideSubtitle(aboutOf(selected.model), group, model.members, model.memberId) }
-          })
-        )
-      }
-
-      return sidePane(h, {
-        thread: selected.model,
-        group,
-        members: model.members,
-        self: model.memberId,
-        backTo: "Inbox",
-        subtitle: Option.getOrUndefined(
-          Option.map(selectedReasonWords(model), (reason) =>
-            reasonSubtitle(reason, group, model.members, model.memberId)
-          )
-        ),
-        onClose: Message.ClickedClose(),
-        follow: h.block(
-          ThreadBinding.embedView({
-            key: selected.threadId,
-            slotId: "thread-follow",
-            model: selected.model,
-            view: followView
-          })
-        ),
-        body: h.block(
-          ThreadBinding.embedView({
-            key: selected.threadId,
-            slotId: "thread",
-            model: selected.model,
-            viewInputs: { now, openTriggerId, highlightedMessageId: selected.messageId }
-          })
-        ),
-        reply: h.block(
-          ThreadBinding.embedView({
-            key: selected.threadId,
-            slotId: "thread-reply",
-            model: selected.model,
-            view: replyView
-          })
-        )
-      })
-    }
   })
 )

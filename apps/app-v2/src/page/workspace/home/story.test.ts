@@ -78,7 +78,7 @@ const fromInbox = (message: typeof InboxBlock.Message.Type) =>
   InboxBinding.embedView({
     slotId: "inbox",
     model: opened.inbox,
-    viewInputs: { now, workspaceName: "Studio", openTriggerId: undefined }
+    view: InboxBlock.makeView((_model, h) => h.empty)
   }).toParentMessage(message)
 
 /** What the member's card reports, as Home receives it. */
@@ -99,7 +99,7 @@ const fromGroupThread = (message: typeof ThreadBlock.Message.Type) =>
       key: thread.id,
       slotId: "thread",
       model: openThreadModel,
-      viewInputs: { now, openTriggerId: undefined }
+      view: ThreadBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 
@@ -110,7 +110,7 @@ const fromInboxThread = (message: typeof ThreadBlock.Message.Type) =>
       key: thread.id,
       slotId: "thread",
       model: openThreadModel,
-      viewInputs: { now, openTriggerId: undefined }
+      view: ThreadBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 
@@ -133,7 +133,7 @@ const fromGroup = (message: typeof GroupBlock.Message.Type) =>
     key: groupId,
     slotId: "group",
     model: openGroupModel,
-    viewInputs: { now, workspaceName: "Studio", viewport: "Desktop", openTriggerId: undefined }
+    view: GroupBlock.makeView((_model, h) => h.empty)
   }).toParentMessage(message)
 
 /** What the open group's threads report, as Home receives it. */
@@ -142,16 +142,7 @@ const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
     ThreadsBinding.embedView({
       slotId: "threads",
       model: openGroupModel.threads,
-      viewInputs: {
-        members: [],
-        groupName: "General",
-        isTeam: true,
-        memberNames: [],
-        openThreadId: Option.none(),
-        openTriggerId: undefined,
-        present: [],
-        now
-      }
+      view: ThreadsBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 

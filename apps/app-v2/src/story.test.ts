@@ -128,7 +128,7 @@ const fromGroup = (message: typeof GroupBlock.Message.Type) =>
       key: groupId,
       slotId: "group",
       model: initGroup(membership.workspace.id, membership.member.id, groupId, Option.none()).model,
-      viewInputs: { now, workspaceName: "Studio", viewport: "Split", openTriggerId: undefined }
+      view: GroupBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 

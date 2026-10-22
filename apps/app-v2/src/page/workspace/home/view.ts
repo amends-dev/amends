@@ -4,10 +4,12 @@ import type { RenderInfo } from "@foldkit/ui/dialog"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { threadView as groupThreadView } from "../../../feature/group/view.ts"
+import { view as groupView } from "../../../feature/group/view/main.ts"
+import { threadView as groupThreadView } from "../../../feature/group/view/thread.ts"
 import { browseView, dialogView as groupsDialogView } from "../../../feature/groups/view.ts"
 import { waitingCount } from "../../../feature/inbox/definition.ts"
-import { threadView as inboxThreadView } from "../../../feature/inbox/view.ts"
+import { view as inboxView } from "../../../feature/inbox/view/list.ts"
+import { threadView as inboxThreadView } from "../../../feature/inbox/view/thread.ts"
 import { openTriggerIdOf } from "../../../feature/profileCard/definition.ts"
 import { view as memberProfileView } from "../../../feature/profileCard/view.ts"
 import { triageCount } from "../../../feature/tasks/definition.ts"
@@ -44,7 +46,8 @@ export const view = HomeComposition.makeView.withInputs<ViewInputs>((model, { no
         InboxBinding.embedView({
           slotId: "inbox",
           model: model.inbox,
-          viewInputs: { now, workspaceName, openTriggerId }
+          viewInputs: { now, workspaceName, openTriggerId },
+          view: inboxView
         })
       ),
     Triage: () =>
@@ -58,7 +61,8 @@ export const view = HomeComposition.makeView.withInputs<ViewInputs>((model, { no
           key: groupId,
           slotId: "group",
           model: open,
-          viewInputs: { now, workspaceName, viewport: model.viewport, openTriggerId }
+          viewInputs: { now, workspaceName, viewport: model.viewport, openTriggerId },
+          view: groupView
         })
       ),
     Unsent: ({ model: unsent }) =>

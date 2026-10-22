@@ -269,7 +269,8 @@ would work through the whole structure of the Block and of everything it binds a
 named contracts alongside the declaration patches described above; removing one requires checking
 the complete app, including the workspace's sibling policies.
 
-The composer, profile card, connections, agents, and settings Blocks assemble without default views. Their
+The composer, profile card, connections, agents, settings, group, thread list, thread, inbox, task,
+and turns Blocks assemble without default views. Their
 `block.ts` files assemble behavior without importing a view. Views use the completed Block's
 `makeView`, and parents select them explicitly with `Binding.embedView({ view, ... })`. The
 composer's `definition.ts` also holds its empty composition. The profile card keeps agent
@@ -284,6 +285,16 @@ surface it embeds directly; every surface uses its completed Block's `makeView`.
 helpers stay beside those views: error displays, the settings page frame, and connection settings
 or agent setup fields. Each feature keeps one state machine and its existing child bindings
 across those surfaces.
+
+The group keeps its main pane, settings dialog, and open-thread pane in `feature/group/view/`.
+The inbox has a list, an open-thread pane, and notification presentation helpers in its `view/`.
+The thread separates its body, message timeline, follow/reply controls, turn-log placement, and
+shared side-pane frame. These views explicitly choose the task and turn renderers they embed.
+Day grouping, message stacking, notification marks and text, and participation labels live with
+the views that use them; their definitions retain model/message schemas and queries.
+The thread list's day and stacking helpers live in `feature/threads/view/timeline.ts`; its welcome
+and sort labels live in `view/wording.ts`. Turn status labels and ending sentences live in the
+turns feature's existing `log.ts` presentation module.
 
 - `feature/composer`: what the person writes at a place, a reply in a thread, a new thread in a
   group, or the first message of a conversation not yet started, kept as a draft in their browser until they send it. It reports what it sends, and that

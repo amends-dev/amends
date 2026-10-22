@@ -60,7 +60,9 @@ import {
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
-import { followView, replyView, turnLogView, view } from "./view.ts"
+import { view } from "./view/body.ts"
+import { followView, replyView } from "./view/controls.ts"
+import { turnLogView } from "./view/turnLog.ts"
 
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
 const memberId = MemberId.MemberId.make("member-1")

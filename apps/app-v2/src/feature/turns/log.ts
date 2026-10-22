@@ -224,3 +224,41 @@ export const footerOf = (state: TurnState, { hasNewActivity, canRetry, hasReply 
 
   return state === "working" || state === "stopping" ? Footer.FollowingLive() : Footer.Finished()
 }
+
+/** Where a turn in each status stands, as `apps/ui` names it: running is working and cancelling is stopping. */
+const stateOfStatus: Readonly<Record<Turn.Status, TurnState>> = {
+  queued: "queued",
+  running: "working",
+  cancelling: "stopping",
+  completed: "done",
+  failed: "failed",
+  cancelled: "stopped"
+}
+
+/** Where `turn` stands. */
+export const stateOf = ({ status }: ReplicaRecord.Turn): TurnState => stateOfStatus[status]
+
+/**
+ * What a turn that ended says under its row, `agent` being its agent's name: why it failed; that its agent stopped
+ * taking part in the thread or that its task no longer asks it to work; that it ended without a reply. A turn that was
+ * stopped because the person asked, or is not over, or replied, says nothing.
+ */
+export const endingOf = (turn: ReplicaRecord.Turn, agent: string): Option.Option<string> => {
+  switch (turn.status) {
+    case "failed":
+      return Option.fromNullOr(turn.failure)
+    case "cancelled":
+      switch (turn.cancelReason) {
+        case "participation-ended":
+          return Option.some(`${agent} stopped taking part in this thread.`)
+        case "task-changed":
+          return Option.some(`The task no longer asks ${agent} to work on it.`)
+        default:
+          return Option.none()
+      }
+    case "completed":
+      return turn.messageIds.length === 0 ? Option.some("No reply posted.") : Option.none()
+    default:
+      return Option.none()
+  }
+}

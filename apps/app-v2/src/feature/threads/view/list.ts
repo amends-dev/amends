@@ -1,3 +1,5 @@
+/** The group’s thread and task lists, toolbar, tabs, and composer. */
+
 import type { Presence } from "@amends-dev/core/presence"
 import { Task } from "@amends-dev/core/task"
 import type { ThreadId } from "@amends-dev/core/thread"
@@ -20,41 +22,39 @@ import { taskHeadings, taskListEmpty } from "@amends-dev/design/taskList"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html, HtmlBuilder } from "foldkit/html"
-import { memberName } from "../../data/members.ts"
-import { authorMemberId, authorName, isAuthorAgent, typingNames } from "../../data/messages.ts"
-import { threadWords } from "../../data/threads.ts"
-import { workingLabel } from "../../view/agents.ts"
-import { pluralize, repliesLabel } from "../../view/counts.ts"
-import { initials } from "../../view/members.ts"
-import { threadText, typingLine } from "../../view/messages.ts"
-import { assigneeFilterMenu, statusChoices, statusFilterMenu } from "../../view/taskFilter.ts"
-import { noTasksMatch, taskRows } from "../../view/taskList.ts"
-import { statusLabel, statusShape } from "../../view/tasks.ts"
-import { shortTimeOf, timeOf } from "../../view/time.ts"
-import type { OfferedSlashCommand } from "../composer/definition.ts"
-import { view as composerInputView } from "../composer/view.ts"
+import { memberName } from "../../../data/members.ts"
+import { authorMemberId, authorName, isAuthorAgent, typingNames } from "../../../data/messages.ts"
+import { threadWords } from "../../../data/threads.ts"
+import { workingLabel } from "../../../view/agents.ts"
+import { pluralize, repliesLabel } from "../../../view/counts.ts"
+import { initials } from "../../../view/members.ts"
+import { threadText, typingLine } from "../../../view/messages.ts"
+import { assigneeFilterMenu, statusChoices, statusFilterMenu } from "../../../view/taskFilter.ts"
+import { noTasksMatch, taskRows } from "../../../view/taskList.ts"
+import { statusLabel, statusShape } from "../../../view/tasks.ts"
+import { shortTimeOf, timeOf } from "../../../view/time.ts"
+import type { OfferedSlashCommand } from "../../composer/definition.ts"
+import { view as composerInputView } from "../../composer/view.ts"
+import { ThreadsBlock } from "../block.ts"
 import {
   AssigneeBinding,
   ComposerBinding,
   SortBinding,
   StatusBinding,
-  ThreadsComposition,
   type ThreadsViewBuilder
-} from "./composition.ts"
+} from "../composition.ts"
 import {
-  byDay,
   isFiltered,
   isReadFailed,
-  openingStacksUnder,
   threadsListId,
   Message,
   type Model,
-  membersLine,
   openTaskCount,
-  taskSortChoices,
   type ThreadItem,
   tasksOf
-} from "./definition.ts"
+} from "../definition.ts"
+import { byDay, openingStacksUnder } from "./timeline.ts"
+import { membersLine, taskSortChoices } from "./wording.ts"
 
 /**
  * Who could have written the openings, what the group is called and whether it is a team, who belongs to a team as its
@@ -84,7 +84,7 @@ const taskStatusChoices = statusChoices(Task.Status.literals)
  * The tabs under the group's title, named for the group: its threads, and those that track a task, counted while any
  * is open.
  */
-export const tabsView = ThreadsComposition.makeView.withInputs<TabsInputs>((model, { groupName }, h) => {
+export const tabsView = ThreadsBlock.makeView.withInputs<TabsInputs>((model, { groupName }, h) => {
   const open = openTaskCount(model.threads)
 
   return paneTabs(h, {
@@ -285,7 +285,7 @@ const tasksView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): Htm
  * composer; under it, how many tasks the tab lists and the labels of its columns, which stay over the line that says
  * the filters leave none.
  */
-export const toolbarView = ThreadsComposition.makeView.withInputs<ViewInputs>((model, inputs, h) => {
+export const toolbarView = ThreadsBlock.makeView.withInputs<ViewInputs>((model, inputs, h) => {
   const shown = tasksOf(model, inputs.members)
 
   return paneToolbarStack(h, [
@@ -333,7 +333,7 @@ export const toolbarView = ThreadsComposition.makeView.withInputs<ViewInputs>((m
  * What the tab shows: the group's threads, or the tasks they track; or, in place of both, that the conversation could
  * not be read.
  */
-export const view = ThreadsComposition.makeView.withInputs<ViewInputs>((model, inputs, h) => {
+export const view = ThreadsBlock.makeView.withInputs<ViewInputs>((model, inputs, h) => {
   if (isReadFailed(model)) {
     return cantLoadConversation(h, Message.ClickedTryAgain())
   }
@@ -346,7 +346,7 @@ export const view = ThreadsComposition.makeView.withInputs<ViewInputs>((model, i
  * #general" for a team and "Message Bob" for a conversation; or on the Tasks tab, a thread that tracks a task, "New
  * task in #general".
  */
-export const composerView = ThreadsComposition.makeView.withInputs<ViewInputs>(
+export const composerView = ThreadsBlock.makeView.withInputs<ViewInputs>(
   (model, { groupName, isTeam, members, commands = [] }, h) => {
     const place = `${isTeam ? "#" : ""}${groupName}`
 

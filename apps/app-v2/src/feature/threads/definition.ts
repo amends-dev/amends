@@ -30,8 +30,6 @@ import {
 import { AgentAtWork } from "../../data/agents.ts"
 import { isOpen } from "../../data/tasks.ts"
 import { threadContains } from "../../data/threads.ts"
-import { isStackedUnder, type Stackable } from "../../view/messages.ts"
-import { type Day, groupByDay } from "../../view/time.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { SlashCommand } from "../composer/definition.ts"
 
@@ -66,13 +64,6 @@ export type TaskSort = typeof TaskSort.Type
 
 /** The menu that chooses how the Tasks tab orders its tasks. */
 export const TaskSortMenu = Menu.create<TaskSort>()
-
-/** The orders of the Tasks tab, as the person reads them. */
-export const taskSortChoices: ReadonlyArray<readonly [TaskSort, string]> = [
-  ["Latest", "Latest activity"],
-  ["Newest", "Newest"],
-  ["Oldest", "Oldest"]
-]
 
 /**
  * The group's threads as they were read, whether they were yet, the tab shown, what the Tasks tab is narrowed to, how
@@ -129,33 +120,7 @@ export type OutMessage = typeof OutMessage.Type
 
 export const ThreadsDefinition = Block.makeDefinition("Threads", { Model, Message, OutMessage, ChildInitContext })
 
-const byCreated = Order.mapInput(DateTime.Order, ({ thread }: ThreadItem) => thread.createdAt)
-
-/**
- * `items` oldest first by when their threads were created, as the days they were created on by the person's own
- * clock, each named as it is from `now`: "Today", "Yesterday", a weekday, or a date.
- */
-export const byDay = (items: ReadonlyArray<ThreadItem>, now: DateTime.Utc): ReadonlyArray<Day<ThreadItem>> =>
-  groupByDay(Array.sort(items, byCreated), ({ thread }) => thread.createdAt, now)
-
-/**
- * What a thread's opening is to the thread before it when they stack: who wrote it, when the thread began, and replies.
- */
-const stackableOf = (item: ThreadItem): Option.Option<Stackable> =>
-  Option.map(item.opening, ({ author }) => ({
-    author,
-    at: item.thread.createdAt,
-    hasReplies: item.replies > 0
-  }))
-
-/**
- * Whether the opening of `item` stacks under the opening of `previous`, the thread just before it within a day, as the
- * timeline stacks messages: see `isStackedUnder`. An opening not yet read stacks under none and none stacks under it.
- */
-export const openingStacksUnder = (item: ThreadItem, previous: ThreadItem | undefined): boolean =>
-  Option.exists(stackableOf(item), (stackable) =>
-    isStackedUnder(stackable, Option.getOrUndefined(Option.flatMap(Option.fromUndefinedOr(previous), stackableOf)))
-  )
+export const byCreated = Order.mapInput(DateTime.Order, ({ thread }: ThreadItem) => thread.createdAt)
 
 /** The `id` of the list of the threads of `groupId`, which the scroll that keeps it at its end finds it by. */
 export const threadsListId = (groupId: GroupId.GroupId): string => `group-threads-${groupId}`
@@ -166,23 +131,6 @@ export const threadsListId = (groupId: GroupId.GroupId): string => `group-thread
  */
 export const showsConversation = (model: Model): boolean =>
   model.tab === "Threads" && model.isLoaded && model.threads.length > 0
-
-const memberNamesList = new Intl.ListFormat("en", { style: "long", type: "conjunction" })
-
-/** What the welcome calls the person among the members' names. */
-export const selfName = "You"
-
-/**
- * Who belongs to a team as its welcome says it, from `names`: "You, Alex Morgan, and Sara are members.", "You and Sara
- * are members.", and for one "You are a member." or "Sara is a member.".
- */
-export const membersLine = (names: ReadonlyArray<string>): string => {
-  if (names.length !== 1) {
-    return `${memberNamesList.format(names)} are members.`
-  }
-
-  return names[0] === selfName ? `${selfName} are a member.` : `${names[0]} is a member.`
-}
 
 /** Whether the threads could not be read, which is why none are shown: nothing was read, and why. */
 export const isReadFailed = (model: Model): boolean => !model.isLoaded && Option.isSome(model.notice)

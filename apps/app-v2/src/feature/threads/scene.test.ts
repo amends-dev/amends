@@ -33,7 +33,7 @@ import { FocusComposer, ScrollThreadsToEnd, StartThread } from "./command.ts"
 import { Message, OutMessage, TaskSortMenu } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { composerView, tabsView, toolbarView, view } from "./view.ts"
+import { composerView, tabsView, toolbarView, view } from "./view/list.ts"
 
 const { member } = membership
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")

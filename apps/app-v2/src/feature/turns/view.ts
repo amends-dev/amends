@@ -21,21 +21,20 @@ import type { Html } from "foldkit/html"
 import { memberName } from "../../data/members.ts"
 import { initials } from "../../view/members.ts"
 import { fullTimeOf, timeOf } from "../../view/time.ts"
-import { TurnsComposition, type TurnsViewBuilder } from "./composition.ts"
+import { TurnsBlock } from "./block.ts"
+import type { TurnsViewBuilder } from "./composition.ts"
 import {
   directs,
-  endingOf,
   findTurn,
   LogState,
   logListId,
   Message,
   type Model,
   problemOf,
-  stateOf,
   type TurnItem,
   type TurnLog
 } from "./definition.ts"
-import { Entry, entriesOf, Footer, footerOf, summaryOf, wordsOf } from "./log.ts"
+import { endingOf, stateOf, Entry, entriesOf, Footer, footerOf, summaryOf, wordsOf } from "./log.ts"
 import { problemText } from "./problem.ts"
 
 /** Which turn a view shows: the one that took on the work, by its id. */
@@ -93,12 +92,12 @@ const rowView = (item: TurnItem, model: Model, h: TurnsViewBuilder): Html => {
 }
 
 /** The row of the turn that took on the work, or nothing for a turn the thread does not hold. */
-export const view = TurnsComposition.makeView.withInputs<ViewInputs>((model, { turnId }, h) =>
+export const view = TurnsBlock.makeView.withInputs<ViewInputs>((model, { turnId }, h) =>
   Option.match(findTurn(model, turnId), { onNone: () => h.empty, onSome: (item) => rowView(item, model, h) })
 )
 
 /** View turn log, the action of the message the turn posted as its reply, in place of a row of the turn's own. */
-export const replyActionView = TurnsComposition.makeView.withInputs<ViewInputs>((_model, { turnId }, h) =>
+export const replyActionView = TurnsBlock.makeView.withInputs<ViewInputs>((_model, { turnId }, h) =>
   iconButton(h, { icon: "list", label: "View turn log", onClick: Message.ClickedViewLog({ turnId }) })
 )
 
@@ -258,7 +257,7 @@ export type LogPaneInputs = Readonly<{ where: string }>
  * Back to thread, which returns to the thread, Stop while the turn can be stopped, and Close turn log, which leaves the
  * thread too, and, under the title, the agent and how its turn stands. Nothing while the person follows no log.
  */
-export const logPaneView = TurnsComposition.makeView.withInputs<LogPaneInputs>((model, { where }, h) =>
+export const logPaneView = TurnsBlock.makeView.withInputs<LogPaneInputs>((model, { where }, h) =>
   Option.match(model.log, {
     onNone: () => h.empty,
     onSome: (turnLog) => {

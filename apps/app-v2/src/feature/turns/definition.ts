@@ -12,7 +12,6 @@ import { ReplicaRecord } from "@amends-dev/core/replica"
 import { ThreadId } from "@amends-dev/core/thread"
 import { Turn, TurnId } from "@amends-dev/core/turn"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
-import type { TurnState } from "@amends-dev/design/details"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
@@ -115,44 +114,6 @@ export const findTurn = (model: Model, turnId: TurnId.TurnId): Option.Option<Tur
 /** Whether the person may direct the agent of `turn`: stopping its turns and retrying them both need it. */
 export const directs = (model: Model, turn: ReplicaRecord.Turn): boolean =>
   Grant.anyCovers(model.grants, Turn.directRequirement(turn))
-
-/** Where a turn in each status stands, as `apps/ui` names it: running is working and cancelling is stopping. */
-const stateOfStatus: Readonly<Record<Turn.Status, TurnState>> = {
-  queued: "queued",
-  running: "working",
-  cancelling: "stopping",
-  completed: "done",
-  failed: "failed",
-  cancelled: "stopped"
-}
-
-/** Where `turn` stands. */
-export const stateOf = ({ status }: ReplicaRecord.Turn): TurnState => stateOfStatus[status]
-
-/**
- * What a turn that ended says under its row, `agent` being its agent's name: why it failed; that its agent stopped
- * taking part in the thread or that its task no longer asks it to work; that it ended without a reply. A turn that was
- * stopped because the person asked, or is not over, or replied, says nothing.
- */
-export const endingOf = (turn: ReplicaRecord.Turn, agent: string): Option.Option<string> => {
-  switch (turn.status) {
-    case "failed":
-      return Option.fromNullOr(turn.failure)
-    case "cancelled":
-      switch (turn.cancelReason) {
-        case "participation-ended":
-          return Option.some(`${agent} stopped taking part in this thread.`)
-        case "task-changed":
-          return Option.some(`The task no longer asks ${agent} to work on it.`)
-        default:
-          return Option.none()
-      }
-    case "completed":
-      return turn.messageIds.length === 0 ? Option.some("No reply posted.") : Option.none()
-    default:
-      return Option.none()
-  }
-}
 
 /**
  * Why the last stop or retry of `turnId` did not go through: what the browser could not keep, else what the server

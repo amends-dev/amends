@@ -11,13 +11,8 @@ import { groupTarget, may, threadTarget } from "../../permissions.ts"
 import { memberMark } from "../../view/members.ts"
 import { assigneeProperties } from "../../view/taskFilter.ts"
 import { priorityLabel, statusLabel, statusShape } from "../../view/tasks.ts"
-import {
-  AssigneeBinding,
-  PriorityBinding,
-  StatusBinding,
-  TaskComposition,
-  type TaskViewBuilder
-} from "./composition.ts"
+import { TaskBlock } from "./block.ts"
+import { AssigneeBinding, PriorityBinding, StatusBinding, type TaskViewBuilder } from "./composition.ts"
 import { assignable, Message, type Model, type ThreadTask } from "./definition.ts"
 
 /** The statuses a task can be changed to, each with the drawing that says it. */
@@ -110,7 +105,7 @@ const taskView = ({ task, pending }: ThreadTask, model: Model, h: TaskViewBuilde
   ])
 
 /** The task the thread tracks, or making it one, when the person may create tasks in its group. */
-export const view = TaskComposition.makeView((model, h) =>
+export const view = TaskBlock.makeView((model, h) =>
   Option.match(model.task, {
     onSome: (item) => taskView(item, model, h),
     onNone: () =>

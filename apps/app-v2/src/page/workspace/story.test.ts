@@ -1,6 +1,5 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { GroupId } from "@amends-dev/core/group"
-import { TurnId } from "@amends-dev/core/turn"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { currentSidebarRowSelector } from "@amends-dev/design/sidebar"
 import { describe, expect, it } from "@effect/vitest"
@@ -72,6 +71,7 @@ import {
   Written as SettingsWritten
 } from "../../feature/settings/definition.ts"
 import { TasksBlock } from "../../feature/tasks/block.ts"
+import { ThreadBlock } from "../../feature/thread/block.ts"
 import { TurnsBinding } from "../../feature/thread/composition.ts"
 import { init as initThread } from "../../feature/thread/init.ts"
 import { ThreadsBlock } from "../../feature/threads/block.ts"
@@ -103,8 +103,6 @@ const groupId = GroupId.GroupId.make("general")
 const otherGroupId = GroupId.GroupId.make("design")
 
 const opened = init(workspaceId, memberId, "Studio", "Split").model
-
-const scoutTurnId = TurnId.TurnId.make("turn-1")
 
 const unreachable = "The host could not be reached. Try again."
 
@@ -269,7 +267,7 @@ const fromInbox = (message: typeof InboxBlock.Message.Type) =>
     InboxBinding.embedView({
       slotId: "inbox",
       model: opened.home.inbox,
-      viewInputs: { now, workspaceName: "Studio", openTriggerId: undefined }
+      view: InboxBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 
@@ -353,7 +351,7 @@ const fromGroup = (message: typeof GroupBlock.Message.Type) =>
       key: groupId,
       slotId: "group",
       model: openGroupModel,
-      viewInputs: { now, workspaceName: "Studio", viewport: "Desktop", openTriggerId: undefined }
+      view: GroupBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 
@@ -363,16 +361,7 @@ const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
     ThreadsBinding.embedView({
       slotId: "threads",
       model: openGroupModel.threads,
-      viewInputs: {
-        members: [],
-        groupName: "General",
-        isTeam: true,
-        memberNames: [],
-        openThreadId: Option.none(),
-        openTriggerId: undefined,
-        present: [],
-        now
-      }
+      view: ThreadsBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 
@@ -384,7 +373,7 @@ const fromTurnsOfThread = (message: typeof TurnsBlock.Message.Type) =>
   TurnsBinding.embedView({
     slotId: "turn",
     model: openThreadModel.turns,
-    viewInputs: { turnId: scoutTurnId }
+    view: TurnsBlock.makeView((_model, h) => h.empty)
   }).toParentMessage(message)
 
 /** What the turns of the open group's thread report, as the thread, group, Home, and then the workspace receive it. */
@@ -394,7 +383,7 @@ const fromTurnsOfGroupThread = (message: typeof TurnsBlock.Message.Type) =>
       key: thread.id,
       slotId: "thread",
       model: openThreadModel,
-      viewInputs: { now, openTriggerId: undefined, highlightedMessageId: Option.none() }
+      view: ThreadBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(fromTurnsOfThread(message))
   )
 
@@ -405,7 +394,7 @@ const fromTurnsOfInboxThread = (message: typeof TurnsBlock.Message.Type) =>
       key: thread.id,
       slotId: "thread",
       model: openThreadModel,
-      viewInputs: { now, openTriggerId: undefined, highlightedMessageId: Option.none() }
+      view: ThreadBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(fromTurnsOfThread(message))
   )
 

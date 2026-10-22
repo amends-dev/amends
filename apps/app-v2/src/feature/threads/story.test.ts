@@ -24,20 +24,19 @@ import { AssigneeBinding, ComposerBinding, SortBinding, StatusBinding } from "./
 import {
   isFiltered,
   isReadFailed,
-  openingStacksUnder,
   threadsListId,
   Message,
-  membersLine,
   openTaskCount,
   OutMessage,
   showsConversation,
   type TaskSort,
   TaskSortMenu,
-  taskSortChoices,
   tasksOf
 } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
+import { openingStacksUnder } from "./view/timeline.ts"
+import { membersLine, taskSortChoices } from "./view/wording.ts"
 
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
 const memberId = MemberId.MemberId.make("member-1")
