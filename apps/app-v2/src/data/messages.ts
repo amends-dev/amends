@@ -1,10 +1,12 @@
-/** Message authors, plain text, and typing participants. */
+/** Message authors, plain text, chronological order, and typing participants. */
 
 import type { Contact } from "@amends-dev/core/channel"
 import type { Presence } from "@amends-dev/core/presence"
 import { ThreadMessage, type ThreadId } from "@amends-dev/core/thread"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
 import { markdownWords } from "@amends-dev/markdown"
+import * as DateTime from "effect/DateTime"
+import * as Order from "effect/Order"
 import { isAgent } from "./members.ts"
 
 export const deletedMessageText = "Message deleted"
@@ -50,3 +52,5 @@ export const typingNames = (
   present
     .filter((who) => who.typingIn === threadId && who.memberId !== self)
     .map(({ memberId }) => members.find((member) => member.id === memberId)?.name ?? "Someone")
+
+export const byPublished = Order.mapInput(DateTime.Order, (message: ThreadMessage.ThreadMessage) => message.publishedAt)

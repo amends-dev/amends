@@ -4,7 +4,7 @@ import { MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
 import { conversationWithBob, general, membership } from "../../../test/fixtures.ts"
-import type * as Store from "../../store/Store.ts"
+import type * as GroupQuery from "../../store/query/groups.ts"
 import { Message } from "./definition.ts"
 import { receivedConversation } from "./subscription.ts"
 
@@ -15,7 +15,7 @@ const bobId = MemberId.MemberId.make("member-2")
 const scoutId = MemberId.MemberId.make("member-3")
 
 /** `group` as the store lists it, still on its way when `pending`. */
-const listed = (group: Group.Group, pending = false): Store.GroupView => ({
+const listed = (group: Group.Group, pending = false): GroupQuery.GroupView => ({
   group: { record: cases.Group.make({ value: group }), pending },
   members: 2
 })

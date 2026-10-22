@@ -173,6 +173,27 @@ for await (const path of new Bun.Glob("apps/{icons,ui,app-v2,markdown}/{src,test
           `${path}: app data must depend only on shared packages, Markdown, Effect, and other data modules (${dependency}).`
         )
     }
+    if (path.startsWith("apps/app-v2/src/store/query/") && !path.endsWith(".test.ts")) {
+      const packageName = dependency.split("/").slice(0, 2).join("/")
+      const isQueryOrData =
+        dependency.startsWith(".") &&
+        ["store/query", "data"].some((folder) => target.startsWith(resolve(root, `apps/app-v2/src/${folder}`) + "/"))
+      const isPending = target === resolve(root, "apps/app-v2/src/store/Pending.ts")
+      const isReplicaType =
+        target === resolve(root, "apps/app-v2/src/store/Replica.ts") &&
+        !imports.some((imported) => imported.path === dependency)
+      if (
+        !(
+          isQueryOrData ||
+          isPending ||
+          isReplicaType ||
+          dependency === "effect" ||
+          dependency.startsWith("effect/") ||
+          sharedNames.has(packageName)
+        )
+      )
+        errors.push(`${path}: store queries must not import runtime services, features, or views (${dependency}).`)
+    }
     if (path.startsWith("apps/app-v2/src/control/") && !path.endsWith(".test.ts")) {
       const packageName = dependency.split("/").slice(0, 2).join("/")
       const isLocalControlOrData =

@@ -1633,7 +1633,16 @@ and kind (`pickerPeople`), the person locked as "You" (`youInPicker`), and the c
 
 ## The store
 
-`store/Store.ts` opens one person's store of one workspace on one host, for as long as a scope lasts:
+`store/Store.ts` opens one person's store of one workspace on one host, for as long as a scope lasts.
+It owns the services, sync lifecycle, and streams. `store/query/` derives thread, task, group, turn,
+and inbox results from records and pending actions; its result types live beside those functions.
+`data/threads.ts` owns reply summaries, last-activity times, and participation history, while
+`data/search.ts` builds jump targets from plain records. The pure tests sit beside these modules;
+`test/store.test.ts` exercises the store through the HTTP and sync servers.
+`bun run check:packages` keeps store queries independent of runtime services, features, and views;
+they may import replica record types, pending-action calculations, app data, and other queries.
+
+The store has these responsibilities:
 
 - Its event log, Effect eventlog's, journals into an IndexedDB database of its own and applies each
   `ReplicaChanged` the server writes to the replica. `write` writes an action, which eventlog sends
@@ -1675,28 +1684,23 @@ and kind (`pickerPeople`), the person locked as "You" (`youInPicker`), and the c
   entry and sends it again after a stop between the two; a reset applies at any position. It holds
   the server's records alone, and the person's unfinished actions beside them: `Completed` drops
   the action it names, and `Rejected` keeps it, with why, until `dismiss`. `list` reads the records
-  of a kind at a place, `threads` a group's threads with their messages, and, for each thread, how many messages follow its
-  opening and who wrote them (`summarizeReplies`) and when it was last active (`deriveLastActiveAt`: when its
-  latest message was published, or when the thread was created while it has none), and `actions` the person's
-  unfinished actions, each again after every change, `every` the records of a kind wherever they
-  sit, `tasks` every task with the thread that tracks it, summarized as `threads` summarizes one, its
-  opening, its replies, and when it was last active, and the name of its group as the person reads
-  it, and whether the thread is still being started (`viewTasks`; a task whose thread or group the
-  replica lacks is left out, since it could not be opened; the replica reads the threads that track
-  tasks and their messages alone, each by the place it sits at, in one transaction, so that what it
-  reads follows the number of tasks and not of threads, and reads those of the tasks the person's
-  unfinished actions create too, since their actions hold the tasks), `inbox` the person's
-  notifications with the threads they come from, which the store
-  shows each by the message its activity is about, `thread` what a thread holds, with its task,
-  its turns, and the changes to who takes part in it (`deriveParticipationChanges`: the follows and the endings
-  among its activities, each with the member whose part it was), `group` a group with its admissions and the person's follow of it, `groups` every group
-  the replica holds with how many members it has, a team's admitted ones, which a removed
-  admission leaves out, and a conversation's own, and `grants` what
-  the person may do, resolved by core's `GrantResolver` from their active assignments and the
-  workspace's roles; the store reads each through `overlay`, and offers each turn's retry by core's
-  `Turn.whyNotRetryable`, from where its agent stands among the thread's turns, by
-  `TurnStore.latestOf`, and who takes part in it. `get` and `getActions` read a record and the
-  actions once, for an action being written.
+  of a kind at a place, `every` reads them across places, and `threads`, `thread`, and `inbox`
+  collect the related records those reads need. These streams emit again after changes to their
+  records. `tasks` reads tasks and their threads and messages in one transaction, including threads
+  of tasks that unfinished actions create. It reads those threads by place, so the read follows the
+  number of tasks rather than all threads. `get` and `getActions` read once for an action being written.
+- `store/query/threads.ts` applies pending actions and derives thread lists and details: openings,
+  replies and their authors, agents at work, last-activity times, unread counts, the person's
+  participation, and the task and turns of an open thread. Participation history comes from the
+  server's activities; local actions change the person's current participation separately.
+  `store/query/tasks.ts` joins tasks with their threads, opening messages, last-activity times,
+  and group names, leaving out tasks whose thread or group is absent. `store/query/groups.ts`
+  counts active team admissions and the members a direct group was created with.
+  `store/query/inbox.ts` associates each notification with its thread, opening, and the message
+  its activity names. `store/query/turns.ts` orders turns and checks retry eligibility through
+  core's `Turn.whyNotRetryable` and `TurnStore.latestOf`.
+  The Store combines these results with pending-action updates, resolves grants from active
+  assignments and roles, and reads the open group's admissions and the person's follow.
 - `members`, `contacts`, and `people` are the workspace's members, its contacts, the people its channels
   heard from, and the two together as `{ members, contacts }`, as values and not held records, each
   again after each change to them or to the person's actions, as `list` is. The thread, the inbox, and
@@ -1705,7 +1709,7 @@ and kind (`pickerPeople`), the person locked as "You" (`youInPicker`), and the c
   members with `list`, since they show which are unfinished. `workspacePlace` is the place of the
   records the workspace holds itself, which a Block lists the other kinds at, such as groups, roles,
   assignments, connections, and channels.
-- `jumpTargets` is a stream of where the person can jump to, which `listJumpTargets` decides from the groups, the
+- `jumpTargets` is a stream of where the person can jump to, which `data/search.ts`’s `listJumpTargets` decides from the groups, the
   members, the threads, and their messages, as the person's unfinished actions leave them, so it follows what the
   person writes and what the server sends. It reads every message, since the replica keeps no index of a thread's
   opening. It gives `JumpTargets`: the groups, each with the name the person reads it by (a conversation by the other
@@ -2272,19 +2276,12 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   give the owner the workspace with its members, roles, assignments, and invitations, and the grant to rename it; and the members, the contacts, and the people together: a contact a channel heard
   from reaches them, and a member renamed here shows at once, then as the host has it; and the places to jump to
   are a team, a thread, and the member a conversation the person started is with, and not the conversation
-  itself or the person themselves, before the server has them and after. `Store.deriveParticipationChanges` is tested apart: a follow and each way a
-  participation ended in the order of the thread, when each was made, and nothing for other activity, details that do
-  not read, or a participation that is not a member's, and so is `Store.viewTurns`: which turns may run again, and so is `Store.summarizeReplies`: no replies, and each
-  replier once in the order of their first reply, and so is `Store.deriveLastActiveAt`: the creation of a thread
-  with no messages, and the later of two messages, and so is `Store.viewTasks`: each task with its
-  thread, the place of its group, and the summary of its messages, a conversation's group placed by the other
-  member, a thread still being started, and no task whose thread or group the replica lacks, and so
-  is `Store.listJumpTargets`: the groups by
-  the name the person reads, a conversation of two with an active person left to the people and one with several, or
-  with someone who is gone, kept, a thread by its title or its opening's words and shown by its title, a mention in an
-  opening as the member's current name and the syntax of its markdown not read, no thread without words or without its
-  group, the active members but the person, the active agents, and every one in the order of the records,
-  and the shared data and view helpers: search text normalized by `data/search.ts`, member and group names and task state decisions in `data/`, and the initials of a name, the time of day, the
+  itself or the person themselves, before the server has them and after. The pure tests beside `data/threads.ts` cover participation
+  history, reply counts and authors, and last-activity times. Those beside `data/search.ts` cover
+  jump targets, names, ordering, missing records, and the plain text of Markdown and mentions.
+  `store/query/tasks.test.ts` covers task/thread joins and pending flags;
+  `store/query/turns.test.ts` covers ordering and retry eligibility. The remaining tests cover
+  the shared data and view helpers: search text normalized by `data/search.ts`, member and group names and task state decisions in `data/`, and the initials of a name, the time of day, the
   full date and time of a moment, the start of a day in the person's own time zone, and the labels of a day, of when a message was, and of how long ago it was, from
   times fixed on the clock of the machine the tests run on, and of when an invitation expires, in days rounded up
   and once it has, and of how many replies a thread has, and of who types in a thread, by name and not the person, and of which messages stack under the one before, within five minutes by the same author and not beside a thread with replies, and of whether an author is an agent, and the short time of day, and a count with the word for one or many, whether a thread's title or opening has the letters searched for, and which statuses leave a task open, and the text of a message and of a thread's row as markdown with the members its mentions may name, and the words of a message and of a thread's row without that markdown's syntax,
