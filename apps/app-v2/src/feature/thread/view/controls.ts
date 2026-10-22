@@ -2,7 +2,7 @@
 
 import { iconButton } from "@amends-dev/design/control"
 import * as Option from "effect/Option"
-import { view as composerView } from "../../composer/view.ts"
+import { view as composerView } from "../../composer/view/main.ts"
 import { ThreadBlock } from "../block.ts"
 import { ReplyBinding } from "../composition.ts"
 import { Message } from "../definition.ts"

@@ -24,9 +24,9 @@ import {
   type Selected,
   workspaceName
 } from "../definition.ts"
-import { accessDetail, accessName, displayName, statusLabels } from "../wording.ts"
 import { failureView } from "./feedback.ts"
 import { roleChoices } from "./roles.ts"
+import { accessDetail, accessName, displayName, statusLabels } from "./wording.ts"
 
 /** The form that changes the role of the member open, where the person may. */
 const roleForm = (model: Model, selected: Selected, h: SettingsViewBuilder): Html =>

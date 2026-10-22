@@ -23,8 +23,8 @@ import {
   roleLabel,
   shownMembers
 } from "../definition.ts"
-import { displayName, emptyRoster, emptyRosterArt, filterChoices, invitationDetail, statusLabels } from "../wording.ts"
 import { settingsPage } from "./page.ts"
+import { displayName, emptyRoster, emptyRosterArt, filterChoices, invitationDetail, statusLabels } from "./wording.ts"
 
 /**
  * A member as a row of the roster: their mark, their name, with Agent under it for an agent, their role, and their

@@ -4,7 +4,7 @@ import type { IconName } from "@amends-dev/design/icon"
 import * as Array from "effect/Array"
 import * as Option from "effect/Option"
 import type { KeyboardModifiers } from "foldkit/html"
-import { Format } from "./definition.ts"
+import { Format } from "../definition.ts"
 
 /** A key that asks for a format with Control or Command: the keys it may be, and whether Shift and Alt are held. */
 type Shortcut = Readonly<{ name: string; keys: ReadonlyArray<string>; hasShift: boolean; hasAlt: boolean }>

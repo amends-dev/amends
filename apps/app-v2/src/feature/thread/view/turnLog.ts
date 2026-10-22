@@ -1,6 +1,6 @@
 /** The turn log displayed in place of its thread. */
 
-import { logPaneView } from "../../turns/view.ts"
+import { logPaneView } from "../../turns/view/log.ts"
 import { ThreadBlock } from "../block.ts"
 import { TurnsBinding } from "../composition.ts"
 

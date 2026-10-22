@@ -161,7 +161,7 @@ caret moves to its end, since that form sets no selection.
 
 The composer's toolbar named "Formatting" writes markdown, because the box holds the markdown a message is rendered
 from: Bold, Italic, Strikethrough, Link, Numbered list, Bulleted list, Quote, Code, and Code block. The editing operations
-live in `src/feature/composer/format.ts`; `toolbar.ts` owns their buttons, icons, groups, and keyboard shortcuts.
+live in `src/feature/composer/format.ts`; `view/toolbar.ts` owns their buttons, icons, groups, and keyboard shortcuts.
 A button reads the selection through a command, which runs before the render commits, and the answer is formatted by a
 pure function of the text, its mentions, and the selection: an inline format wraps the selected words in its markers,
 leaving the spaces at the ends outside, or takes the markers off when they are just outside the selection or its first
@@ -275,8 +275,8 @@ views use the completed Block's `makeView`, and parents select them explicitly w
 edge. The composer's `definition.ts` also holds its empty composition. The profile card keeps
 agent readiness and activity in its model; its view chooses status wording and logo motions
 through `view/agents.ts`. These remain browser features with commands, mounts, and subscriptions.
-`bun run check:packages` rejects view or design-renderer imports in feature assembly, definitions,
-composition, initialization, updates, commands, and subscriptions, including type-only imports.
+`bun run check:packages` rejects view or design-renderer imports in every feature behavior module,
+including helpers and type-only imports. Presentation belongs in `view.ts` or `view/`.
 The shared viewport schema is allowed because it carries the responsive layout contract.
 
 Agent setup drafts and validation live in `feature/agents/setup.ts`; connection settings forms live
@@ -292,6 +292,12 @@ helpers stay beside those views: error displays, the settings page frame, and co
 or agent setup fields. Each feature keeps one state machine and its existing child bindings
 across those surfaces.
 
+Turns keeps its activity entries in `feature/turns/activity.ts`, which updates use to follow new
+activity. `feature/turns/view/` owns the row, log pane, their shared controls, and the wording of
+entries, statuses, and footers. Settings and connection wording also live beside their views.
+The composer keeps its main view and formatting toolbar under `feature/composer/view/`; its text
+editing remains in `format.ts` and the shared mention control.
+
 The group keeps its main pane, settings dialog, and open-thread pane in `feature/group/view/`.
 The inbox has a list, an open-thread pane, and notification presentation helpers in its `view/`.
 The thread separates its body, message timeline, follow/reply controls, turn-log placement, and
@@ -299,8 +305,7 @@ shared side-pane frame. These views explicitly choose the task and turn renderer
 Day grouping, message stacking, notification marks and text, and participation labels live with
 the views that use them; their definitions retain model/message schemas and queries.
 The thread list's day and stacking helpers live in `feature/threads/view/timeline.ts`; its welcome
-and sort labels live in `view/wording.ts`. Turn status labels and ending sentences live in the
-turns feature's existing `log.ts` presentation module.
+and sort labels live in `view/wording.ts`.
 
 - `feature/composer`: what the person writes at a place, a reply in a thread, a new thread in a
   group, or the first message of a conversation not yet started, kept as a draft in their browser until they send it. It reports what it sends, and that

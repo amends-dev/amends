@@ -138,9 +138,10 @@ for await (const path of new Bun.Glob("apps/{icons,ui,app-v2,markdown}/{src,test
   for (const dependency of dependencies) {
     const target = dependency.startsWith(".") ? resolve(root, dirname(path), dependency) : dependency
     if (
-      /^apps\/app-v2\/src\/feature\/[^/]+\/(block|definition|composition|init|update|command|subscription)\.ts$/.test(
-        path
-      )
+      path.startsWith("apps/app-v2/src/feature/") &&
+      !path.endsWith(".test.ts") &&
+      !path.includes("/view/") &&
+      !path.endsWith("/view.ts")
     ) {
       const isView =
         target.startsWith(resolve(root, "apps/app-v2/src") + "/") &&

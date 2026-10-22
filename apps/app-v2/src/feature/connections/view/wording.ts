@@ -9,8 +9,8 @@ import { Connection } from "@amends-dev/core/connection"
 import type { NoticeBoxTone } from "@amends-dev/design/control"
 import type { MarkStatus } from "@amends-dev/design/mark"
 import * as Option from "effect/Option"
-import { type ConnectionItem, isUninstalled } from "../../data/connections.ts"
-import type { ConnectionsAction, ConnectionsTab, Failure, Reason } from "./definition.ts"
+import { type ConnectionItem, isUninstalled } from "../../../data/connections.ts"
+import type { ConnectionsAction, ConnectionsTab, Failure, Reason } from "../definition.ts"
 
 export const capabilityLabels: Readonly<Record<Integration.Capability, string>> = {
   models: "Models",

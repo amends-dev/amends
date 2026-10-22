@@ -7,7 +7,7 @@ import * as Option from "effect/Option"
 import { areIntegrationsListed, connectionItemsGiving } from "../../../data/connections.ts"
 import { ConnectionsBlock } from "../block.ts"
 import { mayAdd, Message, type Model } from "../definition.ts"
-import { addLabel, capabilityLabels, connectionStatus } from "../wording.ts"
+import { addLabel, capabilityLabels, connectionStatus } from "./wording.ts"
 
 /** The sections of the sidebar that list connections, one for each thing a connection can give the workspace. */
 const capabilitySections = ["models", "tools", "sandboxes", "harnesses"] as const

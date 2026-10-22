@@ -23,9 +23,9 @@ import {
   settingsToAdd,
   shownIntegrations
 } from "../definition.ts"
-import { addLabel, authLabels, authOptionsLabel, capabilityLabels, providesLabel } from "../wording.ts"
 import { failureView } from "./feedback.ts"
 import { settingsFields } from "./settingsFields.ts"
+import { addLabel, authLabels, authOptionsLabel, capabilityLabels, providesLabel } from "./wording.ts"
 
 /** The name of the workspace, which the dialog that adds a connection says it adds the connection to. */
 export type DialogInputs = Readonly<{ workspaceName: string }>

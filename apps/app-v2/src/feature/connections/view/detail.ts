@@ -29,9 +29,9 @@ import {
   settingsDraftOf
 } from "../definition.ts"
 import * as SettingsForm from "../settingsForm.ts"
-import { healthWording, providesLabel } from "../wording.ts"
 import { failureView, isUnread, unreadConnections } from "./feedback.ts"
 import { settingsFields } from "./settingsFields.ts"
+import { healthWording, providesLabel } from "./wording.ts"
 
 /** The connection whose page it is, and the name of the workspace, which a phone shows under the title. */
 export type ConnectionInputs = Readonly<{

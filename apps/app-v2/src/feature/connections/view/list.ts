@@ -18,8 +18,8 @@ import {
   type Model,
   shownConnections
 } from "../definition.ts"
-import { authLabels, connectionStatus, integrationLine, tabLabel } from "../wording.ts"
 import { isUnread, unreadConnections } from "./feedback.ts"
+import { authLabels, connectionStatus, integrationLine, tabLabel } from "./wording.ts"
 
 /**
  * What the host's integrations say while the person waits for them, or why they could not be listed, with a way to ask

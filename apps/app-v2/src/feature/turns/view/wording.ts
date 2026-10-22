@@ -1,105 +1,14 @@
-/**
- * What a turn's log pane says, decided from the turn, what its log holds, and the thread's other turns: the activity as
- * a list of entries, oldest first, each in the words `apps/ui` gives it; the lines of what the turn ran on; and the
- * line at the foot that fits how it stands.
- */
+/** The wording, status, summary, and footer of a turn and its activity. */
 
 import type { ReplicaRecord } from "@amends-dev/core/replica"
-import { Turn } from "@amends-dev/core/turn"
+import type { Turn } from "@amends-dev/core/turn"
 import type { TurnState } from "@amends-dev/design/details"
 import type { SummaryLine } from "@amends-dev/design/turnLog"
-import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
-import * as Schema from "effect/Schema"
 import { defineTaggedUnion } from "foldkit/schema"
-import { connectionNameIn } from "../../data/connections.ts"
-import type { TurnItem } from "./definition.ts"
-
-/** Why a turn stopped: the person asked, its agent stopped taking part in the thread, or its task changed. */
-const StoppedBy = Schema.Literals(["request", "departure", "task"])
-
-/**
- * One thing in a turn's activity, with when it happened: that the work was accepted and the turn started, which the
- * turn records; what its log holds, the input it took, a response it recorded and whether that was posted as its
- * reply, and a run that stopped short and whether it runs again; and how it ended, which the turn records too.
- */
-export const Entry = defineTaggedUnion({
-  Accepted: { at: Schema.DateTimeUtc },
-  Started: { at: Schema.DateTimeUtc },
-  Input: { at: Schema.DateTimeUtc, messages: Schema.Int, isFirst: Schema.Boolean },
-  Response: { at: Schema.DateTimeUtc, text: Schema.String, isPosted: Schema.Boolean },
-  Interrupted: { at: Schema.DateTimeUtc, reason: Schema.String, isRetrying: Schema.Boolean },
-  Replied: { at: Schema.DateTimeUtc },
-  Finished: { at: Schema.DateTimeUtc },
-  Failed: { at: Schema.DateTimeUtc, reason: Schema.Option(Schema.String) },
-  Stopped: { at: Schema.DateTimeUtc, by: StoppedBy }
-})
-export type Entry = typeof Entry.Type
-
-/** Whether no earlier turn of `turn`'s session was in the thread: its session log began with the turn's own input. */
-const beginsItsSession = (turn: ReplicaRecord.Turn, turns: ReadonlyArray<TurnItem>): boolean =>
-  !turns.some(
-    ({ turn: other }) =>
-      other.participationId === turn.participationId && DateTime.isLessThan(other.createdAt, turn.createdAt)
-  )
-
-/** Why `turn` was stopped, as the activity says it: someone asked, unless its agent left or its task changed. */
-const stoppedBy = (turn: ReplicaRecord.Turn): typeof StoppedBy.Type => {
-  switch (turn.cancelReason) {
-    case "participation-ended":
-      return "departure"
-    case "task-changed":
-      return "task"
-    default:
-      return "request"
-  }
-}
-
-/** How `turn` ended, once it did: that it replied, or finished without one, failed, or stopped. */
-const endingEntries = (turn: ReplicaRecord.Turn): ReadonlyArray<Entry> =>
-  Option.match(Option.fromNullOr(turn.finishedAt), {
-    onNone: () => [],
-    onSome: (at) => {
-      switch (turn.status) {
-        case "completed":
-          return [turn.messageIds.length === 0 ? Entry.Finished({ at }) : Entry.Replied({ at })]
-        case "failed":
-          return [Entry.Failed({ at, reason: Option.fromNullOr(turn.failure) })]
-        case "cancelled":
-          return [Entry.Stopped({ at, by: stoppedBy(turn) })]
-        default:
-          return []
-      }
-    }
-  })
-
-/**
- * The activity of the turn `item`, oldest first: that it accepted the work, that it started, what its log `items` hold,
- * and how it ended. Its first input is the one that began its session, which no earlier turn of its agent in the
- * thread's `turns` did, so that it adds the request and the conversation before it.
- */
-export const entriesOf = (
-  { turn }: TurnItem,
-  items: ReadonlyArray<Turn.LogItem>,
-  turns: ReadonlyArray<TurnItem>
-): ReadonlyArray<Entry> => {
-  const firstInputIndex = items.findIndex(Turn.LogItem.isAnyOf(["InputTaken"]))
-  const isSessionFirst = beginsItsSession(turn, turns)
-
-  return [
-    Entry.Accepted({ at: turn.createdAt }),
-    ...Option.toArray(Option.map(Option.fromNullOr(turn.startedAt), (at) => Entry.Started({ at }))),
-    ...items.map((item, index) =>
-      Turn.LogItem.match<Entry>(item, {
-        InputTaken: ({ at, messages }) =>
-          Entry.Input({ at, messages, isFirst: isSessionFirst && index === firstInputIndex }),
-        Responded: ({ at, text, reply }) => Entry.Response({ at, text, isPosted: reply }),
-        Interrupted: ({ at, reason, retryable }) => Entry.Interrupted({ at, reason, isRetrying: retryable })
-      })
-    ),
-    ...endingEntries(turn)
-  ]
-}
+import { connectionNameIn } from "../../../data/connections.ts"
+import { Entry } from "../activity.ts"
+import type { TurnProblem } from "../problem.ts"
 
 /** What an entry says: its title in medium weight and the line under it, when it has one. */
 export type Words = Readonly<{ title: string; text: string | undefined }>
@@ -260,5 +169,29 @@ export const endingOf = (turn: ReplicaRecord.Turn, agent: string): Option.Option
       return turn.messageIds.length === 0 ? Option.some("No reply posted.") : Option.none()
     default:
       return Option.none()
+  }
+}
+
+/** The problem with a turn's agent, `agent` by name, in words. */
+export const problemText = (problem: TurnProblem, agent: string): string => {
+  switch (problem) {
+    case "stop-failed":
+      return "Couldn’t stop the turn. Try again."
+    case "retry-failed":
+      return "Couldn’t start another attempt. Try again."
+    case "finished":
+      return "This turn has already finished."
+    case "still-running":
+      return "This turn is still running."
+    case "replied":
+      return "This turn already replied."
+    case "superseded":
+      return "A newer turn followed this one."
+    case "departed":
+      return `${agent} no longer takes part in this thread.`
+    case "denied":
+      return `You can’t direct ${agent}.`
+    case "gone":
+      return "This turn is no longer available."
   }
 }

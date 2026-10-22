@@ -60,7 +60,7 @@ import {
   connectionStatus,
   integrationLine,
   needsRefresh
-} from "./wording.ts"
+} from "./view/wording.ts"
 
 const { workspace, member } = membership
 const asMember = { workspaceId: workspace.id, memberId: member.id }

@@ -22,9 +22,9 @@ import {
   workspaceName,
   workspaceNameDraft
 } from "../definition.ts"
-import { displayName } from "../wording.ts"
 import { failureView } from "./feedback.ts"
 import { settingsPage } from "./page.ts"
+import { displayName } from "./wording.ts"
 
 /** "6f942c11…5b62": the start and end of a long ID. */
 const shortId = (id: string): string => (id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id)

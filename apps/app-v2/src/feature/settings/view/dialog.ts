@@ -22,9 +22,9 @@ import {
   transferCandidates,
   workspaceName
 } from "../definition.ts"
-import { invitationDetail, invitationStatusLabels, settingsMessage } from "../wording.ts"
 import { failureView } from "./feedback.ts"
 import { roleChoices } from "./roles.ts"
+import { invitationDetail, invitationStatusLabels, settingsMessage } from "./wording.ts"
 
 type InvitingEntering = Extract<Entering, { readonly _tag: "Inviting" }>
 

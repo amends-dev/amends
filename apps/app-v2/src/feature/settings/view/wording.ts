@@ -8,7 +8,7 @@ import { Assignment, Scope } from "@amends-dev/core/authorization"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
 import type { StateArtKind } from "@amends-dev/design/stateArt"
 import type * as DateTime from "effect/DateTime"
-import { dayLabel, dayOf, expiryInDaysLabel } from "../../view/time.ts"
+import { dayLabel, dayOf, expiryInDaysLabel } from "../../../view/time.ts"
 import {
   type Failure,
   type InvitationItem,
@@ -19,7 +19,7 @@ import {
   type Reason,
   roleName,
   type SettingsAction
-} from "./definition.ts"
+} from "../definition.ts"
 
 /** What a member is called, with "· You" after the name of the person themselves. */
 export const displayName = (member: Member.Member, selfId: MemberId.MemberId): string =>

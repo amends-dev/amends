@@ -52,7 +52,7 @@ import {
 } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { emptyRoster, invitationDetail, settingsMessage, settingsToast } from "./wording.ts"
+import { emptyRoster, invitationDetail, settingsMessage, settingsToast } from "./view/wording.ts"
 
 const { workspace, member: alice } = membership
 const asMember = { workspaceId: workspace.id, memberId: alice.id }

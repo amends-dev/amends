@@ -6,7 +6,7 @@ import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import type { ConnectionsViewBuilder } from "../composition.ts"
 import { type Failure, Message, type Model } from "../definition.ts"
-import { connectionsMessage, needsRefresh } from "../wording.ts"
+import { connectionsMessage, needsRefresh } from "./wording.ts"
 
 /**
  * What went wrong with a change or a check, for the place it was made, with a way to refresh when what the person sees

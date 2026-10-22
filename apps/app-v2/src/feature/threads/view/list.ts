@@ -34,7 +34,7 @@ import { noTasksMatch, taskRows } from "../../../view/taskList.ts"
 import { statusLabel, statusShape } from "../../../view/tasks.ts"
 import { shortTimeOf, timeOf } from "../../../view/time.ts"
 import type { OfferedSlashCommand } from "../../composer/definition.ts"
-import { view as composerInputView } from "../../composer/view.ts"
+import { view as composerInputView } from "../../composer/view/main.ts"
 import { ThreadsBlock } from "../block.ts"
 import {
   AssigneeBinding,

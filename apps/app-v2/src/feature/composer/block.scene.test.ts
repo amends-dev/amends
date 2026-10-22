@@ -22,7 +22,7 @@ import * as Drafts from "../../store/Drafts.ts"
 import { ComposerBlock } from "./block.ts"
 import { SaveDraft } from "./command.ts"
 import { boxId, Message, OutMessage } from "./definition.ts"
-import { type ViewInputs, view } from "./view.ts"
+import { type ViewInputs, view } from "./view/main.ts"
 
 /** A consumer supplies native HTML and headless controls without changing the composer's behavior. */
 const plainView = ComposerBlock.makeView.withInputs<ViewInputs>((model, { placeholder }, h) => {

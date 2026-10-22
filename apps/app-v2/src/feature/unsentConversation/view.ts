@@ -1,6 +1,6 @@
 import { notice } from "@amends-dev/design/control"
 import { pane, paneColumn } from "@amends-dev/design/pane"
-import { view as composerView } from "../composer/view.ts"
+import { view as composerView } from "../composer/view/main.ts"
 import { welcome } from "../threads/view/list.ts"
 import { UnsentConversationBlock } from "./block.ts"
 import { ComposerBinding } from "./composition.ts"
