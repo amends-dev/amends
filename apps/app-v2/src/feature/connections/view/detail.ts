@@ -10,7 +10,6 @@ import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { type ConnectionItem, findConnection, integrationOf, isUninstalled } from "../../../data/connections.ts"
 import { memberName } from "../../../data/members.ts"
-import * as SettingsForm from "../../../settingsForm.ts"
 import { calendarDate } from "../../../view/time.ts"
 import { ConnectionsBlock } from "../block.ts"
 import type { ConnectionsViewBuilder } from "../composition.ts"
@@ -29,6 +28,7 @@ import {
   nameDraftOf,
   settingsDraftOf
 } from "../definition.ts"
+import * as SettingsForm from "../settingsForm.ts"
 import { healthWording, providesLabel } from "../wording.ts"
 import { failureView, isUnread, unreadConnections } from "./feedback.ts"
 import { settingsFields } from "./settingsFields.ts"

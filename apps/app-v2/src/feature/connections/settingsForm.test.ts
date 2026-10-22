@@ -1,7 +1,7 @@
 import { Integration } from "@amends-dev/connection"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Result, Schema } from "effect"
-import * as SettingsForm from "../src/settingsForm.ts"
+import * as SettingsForm from "./settingsForm.ts"
 
 /** The form of an integration with each kind of setting, as the host lists it. */
 const form = Integration.make({

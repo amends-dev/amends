@@ -1,6 +1,13 @@
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
-import { editedText, pickMention, readMarkdown, replaceRange, type Written, writeMarkdown } from "../../mentions.ts"
+import {
+  editedText,
+  pickMention,
+  readMarkdown,
+  replaceRange,
+  type Written,
+  writeMarkdown
+} from "../../control/mentions.ts"
 import { ReadSelection, SaveDraft, SelectText } from "./command.ts"
 import {
   boxId,

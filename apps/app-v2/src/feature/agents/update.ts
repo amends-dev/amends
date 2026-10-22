@@ -5,7 +5,6 @@ import * as Option from "effect/Option"
 import * as Result from "effect/Result"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
-import * as AgentSetup from "../../agentSetup.ts"
 import { Integrations } from "../../data/connections.ts"
 import { ConfigureAgent, CreateAgent, LoadModels, RemoveAgent, RenameAgent } from "./command.ts"
 import { AgentsComposition, DialogBinding, leaveDialog } from "./composition.ts"
@@ -37,6 +36,7 @@ import {
   setupDraftOf,
   Written
 } from "./definition.ts"
+import * as AgentSetup from "./setup.ts"
 
 /** The model with the edit of the agent `agentId` as `change` makes it, which is dropped once it holds nothing. */
 const atEdit = (model: Model, agentId: Identity.AgentId, change: (edit: Edit) => Edit): Model => {

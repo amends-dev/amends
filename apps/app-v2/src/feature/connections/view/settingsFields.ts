@@ -8,9 +8,9 @@ import type { Connection } from "@amends-dev/core/connection"
 import { choiceSelect, field, toggle } from "@amends-dev/design/control"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import * as SettingsForm from "../../../settingsForm.ts"
 import type { ConnectionsViewBuilder } from "../composition.ts"
 import type { Message } from "../definition.ts"
+import * as SettingsForm from "../settingsForm.ts"
 
 /** What a form asks its settings fields: the form, what is in it now, and what a change to a field sends. */
 export type SettingsFieldsConfig = Readonly<{

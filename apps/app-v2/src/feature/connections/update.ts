@@ -5,7 +5,6 @@ import * as Result from "effect/Result"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import { findConnection, findIntegration, Integrations, integrationOf } from "../../data/connections.ts"
-import * as SettingsForm from "../../settingsForm.ts"
 import {
   AddConnection,
   CheckConnection,
@@ -43,6 +42,7 @@ import {
   startConfiguring,
   Written
 } from "./definition.ts"
+import * as SettingsForm from "./settingsForm.ts"
 
 /** A failure of `action` for `reason`, with nothing the integration said. */
 const failureOf = (action: ConnectionsAction, reason: Reason): Failure => ({

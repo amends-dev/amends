@@ -49,8 +49,8 @@ import { HttpApiClient, HttpApiMiddleware } from "effect/http-api"
 import { KeyValueStore } from "effect/persistence"
 import { Socket } from "effect/socket"
 import { memberClient } from "../src/api.ts"
+import { may, workspaceTarget } from "../src/data/permissions.ts"
 import { readSettings } from "../src/feature/settings/subscription.ts"
-import { may, workspaceTarget } from "../src/permissions.ts"
 import * as Store from "../src/store/Store.ts"
 import {
   bob,

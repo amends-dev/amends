@@ -11,7 +11,7 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { selectTextOnFocus } from "../../selectOnFocus.ts"
+import { selectTextOnFocus } from "../../control/selectOnFocus.ts"
 import * as Stores from "../../store/Stores.ts"
 import { Message, SettingsDefinition, Written } from "./definition.ts"
 

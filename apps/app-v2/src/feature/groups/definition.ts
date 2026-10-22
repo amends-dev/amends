@@ -14,7 +14,7 @@
  */
 
 import { Grant } from "@amends-dev/core/authorization"
-import { Group, GroupId, GroupMembership } from "@amends-dev/core/group"
+import { Group, GroupId, GroupMembership, GroupPermissions } from "@amends-dev/core/group"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { DialogBlock } from "@foldkit/ui/dialog"
@@ -31,6 +31,7 @@ import { modifyFields } from "foldkit/struct"
 import { MembersComboboxBlock } from "../../control/memberPicker.ts"
 import { activityOfAgent, AgentItem } from "../../data/agents.ts"
 import { groupName, isJoinable, conversationAmong } from "../../data/groups.ts"
+import { may, workspaceTarget } from "../../data/permissions.ts"
 import { foldAccents } from "../../data/search.ts"
 
 /** A group the person can see, whether it is still being created, and how many members it has. */
@@ -366,3 +367,7 @@ export const findCreatedTeam = (model: Model): Option.Option<TeamItem> =>
         )
     )
   )
+
+/** Whether the person may start a team. */
+export const mayCreateTeam = (model: Model): boolean =>
+  may(model.grants, GroupPermissions.Create, workspaceTarget(model.workspaceId))

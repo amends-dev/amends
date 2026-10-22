@@ -1,6 +1,6 @@
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
-import { editedText, readMarkdown, writeMarkdown } from "../../mentions.ts"
+import { editedText, readMarkdown, writeMarkdown } from "../../control/mentions.ts"
 import {
   DeleteMessage,
   EditMessage,

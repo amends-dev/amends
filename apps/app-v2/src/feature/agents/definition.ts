@@ -29,7 +29,6 @@ import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
-import * as AgentSetup from "../../agentSetup.ts"
 import { AgentItem } from "../../data/agents.ts"
 import {
   connectionNameIn,
@@ -40,9 +39,10 @@ import {
   Integrations,
   areIntegrationsListed
 } from "../../data/connections.ts"
+import { may, memberTarget, workspaceTarget } from "../../data/permissions.ts"
 import { foldAccents } from "../../data/search.ts"
 import { givableRoles, WorkspaceItem } from "../../data/workspace.ts"
-import { may, memberTarget, workspaceTarget } from "../../permissions.ts"
+import * as AgentSetup from "./setup.ts"
 
 /** What the person asks of the agents: adding one, renaming one, setting one up again, and removing one. */
 export const AgentAction = Schema.Literals(["Create", "Rename", "Configure", "Remove"])

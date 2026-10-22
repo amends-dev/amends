@@ -1,6 +1,6 @@
 import { MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
-import type { Written } from "../../mentions.ts"
+import type { Written } from "../../control/mentions.ts"
 import type { Format } from "./definition.ts"
 import { applyFormat } from "./format.ts"
 

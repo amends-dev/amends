@@ -37,9 +37,9 @@ import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
+import { may, memberTarget, workspaceTarget } from "../../data/permissions.ts"
 import { foldAccents } from "../../data/search.ts"
 import { WorkspaceItem, isOwner } from "../../data/workspace.ts"
-import { may, memberTarget, workspaceTarget } from "../../permissions.ts"
 
 /** A member of the workspace, and whether a change to them is on its way. */
 export const MemberItem = Schema.Struct({ member: Member.Member, pending: Schema.Boolean })

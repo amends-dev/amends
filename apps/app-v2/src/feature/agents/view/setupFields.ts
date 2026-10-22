@@ -11,7 +11,6 @@ import type { Connection } from "@amends-dev/core/connection"
 import { type Choice, choiceSelect, field, textarea } from "@amends-dev/design/control"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import type * as AgentSetup from "../../../agentSetup.ts"
 import {
   Integrations,
   connectionItemsGiving,
@@ -31,6 +30,7 @@ import {
   sandboxProblem,
   type SetupTarget
 } from "../definition.ts"
+import type * as AgentSetup from "../setup.ts"
 
 /** How the person reads each effort a model takes. */
 const effortLabels: Readonly<Record<NonNullable<Agent.Model["effort"]>, string>> = {

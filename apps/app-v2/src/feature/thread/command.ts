@@ -11,7 +11,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as Api from "../../api.ts"
-import { followEnd, revealMessage, scrollToEnd } from "../../conversationScroll.ts"
+import { followEnd, revealMessage, scrollToEnd } from "../../control/conversationScroll.ts"
 import * as Stores from "../../store/Stores.ts"
 import { Message, messagesListId, ThreadDefinition } from "./definition.ts"
 

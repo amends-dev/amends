@@ -1,7 +1,7 @@
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { describe, expect, it } from "@effect/vitest"
 import { Result, Schema } from "effect"
-import * as AgentSetup from "../src/agentSetup.ts"
+import * as AgentSetup from "./setup.ts"
 
 const agent = Schema.decodeSync(ReplicaRecord.Agent)({
   id: "agent-1",

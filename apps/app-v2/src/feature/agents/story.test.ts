@@ -29,7 +29,6 @@ import {
   scoutAgent,
   turnOf
 } from "../../../test/fixtures.ts"
-import { type Draft, empty } from "../../agentSetup.ts"
 import { activityOfAgent, turnsOfAgent } from "../../data/agents.ts"
 import { connectionsGiving, Integrations } from "../../data/connections.ts"
 import { givableRoles } from "../../data/workspace.ts"
@@ -62,6 +61,7 @@ import {
   Written
 } from "./definition.ts"
 import { init } from "./init.ts"
+import { type Draft, empty } from "./setup.ts"
 import { update } from "./update.ts"
 import { connectionChoices } from "./view/setupFields.ts"
 

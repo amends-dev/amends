@@ -6,7 +6,7 @@
  */
 
 import * as Match from "effect/Match"
-import { replaceRange, type Written } from "../../mentions.ts"
+import { replaceRange, type Written } from "../../control/mentions.ts"
 import type { Format, Selection } from "./definition.ts"
 
 /** The text a format wrote, and where the selection is: on what was formatted, or where the person writes next. */

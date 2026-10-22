@@ -153,7 +153,7 @@ gives the caret, so the composer finds it from what the person typed, the end of
 before, and reads the mention being typed up to it, an "@" at the start of the text or after a space and the letters after it
 with no space among them, so a mention typed in the middle of the text is suggested for too. What a box shows of a
 mention is its member's name with an "@", and the box is the text, so the mention is a span the Block keeps of that
-text (`src/mentions.ts`), written as a link when the text is kept, reported, or sent, so a draft read from the
+text (`src/control/mentions.ts`), written as a link when the text is kept, reported, or sent, so a draft read from the
 browser, or a message loaded for editing, shows the names. A link written by hand still addresses its member, since a
 write reads the text. The textarea that edits a message shows its mentions the same way, as names, keeps and drops them as
 the composer does, and writes them as links when saved, but suggests no one; it is not the composer. When the person removes a mention whole from the textarea of an edit, the
@@ -244,7 +244,7 @@ parent, so it embeds wherever those identities are known. `feature/` holds the f
 the pages that compose them; the root composes the pages.
 
 `data/` holds shared record shapes and queries: connection capabilities and integration loading state,
-agent activity, workspace ownership and role choices, member and group names, search normalization,
+agent activity, permission checks, workspace ownership and role choices, member and group names, search normalization,
 task state decisions, and message text used by search and the store. These modules depend only on
 shared packages, Effect, the Markdown parser, and each other;
 `bun run check:packages` enforces that boundary, including type-only imports. Features import these
@@ -255,8 +255,8 @@ Tests sit beside the data or view module they exercise. The browser store remain
 and obtains plain text from `data/messages.ts`, without importing a design renderer.
 The former `seen.ts` module has been removed; consumers import each helper from its owner.
 
-`control/` holds the shared headless member combobox, task-filter schemas and menus, and
-picker focus behavior. It depends on Foldkit, Effect, shared packages, and app data or controls;
+`control/` holds the shared headless member combobox, task-filter schemas and menus,
+mention editing, conversation scrolling, and focus behavior. It depends on Foldkit, Effect, shared packages, and app data or controls;
 `bun run check:packages` prevents it from importing design renderers, views, or features.
 `view/memberPicker.ts` and `view/taskFilter.ts` supply the choices, marks, labels, and renderers.
 The shared task list lives in `view/taskList.ts`.
@@ -279,7 +279,12 @@ through `view/agents.ts`. These remain browser features with commands, mounts, a
 composition, initialization, updates, commands, and subscriptions, including type-only imports.
 The shared viewport schema is allowed because it carries the responsive layout contract.
 
-A feature with several surfaces keeps them under `view/`. Connections and agents each have
+Agent setup drafts and validation live in `feature/agents/setup.ts`; connection settings forms live
+in `feature/connections/settingsForm.ts`, with their tests beside them. These belong to the feature
+that edits them, while shared permission checks live in `data/permissions.ts`.
+
+A feature with several surfaces keeps them under `view/`. Groups has `sidebar.ts`, `list.ts`, and
+`dialog.ts` for navigation, browsing, and creation. Connections and agents each have
 `sidebar.ts`, `list.ts`, `detail.ts`, and `dialog.ts`. Settings has `workspace.ts`, `members.ts`,
 `member.ts`, `account.ts`, and `dialog.ts` for its distinct surfaces. The workspace imports the
 surface it embeds directly; every surface uses its completed Block's `makeView`. Shared render
@@ -313,7 +318,7 @@ turns feature's existing `log.ts` presentation module.
   it, and Escape dismisses the list (`DismissedSuggestions`) until the letters change. A draft read as the place opens
   opens no list, and neither does a name already picked. A picked mention shows in the box as "@" and the name, "@Sara
   Lind", in place of the letters typed, and a space follows it, as typing does; the Block keeps which spans of its text
-  are picked mentions (`mentions`, from `src/mentions.ts`) and writes each as `ThreadMessage.mentionText`, the link
+  are picked mentions (`mentions`, from `src/control/mentions.ts`) and writes each as `ThreadMessage.mentionText`, the link
   `[@Sara Lind](member:<id>)`, in what it saves as the draft, reports (`ChangedText`), and sends (`SubmittedText`), so
   that the draft, the report, and the message stay markdown and what the person sees is the name. A draft read, or a
   message loaded for editing, goes the other way: each mention link shows as its name, and its span is kept. A span
@@ -386,7 +391,7 @@ turns feature's existing `log.ts` presentation module.
   one named "Following thread" and pressed, which stops following, and disabled, as it was, while a change
   is on its way. `replyView` is the reply composer, named and shown as "Reply in thread", for the pane's footer, which
   suggests the workspace's members the thread has read. A thread that tracks no task keeps its messages at their end, as
-  `conversationScroll.ts` does (below): its list has the id `thread-messages-` and the thread's, the `ScrollMessagesToEnd`
+  `control/conversationScroll.ts` does (below): its list has the id `thread-messages-` and the thread's, the `ScrollMessagesToEnd`
   Command scrolls it to its end as the thread opens, unless a message is highlighted, which the person came for, and,
   from then on, when a message or a note is added while the person was near its end. `sidePane` puts the three into the design's
   side `pane` for the group and the inbox alike: the pane is named Thread, or Task for a thread that
@@ -993,7 +998,7 @@ turns feature's existing `log.ts` presentation module.
   lose and that they need a fresh invitation to rejoin; and Your name (`ChangingName`, opened by "Change your name…"),
   a compact dialog (`size: "compact"`) titled "Your name" with the workspace's name beside the title, "What people in
   this workspace call you. Others keep their own." under it, and one field, "Name", that starts from the name the
-  person has, takes the focus with its text selected (the `SelectOnFocus` mount, `selectOnFocus.ts`), and a Save name
+  person has, takes the focus with its text selected (the `SelectOnFocus` mount, `control/selectOnFocus.ts`), and a Save name
   that waits for a name that is not blank and not the one they have, as `apps/ui`'s change-name dialog does. Its
   Cancel is disabled while the name is being saved (`isCancelDisabled`). It opens from the person's account at the foot of the rail, which the Block draws (`accountView`, given the
   address the person signed in with and their Appearance) as a Foldkit `Menu` Block it binds (`AccountBinding`, a menu
@@ -1162,7 +1167,7 @@ turns feature's existing `log.ts` presentation module.
   Saving a name or a setup reports `SavedName` or `SavedSetup`. A setup that can't be saved as it is
   sends nothing: `checkSetup` marks each part beside its field, a model connection, harness, or sandbox that
   was removed or no longer gives what the part needs, a model that its connection, which lists only its own,
-  does not offer, a harness that works only in a sandbox the setup has none of, and what `agentSetup.ts` finds
+  does not offer, a harness that works only in a sandbox the setup has none of, and what `feature/agents/setup.ts` finds
   it still wants, a model connection, a model, instructions the store can't keep, or a model ID of 1 to 200
   characters. A save the store could not keep, or a name or setup it refused to decode, is worded under the form
   that made it, the dialog's under its fields: "Use 1 to 80 characters, with no invisible ones.", "Check the
@@ -1574,7 +1579,7 @@ the host's integrations, which the workspace page does once for the connections,
 channels, adding a connection, replacing its key, checking it, and listing the models a connection
 offers an agent.
 
-`conversationScroll.ts`, where a conversation sits in the pane that scrolls it, as `apps/ui`'s `useStickToBottom` keeps
+`control/conversationScroll.ts`, where a conversation sits in the pane that scrolls it, as `apps/ui`'s `useStickToBottom` keeps
 it, is the threads Block's and the thread Block's. A conversation is a message list with an `id` in a pane body that
 says it is anchored to the bottom (`data-anchor="bottom"`, from the design's `pane`); a list in any other body, such as a
 task's activity, is left where it is. `scrollToEnd` scrolls it to its end once the render in progress has committed, as
@@ -1583,8 +1588,8 @@ pane body at once, before the render commits, since a Command runs before it doe
 if the person was near the end, less than 80px of it (`nearEnd`, `isNearEnd`) below the view. `revealMessage` scrolls a
 message to the middle of the pane. Typing and the agents at work are not followed as the end moves, as in `apps/ui`, which
 follows only as its entries are counted; a note of who types may sit just below the view until the person scrolls.
-`settingsForm.ts`, an integration's settings form as the person fills it in, is the connections
-feature's, and `agentSetup.ts`, an agent's setup as the person fills it in, is the agents feature's.
+`feature/connections/settingsForm.ts`, an integration's settings form as the person fills it in, is the connections
+feature's, and `feature/agents/setup.ts`, an agent's setup as the person fills it in, is the agents feature's.
 `data/agents.ts` derives an agent's activity from its turns, shared by the store and feature Blocks. A turn that is queued, running, or being
 stopped is under way, as Queued, Working, or Stopping, and a turn that finished is not (`activityStateOf`);
 `turnsUnderWay` lists an agent's, the most pressing first (working, then stopping, then queued) and the oldest
@@ -1734,7 +1739,7 @@ state art, the brand alone in the header, and Reload as a link to the page's own
 - `test/foldkit-policies.test.ts` exercises a cycle of three sibling bindings, including a command emitted only
   by their policies, and checks that its handler and service requirements and outgoing messages remain typed.
   Compile-time rejection cases require the handler layer and every sibling used by the policies.
-- `conversationScroll.test.ts` gives a pane body the extent a browser would measure, with happy-dom's `scrollHeight`
+- `control/conversationScroll.test.ts` gives a pane body the extent a browser would measure, with happy-dom's `scrollHeight`
   and `clientHeight` stubbed, and reads back the `scrollTop` the effects set: near the end is less than 80px, a list
   scrolls to the end when the render has committed unless a message is current and it is told to keep the view, a list
   in a body neither anchored to the bottom nor following its end, as a turn's log does, is left alone, the person is measured before the render grows the pane and
@@ -1775,7 +1780,7 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   a space, other words, a mention, or a draft read, narrowed by the letters, run by Enter, Tab, or a click, which empty
   the draft and report the command, closed on Escape for the letters, and offered to a composer only when it is given
   some; a thread's message loaded for editing with its mentions as names, saved as the
-  links, and as plain text once the name is edited, and `mentions.ts`: a markdown text read as text and spans and
+  links, and as plain text once the name is edited, and `control/mentions.ts`: a markdown text read as text and spans and
   written back, whatever is escaped in a name, a range replaced, and an edit found by comparing the text before and
   after it, and a mention picked; a group
   opening its settings on General, with the draft of the team's name started only for someone who
@@ -2271,9 +2276,9 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   full date and time of a moment, the start of a day in the person's own time zone, and the labels of a day, of when a message was, and of how long ago it was, from
   times fixed on the clock of the machine the tests run on, and of when an invitation expires, in days rounded up
   and once it has, and of how many replies a thread has, and of who types in a thread, by name and not the person, and of which messages stack under the one before, within five minutes by the same author and not beside a thread with replies, and of whether an author is an agent, and the short time of day, and a count with the word for one or many, whether a thread's title or opening has the letters searched for, and which statuses leave a task open, and the text of a message and of a thread's row as markdown with the members its mentions may name, and the words of a message and of a thread's row without that markdown's syntax,
-  a mention as "@" and the member's current name or the name it recorded, a title as written, and `settingsForm.ts`: the fields an
+  a mention as "@" and the member's current name or the name it recorded, a title as written, and `feature/connections/settingsForm.ts`: the fields an
   integration's form gives, a draft from its defaults or a connection's settings, and the settings a
-  draft makes, and `agentSetup.ts`: an agent's draft, and the configuration a draft makes, and `data/agents.ts`:
+  draft makes, and `feature/agents/setup.ts`: an agent's draft, and the configuration a draft makes, and `data/agents.ts`:
   the state of a turn in each status, the turns under way of an agent, ordered, named by place, and carrying the group and the thread each works in, its activity
   from them, idle or by the most pressing state and each place once, and the agents at work
   in one thread from its turns, by state and oldest first, and the most pressing state of a group's

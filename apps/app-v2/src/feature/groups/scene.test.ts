@@ -49,7 +49,9 @@ import { Message, type Model, type NewActivity, OutMessage, VisibilityRadioGroup
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
-import { browseView, dialogView, view } from "./view.ts"
+import { dialogView } from "./view/dialog.ts"
+import { view as browseView } from "./view/list.ts"
+import { sidebarView as view } from "./view/sidebar.ts"
 
 const { workspace, member } = membership
 

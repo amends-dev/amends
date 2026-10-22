@@ -28,9 +28,9 @@ import {
   integrationOf,
   areIntegrationsListed
 } from "../../data/connections.ts"
+import { connectionTarget, may, workspaceTarget } from "../../data/permissions.ts"
 import { foldAccents } from "../../data/search.ts"
-import { connectionTarget, may, workspaceTarget } from "../../permissions.ts"
-import * as SettingsForm from "../../settingsForm.ts"
+import * as SettingsForm from "./settingsForm.ts"
 
 /** Which connections the list page shows: all of them, or those whose integration gives one thing. */
 export const ConnectionsTab = Schema.Union([Schema.Literal("all"), Integration.Capability])

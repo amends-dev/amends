@@ -16,7 +16,7 @@ import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as Dom from "foldkit/dom"
 import * as Api from "../../api.ts"
-import { selectTextOnFocus } from "../../selectOnFocus.ts"
+import { selectTextOnFocus } from "../../control/selectOnFocus.ts"
 import {
   FormErrors,
   JoinErrors,
