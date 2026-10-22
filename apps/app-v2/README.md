@@ -290,6 +290,11 @@ Agent setup drafts and validation live in `feature/agents/setup.ts`; connection 
 in `feature/connections/settingsForm.ts`, with their tests beside them. These belong to the feature
 that edits them, while shared permission checks live in `data/permissions.ts`.
 
+Agents keeps message routing and dialog coordination in `update.ts`. Its `update/forms.ts` owns
+draft mutations and save/failure transitions, `update/submission.ts` validates forms and issues
+commands, and `update/models.ts` loads and caches model choices. These helpers use the same
+feature model and completed Block; no additional state machine is introduced.
+
 A feature with several surfaces keeps them under `view/`. Groups has `sidebar.ts`, `list.ts`, and
 `dialog.ts` for navigation, browsing, and creation. Connections and agents each have
 `sidebar.ts`, `list.ts`, `detail.ts`, and `dialog.ts`. Settings has `workspace.ts`, `members.ts`,
