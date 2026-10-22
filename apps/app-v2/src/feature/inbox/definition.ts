@@ -24,7 +24,10 @@ import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { placeName } from "../../data/groups.ts"
-import { authorMark, authorMemberId, authorName, type Day, groupByDay, messageText } from "../../seen.ts"
+import { authorMemberId, authorName } from "../../data/messages.ts"
+import { authorMark } from "../../view/members.ts"
+import { messageText } from "../../view/messages.ts"
+import { type Day, groupByDay } from "../../view/time.ts"
 import { ThreadBlock } from "../thread/block.ts"
 
 /**

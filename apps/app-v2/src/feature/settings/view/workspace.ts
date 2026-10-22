@@ -6,7 +6,7 @@ import { form } from "@amends-dev/design/form"
 import { paneSection } from "@amends-dev/design/pane"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { memberMark } from "../../../seen.ts"
+import { memberMark } from "../../../view/members.ts"
 import { SettingsBlock } from "../block.ts"
 import type { SettingsViewBuilder } from "../composition.ts"
 import {

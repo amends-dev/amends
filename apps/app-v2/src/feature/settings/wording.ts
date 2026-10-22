@@ -8,7 +8,7 @@ import { Assignment, Scope } from "@amends-dev/core/authorization"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
 import type { StateArtKind } from "@amends-dev/design/stateArt"
 import type * as DateTime from "effect/DateTime"
-import { dayLabel, dayOf, expiryInDaysLabel } from "../../seen.ts"
+import { dayLabel, dayOf, expiryInDaysLabel } from "../../view/time.ts"
 import {
   type Failure,
   type InvitationItem,

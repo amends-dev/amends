@@ -6,7 +6,7 @@ import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneForm, paneSection
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { isAgent } from "../../../data/members.ts"
-import { memberMark } from "../../../seen.ts"
+import { memberMark } from "../../../view/members.ts"
 import { SettingsBlock } from "../block.ts"
 import type { SettingsViewBuilder } from "../composition.ts"
 import {

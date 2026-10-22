@@ -43,7 +43,7 @@ import {
 } from "../../../test/fixtures.ts"
 import { panelIs } from "../../../test/panelSize.ts"
 import { Integrations } from "../../data/connections.ts"
-import { calendarDate } from "../../seen.ts"
+import { calendarDate } from "../../view/time.ts"
 import { ConnectionsBlock } from "./block.ts"
 import {
   AddConnection,

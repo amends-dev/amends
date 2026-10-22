@@ -55,7 +55,7 @@ import {
 } from "../../../test/fixtures.ts"
 import { panelIs } from "../../../test/panelSize.ts"
 import { Integrations } from "../../data/connections.ts"
-import { calendarDate } from "../../seen.ts"
+import { calendarDate } from "../../view/time.ts"
 import { AgentsBlock } from "./block.ts"
 import { ConfigureAgent, CreateAgent, LoadModels, RemoveAgent, RenameAgent } from "./command.ts"
 import { Message, type Model, OfferedModels, OutMessage, Reason, Written } from "./definition.ts"

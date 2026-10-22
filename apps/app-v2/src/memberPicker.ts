@@ -10,7 +10,8 @@ import { Multi, inputId } from "@foldkit/ui/combobox"
 import * as Effect from "effect/Effect"
 import * as Dom from "foldkit/dom"
 import { isAgent } from "./data/members.ts"
-import { memberMark, pluralize } from "./seen.ts"
+import { pluralize } from "./view/counts.ts"
+import { memberMark } from "./view/members.ts"
 
 /** The headless combobox every members picker binds, whose values are the IDs of members. */
 export const MembersComboboxBlock = Multi.create()

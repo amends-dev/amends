@@ -3,7 +3,7 @@
 import type { MenuGroup } from "@amends-dev/design/menu"
 import { railAccount } from "@amends-dev/design/rail"
 import type { Appearance } from "../../../appearance.ts"
-import { initials } from "../../../seen.ts"
+import { initials } from "../../../view/members.ts"
 import { SettingsBlock } from "../block.ts"
 import { AccountBinding } from "../composition.ts"
 import { type AccountEntry, ownName } from "../definition.ts"

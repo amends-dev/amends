@@ -116,15 +116,15 @@ the channels, and the side panes, keep the `paneColumn`'s measure; the panes tha
 threads and tasks, the groups to browse, the inbox, and the tasks' Triage and Tasks, pass it `isWide`,
 so that a list spans the pane. Inside the group's panes, the threads, the thread's messages, and the
 composers are the design's `message`, `divider`, and `composer`, in a `messageList`, with a person's
-initials and when a message was, by its time of day today and by its day before, from `src/seen.ts`,
-which also groups what has a time by the day it was (`groupByDay`, under a `divider` each) and says where a
-group is: its mark in a list (`groupMark`), as a line says it, `#general` or the others in a conversation
-(`placeName`), and as a side pane's subtitle (`sideSubtitle`, and `reasonSubtitle` for the inbox's), and which
-draws a task's status (`statusShape`) with the design's `taskStatus`.
+initials from `src/view/members.ts` and its time of day or day from `src/view/time.ts`.
+The time module also groups items by local day (`groupByDay`, under a `divider` each).
+`data/groups.ts` names a group's place (`placeName`); `view/groups.ts` formats side-pane
+subtitles (`sideSubtitle` and the inbox's `reasonSubtitle`). `view/tasks.ts` maps a task's
+status to the design's drawing (`statusShape`).
 
 A message's text is markdown as the person wrote it, and a mention in it is a link to the member,
 `[@Ada](member:<id>)`, labelled with the name they had when mentioned. Wherever a message's text is
-shown, in a thread, as a task's description, in a group's list of threads, and in the inbox, `seen.ts` hands the
+shown, in a thread, as a task's description, in a group's list of threads, and in the inbox, `view/messages.ts` hands the
 design the markdown with the members its mentions may name (`messageText` and `threadText`, which are a `MessageText`
 of the design's `message` module) and the design shows it as `apps/ui`'s `RichText` does: paragraphs, emphasis, code,
 quotes, lists, tables, and links, a mention as a chip of "@" and the member's current name among the members the view
@@ -249,10 +249,11 @@ task state decisions, and message text used by search and the store. These modul
 shared packages, Effect, the Markdown parser, and each other;
 `bun run check:packages` enforces that boundary, including type-only imports. Features import these
 modules directly instead of obtaining shared records from another feature's Block definition.
-`view/agents.ts` maps agent data to labels, marks, and logo motions. Its tests sit beside it, and
-the activity tests sit in `data/agents.test.ts`. The browser store remains in `store/` and obtains
-plain text from `data/messages.ts`, without importing a design renderer. Other
-presentation helpers in `seen.ts` have not yet been reorganized.
+`view/` holds reusable presentation mappings: agent status and motion, member marks,
+message and thread display, group subtitles, local times, counts, and task labels and shapes.
+Tests sit beside the data or view module they exercise. The browser store remains in `store/`
+and obtains plain text from `data/messages.ts`, without importing a design renderer.
+The former `seen.ts` module has been removed; consumers import each helper from its owner.
 
 Each `block.ts` exports its completed Block under a name of its own: the assembled value stays
 private as `XBlockValue`, `type XBlockType = typeof XBlockValue` takes its type,
@@ -505,7 +506,7 @@ across those surfaces.
   group's members), with "Sending…" while it is being started. An opening by the same author as the thread before it
   within the day, less than five minutes after it, stacks under it without its mark and name, with the short time of
   day ("10:02", `shortTimeOf`) in the mark's place while the pointer or the keyboard is on it (`openingStacksUnder`,
-  from `seen.ts`'s `isStackedUnder`: as `apps/ui`'s `stacked` has it, neither has replies, since a thread's replies
+  from `view/messages.ts`'s `isStackedUnder`: as `apps/ui`'s `stacked` has it, neither has replies, since a thread's replies
   end a stack and start their own, and an opening not read yet stacks under none and has none stack under it). Under
   the text, the task the thread tracks as a chip, the status drawn and the thread's words beside it, named "Plans for
   the week, Triage" (`taskChip`, in place of the status word the row used to say), then the button that opens the
@@ -852,7 +853,7 @@ across those surfaces.
   Each tab's notifications sit under a divider for each day they came on by the person's own clock, named
   as it is from the time now (`dayLabel`), its label before the rule that runs on (`align: "start"`, as `apps/ui`
   has it), and each is a row of its own: who wrote the message its
-  activity is about, by their name and initials, on their tone (`authorMark` in `seen.ts`: an agent's lilac, a
+  activity is about, by their name and initials, on their tone (`authorMark` in `view/members.ts`: an agent's lilac, a
   person's and a contact's neutral), and what they did, which is why the person is told
   (`notificationReason`): the message mentions them ("mentioned you"), it opens the thread ("started
   a thread"), or it replies ("replied"); where it comes from, a team as `#` and its name, a
@@ -879,7 +880,7 @@ across those surfaces.
   waits. `threadView` is the thread open as a side pane, as the group's is (the thread Block's
   `sidePane`): titled by the thread, or for a thread that tracks a task by its status drawing, with why the
   notification came under it, "Mention · #General", "New thread · Bob", or "Reply · #General"
-  (`reasonSubtitle` in `seen.ts`, by `selectedReasonWords`), or, while the store lacks the message
+  (`reasonSubtitle` in `view/groups.ts`, by `selectedReasonWords`), or, while the store lacks the message
   the notification is about, where the thread is as the group's pane says it, or only the reason while it lacks the group,
   with the thread's bell, Follow thread, and Close thread, or Close task, beside the title and, below 48rem, Back to Inbox
   before it, both sending
@@ -1255,7 +1256,7 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   invitations still open to the person, which the host lists with the workspaces, follow them under an
   "Invitations" heading with their count, each keyed by its ID, as the design's `rowWithButton`: the first
   letter of the workspace's name ("?" when the host has none), the name or "Workspace invitation", "Pending
-  invitation · Expires in 7 days" (`expiryLabel` in `seen.ts`, from the time now, which the root gives the view, as
+  invitation · Expires in 7 days" (`expiryLabel` in `view/time.ts`, from the time now, which the root gives the view, as
   `apps/ui` words it: "Expires in 5 hours" while less than a day is left, "Expires tomorrow" once the days left
   rounded up are one, "Expires in N days" up to thirty days, the date, "Expires Oct 6, 2026", beyond, and "Expired"
   once it has; what is left is counted from a minute after the time now, which the app's time may be behind by, so
@@ -1589,7 +1590,7 @@ the two say where the filters leave none (`noTasksMatch`).
 chosen from a menu, is theirs too. The assignee is an `AssigneeFilter`: `Anyone`, `Unassigned`, or `Member` with the
 member's ID. The menu reports a choice as a string, `Anyone`, `Unassigned`, or `Member:` and the ID
 (`assigneeChoiceOf`, `assigneeFilterOf`), and `assigneeChoices` lists the members still in the workspace, by name, with
-the mark `seen.ts` gives them (`memberMark`: their initials, lilac for an agent).
+the mark `view/members.ts` gives them (`memberMark`: their initials, lilac for an agent).
 `memberPicker.ts`, the choice of several workspace members over the design's `memberPicker`, is the Create group form's
 and the group settings' Add members: it holds the combobox Block every picker binds (`MembersComboboxBlock`), the members as the picker offers them, with
 their name, mark, and whether they are a person or an agent (`pickerPeople`), the person themself locked as "You"

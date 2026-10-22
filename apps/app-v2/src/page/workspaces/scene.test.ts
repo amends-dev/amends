@@ -34,7 +34,7 @@ import {
   unnamedInvitation
 } from "../../../test/fixtures.ts"
 import { panelIs } from "../../../test/panelSize.ts"
-import { calendarDate } from "../../seen.ts"
+import { calendarDate } from "../../view/time.ts"
 import {
   AcceptInvitation,
   CreateWorkspace,

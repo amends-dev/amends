@@ -2,7 +2,7 @@ import type { Member } from "@amends-dev/core/workspace"
 import { composer, type Formatting, type Suggestion, type Suggestions } from "@amends-dev/design/composer"
 import * as Match from "effect/Match"
 import * as Option from "effect/Option"
-import { memberMark } from "../../seen.ts"
+import { memberMark } from "../../view/members.ts"
 import { ComposerBlock } from "./block.ts"
 import {
   boxId,

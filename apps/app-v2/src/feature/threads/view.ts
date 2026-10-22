@@ -21,25 +21,16 @@ import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { memberName } from "../../data/members.ts"
+import { authorMemberId, authorName, isAuthorAgent, typingNames } from "../../data/messages.ts"
 import { threadWords } from "../../data/threads.ts"
-import {
-  authorMemberId,
-  authorName,
-  initials,
-  isAuthorAgent,
-  pluralize,
-  repliesLabel,
-  shortTimeOf,
-  statusLabel,
-  statusShape,
-  threadText,
-  timeOf,
-  typingLine,
-  typingNames
-} from "../../seen.ts"
 import { assigneeFilterMenu, statusChoices, statusFilterMenu } from "../../taskFilter.ts"
 import { noTasksMatch, taskRows } from "../../taskList.ts"
 import { workingLabel } from "../../view/agents.ts"
+import { pluralize, repliesLabel } from "../../view/counts.ts"
+import { initials } from "../../view/members.ts"
+import { threadText, typingLine } from "../../view/messages.ts"
+import { statusLabel, statusShape } from "../../view/tasks.ts"
+import { shortTimeOf, timeOf } from "../../view/time.ts"
 import type { OfferedSlashCommand } from "../composer/definition.ts"
 import { view as composerInputView } from "../composer/view.ts"
 import {

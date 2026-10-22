@@ -1,7 +1,7 @@
 import { type Profile, type ProfileAction, profileCard } from "@amends-dev/design/profile"
 import * as Option from "effect/Option"
-import { initials } from "../../seen.ts"
 import { motionOfState, statusOfAgent } from "../../view/agents.ts"
+import { initials } from "../../view/members.ts"
 import { ProfileCardBlock } from "./block.ts"
 import { AnchorProfileCard } from "./command.ts"
 import { Card, type MemberProfile, Message } from "./definition.ts"

@@ -22,7 +22,7 @@ import {
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { bob, connectionOf, membership, scout, turnOf } from "../../../test/fixtures.ts"
-import { fullTimeOf, timeOf } from "../../seen.ts"
+import { fullTimeOf, timeOf } from "../../view/time.ts"
 import { TurnsBlock } from "./block.ts"
 import { FollowLogEnd, RetryTurn, ScrollLogToEnd, StopTurn } from "./command.ts"
 import { LogState, Message, type Model, OutMessage, type TurnItem, type TurnLog } from "./definition.ts"

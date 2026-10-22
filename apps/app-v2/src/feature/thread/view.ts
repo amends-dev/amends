@@ -22,21 +22,13 @@ import type { ProfileOpener } from "@amends-dev/design/profile"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html, HtmlBuilder } from "foldkit/html"
-import {
-  authorMemberId,
-  authorName,
-  fullTimeOf,
-  groupByDay,
-  initials,
-  isAuthorAgent,
-  messageText,
-  repliesLabel,
-  sideSubtitle,
-  statusShape,
-  timeOf,
-  typingLine,
-  whenLabel
-} from "../../seen.ts"
+import { authorMemberId, authorName, isAuthorAgent } from "../../data/messages.ts"
+import { repliesLabel } from "../../view/counts.ts"
+import { sideSubtitle } from "../../view/groups.ts"
+import { initials } from "../../view/members.ts"
+import { messageText, typingLine } from "../../view/messages.ts"
+import { statusShape } from "../../view/tasks.ts"
+import { fullTimeOf, groupByDay, timeOf, whenLabel } from "../../view/time.ts"
 import { view as composerView } from "../composer/view.ts"
 import { logPaneView, replyActionView } from "../turns/view.ts"
 import { RevealHighlightedMessage } from "./command.ts"

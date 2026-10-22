@@ -24,8 +24,11 @@ import { type ActivityState, stateInGroup, type AgentItem, readinessOfAgent } fr
 import { groupName } from "../../data/groups.ts"
 import { includedHint, pickerPeople, pickerPeopleChosen, youInPicker } from "../../memberPicker.ts"
 import { may, workspaceTarget } from "../../permissions.ts"
-import { memberMark, pluralize, statusLabel, statusShape, visibilityHint } from "../../seen.ts"
 import { motionOfState, stateWord, sidebarActivity, statusOfAgent } from "../../view/agents.ts"
+import { pluralize } from "../../view/counts.ts"
+import { visibilityHint } from "../../view/groups.ts"
+import { memberMark } from "../../view/members.ts"
+import { statusLabel, statusShape } from "../../view/tasks.ts"
 import {
   DialogBinding,
   GroupsComposition,

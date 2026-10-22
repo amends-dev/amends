@@ -15,7 +15,9 @@ import type * as Option from "effect/Option"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { isOpen } from "./data/tasks.ts"
 import { threadWords } from "./data/threads.ts"
-import { ageLabel, initials, memberMark, statusLabel, statusShape } from "./seen.ts"
+import { initials, memberMark } from "./view/members.ts"
+import { statusLabel, statusShape } from "./view/tasks.ts"
+import { ageLabel } from "./view/time.ts"
 
 /** What a list of tasks says where the person's filters leave none, as `apps/ui` words it. */
 export const noTasksMatch = "No tasks match these filters."

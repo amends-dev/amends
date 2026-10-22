@@ -5,7 +5,7 @@ import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { initials } from "../../seen.ts"
+import { initials } from "../../view/members.ts"
 import { DialogBinding, SearchComposition, type SearchViewBuilder } from "./composition.ts"
 import {
   activeItem,

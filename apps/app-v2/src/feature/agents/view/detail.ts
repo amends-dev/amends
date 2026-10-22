@@ -16,8 +16,8 @@ import {
   turnsOfAgent
 } from "../../../data/agents.ts"
 import { memberName } from "../../../data/members.ts"
-import { calendarDate } from "../../../seen.ts"
 import { motionOfState, stateWord, turnLabel, issueSentence, statusOfAgent } from "../../../view/agents.ts"
+import { calendarDate } from "../../../view/time.ts"
 import { AgentsBlock } from "../block.ts"
 import type { AgentsViewBuilder } from "../composition.ts"
 import {
