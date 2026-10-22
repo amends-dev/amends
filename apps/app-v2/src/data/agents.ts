@@ -1,5 +1,6 @@
 /** Shared agent records and activity derived from their turns. */
 
+import type { Agent } from "@amends-dev/core/agent"
 import type { Group, GroupId } from "@amends-dev/core/group"
 import type { Identity } from "@amends-dev/core/identity"
 import { ReplicaRecord } from "@amends-dev/core/replica"
@@ -15,6 +16,10 @@ import { placeName } from "./groups.ts"
 /** An agent of the workspace, and whether a change to it is on its way. Its name and role are its member's. */
 export const AgentItem = Schema.Struct({ agent: ReplicaRecord.Agent, pending: Schema.Boolean })
 export type AgentItem = typeof AgentItem.Type
+
+/** Readiness reported by the server, unavailable while a local change is pending. */
+export const readinessOfAgent = ({ agent, pending }: AgentItem): Option.Option<Agent.Readiness> =>
+  pending ? Option.none() : Option.some(agent.readiness)
 
 /** Where a turn under way stands: waiting to start, working, or stopping as asked. */
 export const ActivityState = Schema.Literals(["queued", "working", "stopping"])
@@ -65,7 +70,8 @@ export const agentsAtWork = (turns: ReadonlyArray<ReplicaRecord.Turn>): Readonly
     )
 
 /** What an agent is doing: its most pressing state, and each place it is at work, once. */
-export type AgentActivity = Readonly<{ state: ActivityState; places: ReadonlyArray<string> }>
+export const AgentActivity = Schema.Struct({ state: ActivityState, places: Schema.Array(Schema.String) })
+export type AgentActivity = typeof AgentActivity.Type
 
 /** A stored turn that is under way, and the state it is in. */
 type StoredTurnUnderWay = Readonly<{ turn: ReplicaRecord.Turn; state: ActivityState }>

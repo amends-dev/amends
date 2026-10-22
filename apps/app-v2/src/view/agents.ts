@@ -4,7 +4,7 @@ import { Agent } from "@amends-dev/core/agent"
 import type { LogoMotion } from "@amends-dev/design/logo"
 import type { MarkStatus } from "@amends-dev/design/mark"
 import * as Option from "effect/Option"
-import type { ActivityState, AgentActivity, AgentItem, TurnUnderWay } from "../data/agents.ts"
+import type { ActivityState, AgentActivity, TurnUnderWay } from "../data/agents.ts"
 
 /** A state in a word, such as "Working". */
 export const stateWord: Readonly<Record<ActivityState, string>> = {
@@ -57,12 +57,13 @@ export const issueSentence = (issue: Agent.Issue): string =>
  * once it has it.
  */
 export const statusOfAgent = (
-  { agent, pending }: AgentItem,
+  readiness: Option.Option<Agent.Readiness>,
   activity: Option.Option<AgentActivity>
 ): MarkStatus | undefined =>
-  pending
-    ? undefined
-    : Agent.Readiness.match(agent.readiness, {
+  Option.match(readiness, {
+    onNone: () => undefined,
+    onSome: (ready) =>
+      Agent.Readiness.match(ready, {
         Ready: (): MarkStatus | undefined =>
           Option.getOrUndefined(Option.map(activity, (at) => ({ kind: "available", label: activityLabel(at) }))),
         Incomplete: ({ issues }): MarkStatus | undefined => ({
@@ -71,6 +72,7 @@ export const statusOfAgent = (
           detail: issueSentence(issues[0])
         })
       })
+  })
 
 /** What a sidebar row says of the agent being at work: the words, and how the logo moves, as its state does. */
 export const sidebarActivity = (activity: Option.Option<AgentActivity>) =>

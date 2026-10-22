@@ -83,7 +83,11 @@ const fromInbox = (message: typeof InboxBlock.Message.Type) =>
 
 /** What the member's card reports, as Home receives it. */
 const fromProfileCard = (message: typeof ProfileCardBlock.Message.Type) =>
-  ProfileCardBinding.embedView({ slotId: "profile-card", model: opened.profileCard }).toParentMessage(message)
+  ProfileCardBinding.embedView({
+    view: ProfileCardBlock.makeView((_model, h) => h.empty),
+    slotId: "profile-card",
+    model: opened.profileCard
+  }).toParentMessage(message)
 
 /** The thread of the notification, as it opens before its messages are read. */
 const openThreadModel = initThread(workspaceId, memberId, thread.id).model
@@ -1110,8 +1114,8 @@ describe("Home, with the card of a member", () => {
     isYou: false,
     isFormer: false,
     agentId: Option.none(),
-    standing: Option.none(),
-    motion: Option.none()
+    readiness: Option.none(),
+    activity: Option.none()
   }
 
   const agent: MemberProfile = {

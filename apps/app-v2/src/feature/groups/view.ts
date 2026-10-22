@@ -20,7 +20,7 @@ import { sidebarEmpty, sidebarItem, sidebarSection, sidebarSections } from "@ame
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { type ActivityState, stateInGroup, type AgentItem } from "../../data/agents.ts"
+import { type ActivityState, stateInGroup, type AgentItem, readinessOfAgent } from "../../data/agents.ts"
 import { groupName } from "../../data/groups.ts"
 import { includedHint, pickerPeople, pickerPeopleChosen, youInPicker } from "../../memberPicker.ts"
 import { may, workspaceTarget } from "../../permissions.ts"
@@ -101,7 +101,7 @@ const activityInGroup = (model: Model, groupId: Group.Group["id"]) =>
 const standingOfAgent = (item: AgentItem, model: Model) => {
   const activity = activityOfAgentHere(model, item)
 
-  return { status: statusOfAgent(item, activity), ...sidebarActivity(activity) }
+  return { status: statusOfAgent(readinessOfAgent(item), activity), ...sidebarActivity(activity) }
 }
 
 /** What marks a team's row: the channel's drawing, and the logo while an agent is at work in the team. */

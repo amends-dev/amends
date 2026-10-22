@@ -2268,8 +2268,8 @@ describe("a workspace, with the card of a member", () => {
     isYou,
     isFormer: false,
     agentId: Option.none(),
-    standing: Option.none(),
-    motion: Option.none()
+    readiness: Option.none(),
+    activity: Option.none()
   })
 
   it("is drawn in the page's frame when a name in the inbox opens it, and the name says it is expanded", () => {

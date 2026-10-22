@@ -264,8 +264,10 @@ The composer is the first feature whose Block is assembled without a default vie
 `definition.ts` holds the definition and its empty composition, and `block.ts` assembles init,
 update, commands, and subscriptions without importing the view. `view.ts` uses
 `ComposerBlock.makeView` and the design's renderer. The thread, thread list, and unsent conversation
-select that view explicitly with `Binding.embedView({ view, ... })`. Other features still assemble
-their default views; they have not yet adopted this boundary. The composer remains a browser
+select that view explicitly with `Binding.embedView({ view, ... })`. The profile card follows the
+same boundary: Home selects its view, and its model keeps agent readiness and activity rather
+than status wording or logo motions. Its view chooses those through `view/agents.ts`. Other
+features still assemble their default views; they have not yet adopted this boundary. The composer remains a browser
 feature: it uses viewport and selection behavior and the existing shared store services.
 
 - `feature/composer`: what the person writes at a place, a reply in a thread, a new thread in a

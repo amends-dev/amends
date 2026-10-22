@@ -29,6 +29,7 @@ import {
   type TurnUnderWay,
   activityOfAgent,
   type AgentItem,
+  readinessOfAgent,
   turnsOfAgent
 } from "../../data/agents.ts"
 import { Integrations } from "../../data/connections.ts"
@@ -147,7 +148,7 @@ export const sidebarView = AgentsComposition.makeView.withInputs<SidebarInputs>(
 
                 return sidebarItem(h, {
                   mark: { text: nameOfAgent(model, item.agent).slice(0, 1), tone: "lilac" },
-                  status: statusOfAgent(item, activity),
+                  status: statusOfAgent(readinessOfAgent(item), activity),
                   ...sidebarActivity(activity),
                   label: nameOfAgent(model, item.agent),
                   isPending: item.pending,
@@ -194,7 +195,7 @@ const agentRow = (item: AgentItem, model: Model, h: AgentsViewBuilder): Html => 
       row(h, {
         mark: { text: name.slice(0, 1), tone: "lilac" },
         markSize: "md",
-        status: statusOfAgent(item, activity),
+        status: statusOfAgent(readinessOfAgent(item), activity),
         title: name,
         ...(pending ? { meta: "Sending…" } : {}),
         cells: [
@@ -526,7 +527,7 @@ const agentPage = (item: AgentItem, model: Model, workspaceName: string, h: Agen
     header: {
       title: name,
       mark: { text: name.slice(0, 1), tone: "lilac" },
-      status: statusOfAgent(item, activityOfAgent(model, item)),
+      status: statusOfAgent(readinessOfAgent(item), activityOfAgent(model, item)),
       phoneContext: workspaceName,
       ...(item.pending ? { context: "Sending…" } : {})
     },

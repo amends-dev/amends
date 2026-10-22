@@ -9,6 +9,7 @@ import { browseView, dialogView as groupsDialogView } from "../../../feature/gro
 import { waitingCount } from "../../../feature/inbox/definition.ts"
 import { threadView as inboxThreadView } from "../../../feature/inbox/view.ts"
 import { openTriggerIdOf } from "../../../feature/profileCard/definition.ts"
+import { view as memberProfileView } from "../../../feature/profileCard/view.ts"
 import { triageCount } from "../../../feature/tasks/definition.ts"
 import { tasksView, triageView } from "../../../feature/tasks/view.ts"
 import {
@@ -158,7 +159,7 @@ export const threadView = HomeComposition.makeView.withInputs<ThreadInputs>((mod
 
 /** The card of the member whose mark, name, or mention the person opened, which the shell keeps in the frame. */
 export const profileCardView = HomeComposition.makeView((model, h) =>
-  h.block(ProfileCardBinding.embedView({ slotId: "profile-card", model: model.profileCard }))
+  h.block(ProfileCardBinding.embedView({ slotId: "profile-card", model: model.profileCard, view: memberProfileView }))
 )
 
 /** How the shell draws the side pane's dialog, which it lends. */

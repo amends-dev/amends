@@ -924,8 +924,8 @@ describe("Home, with the card of a member", () => {
     isYou: false,
     isFormer: false,
     agentId: Option.none(),
-    standing: Option.none(),
-    motion: Option.none()
+    readiness: Option.none(),
+    activity: Option.none()
   }
 
   const agent: MemberProfile = {

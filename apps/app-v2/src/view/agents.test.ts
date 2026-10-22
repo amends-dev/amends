@@ -2,6 +2,7 @@ import { ReplicaRecord } from "@amends-dev/core/replica"
 import { describe, expect, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
 import { scoutAgent } from "../../test/fixtures.ts"
+import { readinessOfAgent } from "../data/agents.ts"
 import {
   sidebarActivity,
   statusOfAgent,
@@ -22,25 +23,27 @@ const working = Option.some({ state: "working" as const, places: ["#General", "#
 
 describe("how an agent stands as a row of the sidebar says it", () => {
   it("is Needs setup, with why, when it can't run as it is set up, whatever it is doing", () => {
-    expect(statusOfAgent({ agent: incomplete, pending: false }, Option.none())).toEqual({
+    expect(statusOfAgent(readinessOfAgent({ agent: incomplete, pending: false }), Option.none())).toEqual({
       kind: "attention",
       label: "Needs setup",
       detail: "Its harness connection’s integration isn’t installed on this host."
     })
-    expect(statusOfAgent({ agent: incomplete, pending: false }, working)).toMatchObject({ label: "Needs setup" })
+    expect(statusOfAgent(readinessOfAgent({ agent: incomplete, pending: false }), working)).toMatchObject({
+      label: "Needs setup"
+    })
   })
 
   it("is where it is at work while it is ready and at work, and nothing while it is idle", () => {
-    expect(statusOfAgent({ agent: scoutAgent, pending: false }, working)).toEqual({
+    expect(statusOfAgent(readinessOfAgent({ agent: scoutAgent, pending: false }), working)).toEqual({
       kind: "available",
       label: "Working in #General + 1 more"
     })
-    expect(statusOfAgent({ agent: scoutAgent, pending: false }, Option.none())).toBeUndefined()
+    expect(statusOfAgent(readinessOfAgent({ agent: scoutAgent, pending: false }), Option.none())).toBeUndefined()
   })
 
   it("is nothing while a change to the agent is on its way", () => {
-    expect(statusOfAgent({ agent: incomplete, pending: true }, Option.none())).toBeUndefined()
-    expect(statusOfAgent({ agent: scoutAgent, pending: true }, working)).toBeUndefined()
+    expect(statusOfAgent(readinessOfAgent({ agent: incomplete, pending: true }), Option.none())).toBeUndefined()
+    expect(statusOfAgent(readinessOfAgent({ agent: scoutAgent, pending: true }), working)).toBeUndefined()
   })
 })
 

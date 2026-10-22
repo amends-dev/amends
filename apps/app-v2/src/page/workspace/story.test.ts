@@ -276,7 +276,11 @@ const fromInbox = (message: typeof InboxBlock.Message.Type) =>
 /** What the member's card reports, as Home and then the workspace receive it. */
 const fromProfileCard = (message: typeof ProfileCardBlock.Message.Type) =>
   fromHome(
-    ProfileCardBinding.embedView({ slotId: "profile-card", model: opened.home.profileCard }).toParentMessage(message)
+    ProfileCardBinding.embedView({
+      view: ProfileCardBlock.makeView((_model, h) => h.empty),
+      slotId: "profile-card",
+      model: opened.home.profileCard
+    }).toParentMessage(message)
   )
 
 /** What the tasks report, as Home and then the workspace receive it. */
@@ -1866,8 +1870,8 @@ describe("a workspace, with the card of a member", () => {
     isYou: false,
     isFormer: false,
     agentId: Option.none(),
-    standing: Option.none(),
-    motion: Option.none()
+    readiness: Option.none(),
+    activity: Option.none()
   }
 
   /** The card of `profile` open, from the name in the inbox's notification, and read. */

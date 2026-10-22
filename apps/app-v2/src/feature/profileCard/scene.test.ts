@@ -1,3 +1,4 @@
+import { Agent } from "@amends-dev/core/agent"
 import { describe, it } from "@effect/vitest"
 import { Option } from "effect"
 import {
@@ -38,8 +39,8 @@ const person: MemberProfile = {
   isYou: false,
   isFormer: false,
   agentId: Option.none(),
-  standing: Option.none(),
-  motion: Option.none()
+  readiness: Option.none(),
+  activity: Option.none()
 }
 
 const agent: MemberProfile = {
@@ -47,7 +48,8 @@ const agent: MemberProfile = {
   memberId: scout.id,
   name: "Scout",
   kind: "Agent",
-  agentId: Option.some(scoutAgent.id)
+  agentId: Option.some(scoutAgent.id),
+  readiness: Option.some(scoutAgent.readiness)
 }
 
 const triggerId = "thread-message-1-name"
@@ -98,6 +100,7 @@ describe("the profile card", () => {
       Mount.expectExact(AnchorProfileCard),
       expect(role("dialog", { name: "Bob" })).toExist(),
       expect(within(card, text("Person"))).toExist(),
+      expect(within(card, text("B"))).toExist(),
       expect(within(card, role("button", { name: "Close" }))).toExist(),
       expect(within(card, role("button", { name: "Message" }))).toExist(),
       expect(within(card, role("button", { name: "Open agent" }))).toBeAbsent(),
@@ -134,14 +137,15 @@ describe("the profile card", () => {
         showing(
           Option.some({
             ...agent,
-            standing: Option.some({
-              kind: "attention",
-              label: "Needs setup",
-              detail: Option.some("Its harness connection’s integration isn’t installed on this host.")
-            })
+            readiness: Option.some(
+              Agent.Readiness.cases.Incomplete.make({
+                issues: [Agent.Issue.cases.Uninstalled.make({ part: "harness" })]
+              })
+            )
           })
         )
       ),
+      expect(within(card, text("S"))).toExist(),
       expect(within(card, text("Agent · Needs setup"))).toHaveAttr("data-tone", "caution"),
       expect(within(card, text("Its harness connection’s integration isn’t installed on this host."))).toExist(),
       expect(within(card, role("button", { name: "Message" }))).toExist(),
@@ -157,12 +161,49 @@ describe("the profile card", () => {
         showing(
           Option.some({
             ...agent,
-            standing: Option.some({ kind: "available", label: "Working in #General", detail: Option.none() }),
-            motion: Option.some("working")
+            activity: Option.some({ state: "working", places: ["#General"] })
           })
         )
       ),
       expect(within(card, text("Agent · Working in #General"))).toExist(),
+      expect(within(card, selector(".logo-working"))).toExist(),
+      Mount.resolve(AnchorProfileCard, Message.CompletedAnchorProfileCard())
+    )
+  })
+
+  for (const [state, label, motion] of [
+    ["queued", "Queued", "thread"],
+    ["stopping", "Stopping", "tug"]
+  ] as const) {
+    it(`draws ${state} activity without needing presentation in the model`, () => {
+      scene(
+        { update, view: inPane },
+        given(showing(Option.some({ ...agent, activity: Option.some({ state, places: [] }) }))),
+        expect(within(card, text(`Agent · ${label}`))).toExist(),
+        expect(within(card, selector(`.logo-${motion}`))).toExist(),
+        Mount.resolve(AnchorProfileCard, Message.CompletedAnchorProfileCard())
+      )
+    })
+  }
+
+  it("keeps the setup warning while an incomplete agent is working", () => {
+    scene(
+      { update, view: inPane },
+      given(
+        showing(
+          Option.some({
+            ...agent,
+            readiness: Option.some(
+              Agent.Readiness.cases.Incomplete.make({
+                issues: [Agent.Issue.cases.NoHarness.make({})]
+              })
+            ),
+            activity: Option.some({ state: "working", places: ["#General"] })
+          })
+        )
+      ),
+      expect(within(card, text("Agent · Needs setup"))).toExist(),
+      expect(within(card, text("No connection gives a harness it can run on."))).toExist(),
       expect(within(card, selector(".logo-working"))).toExist(),
       Mount.resolve(AnchorProfileCard, Message.CompletedAnchorProfileCard())
     )
