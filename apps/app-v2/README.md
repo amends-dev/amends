@@ -296,6 +296,10 @@ Their `update/forms.ts` modules own draft mutations and save/failure transitions
 caches model choices; Connections' `update/checks.ts` owns health checks. Each feature still owns
 one model and assembles one Block. Connections retains its creation retry key until the draft
 changes, and both features wait for a newly created record to appear before opening its page.
+Settings uses the same `update/forms.ts` and `update/submission.ts` split. Its submissions check
+the active form, pending request, current records, and permission before issuing a command.
+Its update keeps the matching of completions and failures to the affected member or invitation,
+dialog coordination, and account feedback.
 
 A feature with several surfaces keeps them under `view/`. Groups has `sidebar.ts`, `list.ts`, and
 `dialog.ts` for navigation, browsing, and creation. Connections and agents each have

@@ -469,3 +469,12 @@ export const isDialogBusy = (model: Pick<Model, "entering">): boolean =>
   Option.exists(model.entering, (entering) =>
     Entering.matchOrElse(entering, { ViewingHistory: () => false }, ({ isSending }) => isSending)
   )
+
+/** The invitation `invitationId`, while the replica has it and it is still to be accepted. */
+export const findWaitingInvitation = (model: Pick<Model, "invitations">, invitationId: Invitation.InvitationId) =>
+  Option.fromUndefinedOr(
+    model.invitations.find(
+      ({ invitation }) =>
+        invitation.details.id === invitationId && Invitation.State.isAnyOf(["Pending"])(invitation.state)
+    )
+  )
