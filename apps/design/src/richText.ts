@@ -4,11 +4,26 @@
  * No HTML is ever set on the page: every token of the markdown becomes an element of the caller's builder.
  */
 
+import {
+  type Markdown,
+  type NameOf,
+  type MarkedToken,
+  type Token,
+  type Tokens,
+  knownToken,
+  mentionedMemberId,
+  decodeEntities,
+  nestedTokens,
+  nameLookup,
+  mentionLabel,
+  recordedLabelOf,
+  previewRuns,
+  parseMarkdown
+} from "@amends-dev/markdown"
 import * as Array from "effect/Array"
 import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import type { Html, HtmlBuilder } from "foldkit/html"
-import { Marked, type MarkedToken, type Token, type Tokens } from "marked"
 import { icon } from "./icon.ts"
 import { type ProfileOpener, profileTrigger } from "./profile.ts"
 
@@ -58,17 +73,6 @@ const headerCellLook = `${cellLook} bg-subtle font-semibold`
 
 const alignLooks = { center: "text-center", right: "text-end", left: "text-start" } as const
 
-/** A message's markdown, and the members its mentions may name. */
-export type Markdown = Readonly<{
-  /** Markdown, such as a message's text. A mention is a link to the member, `[@Ada](member:<id>)`. */
-  text: string
-  /** Who a mention names, as they are called now; a mention of anyone else shows the name the text recorded. */
-  mentions?: ReadonlyArray<RichTextMention> | undefined
-}>
-
-/** A member a text may mention, by the id its mention links to. */
-export type RichTextMention = Readonly<{ id: string; name: string }>
-
 export type RichTextConfig<Message> = Markdown &
   Readonly<{
     /** One run of words and mentions without layout or formatting, such as a preview's, in place of blocks. */
@@ -76,12 +80,6 @@ export type RichTextConfig<Message> = Markdown &
     /** How a mention opens the card of the member it names; a mention opens nothing without it, or in a preview. */
     profiles?: ProfileOpener<Message> | undefined
   }>
-
-// A newline breaks the line, as people expect of a chat message.
-const marked = new Marked({ gfm: true, breaks: true })
-
-// The lexer yields only the tokens `MarkedToken` lists, since no extension is installed.
-const knownToken = (token: Token): MarkedToken => token as MarkedToken
 
 const linkableProtocols = new Set(["http:", "https:", "mailto:"])
 
@@ -93,213 +91,6 @@ const linkableHref = (href: string): Option.Option<string> =>
     Option.filter(({ protocol }) => linkableProtocols.has(protocol)),
     Option.map(() => href)
   )
-
-const mentionPrefix = "member:"
-
-/** The member a `member:<id>` link mentions. */
-const mentionedMemberId = (href: string): Option.Option<string> =>
-  href.startsWith(mentionPrefix)
-    ? Option.liftThrowable(decodeURIComponent)(href.slice(mentionPrefix.length))
-    : Option.none()
-
-// Entity references people and editors write for characters markdown or HTML would otherwise read as syntax; numeric
-// references name any character.
-const namedEntities: Readonly<Record<string, string>> = {
-  amp: "&",
-  lt: "<",
-  gt: ">",
-  quot: '"',
-  apos: "'",
-  nbsp: " ",
-  copy: "©",
-  reg: "®",
-  trade: "™",
-  hellip: "…",
-  mdash: "—",
-  ndash: "–",
-  lsquo: "‘",
-  rsquo: "’",
-  ldquo: "“",
-  rdquo: "”",
-  laquo: "«",
-  raquo: "»",
-  bull: "•",
-  middot: "·",
-  times: "×",
-  divide: "÷",
-  deg: "°",
-  plusmn: "±",
-  larr: "←",
-  rarr: "→",
-  uarr: "↑",
-  darr: "↓",
-  harr: "↔",
-  euro: "€",
-  pound: "£",
-  yen: "¥",
-  cent: "¢",
-  sect: "§",
-  para: "¶"
-}
-
-const entityReference = /&(?:#(\d{1,7})|#[xX]([\da-fA-F]{1,6})|([a-zA-Z][a-zA-Z\d]{1,31}));/gu
-
-const highestCodePoint = 0x10ffff
-
-const firstSurrogate = 0xd800
-
-const lastSurrogate = 0xdfff
-
-const replacementCharacter = "�"
-
-/** The character an entity reference names: a known name’s, a code point’s, or the replacement for an invalid one. */
-const characterOfEntity = (
-  whole: string,
-  decimal: string | undefined,
-  hex: string | undefined,
-  name: string | undefined
-): string => {
-  if (name !== undefined) {
-    return namedEntities[name] ?? whole
-  }
-
-  const code = Number.parseInt(decimal ?? hex ?? "", decimal === undefined ? 16 : 10)
-  const isValid = code > 0 && code <= highestCodePoint && (code < firstSurrogate || code > lastSurrogate)
-
-  return isValid ? String.fromCodePoint(code) : replacementCharacter
-}
-
-/** Text with its entity references as the characters they name, as markdown reads them. */
-const decodeEntities = (text: string): string =>
-  text.includes("&") ? text.replace(entityReference, characterOfEntity) : text
-
-/** The tokens inside a token, none while it holds only words. */
-const nestedTokens = (token: Readonly<{ tokens?: Array<Token> | undefined }>): ReadonlyArray<Token> =>
-  token.tokens ?? []
-
-type NameOf = (memberId: string) => Option.Option<string>
-
-const nameLookup = (mentions: ReadonlyArray<RichTextMention>): NameOf => {
-  const names = new Map(mentions.map(({ id, name }) => [id, name]))
-
-  return (memberId) => Option.fromUndefinedOr(names.get(memberId))
-}
-
-/** Some words of a text, or a mention of a member, which a preview sets apart. */
-type Run = Readonly<{ text: string; isMention: boolean }>
-
-const wordsRun = (text: string): Run => ({ text, isMention: false })
-
-const joinRuns = (runs: ReadonlyArray<Run>): string => runs.map(({ text }) => text).join("")
-
-/** What a mention says: "@" and the name the member has now, or the label the text recorded while they are unknown. */
-const mentionLabel = (nameOf: NameOf, memberId: string, recordedLabel: string): string =>
-  Option.match(nameOf(memberId), { onNone: () => recordedLabel, onSome: (name) => `@${name}` })
-
-/** The label a mention link recorded: the words it holds. */
-const recordedLabelOf = (nameOf: NameOf, link: Tokens.Link): string => joinRuns(inlineRuns(nameOf, link.tokens))
-
-/** The words and mentions of inline tokens, without their formatting. */
-const inlineRuns = (nameOf: NameOf, tokens: ReadonlyArray<Token>): ReadonlyArray<Run> =>
-  tokens.flatMap((token) => inlineTokenRuns(nameOf, knownToken(token)))
-
-const textTokenRuns = (nameOf: NameOf, token: Tokens.Text | Tokens.Strong | Tokens.Em | Tokens.Del) => {
-  const nested = nestedTokens(token)
-
-  return Array.isReadonlyArrayNonEmpty(nested) ? inlineRuns(nameOf, nested) : [wordsRun(decodeEntities(token.text))]
-}
-
-const inlineTokenRuns = (nameOf: NameOf, token: MarkedToken): ReadonlyArray<Run> =>
-  Match.value(token).pipe(
-    Match.discriminators("type")({
-      br: () => [wordsRun(" ")],
-      codespan: ({ text }) => [wordsRun(text)],
-      escape: ({ text }) => [wordsRun(text)],
-      image: ({ text }) => [wordsRun(decodeEntities(text))],
-      link: (link) =>
-        Option.match(mentionedMemberId(link.href), {
-          onNone: () => inlineRuns(nameOf, link.tokens),
-          onSome: (memberId) => [
-            { text: mentionLabel(nameOf, memberId, recordedLabelOf(nameOf, link)), isMention: true }
-          ]
-        }),
-      text: (text) => textTokenRuns(nameOf, text),
-      strong: (strong) => textTokenRuns(nameOf, strong),
-      em: (em) => textTokenRuns(nameOf, em),
-      del: (del) => textTokenRuns(nameOf, del)
-    }),
-    Match.orElse(({ raw }) => [wordsRun(raw)])
-  )
-
-const spaceRun = wordsRun(" ")
-
-/** The words and mentions of blocks, a space between each, without their layout. */
-const blockRuns = (nameOf: NameOf, tokens: ReadonlyArray<Token>): ReadonlyArray<Run> =>
-  tokens.flatMap((token) => blockTokenRuns(nameOf, knownToken(token)))
-
-const leafBlockRuns = (nameOf: NameOf, token: Tokens.Paragraph | Tokens.Heading | Tokens.Text) => {
-  const nested = nestedTokens(token)
-
-  return [
-    spaceRun,
-    ...(Array.isReadonlyArrayNonEmpty(nested) ? inlineRuns(nameOf, nested) : [wordsRun(decodeEntities(token.text))])
-  ]
-}
-
-const blockTokenRuns = (nameOf: NameOf, token: MarkedToken): ReadonlyArray<Run> =>
-  Match.value(token).pipe(
-    Match.discriminators("type")({
-      space: () => [],
-      def: () => [],
-      hr: () => [],
-      checkbox: () => [],
-      code: ({ text }) => [spaceRun, wordsRun(text)],
-      blockquote: ({ tokens }) => [spaceRun, ...blockRuns(nameOf, tokens)],
-      list: ({ items }) => items.flatMap(({ tokens }) => [spaceRun, ...blockRuns(nameOf, tokens)]),
-      table: ({ header, rows }) =>
-        [header, ...rows].flat().flatMap(({ tokens }) => [spaceRun, ...inlineRuns(nameOf, tokens)]),
-      paragraph: (paragraph) => leafBlockRuns(nameOf, paragraph),
-      heading: (heading) => leafBlockRuns(nameOf, heading),
-      text: (text) => leafBlockRuns(nameOf, text)
-    }),
-    Match.orElse(({ raw }) => [spaceRun, wordsRun(raw)])
-  )
-
-/**
- * `runs` with each stretch of whitespace a single space, neighbouring words as one run, trimmed at both ends, and
- * nothing for the empty.
- */
-const collapseRuns = (runs: ReadonlyArray<Run>): ReadonlyArray<Run> => {
-  if (!Array.isReadonlyArrayNonEmpty(runs)) {
-    return []
-  }
-
-  const merged = Array.groupWith(runs, (run, first) => !run.isMention && !first.isMention).map((group): Run =>
-    Array.headNonEmpty(group).isMention ? Array.headNonEmpty(group) : wordsRun(joinRuns(group))
-  )
-
-  return merged
-    .map((run, index) => {
-      if (run.isMention) {
-        return run
-      }
-
-      const spaced = run.text.replaceAll(/\s+/gu, " ")
-      const startTrimmed = index === 0 ? spaced.trimStart() : spaced
-
-      return wordsRun(index === merged.length - 1 ? startTrimmed.trimEnd() : startTrimmed)
-    })
-    .filter(({ text }) => text !== "")
-}
-
-const previewRuns = ({ text, mentions = [] }: Markdown): ReadonlyArray<Run> =>
-  collapseRuns(blockRuns(nameLookup(mentions), marked.lexer(text)))
-
-/**
- * The words of `markdown` as a reader hears them, without its syntax or layout: one line of words, each mention as "@"
- * and the member’s current name. It is the text of the `isInline` form of `richText`.
- */
-export const richTextWords = (markdown: Markdown): string => joinRuns(previewRuns(markdown))
 
 type Renderer<Message, Requirements> = Readonly<{
   h: HtmlBuilder<Message, Requirements>
@@ -532,7 +323,7 @@ export const richText = <Message, Requirements>(
     [h.Class(blocksLook)],
     renderBlocks(
       { h, nameOf: nameLookup(config.mentions ?? []), profiles: config.profiles, nextMentionPart },
-      marked.lexer(config.text)
+      parseMarkdown(config.text)
     )
   )
 }

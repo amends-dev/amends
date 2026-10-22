@@ -109,8 +109,8 @@ for await (const path of new Bun.Glob("apps/site/src/**/*.{astro,ts,tsx}").scan(
   }
 }
 
-// UI owns presentation, icons are drawings alone, and app data is independent of feature Blocks and views.
-for await (const path of new Bun.Glob("apps/{icons,ui,app-v2}/{src,test,.storybook}/**/*.{ts,tsx}").scan({
+// Markdown has no renderer; app data can use it without depending on design or feature views.
+for await (const path of new Bun.Glob("apps/{icons,ui,app-v2,markdown}/{src,test,.storybook}/**/*.{ts,tsx}").scan({
   cwd: root
 })) {
   const source = await Bun.file(`${root}/${path}`).text()
@@ -137,14 +137,25 @@ for await (const path of new Bun.Glob("apps/{icons,ui,app-v2}/{src,test,.storybo
   }
   for (const dependency of dependencies) {
     const target = dependency.startsWith(".") ? resolve(root, dirname(path), dependency) : dependency
+    if (path.startsWith("apps/markdown/src/") && !path.endsWith(".test.ts")) {
+      const isOwnSource = dependency.startsWith(".") && target.startsWith(resolve(root, "apps/markdown/src") + "/")
+      if (!(isOwnSource || dependency === "marked" || dependency === "effect" || dependency.startsWith("effect/")))
+        errors.push(`${path}: Markdown must depend only on Marked, Effect, and its own source (${dependency}).`)
+    }
     if (path.startsWith("apps/app-v2/src/data/") && !path.endsWith(".test.ts")) {
       const packageName = dependency.split("/").slice(0, 2).join("/")
       const isDataModule = dependency.startsWith(".") && target.startsWith(resolve(root, "apps/app-v2/src/data") + "/")
       if (
-        !(isDataModule || dependency === "effect" || dependency.startsWith("effect/") || sharedNames.has(packageName))
+        !(
+          isDataModule ||
+          dependency === "@amends-dev/markdown" ||
+          dependency === "effect" ||
+          dependency.startsWith("effect/") ||
+          sharedNames.has(packageName)
+        )
       )
         errors.push(
-          `${path}: app data must depend only on shared packages, Effect, and other data modules (${dependency}).`
+          `${path}: app data must depend only on shared packages, Markdown, Effect, and other data modules (${dependency}).`
         )
     }
     const iconImport = dependency === "@amends-dev/icons" || dependency.startsWith("@amends-dev/icons/")
@@ -181,6 +192,6 @@ if (errors.length > 0) {
   process.exitCode = 1
 } else {
   console.log(
-    `Checked ${packages.length} shared packages, ${published.length} published packages' lines, icons/ui/app-data import boundaries, and site styles.`
+    `Checked ${packages.length} shared packages, ${published.length} published packages' lines, icons/ui/markdown/app-data import boundaries, and site styles.`
   )
 }

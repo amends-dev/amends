@@ -21,6 +21,7 @@ import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { memberName } from "../../data/members.ts"
+import { threadWords } from "../../data/threads.ts"
 import {
   authorMemberId,
   authorName,
@@ -32,7 +33,6 @@ import {
   statusLabel,
   statusShape,
   threadText,
-  threadWords,
   timeOf,
   typingLine,
   typingNames

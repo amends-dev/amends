@@ -111,7 +111,9 @@ runs them, and keeps `console` to tests and scripts.
   client through the same package's contract.
 - `apps/*`: what people see and its building blocks. `icons` holds canonical drawings and
   generated Solid icons, raw SVGs, path data for views without Solid, and a separate metadata
-  catalog; apps and UI packages may consume it. `ui` is the pattern-based design system built from
+  catalog; apps and UI packages may consume it. `markdown` is the application Markdown parser,
+  shared by app data and design renderers: tokens, mentions, and plain text over Marked and Effect,
+  without browser APIs, styles, or a UI framework. `ui` is the pattern-based design system built from
   the Lunacy mocks in `design-system/Amends Group Exploration.free`, which are its visual reference:
   foundations, components, the six layout patterns, presentational screens, and the site's
   sections, with a standalone Storybook workshop.

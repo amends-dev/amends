@@ -6,6 +6,7 @@
  * describes it, and the rule that sets a part of the list apart, such as a day or the replies.
  */
 
+import { type Markdown, markdownWords } from "@amends-dev/markdown"
 import * as Button from "@foldkit/ui/button"
 import type { Attribute, Html, HtmlBuilder } from "foldkit/html"
 import { iconButtonWith } from "./control.ts"
@@ -13,7 +14,7 @@ import { type TurnState, turnActivity } from "./details.ts"
 import { type IconName, icon } from "./icon.ts"
 import { type MarkContent, mark, type TaskStatusShape, taskStatus } from "./mark.ts"
 import { type ProfileOpener, profileTrigger } from "./profile.ts"
-import { type Markdown, richText, richTextWords } from "./richText.ts"
+import { richText } from "./richText.ts"
 import { tooltip } from "./tooltip.ts"
 
 const listColumn = "m-0 flex list-none flex-col p-0"
@@ -185,7 +186,7 @@ export const messageTextWords = (text: MessageText): string => {
     return text
   }
 
-  return "deleted" in text ? text.deleted : richTextWords(text)
+  return "deleted" in text ? text.deleted : markdownWords(text)
 }
 
 /**

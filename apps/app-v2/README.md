@@ -128,13 +128,13 @@ shown, in a thread, as a task's description, in a group's list of threads, and i
 design the markdown with the members its mentions may name (`messageText` and `threadText`, which are a `MessageText`
 of the design's `message` module) and the design shows it as `apps/ui`'s `RichText` does: paragraphs, emphasis, code,
 quotes, lists, tables, and links, a mention as a chip of "@" and the member's current name among the members the view
-has, or the name the mention recorded while they are not among them (see the design's `richText`, where `marked` lexes
-the markdown; this app imports no markdown library). A thread's messages and a task's description show it as blocks.
+has, or the name the mention recorded while they are not among them. Both this app and the design use
+[`@amends-dev/markdown`](../markdown/README.md) for parsing and mention resolution. A thread's messages and a task's description show it as blocks.
 A row that is a button, a thread in the group's list, and the text of a notification, show it as the preview, one run
 of its words and mentions, since a button holds no block or link. A thread's title is not markdown and shows as it
 was written. The form that edits a message shows its text as written, mentions too. What a title or a search reads of a
 message is its words without that syntax, a mention as "@" and the member's current name (`messageWords` and
-`threadWords`, by the design's `messageTextWords`, which `richTextWords` gives the markdown's words): a title taken
+`threadWords` in `data/messages.ts` and `data/threads.ts`, using `markdownWords` from the shared parser): a title taken
 from a thread's opening (`titleOf`), in the pane's header and under the group in the sidebar, and what a search for a
 thread's words matches (`threadContains`, and the store's `listJumpTargets`), so that `**` and a link's address are
 never found. Every write of a message's text, a thread's opening, a reply, an edit, and a conversation's
@@ -245,11 +245,13 @@ the pages that compose them; the root composes the pages.
 
 `data/` holds shared record shapes and queries: connection capabilities and integration loading state,
 agent activity, workspace ownership and role choices, member and group names, search normalization,
-and task state decisions. These modules depend only on shared packages, Effect, and each other;
+task state decisions, and message text used by search and the store. These modules depend only on
+shared packages, Effect, the Markdown parser, and each other;
 `bun run check:packages` enforces that boundary, including type-only imports. Features import these
 modules directly instead of obtaining shared records from another feature's Block definition.
 `view/agents.ts` maps agent data to labels, marks, and logo motions. Its tests sit beside it, and
-the activity tests sit in `data/agents.test.ts`. The browser store remains in `store/`; other
+the activity tests sit in `data/agents.test.ts`. The browser store remains in `store/` and obtains
+plain text from `data/messages.ts`, without importing a design renderer. Other
 presentation helpers in `seen.ts` have not yet been reorganized.
 
 Each `block.ts` exports its completed Block under a name of its own: the assembled value stays

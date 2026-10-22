@@ -19,8 +19,10 @@ import {
 import { connectionNameIn } from "./data/connections.ts"
 import { placeName } from "./data/groups.ts"
 import { isAgent } from "./data/members.ts"
+import { messageWords } from "./data/messages.ts"
 import { foldAccents } from "./data/search.ts"
 import { isOpen } from "./data/tasks.ts"
+import { threadContains, threadWords } from "./data/threads.ts"
 import {
   ageLabel,
   authorMemberId,
@@ -37,16 +39,13 @@ import {
   isStackedUnder,
   memberMark,
   messageText,
-  messageWords,
   pluralize,
   reasonSubtitle,
   repliesLabel,
   shortTimeOf,
   sideSubtitle,
   statusShape,
-  threadContains,
   threadText,
-  threadWords,
   timeOf,
   typingLine,
   typingNames,

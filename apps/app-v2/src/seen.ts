@@ -19,14 +19,14 @@ import { type Thread, type ThreadId, ThreadMessage } from "@amends-dev/core/thre
 import type { Turn } from "@amends-dev/core/turn"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
 import type { MarkContent, TaskStatusShape } from "@amends-dev/design/mark"
-import { type MessageText, messageTextWords } from "@amends-dev/design/message"
+import type { MessageText } from "@amends-dev/design/message"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { placeName } from "./data/groups.ts"
 import { isAgent } from "./data/members.ts"
-import { foldAccents } from "./data/search.ts"
+import { deletedMessageText } from "./data/messages.ts"
 
 /** The uppercase first letters of the first two words of `name`, or of its first word alone. */
 export const initials = (name: string): string =>
@@ -302,8 +302,6 @@ export const authorMark = (
   })
 }
 
-const deletedText = "Message deleted"
-
 /**
  * What `message` says as the text a view shows: its markdown, with the members its mentions name, who are called what
  * they are now among `members`, or "Message deleted", which shows quiet and slanted.
@@ -311,15 +309,8 @@ const deletedText = "Message deleted"
 export const messageText = (message: ThreadMessage.ThreadMessage, members: ReadonlyArray<Member.Member>): MessageText =>
   ThreadMessage.Content.match(message.content, {
     Text: ({ text }): MessageText => ({ text, mentions: members }),
-    Deleted: (): MessageText => ({ deleted: deletedText })
+    Deleted: (): MessageText => ({ deleted: deletedMessageText })
   })
-
-/**
- * What `message` says as the words a reader hears, without its markdown's syntax: a mention as "@" and the member's
- * current name.
- */
-export const messageWords = (message: ThreadMessage.ThreadMessage, members: ReadonlyArray<Member.Member>): string =>
-  messageTextWords(messageText(message, members))
 
 /** `count` of something, as the person reads it: "1 member", "4 members", by its `singular` and its `plural`. */
 export const pluralize = (count: number, singular: string, plural: string): string =>
@@ -377,29 +368,6 @@ export const threadText = (
         onSome: (message) => messageText(message, members)
       })
     : thread.title
-
-/** A thread as the person reads it in a list, as words: its title, or its opening's words, or "A thread". */
-export const threadWords = (
-  thread: Thread.Thread,
-  opening: Option.Option<ThreadMessage.ThreadMessage>,
-  members: ReadonlyArray<Member.Member>
-): string => messageTextWords(threadText(thread, opening, members))
-
-/**
- * Whether the thread's title, or its opening's words as the person reads them among `members`, contain `query`, in
- * any case, whatever the accents and the spaces around it; every thread for a query with no letters.
- */
-export const threadContains = (
-  thread: Thread.Thread,
-  opening: Option.Option<ThreadMessage.ThreadMessage>,
-  members: ReadonlyArray<Member.Member>,
-  query: string
-): boolean => {
-  const wanted = foldAccents(query.trim())
-  const words = [thread.title, ...Option.toArray(Option.map(opening, (message) => messageWords(message, members)))]
-
-  return wanted === "" || words.some((text) => text !== null && foldAccents(text).includes(wanted))
-}
 
 /** A task's status, as the person reads it. */
 export const statusLabel: Readonly<Record<Task.Status, string>> = {

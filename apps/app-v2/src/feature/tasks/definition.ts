@@ -18,7 +18,7 @@ import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { modifyFields } from "foldkit/struct"
 import { isOpen } from "../../data/tasks.ts"
-import { threadContains } from "../../seen.ts"
+import { threadContains } from "../../data/threads.ts"
 import { AssigneeFilter, AssigneeMenu, isAssignedTo, StatusFilterMenu, TaskStatusFilter } from "../../taskFilter.ts"
 
 /**

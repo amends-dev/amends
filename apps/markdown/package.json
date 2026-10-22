@@ -1,0 +1,19 @@
+{
+  "name": "@amends-dev/markdown",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/markdown.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "effect": "catalog:",
+    "marked": "^17.0.1"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:"
+  }
+}
