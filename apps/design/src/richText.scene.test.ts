@@ -1,11 +1,11 @@
-import { describe, expect as expectValue, it } from "@effect/vitest"
+import { describe, it } from "@effect/vitest"
 import { Schema } from "effect"
 import type { Update } from "foldkit"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
 import { all, click, expect, expectAll, given, nth, role, scene, selector, text, within } from "foldkit/scene"
 import type { ProfileOpener } from "./profile.ts"
-import { type RichTextConfig, richText, richTextWords } from "./richText.ts"
+import { type RichTextConfig, richText } from "./richText.ts"
 
 const Message = defineMessageUnion({ Unused: {} })
 type Message = typeof Message.Type
@@ -305,31 +305,6 @@ describe("richText", () => {
       given(null),
       expect(selector("div span")).toHaveText("")
     )
-  })
-})
-
-describe("richTextWords", () => {
-  it("is the words of the text without its syntax, a space between blocks", () => {
-    expectValue(
-      richTextWords({ text: "# Plan\n\nShip **it** `now`\n\n- one\n- two\n\n> quoted\n\n```\ncode\n```" })
-    ).toBe("Plan Ship it now one two quoted code")
-  })
-
-  it("reads a mention as the name the member has now, or the one the text recorded", () => {
-    const text = `Hey ${mention("member-1", "Ada")}, ${mention("gone", "Old name")} look`
-    expectValue(richTextWords({ text, mentions: [ada] })).toBe("Hey @Ada Lovelace, @Old name look")
-    expectValue(richTextWords({ text })).toBe("Hey @Ada, @Old name look")
-  })
-
-  it("reads a link as its words, an image as its name, and entity references as their characters", () => {
-    expectValue(richTextWords({ text: "[docs](https://example.com) ![chart](/c.png) Tom &amp; Jerry" })).toBe(
-      "docs chart Tom & Jerry"
-    )
-  })
-
-  it("is the text of the inline form, and nothing for empty text", () => {
-    expectValue(richTextWords({ text: "" })).toBe("")
-    expectValue(richTextWords({ text: "\n\n" })).toBe("")
   })
 })
 

@@ -26,7 +26,6 @@ import {
   MemberId,
   MemberPermissions,
   OwnershipPermissions,
-  Workspace,
   WorkspaceId,
   WorkspaceSettingsPermissions
 } from "@amends-dev/core/workspace"
@@ -38,12 +37,9 @@ import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
-import { may, memberTarget, workspaceTarget } from "../../permissions.ts"
-import { foldAccents } from "../../seen.ts"
-
-/** The workspace, and whether a change to it is on its way. */
-export const WorkspaceItem = Schema.Struct({ workspace: Workspace.Workspace, pending: Schema.Boolean })
-export type WorkspaceItem = typeof WorkspaceItem.Type
+import { may, memberTarget, workspaceTarget } from "../../data/permissions.ts"
+import { foldAccents } from "../../data/search.ts"
+import { WorkspaceItem, isOwner } from "../../data/workspace.ts"
 
 /** A member of the workspace, and whether a change to them is on its way. */
 export const MemberItem = Schema.Struct({ member: Member.Member, pending: Schema.Boolean })
@@ -219,6 +215,7 @@ export const Model = Schema.Struct({
 export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
+  RequestedDismiss: {},
   ReceivedSettings: {
     workspace: Schema.Option(WorkspaceItem),
     members: Schema.Array(MemberItem),
@@ -368,10 +365,6 @@ export const accessOf = (
 export const isChangingRole = (model: Pick<Model, "assignments">, memberId: MemberId.MemberId): boolean =>
   model.assignments.some(({ assignment, pending }) => pending && assignment.memberId === memberId)
 
-/** Whether the person is the workspace's owner. */
-export const isOwner = (model: Pick<Model, "workspace" | "memberId">): boolean =>
-  Option.exists(model.workspace, ({ workspace }) => workspace.ownerMemberId === model.memberId)
-
 /** The member who owns the workspace, while the replica has them. */
 export const ownerOf = (model: Pick<Model, "workspace" | "members">): Option.Option<MemberItem> =>
   Option.flatMap(model.workspace, ({ workspace }) => findMember(model, workspace.ownerMemberId))
@@ -425,16 +418,6 @@ const mayActOn = (model: Model, memberId: MemberId.MemberId): boolean =>
       ) === undefined
   )
 
-/**
- * The roles the person may give: Member, and Administrator when they own the workspace; Owner only
- * passes by transfer. It reads the roles, the workspace, and the person a Model keeps, so a Block
- * that keeps the same three fields asks it of its own.
- */
-export const givableRoles = (model: Pick<Model, "roles" | "workspace" | "memberId">): ReadonlyArray<Role.Role> =>
-  model.roles.filter(
-    ({ id }) => id === BuiltinRoles.MemberId || (id === BuiltinRoles.AdministratorId && isOwner(model))
-  )
-
 /** Whether the person may change `memberId`'s role, which they hold one of at most. */
 export const mayChangeRole = (model: Model, memberId: MemberId.MemberId): boolean =>
   memberId !== model.memberId &&
@@ -486,4 +469,13 @@ export const isRoleChanged = (model: Model, selected: Selected): boolean =>
 export const isDialogBusy = (model: Pick<Model, "entering">): boolean =>
   Option.exists(model.entering, (entering) =>
     Entering.matchOrElse(entering, { ViewingHistory: () => false }, ({ isSending }) => isSending)
+  )
+
+/** The invitation `invitationId`, while the replica has it and it is still to be accepted. */
+export const findWaitingInvitation = (model: Pick<Model, "invitations">, invitationId: Invitation.InvitationId) =>
+  Option.fromUndefinedOr(
+    model.invitations.find(
+      ({ invitation }) =>
+        invitation.details.id === invitationId && Invitation.State.isAnyOf(["Pending"])(invitation.state)
+    )
   )

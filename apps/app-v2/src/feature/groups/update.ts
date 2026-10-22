@@ -4,7 +4,7 @@ import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
-import { placeName } from "../../seen.ts"
+import { placeName } from "../../data/groups.ts"
 import { CreateTeam, FocusStartingMembers, JoinGroup, MarkGroupRead } from "./command.ts"
 import { DialogBinding, GroupsComposition, MembersBinding } from "./composition.ts"
 import {
@@ -180,6 +180,7 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
     })
 
   return Message.match(message, {
+    RequestedDismiss: () => Update.combine(model, [DialogBinding.requestClose()]),
     ReceivedGroups: ({ groups, members, memberships, grants }) =>
       finishCreating(
         modifyFields(model, {
@@ -210,7 +211,8 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
     ClickedGroupsTitle: () => browseOn(model, "Yours"),
     ClickedBrowse: () => browseOn(model, "Discover"),
     ChoseBrowseTab: ({ tab }) => ({
-      model: modifyFields(model, { browse: (browse) => modifyFields(browse, { tab: () => tab }) })
+      model: modifyFields(model, { browse: (browse) => modifyFields(browse, { tab: () => tab }) }),
+      outMessage: OutMessage.ChangedBrowseTab()
     }),
     TypedBrowseQuery: ({ query }) => ({
       model: modifyFields(model, { browse: (browse) => modifyFields(browse, { query: () => query }) })

@@ -12,6 +12,12 @@ is, and imports nothing of `ui`. The design is flat and quiet: no rounded corner
 between panel regions, shadows on floating layers only, one saturated color for status marks, and
 the rest shades of gray.
 
+Navigation renderers accept destinations without owning routes: rail items and brands, sidebar
+items, directory rows, and pane tabs accept `href`; sidebar section titles accept `titleHref`.
+With a destination they render native anchors, preserving modified clicks and the browser’s
+link menu. Without one they keep their Block action. A pane whose tabs all have destinations
+uses a labelled navigation with `aria-current="page"`; local panels remain a tablist.
+
 ## The workshop
 
 ```sh
@@ -1118,9 +1124,9 @@ of the `"side"` variant titled "Turn log", with a `paneBack` that is `isAlways`,
 
 ### `@amends-dev/design/richText`
 
-A message's markdown as elements, as `apps/ui`'s `RichText` shows it. It is the one module here that depends on a
-library, `marked`, at the version `apps/ui` uses, which lexes the text; every token it lexes becomes an element of the
-caller's builder, and no HTML string is ever set on the page.
+A message's markdown as elements, as `apps/ui`'s `RichText` shows it. Parsing and mention resolution come from
+[`@amends-dev/markdown`](../markdown/README.md), which the app's data modules also use. Every token becomes an
+element of the caller's builder; no HTML string is ever set on the page.
 
 - `richText(h, config)` renders `config.text`, markdown such as a message's text, in the type around it, as a column of
   blocks 8px apart with `gfm` and a line break wherever the text has a newline. Its parts: paragraphs; emphasis, strong
@@ -1145,7 +1151,7 @@ caller's builder, and no HTML string is ever set on the page.
 - `config.isInline` is the form for a preview, one `span` of words and mentions with no layout or formatting: blocks
   and line breaks are single spaces, a link is its words, an image its description, code its text, and each mention
   is a chip, and none opens a card. It holds nothing a button may not hold.
-- `richTextWords(markdown)` is the words of that form as one string, for the caller that needs them, such as a
+- `markdownWords(markdown)` from `@amends-dev/markdown` is the words of that form as one string, for the caller that needs them, such as a
   button's description or a search: `{ text, mentions? }` as the text a reader hears, a mention as "@" and the name the
   member has now.
 - `apps/ui`'s `streaming` and `caret`, which close formatting left open at the end of text still arriving and mark
@@ -1520,7 +1526,7 @@ label, with ", unread" after it while the dot shows, its description, its marks 
 the elbow and the marks hidden from assistive technology, and the agents at work and who types inside it, a
 Reply in thread button by its name, its description, and the `data-noted` it carries while something is going on there, with its words
 for the touch screen alone, and a task chip by the title and status that name it, its drawing hidden from assistive technology,
-and a divider by its label in the list; an event by its words as an item of the list, with its drawing hidden from assistive technology, and a description by its text, its mention as a chip, its actions, its body in place of the text, and `aria-current` while it is current; rich text by its paragraphs with a line break where the text has one, each form of emphasis and code, a code block as written with its language, quotes, lists numbered from where the text starts, task boxes by role and name, tables and the alignment of their columns, links by their address, target, and `rel`, images as links and never loaded, raw HTML and entity references as text, mentions as chips with the member's current name or the recorded one, and the inline form as one run of words, with `richTextWords` as plain tests; a property group by its label, its captions in capitals, hidden from assistive technology when the control under one names itself by it, a value that is read, and a property menu by the name its caption and its choice give, its icon, mark, or status drawing in the button and in the list, and the choice it reports; a list of where an agent is at work by its label, a line for each place, and the logo in the motion of each state, and a line with an action as a button named by it, that sends its message, 6px wider than its words, with a line with none beside it as text; a task's status in each of its shapes, its size and color, and a pane's header with it before the title, and Close task; a composer by its form, the textarea found by the same label, the placeholder, the attributes it is given, and the
+and a divider by its label in the list; an event by its words as an item of the list, with its drawing hidden from assistive technology, and a description by its text, its mention as a chip, its actions, its body in place of the text, and `aria-current` while it is current; rich text by its paragraphs with a line break where the text has one, each form of emphasis and code, a code block as written with its language, quotes, lists numbered from where the text starts, task boxes by role and name, tables and the alignment of their columns, links by their address, target, and `rel`, images as links and never loaded, raw HTML and entity references as text, mentions as chips with the member's current name or the recorded one, and the inline form as one run of words, with plain-text tests in `apps/markdown`; a property group by its label, its captions in capitals, hidden from assistive technology when the control under one names itself by it, a value that is read, and a property menu by the name its caption and its choice give, its icon, mark, or status drawing in the button and in the list, and the choice it reports; a list of where an agent is at work by its label, a line for each place, and the logo in the motion of each state, and a line with an action as a button named by it, that sends its message, 6px wider than its words, with a line with none beside it as text; a task's status in each of its shapes, its size and color, and a pane's header with it before the title, and Close task; a composer by its form, the textarea found by the same label, the placeholder, the attributes it is given, and the
 send button, which is unavailable while the box holds nothing or only spaces, Enter that sends the form and Shift+Enter, Control+Enter, Alt+Enter, and Meta+Enter that
 are left to the browser, and its list of people by the listbox named for it, its options with the active one selected and
 each mark at 22px in its tone, the

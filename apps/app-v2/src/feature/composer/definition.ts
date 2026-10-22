@@ -14,8 +14,8 @@ import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
-import { PickedMention, type Written } from "../../mentions.ts"
-import { foldAccents } from "../../seen.ts"
+import { PickedMention, type Written } from "../../control/mentions.ts"
+import { foldAccents } from "../../data/search.ts"
 import * as Drafts from "../../store/Drafts.ts"
 
 /** What the list being picked from holds: the people a mention may mean, or the slash commands a draft may run. */
@@ -110,6 +110,7 @@ export const OutMessage = defineMessageUnion({
 export type OutMessage = typeof OutMessage.Type
 
 export const ComposerDefinition = Block.makeDefinition("Composer", { Model, Message, OutMessage })
+export const ComposerComposition = ComposerDefinition.makeComposition()
 
 /** The id of the box at a place, so a label finds it and the focus can be moved to it. */
 export const boxId = (place: Drafts.Place): string =>

@@ -22,8 +22,8 @@ import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
-import { PickedMention } from "../../mentions.ts"
-import { memberName, messageWords, type SideAbout, typingNames } from "../../seen.ts"
+import { PickedMention } from "../../control/mentions.ts"
+import { messageWords, typingNames } from "../../data/messages.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { TaskBlock } from "../task/block.ts"
 import { TurnsBlock } from "../turns/block.ts"
@@ -162,9 +162,6 @@ export const ThreadDefinition = Block.makeDefinition("Thread", { Model, Message,
 /** Whether the log of a turn is open, which the side pane shows in place of the thread. */
 export const hasTurnLog = (model: Model): boolean => Option.isSome(model.turns.log)
 
-/** What a side pane is about: the task the thread tracks, or the thread. */
-export const aboutOf = (model: Model): SideAbout => (Option.isSome(model.task.task) ? "Task" : "Thread")
-
 /** The `id` of the list of the messages of `threadId`, which the scroll that keeps it at its end finds it by. */
 export const messagesListId = (threadId: ThreadId.ThreadId): string => `thread-messages-${threadId}`
 
@@ -198,30 +195,6 @@ export const titleOf = (model: Model): string =>
       onSome: ({ message }) => messageWords(message, model.members)
     })
   )
-
-/**
- * What a change to a member's part in the thread says, as the person reads it: "Sara followed this thread", "You
- * stopped following", "Sara left the group", "Sara was removed from the group", "You were removed from the
- * workspace". The person is "You".
- */
-export const noteOf = (model: Model, { change, memberId }: ParticipationChange): string => {
-  const isSelf = memberId === model.memberId
-  const who = isSelf ? "You" : memberName(model.members, memberId)
-  const were = isSelf ? "were" : "was"
-
-  switch (change) {
-    case "followed":
-      return `${who} followed this thread`
-    case "unfollowed":
-      return `${who} stopped following`
-    case "left-group":
-      return `${who} left the group`
-    case "removed-from-group":
-      return `${who} ${were} removed from the group`
-    case "removed-from-workspace":
-      return `${who} ${were} removed from the workspace`
-  }
-}
 
 /** The text and revision of `messageId`, while it has text. */
 export const textOf = (model: Model, messageId: ThreadMessageId.ThreadMessageId) =>

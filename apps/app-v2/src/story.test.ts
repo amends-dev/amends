@@ -6,16 +6,17 @@ import { Dialog, DialogBlock } from "@foldkit/ui"
 import { DateTime, Option, Schema } from "effect"
 import { Command, given, message, model, story } from "foldkit/story"
 import { now } from "../test/fixtures.ts"
-import { KeepAppearance, ShowAppearance, SignOut } from "./command.ts"
+import { KeepAppearance, ShowAppearance, SignOut, Navigate } from "./command.ts"
 import { SignInBinding, WorkspaceBinding, WorkspacesBinding } from "./composition.ts"
 import { ComposerBlock } from "./feature/composer/block.ts"
 import { ReadDraft } from "./feature/composer/command.ts"
 import { GroupBlock } from "./feature/group/block.ts"
 import { init as initGroup } from "./feature/group/init.ts"
 import { GroupsBlock } from "./feature/groups/block.ts"
+import { SettingsBlock } from "./feature/settings/block.ts"
 import { AccountBinding } from "./feature/settings/composition.ts"
 import { AccountEntry, AccountMenu } from "./feature/settings/definition.ts"
-import { init } from "./init.ts"
+import { init as initApplication } from "./init.ts"
 import { Message } from "./message.ts"
 import { type Model, Page } from "./model.ts"
 import { SignInBlock } from "./page/signIn/block.ts"
@@ -27,10 +28,21 @@ import { HomeBinding, SettingsBinding } from "./page/workspace/composition.ts"
 import { Open } from "./page/workspace/definition.ts"
 import type { HomeBlock } from "./page/workspace/home/block.ts"
 import { GroupBinding, GroupsBinding } from "./page/workspace/home/composition.ts"
-import { view as homeView } from "./page/workspace/home/view.ts"
+import { view as homeView } from "./page/workspace/home/view/main.ts"
 import { WorkspacesBlock } from "./page/workspaces/block.ts"
 import { LoadWorkspaces } from "./page/workspaces/command.ts"
+import { Route } from "./route.ts"
 import { update } from "./update.ts"
+
+const init = (flags: Parameters<typeof initApplication>[0]) =>
+  initApplication(flags, {
+    protocol: "https:",
+    host: "amends.test",
+    port: Option.none(),
+    pathname: "/",
+    search: Option.none(),
+    hash: Option.none()
+  })
 
 const session: SignIn.Session = {
   token: "alice",
@@ -51,6 +63,7 @@ const membership = Schema.decodeSync(WorkspaceDirectory.Membership)({
 
 const signedOut: Model = {
   page: Page.SignedOut({ signIn: SignInBlock.init("").model }),
+  route: Route.Workspaces(),
   appearance: "System",
   viewport: "Split",
   now,
@@ -90,7 +103,11 @@ const settings = WorkspaceBlock.init(membership.workspace.id, membership.member.
  */
 const choseAccountEntry = (entry: AccountEntry) =>
   fromWorkspace(
-    SettingsBinding.embedView({ slotId: "settings", model: settings }).toParentMessage(
+    SettingsBinding.embedView({
+      slotId: "settings",
+      model: settings,
+      view: SettingsBlock.makeView((_model, h) => h.empty)
+    }).toParentMessage(
       AccountBinding.embedView({
         slotId: "account",
         model: settings.accountMenu,
@@ -123,7 +140,7 @@ const fromGroup = (message: typeof GroupBlock.Message.Type) =>
       key: groupId,
       slotId: "group",
       model: initGroup(membership.workspace.id, membership.member.id, groupId, Option.none()).model,
-      viewInputs: { now, workspaceName: "Studio", viewport: "Split", openTriggerId: undefined }
+      view: GroupBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 
@@ -133,6 +150,7 @@ const inWorkspace = [
     fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership], invitations: [] }))
   ),
   message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
+  Command.resolve(Navigate, Message.CompletedNavigation()),
   Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] }))
 ] as const
 
@@ -160,6 +178,7 @@ describe("the app", () => {
         WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership], invitations: [] })
       ),
       message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
+      Command.resolve(Navigate, Message.CompletedNavigation()),
       // Opened, the workspace asks the host once for the integrations its connections, agents, and channels read.
       Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
       model((model) => {
@@ -168,11 +187,13 @@ describe("the app", () => {
         ).toEqual(Option.some({ workspaceId: membership.workspace.id, memberId: membership.member.id }))
       }),
       message(fromWorkspace(WorkspaceBlock.Message.ClickedWorkspaceSwitcher())),
+      Command.resolve(Navigate, Message.CompletedNavigation()),
       model((model) => {
         expect(openedIn(model)).toEqual(Option.none())
       }),
       message(Message.ClickedSignOut()),
-      Command.expectExact(SignOut()),
+      Command.expectExact(SignOut(), Navigate({ url: "/", replace: true })),
+      Command.resolve(Navigate, Message.CompletedNavigation()),
       Command.resolve(SignOut, Message.CompletedSignOut()),
       model((model) => {
         expect(Page.matchOrElse(model.page, { SignedOut: ({ signIn }) => signIn.form }, () => undefined)).toMatchObject(
@@ -194,7 +215,8 @@ describe("the app", () => {
       ),
       ...inWorkspace,
       message(choseAccountEntry("SignOut")),
-      Command.expectExact(SignOut()),
+      Command.expectExact(SignOut(), Navigate({ url: "/", replace: true })),
+      Command.resolve(Navigate, Message.CompletedNavigation()),
       Command.resolve(SignOut, Message.CompletedSignOut()),
       model((model) => {
         expect(openedIn(model)).toEqual(Option.none())
@@ -247,7 +269,8 @@ describe("the app", () => {
       ),
       ...inWorkspace,
       message(choseAccountEntry("SwitchWorkspace")),
-      Command.expectNone(),
+      Command.expectExact(Navigate({ url: "/", replace: false })),
+      Command.resolve(Navigate, Message.CompletedNavigation()),
       model((model) => {
         expect(openedIn(model)).toEqual(Option.none())
         expect(Page.isAnyOf(["SignedIn"])(model.page)).toBe(true)
@@ -264,7 +287,8 @@ describe("the app", () => {
       ),
       ...inWorkspace,
       message(choseAccountEntry("WorkspaceSettings")),
-      Command.expectNone(),
+      Command.expectExact(Navigate({ url: "/workspaces/workspace-1/settings", replace: false })),
+      Command.resolve(Navigate, Message.CompletedNavigation()),
       model((model) => {
         expect(
           Option.map(openedIn(model), ({ model: opened }) =>
@@ -388,6 +412,7 @@ describe("the app", () => {
         fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership], invitations: [] }))
       ),
       message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
+      Command.resolve(Navigate, Message.CompletedNavigation()),
       Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
       model((model) => {
         expect(model.viewport).toBe("Tablet")
@@ -418,6 +443,7 @@ describe("the app", () => {
         fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership], invitations: [] }))
       ),
       message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
+      Command.resolve(Navigate, Message.CompletedNavigation()),
       Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
       message(Message.Ticked({ now: latest })),
       Command.expectNone(),
@@ -442,6 +468,7 @@ describe("the app", () => {
         fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership], invitations: [] }))
       ),
       message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
+      Command.resolve(Navigate, Message.CompletedNavigation()),
       Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
       message(Message.ChangedViewport({ viewport: "Phone" })),
       model((model) => {
@@ -464,10 +491,11 @@ describe("the app", () => {
           GroupsBinding.embedView({
             slotId: "groups",
             model: workspaceModel.home.groups,
-            viewInputs: { openThread: Option.none(), isBrowsing: false, unsentWith: Option.none() }
+            view: GroupsBlock.makeView((_model, h) => h.empty)
           }).toParentMessage(GroupsBlock.Message.ClickedGroup({ groupId }))
         )
       ),
+      Command.resolve(Navigate, Message.CompletedNavigation()),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       model((model) => {
         expect(Option.map(openedIn(model), ({ model: opened }) => opened.search.dialog.isOpen)).toEqual(
@@ -499,6 +527,7 @@ describe("the app", () => {
       message(Message.PressedSearchKey()),
       Command.expectNone(),
       message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
+      Command.resolve(Navigate, Message.CompletedNavigation()),
       Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
       message(Message.PressedSearchKey()),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),

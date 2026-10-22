@@ -14,6 +14,7 @@
     "@amends-dev/design": "workspace:*",
     "@amends-dev/gateway": "workspace:*",
     "@amends-dev/http": "workspace:*",
+    "@amends-dev/markdown": "workspace:*",
     "@amends-dev/sync": "workspace:*",
     "@effect/platform-browser": "catalog:",
     "@foldkit/ui": "0.168.0-canary.bfd880b1e6ca",

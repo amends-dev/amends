@@ -68,6 +68,7 @@ import {
 } from "../../../test/fixtures.ts"
 import { pickerEnded, pickerReady } from "../../../test/memberPickerSteps.ts"
 import { acknowledgeMenuClosed, chooseMenuItem, closeMenu, openMenu } from "../../../test/menu.ts"
+import { Integrations } from "../../data/connections.ts"
 import { ActionsBlock } from "../../feature/actions/block.ts"
 import { Dismiss, ExpireConfirmation } from "../../feature/actions/command.ts"
 import { Offer } from "../../feature/actions/definition.ts"
@@ -87,7 +88,7 @@ import {
   RenameConnection,
   ReplaceConnectionKey
 } from "../../feature/connections/command.ts"
-import { Integrations, Written as ConnectionWritten } from "../../feature/connections/definition.ts"
+import { Written as ConnectionWritten } from "../../feature/connections/definition.ts"
 import { GroupBlock } from "../../feature/group/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { CreateTeam, JoinGroup } from "../../feature/groups/command.ts"
@@ -103,12 +104,12 @@ import { AccountMenu, Written as SettingsWritten } from "../../feature/settings/
 import { TasksBlock } from "../../feature/tasks/block.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { WorkspaceBlock } from "./block.ts"
-import { LoadIntegrations, RequestNameChange } from "./command.ts"
+import { LoadIntegrations } from "./command.ts"
 import { Message, Open, OutMessage } from "./definition.ts"
 import { Open as HomeOpen } from "./home/definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { view } from "./view.ts"
+import { view } from "./view/shell.ts"
 
 const { workspace, member } = membership
 
@@ -392,7 +393,7 @@ const withTasks = atHome(opened, (home) =>
 const asOwner = modifyFields(opened, {
   connections: (connections) =>
     modifyFields(connections, {
-      integrations: () => Integrations.Loaded({ integrations: [testApi] }),
+      integrations: () => Integrations.cases.Loaded.make({ integrations: [testApi] }),
       grants: () => GrantResolver.grantsOf([aliceOwns], (roleId) => roles.find(({ id }) => id === roleId))
     })
 })
@@ -411,7 +412,9 @@ const withChannel = modifyFields(opened, {
   channels: (channels) =>
     modifyFields(channels, {
       integrations: () =>
-        Integrations.Loaded({ integrations: [integrationGiving("test-channels", "Test channels", ["channels"])] }),
+        Integrations.cases.Loaded.make({
+          integrations: [integrationGiving("test-channels", "Test channels", ["channels"])]
+        }),
       connections: () => [{ connection: keylessConnection("channels-1", "test-channels", "Chat"), pending: false }],
       groups: () => [general],
       memberships: () => [aliceInGeneral],
@@ -450,7 +453,7 @@ const withSearchConnection = modifyFields(opened, {
     modifyFields(connections, {
       isLoaded: () => true,
       integrations: () =>
-        Integrations.Loaded({
+        Integrations.cases.Loaded.make({
           integrations: [integrationGiving("test-models", "Test models", ["models"]), searchApi]
         }),
       grants: () => grantsOf([aliceOwns]),
@@ -467,7 +470,7 @@ const withAgent = modifyFields(opened, {
       members: () => [member, bob, scout],
       connections: () => [{ connection: models, pending: false }],
       integrations: () =>
-        Integrations.Loaded({ integrations: [integrationGiving("test-models", "Test models", ["models"])] }),
+        Integrations.cases.Loaded.make({ integrations: [integrationGiving("test-models", "Test models", ["models"])] }),
       roles: () => roles,
       workspace: () => Option.some({ workspace, pending: false }),
       grants: () => grantsOf([aliceOwns])
@@ -553,7 +556,8 @@ describe("a workspace", () => {
         modifyFields(opened, {
           connections: (connections) =>
             modifyFields(connections, {
-              integrations: () => Integrations.Failed({ error: "The host could not be reached. Try again." }),
+              integrations: () =>
+                Integrations.cases.Failed.make({ error: "The host could not be reached. Try again." }),
               grants: () => grantsOf([aliceOwns])
             })
         })
@@ -1064,7 +1068,7 @@ describe("a workspace", () => {
         modifyFields(connections, {
           isLoaded: () => true,
           integrations: () =>
-            Integrations.Loaded({
+            Integrations.cases.Loaded.make({
               integrations: [integrationGiving("test-models", "Test models", ["models", "tools"])]
             }),
           connections: () => [{ connection: keylessConnection("models-1", "test-models", "Hosted"), pending: false }],
@@ -1099,7 +1103,7 @@ describe("a workspace", () => {
         modifyFields(connections, {
           isLoaded: () => true,
           integrations: () =>
-            Integrations.Loaded({
+            Integrations.cases.Loaded.make({
               integrations: [integrationGiving("test-models", "Test models", ["models", "tools"])]
             }),
           connections: () => [{ connection: hosted, pending: false }],
@@ -1649,15 +1653,16 @@ describe("a workspace", () => {
     )
   })
 
-  it("has a Search button in the header of the open group on a phone only, which asks the app to open the search", () => {
+  it("has a Search button in the header on a phone only, which opens the workspace search", () => {
     scene(
       { update, view: sceneView },
       given(inWindow(withoutThread, "Phone")),
       expect(within(role("main", { name: "General" }), role("button", { name: "Search" }))).toExist(),
       expect(role("dialog", { name: "Jump to" })).toBeAbsent(),
       click(within(role("main", { name: "General" }), role("button", { name: "Search" }))),
-      expectOutMessage(OutMessage.RequestedSearch()),
-      expect(role("dialog", { name: "Jump to" })).toBeAbsent()
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(role("dialog", { name: "Jump to" })).toExist()
     )
 
     for (const viewport of ["Tablet", "Desktop", "Split"] as const) {
@@ -1812,7 +1817,7 @@ describe("a workspace", () => {
       expect(role("main", { name: "Workspace" })).toBeAbsent(),
       ...openMenu(AccountMenu, accountButton),
       click(role("menuitem", { name: "Workspace settings" })),
-      expectNoOutMessage(),
+      expectOutMessage(OutMessage.Navigated()),
       ...acknowledgeMenuClosed(AccountMenu),
       expect(role("menu")).toBeAbsent(),
       expect(role("main", { name: "Workspace" })).toExist(),
@@ -2263,8 +2268,8 @@ describe("a workspace, with the card of a member", () => {
     isYou,
     isFormer: false,
     agentId: Option.none(),
-    standing: Option.none(),
-    motion: Option.none()
+    readiness: Option.none(),
+    activity: Option.none()
   })
 
   it("is drawn in the page's frame when a name in the inbox opens it, and the name says it is expanded", () => {
@@ -2296,8 +2301,6 @@ describe("a workspace, with the card of a member", () => {
       click(within(role("dialog", { name: "Alice" }), role("button", { name: "Change name" }))),
       Mount.expectEnded(AnchorProfileCard),
       expect(role("dialog", { name: "Alice" })).toBeAbsent(),
-      Command.expectExact(RequestNameChange({})),
-      Command.resolve(RequestNameChange, Message.CompletedRequestNameChange()),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
       Mount.resolve(SelectOnFocus, SettingsBlock.Message.CompletedSelectOnFocus()),

@@ -44,6 +44,7 @@ export default defineConfig({
       },
       "apps/app-v2/vitest.config.ts",
       "apps/design/vitest.config.ts",
+      "apps/markdown/vitest.config.ts",
       "apps/icons/vite.config.ts",
       "apps/ui/vite.config.ts"
     ]

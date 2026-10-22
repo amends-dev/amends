@@ -16,6 +16,7 @@ import {
   roleOf,
   searchApi
 } from "../../../test/fixtures.ts"
+import { connectionItemsGiving, connectionsGiving, Integrations } from "../../data/connections.ts"
 import {
   AddConnection,
   CheckConnection,
@@ -31,12 +32,9 @@ import {
   byName,
   checkOf,
   configuringOf,
-  connectionItemsGiving,
-  connectionsGiving,
   connectionsOnTab,
   findEdit,
   integrationsToAdd,
-  Integrations,
   isDialogBusy,
   isNameChanged,
   isSettingsChanged,
@@ -62,7 +60,7 @@ import {
   connectionStatus,
   integrationLine,
   needsRefresh
-} from "./wording.ts"
+} from "./view/wording.ts"
 
 const { workspace, member } = membership
 const asMember = { workspaceId: workspace.id, memberId: member.id }
@@ -104,22 +102,24 @@ describe("the connections", () => {
       update,
       given(listed),
       model((model) => {
-        expect(model.integrations).toEqual(Integrations.Loading())
+        expect(model.integrations).toEqual(Integrations.cases.Loading.make({}))
       }),
       message(Message.FailedLoadIntegrations({ error: "The host could not be reached. Try again." })),
       model((model) => {
-        expect(model.integrations).toEqual(Integrations.Failed({ error: "The host could not be reached. Try again." }))
+        expect(model.integrations).toEqual(
+          Integrations.cases.Failed.make({ error: "The host could not be reached. Try again." })
+        )
       }),
       // Trying again shows they are loading and asks the page to list them again.
       message(Message.ClickedReloadIntegrations()),
       expectOutMessage(OutMessage.RequestedIntegrations()),
       Command.expectNone(),
       model((model) => {
-        expect(model.integrations).toEqual(Integrations.Loading())
+        expect(model.integrations).toEqual(Integrations.cases.Loading.make({}))
       }),
       message(Message.ReceivedIntegrations({ integrations: [searchApi] })),
       model((model) => {
-        expect(model.integrations).toEqual(Integrations.Loaded({ integrations: [searchApi] }))
+        expect(model.integrations).toEqual(Integrations.cases.Loaded.make({ integrations: [searchApi] }))
       }),
       // Asking again once they are loaded asks nothing.
       message(Message.ClickedReloadIntegrations()),
@@ -251,7 +251,7 @@ describe("the connections", () => {
         expect(model.browse).toEqual({ tab: "tools", query: "" })
         expect(shownConnections(model).map(({ connection }) => connection.name)).toEqual(["Search"])
       }),
-      expectNoOutMessage(),
+      expectOutMessage(OutMessage.RequestedBrowse()),
       Command.expectNone()
     )
   })
@@ -993,7 +993,7 @@ describe("adding a connection", () => {
     )
     const sending = modifyFields(listed, {
       isLoaded: () => true,
-      integrations: () => Integrations.Loaded({ integrations: [searchApi] }),
+      integrations: () => Integrations.cases.Loaded.make({ integrations: [searchApi] }),
       grants: () => grantsOf([aliceOwns]),
       adding: () =>
         Option.some(
@@ -1138,7 +1138,7 @@ describe("adding a connection", () => {
   it("finishes at once when the store already lists the connection the host made", () => {
     const sending = modifyFields(listed, {
       isLoaded: () => true,
-      integrations: () => Integrations.Loaded({ integrations: [searchApi] }),
+      integrations: () => Integrations.cases.Loaded.make({ integrations: [searchApi] }),
       grants: () => grantsOf([aliceOwns]),
       connections: () => unpending(team, search, machine, created),
       dialog: (dialog) => modifyFields(dialog, { isOpen: () => true }),
@@ -1245,7 +1245,7 @@ describe("replacing a connection's key", () => {
   /** The dialog on the key being replaced, whose request is on its way. */
   const sendingKey = modifyFields(listed, {
     isLoaded: () => true,
-    integrations: () => Integrations.Loaded({ integrations: [modelsApi, searchApi, sandboxApi] }),
+    integrations: () => Integrations.cases.Loaded.make({ integrations: [modelsApi, searchApi, sandboxApi] }),
     grants: () => grantsOf([aliceOwns]),
     connections: () => unpending(team, search, machine),
     dialog: (dialog) => modifyFields(dialog, { isOpen: () => true }),

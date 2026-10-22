@@ -24,16 +24,12 @@ import { ComposerBlock } from "../composer/block.ts"
 import { ReadDraft } from "../composer/command.ts"
 import { MarkAllNotificationsSeen, MarkNotificationSeen } from "./command.ts"
 import {
-  byDay,
   findGroup,
   hasOlderItems,
   type InboxItem,
   Message,
   newestWaiting,
-  notificationHeadline,
-  notificationPlace,
   notificationReason,
-  notificationText,
   OutMessage,
   pageSize,
   shownItems,
@@ -41,6 +37,7 @@ import {
 } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
+import { byDay, notificationHeadline, notificationPlace, notificationText } from "./view/notification.ts"
 
 const { workspace, member } = membership
 const asMember = { workspaceId: workspace.id, memberId: member.id }

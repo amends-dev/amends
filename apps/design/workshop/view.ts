@@ -6336,6 +6336,59 @@ const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
     )
   ])
 
+/** The same navigation surfaces as native links, including the current-page treatment. */
+const navigationGroup = (h: ApplicationViewBuilder): Html =>
+  group(h, "Navigation links", [
+    sample(
+      h,
+      "Destinations, sidebar items, tabs, and directory rows as links",
+      [
+        rail(h, {
+          brand: { label: "Workshop home", onClick: Message.ClickedButton(), href: "#navigation-links" },
+          items: [
+            {
+              icon: "mark-agents",
+              label: "Agents",
+              isCurrent: true,
+              onClick: Message.ClickedButton(),
+              href: "#navigation-links"
+            }
+          ],
+          footer: []
+        }),
+        sidebarSection(h, {
+          label: "Groups",
+          onTitleClick: Message.ClickedButton(),
+          titleHref: "#navigation-links",
+          children: [
+            sidebarItem(h, {
+              label: "General",
+              icon: "mark-channel",
+              isCurrent: true,
+              onClick: Message.ClickedButton(),
+              href: "#navigation-links"
+            })
+          ]
+        }),
+        paneTabs(h, {
+          label: "Linked activity",
+          tabs: [
+            { label: "Unread", count: 3, isCurrent: true, onClick: Message.ClickedButton(), href: "#navigation-links" },
+            { label: "All", isCurrent: false, onClick: Message.ClickedButton(), href: "#navigation-links" }
+          ]
+        }),
+        row(h, {
+          mark: { text: "A" },
+          title: "Agent one",
+          meta: "Open agent",
+          onClick: Message.ClickedButton(),
+          href: "#navigation-links"
+        })
+      ],
+      "flex max-w-2xl flex-col"
+    )
+  ])
+
 export const view = ApplicationComposition.makeView((model, h) => ({
   title: "amends design workshop",
   body: h.div(
@@ -6346,6 +6399,7 @@ export const view = ApplicationComposition.makeView((model, h) => ({
         [
           h.h1([h.Class(pageTitle)], ["amends design workshop"]),
           buttonGroup(h, model.pressCount),
+          navigationGroup(h),
           fieldGroup(h, model),
           toggleGroup(h, model.isNotificationsOn, model.isDigestOn),
           selectGroup(h, model.plan),

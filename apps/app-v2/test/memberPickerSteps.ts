@@ -2,7 +2,7 @@
 
 import { Combobox } from "@foldkit/ui"
 import { Command, Mount } from "foldkit/scene"
-import { MembersComboboxBlock } from "../src/memberPicker.ts"
+import { MembersComboboxBlock } from "../src/control/memberPicker.ts"
 
 /** The picker acknowledged ready: the button that shows its list keeps the input from losing focus. */
 export const pickerReady = Mount.resolve(

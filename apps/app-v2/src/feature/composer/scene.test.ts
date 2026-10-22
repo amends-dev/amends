@@ -32,7 +32,7 @@ import { boxId, type Format, Message, OutMessage, Reading } from "./definition.t
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
-import { view } from "./view.ts"
+import { view } from "./view/main.ts"
 
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
 const memberId = MemberId.MemberId.make("member-1")

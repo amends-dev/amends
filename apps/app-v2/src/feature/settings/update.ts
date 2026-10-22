@@ -1,136 +1,56 @@
+/** Incoming settings, dialogs, account feedback, and message routing. */
+
 import { BuiltinRoles } from "@amends-dev/core/authorization"
-import { Invitation, type MemberId } from "@amends-dev/core/workspace"
+import type { Invitation, MemberId } from "@amends-dev/core/workspace"
 import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
+import { CopyWorkspaceId, ExpireCopied } from "./command.ts"
 import {
-  ChangeRole,
-  CopyWorkspaceId,
-  ExpireCopied,
-  Invite,
-  RemoveMember,
-  RenameSelf,
-  RenameWorkspace,
-  RevokeInvitation,
-  TransferOwnership
-} from "./command.ts"
-import { askToChangeName, DialogBinding, leaveDialog, openDialog, SettingsComposition } from "./composition.ts"
+  askToChangeName,
+  DialogBinding,
+  leaveDialog,
+  openDialog,
+  SettingsComposition,
+  AccountBinding,
+  MemberStatusBinding
+} from "./composition.ts"
 import {
+  findWaitingInvitation,
   Entering,
-  type Failure,
   findMember,
-  isNameChanged,
-  isRoleChanged,
   Message,
   type Model,
-  mayChangeRole,
   mayInvite,
   mayRemove,
-  mayRename,
   mayTransferOwnership,
-  type NameEdit,
   OutMessage,
-  ownerAssignment,
-  ownName,
   type Reason,
-  type Selected,
-  type SettingsAction,
   transferCandidates,
-  workspaceRolesOf,
   Written
 } from "./definition.ts"
-
-const failureOf = (action: SettingsAction, reason: Reason): Failure => ({ action, reason })
-
-/**
- * What the person typed in the field of a name, with no failure left from the name before it, while it is not on its
- * way.
- */
-const typedName = (edit: Option.Option<NameEdit>, name: string): Option.Option<NameEdit> =>
-  Option.some(
-    Option.match(edit, {
-      onNone: () => ({ name, isSaving: false, failure: Option.none() }),
-      onSome: (typing) => (typing.isSaving ? typing : { ...typing, name, failure: Option.none() })
-    })
-  )
-
-/** The edit of a name once it is sent, which waits for the store to keep it. */
-const sentName = (edit: NameEdit): NameEdit => ({ ...edit, isSaving: true, failure: Option.none() })
-
-/** The edit of a name once `failure` kept it from being sent or kept. */
-const refusedName =
-  (failure: Failure) =>
-  (edit: NameEdit): NameEdit => ({ ...edit, isSaving: false, failure: Option.some(failure) })
-
-/** The model with the name of the workspace being changed as `change` makes it, while one is. */
-const atWorkspaceName = (model: Model, change: (edit: NameEdit) => NameEdit): Model =>
-  modifyFields(model, { workspaceName: Option.map(change) })
-
-/** The model with the member open as `change` makes them, while one is. */
-const atSelected = (model: Model, change: (selected: Selected) => Selected): Model =>
-  modifyFields(model, { selected: Option.map(change) })
-
-type Inviting = Extract<Entering, { readonly _tag: "Inviting" }>
-
-type ChangingName = Extract<Entering, { readonly _tag: "ChangingName" }>
-
-/** The model with the invitation being drafted as `change` makes it, while one is and it is not on its way. */
-const atInviting = (model: Model, change: (inviting: Inviting) => Inviting): Model =>
-  modifyFields(model, {
-    entering: Option.map((entering) =>
-      Entering.isAnyOf(["Inviting"])(entering) && !entering.isSending ? change(entering) : entering
-    )
-  })
-
-/**
- * The model with the person's own name being typed as `change` makes it, while the dialog changes it and its request
- * is not on its way.
- */
-const atChangingName = (model: Model, change: (changing: ChangingName) => ChangingName): Model =>
-  modifyFields(model, {
-    entering: Option.map((entering) =>
-      Entering.isAnyOf(["ChangingName"])(entering) && !entering.isSending ? change(entering) : entering
-    )
-  })
-
-/** What the dialog is doing once its request is sent, which waits for the store to keep it. */
-const sentEntering = (entering: Entering): Entering =>
-  Entering.matchOrElse(entering, { ViewingHistory: () => entering }, (sending) => ({
-    ...sending,
-    isSending: true,
-    failure: Option.none()
-  }))
-
-/** What the dialog is doing once `failure` kept its request from being sent or kept. */
-const refusedEntering =
-  (failure: Failure) =>
-  (entering: Entering): Entering =>
-    Entering.matchOrElse(entering, { ViewingHistory: () => entering }, (refused) => ({
-      ...refused,
-      isSending: false,
-      failure: Option.some(failure)
-    }))
-
-/** What the dialog is doing with no failure shown, since what the person sees is read again. */
-const unfailedEntering = (entering: Entering): Entering =>
-  Entering.matchOrElse(entering, { ViewingHistory: () => entering }, (shown) => ({
-    ...shown,
-    failure: Option.none()
-  }))
-
-/** The model with what the dialog is doing as `change` makes it, while it is doing something. */
-const atEntering = (model: Model, change: (entering: Entering) => Entering): Model =>
-  modifyFields(model, { entering: Option.map(change) })
-
-/** The model with the dialog's request refused for `reason`, when `isFor` says the dialog is doing what was written. */
-const refuseEntering = (
-  model: Model,
-  action: SettingsAction,
-  reason: Reason,
-  isFor: (entering: Entering) => boolean
-): Model =>
-  atEntering(model, (entering) => (isFor(entering) ? refusedEntering(failureOf(action, reason))(entering) : entering))
+import {
+  failureOf,
+  typedName,
+  refusedName,
+  atWorkspaceName,
+  atSelected,
+  atInviting,
+  atChangingName,
+  unfailedEntering,
+  atEntering,
+  refuseEntering
+} from "./update/forms.ts"
+import {
+  submitWorkspaceName,
+  submitOwnName,
+  submitRole,
+  submitInvite,
+  submitRevocation,
+  submitTransfer,
+  submitRemoval
+} from "./update/submission.ts"
 
 /** Close the dialog, whose request is done with. */
 const closeDialog = Update.combine([leaveDialog, DialogBinding.requestClose()])
@@ -150,105 +70,6 @@ const isRevoking = (entering: Entering, invitationId: Invitation.InvitationId): 
 const nameOfMember = (model: Model, memberId: MemberId.MemberId): string =>
   Option.match(findMember(model, memberId), { onNone: () => "The member", onSome: ({ member }) => member.name })
 
-/** Send the name the person typed for the workspace, when it is one to save and they may rename it. */
-const submitWorkspaceName = (model: Model) =>
-  Option.match(model.workspaceName, {
-    onNone: () => ({ model }),
-    onSome: (edit) => {
-      if (edit.isSaving) {
-        return { model }
-      }
-
-      return Option.match(model.workspace, {
-        onNone: () => ({ model: atWorkspaceName(model, refusedName(failureOf("Rename", "Gone"))) }),
-        onSome: ({ workspace }) => {
-          if (!isNameChanged(edit.name, workspace.name)) {
-            return { model }
-          }
-
-          if (!mayRename(model)) {
-            return { model: atWorkspaceName(model, refusedName(failureOf("Rename", "Denied"))) }
-          }
-
-          const { workspaceId, memberId } = model
-          return {
-            model: atWorkspaceName(model, sentName),
-            commands: [RenameWorkspace({ workspaceId, memberId, name: edit.name.trim(), expectedName: workspace.name })]
-          }
-        }
-      })
-    }
-  })
-
-/** Send the name the person typed for themselves, when it is one to save and the replica holds their membership. */
-const submitOwnName = (model: Model) =>
-  Option.match(model.entering, {
-    onNone: () => ({ model }),
-    onSome: (entering) =>
-      Entering.matchOrElse(
-        entering,
-        {
-          ChangingName: ({ name, isSending }) => {
-            if (isSending) {
-              return { model }
-            }
-
-            if (Option.isNone(findMember(model, model.memberId))) {
-              return { model: atEntering(model, refusedEntering(failureOf("RenameSelf", "Gone"))) }
-            }
-
-            if (!isNameChanged(name, ownName(model))) {
-              return { model }
-            }
-
-            const { workspaceId, memberId } = model
-            return {
-              model: atEntering(model, sentEntering),
-              commands: [RenameSelf({ workspaceId, memberId, name: name.trim() })]
-            }
-          }
-        },
-        () => ({ model })
-      )
-  })
-
-/** Send the role the person chose for the member open as a replacement of the roles they saw the member hold. */
-const submitRole = (model: Model) =>
-  Option.match(model.selected, {
-    onNone: () => ({ model }),
-    onSome: (selected) => {
-      const refuse = (reason: Reason) => ({
-        model: atSelected(model, (open) => ({ ...open, failure: Option.some(failureOf("ChangeRole", reason)) }))
-      })
-
-      if (selected.isSaving || Option.isNone(selected.roleId) || !isRoleChanged(model, selected)) {
-        return { model }
-      }
-
-      if (Option.isNone(findMember(model, selected.memberId))) {
-        return refuse("Gone")
-      }
-
-      if (!mayChangeRole(model, selected.memberId)) {
-        return refuse("Denied")
-      }
-
-      const { workspaceId, memberId } = model
-      return {
-        model: atSelected(model, (open) => ({ ...open, isSaving: true, failure: Option.none() })),
-        commands: [
-          ChangeRole({
-            workspaceId,
-            memberId,
-            changeMemberId: selected.memberId,
-            roleId: selected.roleId.value,
-            expectedAssignmentIds: workspaceRolesOf(model, selected.memberId).map(({ id }) => id)
-          })
-        ]
-      }
-    }
-  })
-
 export const update = SettingsComposition.makeUpdate((model, message) => {
   /** Ask for the dialog on an invitation to draft, where the person may invite. */
   const askToInvite = () =>
@@ -263,15 +84,6 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
   /** Ask for the dialog on every invitation, where the person may see them. */
   const askToViewHistory = () =>
     mayInvite(model) ? Update.combine(model, [openDialog(Entering.ViewingHistory())]) : { model }
-
-  /** The invitation `invitationId`, while the replica has it and it is still to be accepted. */
-  const findWaitingInvitation = (model: Model, invitationId: Invitation.InvitationId) =>
-    Option.fromUndefinedOr(
-      model.invitations.find(
-        ({ invitation }) =>
-          invitation.details.id === invitationId && Invitation.State.isAnyOf(["Pending"])(invitation.state)
-      )
-    )
 
   /** Ask for the dialog that confirms revoking `invitationId`, where the person may and it is not itself on its way. */
   const askToRevoke = (invitationId: Invitation.InvitationId) =>
@@ -310,152 +122,6 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
               openDialog(Entering.Removing({ memberId, name: member.name, isSending: false, failure: Option.none() }))
             ])
           : { model }
-    })
-
-  /** Send the invitation the person drafted, when it names someone and they may invite. */
-  const submitInvite = (model: Model) =>
-    Option.match(model.entering, {
-      onNone: () => ({ model }),
-      onSome: (entering) =>
-        Entering.matchOrElse(
-          entering,
-          {
-            Inviting: (inviting) => {
-              if (inviting.isSending || inviting.email.trim() === "") {
-                return { model }
-              }
-
-              if (!mayInvite(model)) {
-                return { model: atEntering(model, refusedEntering(failureOf("Invite", "Denied"))) }
-              }
-
-              const { workspaceId, memberId } = model
-              return {
-                model: atEntering(model, sentEntering),
-                commands: [Invite({ workspaceId, memberId, email: inviting.email.trim(), roleId: inviting.roleId })]
-              }
-            }
-          },
-          () => ({ model })
-        )
-    })
-
-  /** Send the revoking the person confirmed, when the invitation is still to be accepted and they may revoke it. */
-  const submitRevocation = (model: Model) =>
-    Option.match(model.entering, {
-      onNone: () => ({ model }),
-      onSome: (entering) =>
-        Entering.matchOrElse(
-          entering,
-          {
-            Revoking: ({ invitationId, isSending }) => {
-              if (isSending) {
-                return { model }
-              }
-
-              if (Option.isNone(findWaitingInvitation(model, invitationId))) {
-                return { model: atEntering(model, refusedEntering(failureOf("Revoke", "Gone"))) }
-              }
-
-              if (!mayInvite(model)) {
-                return { model: atEntering(model, refusedEntering(failureOf("Revoke", "Denied"))) }
-              }
-
-              const { workspaceId, memberId } = model
-              return {
-                model: atEntering(model, sentEntering),
-                commands: [RevokeInvitation({ workspaceId, memberId, invitationId })]
-              }
-            }
-          },
-          () => ({ model })
-        )
-    })
-
-  /**
-   * Send the handing over the person confirmed, from the owner's assignment they saw, to a member who can still become
-   * the owner.
-   */
-  const submitTransfer = (model: Model) =>
-    Option.match(model.entering, {
-      onNone: () => ({ model }),
-      onSome: (entering) =>
-        Entering.matchOrElse(
-          entering,
-          {
-            Transferring: ({ newOwner, isSending }) => {
-              if (isSending || Option.isNone(newOwner)) {
-                return { model }
-              }
-
-              const refuse = (reason: Reason) => ({
-                model: atEntering(model, refusedEntering(failureOf("Transfer", reason)))
-              })
-              const assignment = ownerAssignment(model)
-
-              if (
-                Option.isNone(assignment) ||
-                !transferCandidates(model).some((candidate) => candidate.id === newOwner.value)
-              ) {
-                return refuse("Gone")
-              }
-
-              if (!mayTransferOwnership(model)) {
-                return refuse("Denied")
-              }
-
-              const { workspaceId, memberId } = model
-              return {
-                model: atEntering(model, sentEntering),
-                commands: [
-                  TransferOwnership({
-                    workspaceId,
-                    memberId,
-                    newOwnerMemberId: newOwner.value,
-                    expectedOwnerAssignmentId: assignment.value.id
-                  })
-                ]
-              }
-            }
-          },
-          () => ({ model })
-        )
-    })
-
-  /** Send the removal the person confirmed, when the member is still in the workspace and they may remove them. */
-  const submitRemoval = (model: Model) =>
-    Option.match(model.entering, {
-      onNone: () => ({ model }),
-      onSome: (entering) =>
-        Entering.matchOrElse(
-          entering,
-          {
-            Removing: ({ memberId: removeMemberId, isSending }) => {
-              if (isSending) {
-                return { model }
-              }
-
-              const refuse = (reason: Reason) => ({
-                model: atEntering(model, refusedEntering(failureOf("Remove", reason)))
-              })
-
-              if (!Option.exists(findMember(model, removeMemberId), ({ member }) => member.status === "active")) {
-                return refuse("Gone")
-              }
-
-              if (!mayRemove(model, removeMemberId)) {
-                return refuse("Denied")
-              }
-
-              const { workspaceId, memberId } = model
-              return {
-                model: atEntering(model, sentEntering),
-                commands: [RemoveMember({ workspaceId, memberId, removeMemberId })]
-              }
-            }
-          },
-          () => ({ model })
-        )
     })
 
   /** What the store keeping an action means for the person: the form is done with, and the page is told to say so. */
@@ -525,6 +191,12 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
     })
 
   return Message.match(message, {
+    RequestedDismiss: () =>
+      Update.combine(model, [
+        AccountBinding.requestClose(),
+        MemberStatusBinding.requestClose(),
+        DialogBinding.requestClose()
+      ]),
     ReceivedSettings: ({ workspace, members, roles, assignments, invitations, grants }) => ({
       model: modifyFields(model, {
         workspace: () => workspace,

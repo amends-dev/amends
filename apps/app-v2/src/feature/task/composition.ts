@@ -1,7 +1,7 @@
 import { Task } from "@amends-dev/core/task"
 import * as Option from "effect/Option"
 import type { Block } from "foldkit"
-import { assigneeOfChoice, AssigneeMenu } from "../../taskFilter.ts"
+import { assigneeOfChoice, AssigneeMenu } from "../../control/taskFilter.ts"
 import { UpdateTask } from "./command.ts"
 import { type Model, PriorityMenu, StatusMenu, TaskDefinition } from "./definition.ts"
 

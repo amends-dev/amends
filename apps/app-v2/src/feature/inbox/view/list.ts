@@ -1,0 +1,179 @@
+/** The inbox’s notification list and paging controls. */
+
+import { button, buttonRow, loadingLine, notice } from "@amends-dev/design/control"
+import { divider, messageList, notification } from "@amends-dev/design/message"
+import { pane, paneColumn, paneEmpty, paneTabs } from "@amends-dev/design/pane"
+import type * as DateTime from "effect/DateTime"
+import * as Option from "effect/Option"
+import type { Html } from "foldkit/html"
+import { ageLabel } from "../../../view/time.ts"
+import { InboxBlock } from "../block.ts"
+import type { InboxViewBuilder } from "../composition.ts"
+import {
+  hasOlderItems,
+  type InboxItem,
+  isSelected,
+  isWaiting,
+  Message,
+  type Model,
+  shownItems,
+  type Tab,
+  waitingCount
+} from "../definition.ts"
+import { byDay, notificationHeadline, notificationPlace, notificationText } from "./notification.ts"
+
+/**
+ * The time now, which the days the notifications came on and how long ago they came are read from, the workspace's
+ * name, which a phone shows under the inbox's title, and the trigger whose member's card is open.
+ */
+export type ViewInputs = Readonly<{
+  now: DateTime.Utc
+  workspaceName: string
+  openTriggerId: string | undefined
+  tabHref?: ((tab: Tab) => string | undefined) | undefined
+}>
+
+/** What the body says when a tab has nothing to list; on Unread, with the way to see what was seen. */
+const nothingToList = (tab: Tab, h: InboxViewBuilder): Html =>
+  tab === "Unread"
+    ? paneEmpty(h, {
+        art: "rest",
+        title: "You’re all caught up",
+        copy: "You’ve seen everything that came to you.",
+        action: button(h, "View all activity", Message.ChoseTab({ tab: "All" }))
+      })
+    : paneEmpty(h, {
+        art: "caret",
+        title: "No activity yet",
+        copy: "Mentions, replies, and new threads in groups you follow appear here."
+      })
+
+/** Whether the notifications could not be read, which is why there are none to show: nothing was read, and why. */
+const isUnread = (model: Model): boolean => !model.isLoaded && Option.isSome(model.notice)
+
+/** What the body says in place of the notifications when they could not be read: why, as the line under the title. */
+const unreadInbox = (model: Model, h: InboxViewBuilder): Html =>
+  paneEmpty(h, {
+    art: "came-apart",
+    title: "Can’t load your inbox",
+    ...Option.match(model.notice, { onNone: () => ({}), onSome: (copy) => ({ copy }) }),
+    action: button(h, "Try again", Message.ClickedTryAgain())
+  })
+
+/** The tabs under the title: those waiting, counted even when none wait, and every notification. */
+const tabs = (model: Model, h: InboxViewBuilder, tabHref?: ViewInputs["tabHref"]): Html =>
+  paneTabs(h, {
+    label: "Inbox",
+    tabs: [
+      {
+        label: "Unread",
+        count: waitingCount(model),
+        isCurrent: model.tab === "Unread",
+        onClick: Message.ChoseTab({ tab: "Unread" }),
+        href: tabHref?.("Unread")
+      },
+      {
+        label: "All",
+        isCurrent: model.tab === "All",
+        onClick: Message.ChoseTab({ tab: "All" }),
+        href: tabHref?.("All")
+      }
+    ]
+  })
+
+/**
+ * A notification as the design's row: the author of what its activity is about, whose name and mark open their
+ * card, and what they did, where it comes from, and what it says, which opens its thread, if it has one, how long ago
+ * it came, and, while it waits, unread, and current while it is the one whose thread is open.
+ */
+const notificationRow = (
+  item: InboxItem,
+  model: Model,
+  { now, openTriggerId }: Pick<ViewInputs, "now" | "openTriggerId">,
+  h: InboxViewBuilder
+): Html => {
+  const { id, recordedAt, thread } = item.notification
+
+  return notification(h, {
+    key: id,
+    ...notificationHeadline(item, model),
+    profiles: {
+      scope: "inbox",
+      openTriggerId,
+      open: (memberId, triggerId) => Message.OpenedProfile({ memberId, triggerId })
+    },
+    place: Option.getOrUndefined(notificationPlace(item, model)),
+    text: notificationText(item, model),
+    age: ageLabel(recordedAt, now),
+    isUnread: isWaiting(item),
+    isCurrent: isSelected(model, item),
+    ...(thread === undefined ? {} : { onOpen: Message.ClickedOpen({ notificationId: id }) })
+  })
+}
+
+/**
+ * The notifications the tab lists, newest first, under the days they came, or what the body says in their place:
+ * that they are being read, why they could not be, or that the tab has none.
+ */
+const notifications = (model: Model, inputs: Pick<ViewInputs, "now" | "openTriggerId">, h: InboxViewBuilder): Html => {
+  if (isUnread(model)) {
+    return unreadInbox(model, h)
+  }
+
+  if (!model.isLoaded) {
+    return loadingLine(h, "Loading your inbox…")
+  }
+
+  const items = shownItems(model)
+
+  return items.length === 0
+    ? nothingToList(model.tab, h)
+    : messageList(h, {
+        label: "Notifications",
+        children: byDay(items, inputs.now).flatMap((day) => [
+          divider(h, day.label, { align: "start" }),
+          ...day.items.map((item) => notificationRow(item, model, inputs, h))
+        ])
+      })
+}
+
+/**
+ * The notifications the tab lists, newest first, under the days they came, each day's name before the rule that runs
+ * on, to open beside the inbox, with the one open kept in its place, and Show older after them while the tab keeps
+ * older ones, or what a tab says when it has none, and a line that says they are being read until they are. The
+ * workspace's name is under the title on phones. Mark all seen is in the header while any notification waits, dimmed
+ * while the write that marks them is on its way.
+ */
+export const view = InboxBlock.makeView.withInputs<ViewInputs>((model, inputs, h) =>
+  pane(h, {
+    variant: "main",
+    label: "Inbox",
+    header: {
+      title: "Inbox",
+      icon: "mark-mail",
+      phoneContext: inputs.workspaceName,
+      tabs: tabs(model, h, inputs.tabHref),
+      actions:
+        waitingCount(model) === 0
+          ? []
+          : [button(h, "Mark all seen", Message.ClickedMarkAllSeen(), { isDisabled: model.isMarkingAllSeen })]
+    },
+    body: [
+      paneColumn(
+        h,
+        [
+          isUnread(model) ? h.empty : notice(h, model.notice),
+          notifications(model, inputs, h),
+          ...(hasOlderItems(model)
+            ? [
+                buttonRow(h, [button(h, "Show older", Message.ClickedShowOlder(), { variant: "quiet" })], {
+                  isCentered: true
+                })
+              ]
+            : [])
+        ],
+        { isWide: true }
+      )
+    ]
+  })
+)

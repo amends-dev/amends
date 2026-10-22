@@ -147,7 +147,7 @@ export const update = WorkspacesComposition.makeUpdate((model, message) =>
         workspaces: () => Workspaces.Loaded({ memberships, invitations, reloadFailed: false })
       })
       return Option.match(model.entering, {
-        onNone: () => ({ model: listed }),
+        onNone: () => ({ model: listed, outMessage: OutMessage.ListedWorkspaces() }),
         onSome: Entering.matchOrElse(
           {
             Opening: ({ workspaceId }) =>
@@ -169,7 +169,7 @@ export const update = WorkspacesComposition.makeUpdate((model, message) =>
                 )
               ])
           },
-          () => ({ model: listed })
+          () => ({ model: listed, outMessage: OutMessage.ListedWorkspaces() })
         )
       })
     },

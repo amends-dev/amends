@@ -31,8 +31,8 @@ import {
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { deleted, now, saying, scout, task, turnOf } from "../../../test/fixtures.ts"
-import { timeOf } from "../../seen.ts"
 import * as Drafts from "../../store/Drafts.ts"
+import { timeOf } from "../../view/time.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { SaveDraft } from "../composer/command.ts"
 import { TurnsBlock } from "../turns/block.ts"
@@ -60,7 +60,9 @@ import {
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
-import { followView, replyView, turnLogView, view } from "./view.ts"
+import { view } from "./view/body.ts"
+import { followView, replyView } from "./view/controls.ts"
+import { turnLogView } from "./view/turnLog.ts"
 
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
 const memberId = MemberId.MemberId.make("member-1")

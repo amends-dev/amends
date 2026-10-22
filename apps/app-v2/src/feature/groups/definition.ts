@@ -14,7 +14,7 @@
  */
 
 import { Grant } from "@amends-dev/core/authorization"
-import { Group, GroupId, GroupMembership } from "@amends-dev/core/group"
+import { Group, GroupId, GroupMembership, GroupPermissions } from "@amends-dev/core/group"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { DialogBlock } from "@foldkit/ui/dialog"
@@ -28,10 +28,11 @@ import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
 import { modifyFields } from "foldkit/struct"
-import { MembersComboboxBlock } from "../../memberPicker.ts"
-import { foldAccents, groupName, isJoinable } from "../../seen.ts"
-import { activityOfAgent, AgentItem } from "../agents/definition.ts"
-import { conversationAmong } from "./conversation.ts"
+import { MembersComboboxBlock } from "../../control/memberPicker.ts"
+import { activityOfAgent, AgentItem } from "../../data/agents.ts"
+import { groupName, isJoinable, conversationAmong } from "../../data/groups.ts"
+import { may, workspaceTarget } from "../../data/permissions.ts"
+import { foldAccents } from "../../data/search.ts"
 
 /** A group the person can see, whether it is still being created, and how many members it has. */
 export const GroupItem = Schema.Struct({ group: Group.Group, pending: Schema.Boolean, members: Schema.Int })
@@ -131,6 +132,7 @@ export const Model = Schema.Struct({
 export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
+  RequestedDismiss: {},
   ReceivedGroups: {
     groups: Schema.Array(GroupItem),
     members: Schema.Array(Member.Member),
@@ -176,6 +178,7 @@ export type Message = typeof Message.Type
  * with where it is as a line says it, "#launches", and to open the team the person created and confirm it.
  */
 export const OutMessage = defineMessageUnion({
+  ChangedBrowseTab: {},
   SelectedGroup: { groupId: GroupId.GroupId },
   SelectedPeople: { memberIds: Schema.Array(MemberId.MemberId) },
   RequestedBrowse: {},
@@ -366,3 +369,7 @@ export const findCreatedTeam = (model: Model): Option.Option<TeamItem> =>
         )
     )
   )
+
+/** Whether the person may start a team. */
+export const mayCreateTeam = (model: Model): boolean =>
+  may(model.grants, GroupPermissions.Create, workspaceTarget(model.workspaceId))

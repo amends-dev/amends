@@ -1,17 +1,19 @@
 # Apps
 
-The apps are what people see: the workspace app, the site at amends.dev, built from the design
-system, and the libraries it draws with. The workspace app is being built: it signs people in and
-keeps each workspace they open in sync, with its groups, threads, and replies; the rest of a
-workspace is still worked in through the [HTTP API](../packages/http/README.md). None of these is published to npm.
+The apps are what people see: the workspace app, the site at amends.dev, and their supporting
+libraries. The workspace app signs people in through the [HTTP API](../packages/http/README.md)
+and keeps open workspaces in sync. It includes conversations, tasks, agents, connections, channels,
+and settings; its README describes the current contract and remaining work. These packages are
+private to the repository.
 
-| Package                      | What it is                                                                     |
-| ---------------------------- | ------------------------------------------------------------------------------ |
-| [`app-v2`](app-v2/README.md) | The workspace app, on Foldkit: groups, threads, and replies, kept in sync.     |
-| [`design`](design/README.md) | The workspace app's look: Tailwind tokens and the renderers that carry them.   |
-| [`ui`](ui/README.md)         | The design system: foundations, components, layout patterns, and every screen. |
-| [`site`](site/README.md)     | amends.dev: the product, the packages, and their docs, on Astro and Starlight. |
-| [`icons`](icons/README.md)   | The icons, drawn as data and generated as Solid components, SVGs, and paths.   |
+| Package                          | What it is                                                                            |
+| -------------------------------- | ------------------------------------------------------------------------------------- |
+| [`app-v2`](app-v2/README.md)     | The workspace app on Foldkit Blocks, with browser replicas and pending local actions. |
+| [`design`](design/README.md)     | The workspace app's look: Tailwind tokens and the renderers that carry them.          |
+| [`markdown`](markdown/README.md) | Markdown tokens, mentions, and plain text shared by app data and design.              |
+| [`ui`](ui/README.md)             | The design system: foundations, components, layout patterns, and every screen.        |
+| [`site`](site/README.md)         | amends.dev: the product, the packages, and their docs, on Astro and Starlight.        |
+| [`icons`](icons/README.md)       | The icons, drawn as data and generated as Solid components, SVGs, and paths.          |
 
 ## How they fit
 
@@ -20,6 +22,10 @@ of the API, the session, or routes. The site composes UI's site sections into st
 defines no styles of its own. The workspace app draws with `design` instead: its views call
 `design`'s renderers and carry no class, and `design` imports nothing of UI; it draws its icons from the
 icons' path data, where UI draws the Solid components.
+
+`markdown` parses text for both app data and design renderers. It depends on Marked and Effect,
+with no browser APIs, styles, or UI framework, so search can read message text independently of
+rendering.
 
 `bun run check:packages` enforces these boundaries: UI depends on no router, Effect, or platform
 package, and the icons' runtime depends on Solid alone.

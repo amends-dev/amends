@@ -1,8 +1,9 @@
+// @vitest-environment node
+// Bun's own fetch and WebSocket reach the in-process server; fake-indexeddb is the browser's storage.
+
 import { ChannelTransport } from "@amends-dev/channel"
 import { Integration } from "@amends-dev/connection"
 import { Assignment, BuiltinRoles } from "@amends-dev/core/authorization"
-// @vitest-environment node
-// Bun's own fetch and WebSocket reach the in-process server; fake-indexeddb is the browser's storage.
 import { ChannelIntake, DeliveryJobs } from "@amends-dev/core/channel"
 import { CoreError } from "@amends-dev/core/error"
 import { Group, GroupPermissions } from "@amends-dev/core/group"
@@ -11,19 +12,12 @@ import { MemoryDatabase } from "@amends-dev/core/journal"
 import { Notification } from "@amends-dev/core/notification"
 import { PresenceRelay } from "@amends-dev/core/presence"
 import { ReplicaRecord } from "@amends-dev/core/replica"
-import {
-  ThreadActivity,
-  ThreadId,
-  ThreadMessage,
-  ThreadMessageService,
-  ThreadParticipation
-} from "@amends-dev/core/thread"
-import { type Turn, TurnJobs } from "@amends-dev/core/turn"
+import { ThreadId, ThreadMessage, ThreadMessageService } from "@amends-dev/core/thread"
+import { TurnJobs } from "@amends-dev/core/turn"
 import {
   Invitation,
   InvitationService,
   Member,
-  MemberId,
   type Workspace,
   WorkspaceSettingsPermissions
 } from "@amends-dev/core/workspace"
@@ -49,24 +43,14 @@ import { HttpApiClient, HttpApiMiddleware } from "effect/http-api"
 import { KeyValueStore } from "effect/persistence"
 import { Socket } from "effect/socket"
 import { memberClient } from "../src/api.ts"
+import { may, workspaceTarget } from "../src/data/permissions.ts"
+import type * as Search from "../src/data/search.ts"
 import { readSettings } from "../src/feature/settings/subscription.ts"
-import { may, workspaceTarget } from "../src/permissions.ts"
+import type * as GroupQuery from "../src/store/query/groups.ts"
+import type * as InboxQuery from "../src/store/query/inbox.ts"
+import type * as TaskQuery from "../src/store/query/tasks.ts"
+import type * as ThreadQuery from "../src/store/query/threads.ts"
 import * as Store from "../src/store/Store.ts"
-import {
-  bob,
-  conversationWithBob,
-  deleted,
-  design,
-  general,
-  membership,
-  opening,
-  reply,
-  saying,
-  scout,
-  scoutAgent,
-  task,
-  thread
-} from "./fixtures.ts"
 
 const alice = Identity.HumanId.make("alice")
 
@@ -220,10 +204,10 @@ const firstWhere = <A, E>(stream: Stream.Stream<A, E>, holds: (value: A) => bool
   stream.pipe(Stream.filter(holds), Stream.runHead, Effect.map(Option.getOrThrow), Effect.timeout("5 seconds"))
 
 /** The task listed under the place `place` among `views`. */
-const taskIn = (views: ReadonlyArray<Store.TaskView>, place: string) => views.find((view) => view.place === place)!
+const taskIn = (views: ReadonlyArray<TaskQuery.TaskView>, place: string) => views.find((view) => view.place === place)!
 
 /** How many members the group `groupId` has among `views`. */
-const membersIn = (views: ReadonlyArray<Store.GroupView>, groupId: Group.Group["id"]) =>
+const membersIn = (views: ReadonlyArray<GroupQuery.GroupView>, groupId: Group.Group["id"]) =>
   views.find(({ group }) => group.record.value.id === groupId)?.members
 
 describe("Store", () => {
@@ -471,7 +455,8 @@ describe("Store", () => {
         mentions: [],
         task: {}
       })
-      const trackers = (threads: ReadonlyArray<Store.ThreadView>) => threads.filter(({ task }) => Option.isSome(task))
+      const trackers = (threads: ReadonlyArray<ThreadQuery.ThreadView>) =>
+        threads.filter(({ task }) => Option.isSome(task))
 
       // The task shows with its thread, in triage, and the thread started without one tracks none.
       const [tracking] = yield* firstWhere(
@@ -648,7 +633,7 @@ describe("Store", () => {
 
       // A conversation counts the members it is made with, before the server holds it and after.
       yield* store.write("DirectThreadStarted", { memberIds: [bob.id], text: "Got a minute?", mentions: [] })
-      const isDirect = ({ group }: Store.GroupView) => group.record.value.kind === "Direct"
+      const isDirect = ({ group }: GroupQuery.GroupView) => group.record.value.kind === "Direct"
       expect((yield* firstWhere(store.groups, (views) => views.some(isDirect))).find(isDirect)?.members).toBe(2)
       const settled = yield* firstWhere(store.groups, (views) =>
         views.some((view) => isDirect(view) && !view.group.pending)
@@ -677,7 +662,7 @@ describe("Store", () => {
       yield* store.write("DirectThreadStarted", { memberIds: [bob.id], text: "Got a minute?", mentions: [] })
 
       /** The groups' names, the threads' words and the names of their groups, and the people's and agents' names. */
-      const readable = ({ groups, threads, people, agents }: Store.JumpTargets) => ({
+      const readable = ({ groups, threads, people, agents }: Search.JumpTargets) => ({
         groups: groups.map(({ name }) => name).toSorted(),
         threads: threads.map(({ words, groupName }) => `${words} in ${groupName}`).toSorted(),
         people: people.map(({ name }) => name),
@@ -691,7 +676,7 @@ describe("Store", () => {
         people: ["Bob"],
         agents: []
       }
-      const isWhole = ({ threads }: Store.JumpTargets) => threads.length === 2
+      const isWhole = ({ threads }: Search.JumpTargets) => threads.length === 2
 
       expect(readable(yield* firstWhere(store.jumpTargets, isWhole))).toEqual(expected)
 
@@ -805,7 +790,7 @@ describe("Store", () => {
           )
         )
         .pipe(Effect.scoped)
-      const isWaiting = ({ notification }: Store.InboxEntry) =>
+      const isWaiting = ({ notification }: InboxQuery.InboxEntry) =>
         Notification.State.isAnyOf(["Pending"])(notification.record.value.state)
       const entry = (yield* firstWhere(store.inbox, (entries) => entries.some(isWaiting))).find(isWaiting)
       expect(Option.map(entry!.message, (message) => message.content)).toMatchObject(
@@ -821,7 +806,7 @@ describe("Store", () => {
         threadId,
         throughSequence: entry!.notification.record.value.thread!.sequence
       })
-      const isSeen = ({ notification }: Store.InboxEntry) =>
+      const isSeen = ({ notification }: InboxQuery.InboxEntry) =>
         Notification.State.isAnyOf(["Seen"])(notification.record.value.state)
       yield* firstWhere(
         store.inbox,
@@ -1069,357 +1054,4 @@ describe("Store, for the workspace's people", () => {
       expect(yield* firstWhere(store.actions, (held) => held.length === 0)).toEqual([])
     }).pipe(Effect.scoped, Effect.provide(browser))
   )
-})
-
-describe("Store.viewTurns", () => {
-  const turn = (id: string, status: Turn.Status, minute: number, participationId = "participation-3") => ({
-    record: ReplicaRecord.ReplicaRecord.cases.Turn.make({
-      value: Schema.decodeSync(ReplicaRecord.Turn)({
-        id,
-        workspaceId: "workspace-1",
-        groupId: "general",
-        threadId: "thread-1",
-        agentId: "agent-1",
-        memberId: "member-3",
-        participationId,
-        retry: null,
-        status,
-        acceptedThroughSequence: 1,
-        selection: null,
-        messageIds: [],
-        failure: null,
-        cancelReason: null,
-        createdAt: `2026-10-18T12:0${minute}:00Z`,
-        startedAt: null,
-        finishedAt: null
-      })
-    }),
-    pending: false
-  })
-  const participation = (id: string, status: "active" | "ended") =>
-    Schema.decodeSync(ThreadParticipation.ThreadParticipation)({
-      id,
-      workspaceId: "workspace-1",
-      threadId: "thread-1",
-      participant: {
-        _tag: "Member",
-        memberId: "member-3",
-        groupMembershipId: "membership-3",
-        identity: { _tag: "Agent", id: "agent-1" }
-      },
-      joinedAt: "2026-10-18T12:00:00Z",
-      joinedAtSequence: 1,
-      status,
-      endedAt: status === "ended" ? "2026-10-18T12:30:00Z" : null
-    })
-  const retryOpen = (views: ReadonlyArray<Store.TurnView>) =>
-    views.map(({ turn, retryOpen }) => [turn.record.value.id, retryOpen])
-
-  it("lists them oldest first, and opens a retry to the agent's latest that failed or stopped, while it takes part", () => {
-    const active = [participation("participation-3", "active")]
-    expect(retryOpen(Store.viewTurns([turn("turn-2", "failed", 2), turn("turn-1", "failed", 1)], active))).toEqual([
-      ["turn-1", false],
-      ["turn-2", true]
-    ])
-    expect(retryOpen(Store.viewTurns([turn("turn-1", "cancelled", 1), turn("turn-2", "queued", 2)], active))).toEqual([
-      ["turn-1", false],
-      ["turn-2", false]
-    ])
-    expect(
-      retryOpen(Store.viewTurns([turn("turn-1", "failed", 1)], [participation("participation-3", "ended")]))
-    ).toEqual([["turn-1", false]])
-  })
-})
-
-describe("Store.deriveParticipationChanges", () => {
-  const activity = (id: string, sequence: number, kind: string, details: Schema.Json) =>
-    Schema.decodeSync(ThreadActivity.ThreadActivity)({
-      id,
-      workspaceId: "workspace-1",
-      threadId: "thread-1",
-      sequence,
-      occurredAt: `2026-10-18T12:${String(sequence).padStart(2, "0")}:00Z`,
-      kind,
-      version: 1,
-      subject: "thread-participation:participation-2",
-      occurrence: null,
-      newActivity: false,
-      details
-    })
-  const participation = (id: string, participant: (typeof ThreadParticipation.Participant)["Encoded"]) =>
-    Schema.decodeSync(ThreadParticipation.ThreadParticipation)({
-      id,
-      workspaceId: "workspace-1",
-      threadId: "thread-1",
-      participant,
-      joinedAt: "2026-10-18T12:00:00Z",
-      joinedAtSequence: 1,
-      status: "active",
-      endedAt: null
-    })
-  const bobsParticipation = participation("participation-2", {
-    _tag: "Member",
-    memberId: "member-2",
-    groupMembershipId: "membership-2",
-    identity: { _tag: "Human", id: "bob" }
-  })
-  const followed = (id: string, sequence: number) =>
-    activity(id, sequence, "participation.followed", { participationId: "participation-2" })
-  const ended = (id: string, sequence: number, reason: string) =>
-    activity(id, sequence, "participation.ended", { participationId: "participation-2", reason })
-  const changesOf = (activities: ReadonlyArray<ThreadActivity.ThreadActivity>) =>
-    Store.deriveParticipationChanges(activities, [
-      bobsParticipation,
-      participation("participation-contact", { _tag: "Contact", contactId: "contact-1" })
-    ]).map(({ id, change, memberId }) => [id, change, memberId])
-
-  it("notes a follow and each way a participation ended, in the order of the thread, for the member whose part it was", () => {
-    expect(
-      changesOf([
-        ended("activity-5", 5, "workspace-removed"),
-        followed("activity-1", 1),
-        ended("activity-2", 2, "unfollowed"),
-        ended("activity-3", 3, "group-left"),
-        ended("activity-4", 4, "group-removed")
-      ])
-    ).toEqual([
-      ["activity-1", "followed", "member-2"],
-      ["activity-2", "unfollowed", "member-2"],
-      ["activity-3", "left-group", "member-2"],
-      ["activity-4", "removed-from-group", "member-2"],
-      ["activity-5", "removed-from-workspace", "member-2"]
-    ])
-  })
-
-  it("says when each was made", () => {
-    expect(
-      Store.deriveParticipationChanges([followed("activity-1", 7)], [bobsParticipation]).map(({ at }) => at)
-    ).toEqual([DateTime.makeUnsafe("2026-10-18T12:07:00Z")])
-  })
-
-  it("notes nothing for other activity, a kind whose details do not read, or a participation that is not a member's", () => {
-    expect(
-      changesOf([
-        activity("activity-1", 1, "message.posted", { messageId: "message-1" }),
-        activity("activity-2", 2, "participation.ended", { participationId: "participation-2", reason: "unknown" }),
-        activity("activity-3", 3, "participation.followed", { participationId: "participation-contact" }),
-        activity("activity-4", 4, "participation.followed", { participationId: "participation-missing" })
-      ])
-    ).toEqual([])
-  })
-})
-
-describe("Store.summarizeReplies", () => {
-  const written = (id: string, author: typeof ThreadMessage.Author.Encoded, minute: number) =>
-    Schema.decodeSync(ThreadMessage.ThreadMessage)({
-      id,
-      workspaceId: "workspace-1",
-      threadId: "thread-1",
-      author,
-      via: null,
-      publishedAt: `2026-10-18T12:0${minute}:00Z`,
-      content: { _tag: "Text", text: id, mentions: [], revision: 1, editedAt: null }
-    })
-  const alice = { _tag: "Member", memberId: "member-1" } as const
-  const bob = { _tag: "Member", memberId: "member-2" } as const
-  const dana = { _tag: "Contact", contactId: "contact-1" } as const
-
-  it("finds no replies in a thread that has none, or no messages yet", () => {
-    expect(Store.summarizeReplies([])).toEqual({ replies: 0, repliers: [] })
-    expect(Store.summarizeReplies([written("message-1", alice, 0)])).toEqual({ replies: 0, repliers: [] })
-  })
-
-  it("counts the messages after the opening, and names their authors once each, in the order of their first reply", () => {
-    const messages = [
-      written("message-1", alice, 0),
-      written("message-2", bob, 1),
-      written("message-3", dana, 2),
-      written("message-4", bob, 3),
-      written("message-5", alice, 4)
-    ]
-
-    const decode = Schema.decodeSync(ThreadMessage.Author)
-
-    expect(Store.summarizeReplies(messages)).toEqual({
-      replies: 4,
-      repliers: [decode(bob), decode(dana), decode(alice)]
-    })
-  })
-})
-
-describe("Store.deriveLastActiveAt", () => {
-  it("is when the thread was created while it has no messages", () => {
-    expect(Store.deriveLastActiveAt(thread, [])).toEqual(thread.createdAt)
-  })
-
-  it("is when the latest message was published, which a thread with two is the later of", () => {
-    expect(Store.deriveLastActiveAt(thread, [opening])).toEqual(opening.publishedAt)
-    expect(Store.deriveLastActiveAt(thread, [opening, reply])).toEqual(reply.publishedAt)
-    expect(reply.publishedAt).not.toEqual(opening.publishedAt)
-  })
-})
-
-describe("Store.viewTasks", () => {
-  const person = membership.member
-  const heldThread = (value: typeof thread, pending = false) => ({
-    record: ReplicaRecord.ReplicaRecord.cases.Thread.make({ value }),
-    pending
-  })
-  /** A thread in design that tracks a task, with no messages. */
-  const logoThread = { ...thread, id: ThreadId.ThreadId.make("thread-2"), groupId: design.id }
-  const logoTask = { ...task, threadId: logoThread.id, groupId: design.id }
-  const records: Store.TaskRecords = {
-    memberId: person.id,
-    tasks: [task, logoTask],
-    threads: [heldThread(thread), heldThread(logoThread)],
-    messages: [reply, opening],
-    groups: [general, design],
-    members: [person, bob]
-  }
-
-  it("pairs each task with its thread, the place of its group, its opening, and when it was last active", () => {
-    expect(Store.viewTasks(records)).toEqual([
-      {
-        task,
-        thread,
-        place: "#General",
-        opening: Option.some(opening),
-        lastActiveAt: reply.publishedAt,
-        pending: false
-      },
-      {
-        task: logoTask,
-        thread: logoThread,
-        place: "#Design",
-        opening: Option.none(),
-        lastActiveAt: logoThread.createdAt,
-        pending: false
-      }
-    ])
-  })
-
-  it("places a conversation by the other member", () => {
-    const talk = { ...thread, groupId: conversationWithBob.id }
-
-    expect(
-      Store.viewTasks({
-        ...records,
-        tasks: [{ ...task, groupId: talk.groupId }],
-        threads: [heldThread(talk)],
-        groups: [conversationWithBob]
-      }).map(({ place }) => place)
-    ).toEqual(["Bob"])
-  })
-
-  it("says whether the thread of a task is still being started", () => {
-    expect(
-      Store.viewTasks({ ...records, threads: [heldThread(thread, true), heldThread(logoThread)] }).map(
-        ({ pending }) => pending
-      )
-    ).toEqual([true, false])
-  })
-
-  it("leaves out a task whose thread or group the replica lacks", () => {
-    const among = (changed: Partial<Store.TaskRecords>) =>
-      Store.viewTasks({ ...records, ...changed }).map(({ thread }) => thread.id)
-
-    expect(among({ groups: [general] })).toEqual([thread.id])
-    expect(among({ threads: [heldThread(logoThread)] })).toEqual([logoThread.id])
-    expect(among({ groups: [], threads: [] })).toEqual([])
-  })
-})
-
-describe("Store.listJumpTargets", () => {
-  const person = membership.member
-  const zoe = { ...bob, id: MemberId.MemberId.make("member-4"), name: "Zoë" }
-  const source: Store.JumpSource = {
-    memberId: person.id,
-    groups: [general, design, conversationWithBob],
-    members: [person, bob, zoe, scout],
-    threads: [thread],
-    messages: [reply, opening]
-  }
-  const groupNames = (among: Store.JumpSource = source) => Store.listJumpTargets(among).groups.map(({ name }) => name)
-
-  it("lists the groups by the names the person reads, other than a conversation with one other person", () => {
-    expect(groupNames()).toEqual(["General", "Design"])
-    expect(Store.listJumpTargets(source).groups.map(({ group }) => group.id)).toEqual([general.id, design.id])
-  })
-
-  it("keeps a conversation with several people, or with one who is gone, among the groups", () => {
-    const withZoe = Schema.decodeSync(Group.Group)({
-      id: "alice-bob-and-zoe",
-      workspaceId: "workspace-1",
-      kind: "Direct",
-      memberIds: ["member-1", "member-2", "member-4"],
-      createdBy: "member-1",
-      createdAt: "2026-10-18T12:00:00Z"
-    })
-    const goneBob = { ...bob, status: "removed" as const }
-
-    expect(groupNames({ ...source, groups: [withZoe] })).toEqual(["Bob, Zoë"])
-    expect(groupNames({ ...source, groups: [conversationWithBob], members: [person, goneBob] })).toEqual(["Bob"])
-  })
-
-  it("lists a thread with its group's name and the words it is read by: its title, else its opening's", () => {
-    const titled = { ...thread, title: "Weekly sync" as typeof thread.title }
-
-    expect(Store.listJumpTargets(source).threads).toEqual([
-      { thread, groupName: "General", words: "Plans for the week", openingWords: Option.some("Plans for the week") }
-    ])
-    expect(Store.listJumpTargets({ ...source, threads: [titled] }).threads).toEqual([
-      { thread: titled, groupName: "General", words: "Weekly sync", openingWords: Option.some("Plans for the week") }
-    ])
-  })
-
-  it("lists a titled thread whose opening has no words, and leaves out an untitled one", () => {
-    const titled = { ...thread, title: "Weekly sync" as typeof thread.title }
-
-    expect(Store.listJumpTargets({ ...source, threads: [titled], messages: [deleted(opening)] }).threads).toEqual([
-      { thread: titled, groupName: "General", words: "Weekly sync", openingWords: Option.none() }
-    ])
-    expect(Store.listJumpTargets({ ...source, messages: [deleted(opening)] }).threads).toEqual([])
-    expect(Store.listJumpTargets({ ...source, messages: [] }).threads).toEqual([])
-  })
-
-  it("reads a mention in an opening as the member's current name", () => {
-    const mentioning = saying(opening, `Hey ${ThreadMessage.mentionText(bob.id, "Bobby")}, look`)
-
-    expect(Store.listJumpTargets({ ...source, messages: [mentioning] }).threads).toMatchObject([
-      { words: "Hey @Bob, look" }
-    ])
-  })
-
-  it("reads an opening's words without the syntax of its markdown", () => {
-    const formatted = saying(opening, "**Ship** the [retry fix](https://example.com) `now`")
-
-    expect(Store.listJumpTargets({ ...source, messages: [formatted] }).threads).toMatchObject([
-      { words: "Ship the retry fix now" }
-    ])
-  })
-
-  it("leaves out a thread whose group the replica lacks", () => {
-    expect(Store.listJumpTargets({ ...source, groups: [design] }).threads).toEqual([])
-  })
-
-  it("lists the active people other than the person, and the active agents apart from them", () => {
-    const names = (among: Store.JumpSource = source) => Store.listJumpTargets(among).people.map(({ name }) => name)
-
-    expect(names()).toEqual(["Bob", "Zoë"])
-    expect(names({ ...source, members: [person, { ...bob, status: "removed" }] })).toEqual([])
-    expect(Store.listJumpTargets(source).agents).toEqual([{ agentId: scoutAgent.id, member: scout }])
-    expect(Store.listJumpTargets({ ...source, members: [person, { ...scout, status: "removed" }] }).agents).toEqual([])
-  })
-
-  it("lists every one in the order of the records, for the search to rank, however many there are", () => {
-    const crowd = Array.from({ length: 10 }, (_, index) => ({
-      ...bob,
-      id: MemberId.MemberId.make(`member-${index + 10}`),
-      name: `Sam ${index}`
-    }))
-
-    expect(Store.listJumpTargets({ ...source, members: [person, ...crowd] }).people.map(({ name }) => name)).toEqual(
-      crowd.map(({ name }) => name)
-    )
-  })
 })

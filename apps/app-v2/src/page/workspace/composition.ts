@@ -16,12 +16,13 @@ import { Offer } from "../../feature/actions/definition.ts"
 import { AgentsBlock } from "../../feature/agents/block.ts"
 import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
-import { connectionsToast } from "../../feature/connections/wording.ts"
+import { connectionsToast } from "../../feature/connections/view/wording.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
 import type { Destination } from "../../feature/search/definition.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
-import { settingsToast } from "../../feature/settings/wording.ts"
-import { LoadIntegrations, RequestNameChange } from "./command.ts"
+import { settingsToast } from "../../feature/settings/view/wording.ts"
+import { Destination as WorkspaceDestination } from "../../route.ts"
+import { LoadIntegrations } from "./command.ts"
 import { AppAccountEntry, type Model, Open, OutMessage, type SettingsPage, WorkspaceDefinition } from "./definition.ts"
 import { HomeBlock } from "./home/block.ts"
 
@@ -30,9 +31,6 @@ const loadIntegrationsAgain = WorkspaceDefinition.step((model: Model) => ({
   model,
   commands: [LoadIntegrations({ workspaceId: model.workspaceId })]
 }))
-
-/** Have the page ask the settings, as a Message of its own, for the dialog that changes the person's own name. */
-const requestNameChange = WorkspaceDefinition.step((model: Model) => ({ model, commands: [RequestNameChange({})] }))
 
 /** Show Home in the main content. */
 export const showHome = WorkspaceDefinition.step((model: Model) => ({
@@ -108,23 +106,22 @@ const goToHome = () => Update.combine([MenuBinding.requestClose(), hideAside, sh
  * confirmed to them, that they created one, which is confirmed to them and shown, as it is already open, and that they
  * asked for the settings of an agent whose turn failed or from a member's card, which opens its page as picking the
  * agent does, that they chose Message on a member's card, which opens the conversation with them, and Change name on
- * their own, which asks for the dialog the account menu's does. The search a group's header asks for on a phone is
- * reported to the app by the binding below, which asks this page to open it, as it does for the key for it; opening it
- * here needs the search's step in the type of this fold, whose search fold already needs Home's, and TypeScript gives
- * up on the page's update.
+ * their own, which opens the same dialog as the account menu. A group's Search button opens this workspace's search.
  */
-const foldHomeOutMessage = HomeBlock.OutMessage.match({
-  Navigated: () => goToHome(),
-  JoinedGroup: ({ groupId, place }) =>
-    ActionsBinding.confirm({ text: `Joined ${place}`, offer: Offer.OpenGroup({ groupId }) }),
-  FollowedGroup: ({ place }) => ActionsBinding.confirm({ text: `Following ${place}` }),
-  UnfollowedGroup: ({ place }) => ActionsBinding.confirm({ text: `Unfollowed ${place}` }),
-  CreatedGroup: () => Update.combine([ActionsBinding.confirm({ text: "Group created" }), goToHome()]),
-  OpenedAgent: ({ agentId }) => goTo(showAgent(agentId)),
-  OpenedPerson: ({ memberId }) => HomeBinding.requestConversationWith({ memberId }),
-  RequestedNameChange: () => requestNameChange,
-  RequestedSearch: () => WorkspaceDefinition.stepNoop()
-})
+const foldHomeOutMessage = (outMessage: typeof HomeBlock.OutMessage.Type) =>
+  HomeBlock.OutMessage.match(outMessage, {
+    Navigated: () => goToHome(),
+    ReplacedConversation: () => goToHome(),
+    JoinedGroup: ({ groupId, place }) =>
+      ActionsBinding.confirm({ text: `Joined ${place}`, offer: Offer.OpenGroup({ groupId }) }),
+    FollowedGroup: ({ place }) => ActionsBinding.confirm({ text: `Following ${place}` }),
+    UnfollowedGroup: ({ place }) => ActionsBinding.confirm({ text: `Unfollowed ${place}` }),
+    CreatedGroup: () => Update.combine([ActionsBinding.confirm({ text: "Group created" }), goToHome()]),
+    OpenedAgent: ({ agentId }) => goTo(showAgent(agentId)),
+    OpenedPerson: ({ memberId }) => HomeBinding.requestConversationWith({ memberId }),
+    RequestedNameChange: () => SettingsBinding.requestNameChange(),
+    RequestedSearch: () => SearchBinding.requestOpen()
+  })
 
 /** Open the group `groupId` in Home, as picking it in the sidebar does, and show Home. */
 const openGroupInHome = (groupId: GroupId.GroupId) =>
@@ -252,7 +249,14 @@ export const MenuBinding = WorkspaceDefinition.bindChild(DialogBlock, {
 export const AsideBinding = WorkspaceDefinition.bindChild(DialogBlock, {
   field: "aside",
   init: { contextToArgs: () => [{ id: "workspace-aside" }] },
-  outMessage: { fold: foldAsideOutMessage }
+  outMessage: {
+    fold: foldAsideOutMessage,
+    forward: DialogBlock.OutMessage.match({
+      Opened: () => undefined,
+      Closed: () => OutMessage.Navigated(),
+      CompletedClose: () => undefined
+    })
+  }
 })
 
 /** Open the side pane's dialog, where the window's width puts the side pane in one. */
@@ -271,45 +275,70 @@ const foldActionsOutMessage = ActionsBlock.OutMessage.match({
 export const ActionsBinding = WorkspaceDefinition.bindChild(ActionsBlock, {
   field: "actions",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { fold: foldActionsOutMessage }
+  outMessage: { fold: foldActionsOutMessage, forward: () => OutMessage.Navigated() }
 })
 
 export const SearchBinding = WorkspaceDefinition.bindChild(SearchBlock, {
   field: "search",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { fold: foldSearchOutMessage }
+  outMessage: { fold: foldSearchOutMessage, forward: () => OutMessage.Navigated() }
 })
 
 export const HomeBinding = WorkspaceDefinition.bindChild(HomeBlock, {
   field: "home",
   init: { contextToArgs: ({ workspaceId, memberId, viewport }) => [workspaceId, memberId, viewport] },
   outMessage: {
-    /** The search a group asks for is reported to the app, which opens it as the key for it does. */
+    fold: foldHomeOutMessage,
     forward: HomeBlock.OutMessage.match({
-      Navigated: () => undefined,
+      Navigated: () => OutMessage.Navigated(),
+      ReplacedConversation: () => OutMessage.ReplacedDestination(),
+      CreatedGroup: () => OutMessage.Navigated(),
+      OpenedAgent: () => OutMessage.Navigated(),
       JoinedGroup: () => undefined,
-      FollowedGroup: () => undefined,
-      UnfollowedGroup: () => undefined,
-      CreatedGroup: () => undefined,
-      OpenedAgent: () => undefined,
       OpenedPerson: () => undefined,
       RequestedNameChange: () => undefined,
-      RequestedSearch: () => OutMessage.RequestedSearch()
-    }),
-    fold: foldHomeOutMessage
+      FollowedGroup: () => undefined,
+      UnfollowedGroup: () => undefined,
+      RequestedSearch: () => undefined
+    })
   }
 })
 
 export const ConnectionsBinding = WorkspaceDefinition.bindChild(ConnectionsBlock, {
   field: "connections",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { fold: foldConnectionsOutMessage }
+  outMessage: {
+    fold: foldConnectionsOutMessage,
+    forward: ConnectionsBlock.OutMessage.match({
+      RequestedBrowse: () => OutMessage.Navigated(),
+      OpenedConnection: () => OutMessage.Navigated(),
+      RequestedChannels: () => OutMessage.Navigated(),
+      CreatedConnection: () => OutMessage.Navigated(),
+      RemovedConnection: () => OutMessage.Navigated(),
+      RequestedIntegrations: () => undefined,
+      SavedName: () => undefined,
+      SavedSettings: () => undefined,
+      ReplacedKey: () => undefined
+    })
+  }
 })
 
 export const AgentsBinding = WorkspaceDefinition.bindChild(AgentsBlock, {
   field: "agents",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { fold: foldAgentsOutMessage }
+  outMessage: {
+    fold: foldAgentsOutMessage,
+    forward: AgentsBlock.OutMessage.match({
+      RequestedBrowse: () => OutMessage.Navigated(),
+      OpenedAgent: () => OutMessage.Navigated(),
+      OpenedThread: () => OutMessage.Navigated(),
+      CreatedAgent: () => OutMessage.Navigated(),
+      RemovedAgent: () => OutMessage.Navigated(),
+      RequestedIntegrations: () => undefined,
+      SavedName: () => undefined,
+      SavedSetup: () => undefined
+    })
+  }
 })
 
 export const SettingsBinding = WorkspaceDefinition.bindChild(SettingsBlock, {
@@ -318,17 +347,17 @@ export const SettingsBinding = WorkspaceDefinition.bindChild(SettingsBlock, {
   outMessage: {
     /** The entries of the account menu that the app acts on are reported to it. */
     forward: SettingsBlock.OutMessage.match({
-      OpenedMember: () => undefined,
-      ClosedMember: () => undefined,
+      OpenedMember: () => OutMessage.Navigated(),
+      ClosedMember: () => OutMessage.Navigated(),
       RenamedWorkspace: () => undefined,
       RenamedSelf: () => undefined,
       ChangedRole: () => undefined,
-      RemovedMember: () => undefined,
+      RemovedMember: () => OutMessage.Navigated(),
       TransferredOwnership: () => undefined,
       InvitedMember: () => undefined,
       RevokedInvitation: () => undefined,
       ChoseAccountEntry: ({ entry }) =>
-        Schema.is(AppAccountEntry)(entry) ? OutMessage.ChoseAccountEntry({ entry }) : undefined
+        Schema.is(AppAccountEntry)(entry) ? OutMessage.ChoseAccountEntry({ entry }) : OutMessage.Navigated()
     }),
     fold: foldSettingsOutMessage
   }
@@ -339,6 +368,36 @@ export const ChannelsBinding = WorkspaceDefinition.bindChild(ChannelsBlock, {
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
   outMessage: { fold: ChannelsBlock.OutMessage.match({ RequestedIntegrations: () => loadIntegrationsAgain }) }
 })
+
+/** Restore a destination through the same child operations used by visible navigation. */
+export const dismissOverlays = Update.combine([
+  SearchBinding.requestDismiss(),
+  AgentsBinding.requestDismiss(),
+  ConnectionsBinding.requestDismiss(),
+  SettingsBinding.requestDismiss(),
+  HomeBinding.requestDismiss()
+])
+
+export const showDestination = (destination: WorkspaceDestination) =>
+  WorkspaceDestination.match(destination, {
+    Home: ({ destination }) =>
+      Update.combine([
+        MenuBinding.requestClose(),
+        hideAside,
+        showHome,
+        HomeBinding.requestDestination({ destination })
+      ]),
+    Connections: ({ tab }) => Update.combine([goTo(showConnections), ConnectionsBinding.requestBrowseTab({ tab })]),
+    Connection: ({ connectionId }) => goTo(showConnection(connectionId)),
+    Agents: ({ tab }) => Update.combine([goTo(showAgents), AgentsBinding.requestBrowseTab({ tab })]),
+    Agent: ({ agentId }) => goTo(showAgent(agentId)),
+    Settings: ({ page, memberId }) =>
+      Update.combine([
+        goTo(showSettings(page)),
+        ...Option.toArray(Option.map(memberId, (id) => Update.combine([openMember(id), showAside])))
+      ]),
+    Channels: () => goTo(showChannels)
+  })
 
 export const WorkspaceComposition = WorkspaceDefinition.makeComposition({
   bindings: [

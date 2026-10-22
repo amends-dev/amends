@@ -26,12 +26,13 @@ import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { modifyFields } from "foldkit/struct"
-import { MembersComboboxBlock } from "../../memberPicker.ts"
-import { groupTarget, may } from "../../permissions.ts"
-import { placeName } from "../../seen.ts"
+import { MembersComboboxBlock } from "../../control/memberPicker.ts"
+import { placeName } from "../../data/groups.ts"
+import { groupTarget, may } from "../../data/permissions.ts"
 import type { OfferedSlashCommand } from "../composer/definition.ts"
 import { ThreadBlock } from "../thread/block.ts"
 import { ThreadsBlock } from "../threads/block.ts"
+import { ThreadsTab } from "../threads/definition.ts"
 
 /** Whose store an action on the group is written to, and the group it acts on. */
 export const inGroup = ({ workspaceId, memberId, groupId }: Model) => ({ workspaceId, memberId, groupId })
@@ -102,6 +103,7 @@ export const ChildInitContext = Schema.Struct({
 })
 
 export const Message = defineMessageUnion({
+  RequestedDismiss: {},
   ReceivedGroup: {
     group: Schema.Option(GroupItem),
     memberships: Schema.Array(MembershipItem),
@@ -132,12 +134,15 @@ export const Message = defineMessageUnion({
   ClickedRemoveMember: { membershipId: GroupMembership.GroupMembershipId },
   ClickedAllThreads: {},
   RequestedCloseThread: {},
+  RequestedThread: { threadId: Schema.Option(ThreadId.ThreadId) },
+  RequestedTab: { tab: ThreadsTab },
   WroteAction: {},
   FailedWriteAction: { error: Schema.String }
 })
 export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
+  ChangedTab: {},
   OpenedThread: {},
   ClosedThread: {},
   OpenedAgent: { agentId: Identity.AgentId },

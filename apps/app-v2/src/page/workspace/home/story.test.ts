@@ -12,7 +12,6 @@ import {
   design,
   general,
   notificationOf,
-  now,
   opening,
   reply,
   scout,
@@ -70,7 +69,7 @@ const fromGroups = (message: typeof GroupsBlock.Message.Type) =>
   GroupsBinding.embedView({
     slotId: "groups",
     model: opened.groups,
-    viewInputs: { openThread: Option.none(), isBrowsing: false, unsentWith: Option.none() }
+    view: GroupsBlock.makeView((_model, h) => h.empty)
   }).toParentMessage(message)
 
 /** What the inbox reports, as Home receives it. */
@@ -78,12 +77,16 @@ const fromInbox = (message: typeof InboxBlock.Message.Type) =>
   InboxBinding.embedView({
     slotId: "inbox",
     model: opened.inbox,
-    viewInputs: { now, workspaceName: "Studio", openTriggerId: undefined }
+    view: InboxBlock.makeView((_model, h) => h.empty)
   }).toParentMessage(message)
 
 /** What the member's card reports, as Home receives it. */
 const fromProfileCard = (message: typeof ProfileCardBlock.Message.Type) =>
-  ProfileCardBinding.embedView({ slotId: "profile-card", model: opened.profileCard }).toParentMessage(message)
+  ProfileCardBinding.embedView({
+    view: ProfileCardBlock.makeView((_model, h) => h.empty),
+    slotId: "profile-card",
+    model: opened.profileCard
+  }).toParentMessage(message)
 
 /** The thread of the notification, as it opens before its messages are read. */
 const openThreadModel = initThread(workspaceId, memberId, thread.id).model
@@ -95,7 +98,7 @@ const fromGroupThread = (message: typeof ThreadBlock.Message.Type) =>
       key: thread.id,
       slotId: "thread",
       model: openThreadModel,
-      viewInputs: { now, openTriggerId: undefined }
+      view: ThreadBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 
@@ -106,13 +109,17 @@ const fromInboxThread = (message: typeof ThreadBlock.Message.Type) =>
       key: thread.id,
       slotId: "thread",
       model: openThreadModel,
-      viewInputs: { now, openTriggerId: undefined }
+      view: ThreadBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 
 /** What the tasks report, as Home receives it. */
 const fromTasks = (message: typeof TasksBlock.Message.Type) =>
-  TasksBinding.embedView({ slotId: "tasks", model: opened.tasks, viewInputs: { now } }).toParentMessage(message)
+  TasksBinding.embedView({
+    slotId: "tasks",
+    model: opened.tasks,
+    view: TasksBlock.makeView((_model, h) => h.empty)
+  }).toParentMessage(message)
 
 /** What the side pane's dialog reports, as Home receives it. */
 const fromAside = (message: typeof DialogBlock.Message.Type) =>
@@ -129,7 +136,7 @@ const fromGroup = (message: typeof GroupBlock.Message.Type) =>
     key: groupId,
     slotId: "group",
     model: openGroupModel,
-    viewInputs: { now, workspaceName: "Studio", viewport: "Desktop", openTriggerId: undefined }
+    view: GroupBlock.makeView((_model, h) => h.empty)
   }).toParentMessage(message)
 
 /** What the open group's threads report, as Home receives it. */
@@ -138,16 +145,7 @@ const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
     ThreadsBinding.embedView({
       slotId: "threads",
       model: openGroupModel.threads,
-      viewInputs: {
-        members: [],
-        groupName: "General",
-        isTeam: true,
-        memberNames: [],
-        openThreadId: Option.none(),
-        openTriggerId: undefined,
-        present: [],
-        now
-      }
+      view: ThreadsBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 
@@ -846,7 +844,7 @@ describe("home", () => {
         key: Group.directKey([bob.id]),
         slotId: "unsent",
         model: unsentWithBob,
-        viewInputs: { workspaceName: "Studio" }
+        view: UnsentConversationBlock.makeView((_model, h) => h.empty)
       }).toParentMessage(message)
 
     /** The draft of the first message to Bob read, as the conversation not started opens. */
@@ -1023,7 +1021,7 @@ const fromComposer = (message: typeof ComposerBlock.Message.Type) =>
     ThreadsComposerBinding.embedView({
       slotId: "composer",
       model: openGroupModel.threads.composer,
-      viewInputs: { placeholder: "Message #General", members: [] }
+      view: ComposerBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 
@@ -1110,8 +1108,8 @@ describe("Home, with the card of a member", () => {
     isYou: false,
     isFormer: false,
     agentId: Option.none(),
-    standing: Option.none(),
-    motion: Option.none()
+    readiness: Option.none(),
+    activity: Option.none()
   }
 
   const agent: MemberProfile = {

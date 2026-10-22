@@ -9,7 +9,7 @@
  * list or the agent's page for, and confirms. An agent's role is its membership's, in the settings. The workspace page
  * lists the host's integrations once and informs the Block of them, which say what each connection gives, and a model
  * connection lists its models over HTTP as a setup chooses it. What an agent is doing is read from the turns the store
- * holds (see `agentActivity.ts`), and the person picks one of an agent's turns on its page to open its thread, which
+ * holds (see `data/agents.ts`), and the person picks one of an agent's turns on its page to open its thread, which
  * the page does in Home.
  */
 
@@ -22,7 +22,6 @@ import { Identity } from "@amends-dev/core/identity"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { ThreadId } from "@amends-dev/core/thread"
 import { Member, MemberId, MemberPermissions, WorkspaceId } from "@amends-dev/core/workspace"
-import type { Choice } from "@amends-dev/design/control"
 import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import * as Result from "effect/Result"
@@ -30,16 +29,20 @@ import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
-import { activityOf, type AgentActivity, turnsUnderWay } from "../../agentActivity.ts"
-import * as AgentSetup from "../../agentSetup.ts"
-import { may, memberTarget, workspaceTarget } from "../../permissions.ts"
-import { connectionNameIn, foldAccents } from "../../seen.ts"
-import { ConnectionItem, connectionItemsGiving, findIntegration, Integrations } from "../connections/definition.ts"
-import { givableRoles, WorkspaceItem } from "../settings/definition.ts"
-
-/** An agent of the workspace, and whether a change to it is on its way. Its name and role are its member's. */
-export const AgentItem = Schema.Struct({ agent: ReplicaRecord.Agent, pending: Schema.Boolean })
-export type AgentItem = typeof AgentItem.Type
+import { AgentItem } from "../../data/agents.ts"
+import {
+  connectionNameIn,
+  findConnection,
+  ConnectionItem,
+  connectionItemsGiving,
+  findIntegration,
+  Integrations,
+  areIntegrationsListed
+} from "../../data/connections.ts"
+import { may, memberTarget, workspaceTarget } from "../../data/permissions.ts"
+import { foldAccents } from "../../data/search.ts"
+import { givableRoles, WorkspaceItem } from "../../data/workspace.ts"
+import * as AgentSetup from "./setup.ts"
 
 /** What the person asks of the agents: adding one, renaming one, setting one up again, and removing one. */
 export const AgentAction = Schema.Literals(["Create", "Rename", "Configure", "Remove"])
@@ -174,6 +177,7 @@ export const Model = Schema.Struct({
 export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
+  RequestedDismiss: {},
   ReceivedAgents: {
     agents: Schema.Array(AgentItem),
     members: Schema.Array(Member.Member),
@@ -276,10 +280,6 @@ export const mayConfigure = (model: Pick<Model, "workspaceId" | "grants">, agent
 export const mayRemove = (model: Pick<Model, "workspaceId" | "grants">, agent: AgentItem["agent"]): boolean =>
   may(model.grants, MemberPermissions.Remove, memberTarget(model.workspaceId, agent.memberId))
 
-/** Whether the host has listed its integrations, which say what each connection gives. */
-const areIntegrationsListed = (model: Pick<Model, "integrations">): boolean =>
-  Integrations.isAnyOf(["Loaded"])(model.integrations)
-
 /** Whether the person may create agents. */
 export const mayCreate = (model: Pick<Model, "workspaceId" | "grants">): boolean =>
   may(model.grants, AgentPermissions.Create, workspaceTarget(model.workspaceId))
@@ -290,21 +290,6 @@ export const mayCreate = (model: Pick<Model, "workspaceId" | "grants">): boolean
  */
 export const mayAdd = (model: Pick<Model, "workspaceId" | "grants" | "integrations">): boolean =>
   mayCreate(model) && areIntegrationsListed(model)
-
-/**
- * The turns of the agent that are under way, the most pressing first, each in the group it is in as the person names
- * it. An agent still on its way has none.
- */
-export const turnsOfAgent = (
-  model: Pick<Model, "turns" | "groups" | "members" | "memberId">,
-  { agent, pending }: AgentItem
-) => (pending ? [] : turnsUnderWay(agent.id, model.turns, model.groups, model.members, model.memberId))
-
-/** What the agent is doing, from its turns under way: nothing while it is idle. */
-export const activityOfAgent = (
-  model: Pick<Model, "turns" | "groups" | "members" | "memberId">,
-  item: AgentItem
-): Option.Option<AgentActivity> => activityOf(turnsOfAgent(model, item))
 
 /** The name of the agent, its membership's, or "An agent" while the members are not read. */
 export const nameOfAgent = (model: Pick<Model, "members">, agent: AgentItem["agent"]): string =>
@@ -377,10 +362,6 @@ export const modelProblem = (model: Pick<Model, "offered">, setup: AgentSetup.Dr
     ? Option.some("This connection offers only the models it lists.")
     : Option.none()
 
-/** The connection `connectionId` among the workspace's, while it is one. */
-const connectionOf = (model: Pick<Model, "connections">, connectionId: string): Option.Option<ConnectionItem> =>
-  Option.fromUndefinedOr(model.connections.find(({ connection }) => connection.id === connectionId))
-
 /** Why `setup` can't have no sandbox: the harness it names works only in one. */
 export const sandboxProblem = (
   model: Pick<Model, "connections" | "integrations">,
@@ -388,7 +369,7 @@ export const sandboxProblem = (
 ): Option.Option<string> =>
   setup.harness === "" || setup.sandbox !== ""
     ? Option.none()
-    : Option.flatMap(connectionOf(model, setup.harness), ({ connection }) =>
+    : Option.flatMap(findConnection(model, setup.harness), ({ connection }) =>
         Option.exists(findIntegration(model, connection.integration), ({ requiresSandbox }) => requiresSandbox)
           ? Option.some(`${connection.name} works only in a sandbox. Choose one.`)
           : Option.none()
@@ -467,56 +448,6 @@ export const failureMessage = ({ action, reason }: Failure): string =>
     Invalid: () => invalidMessages[action],
     Incomplete: () => "This setup can’t be saved as it is. Change what’s marked, then try again.",
     Unwritable: () => unwritableMessages[action]
-  })
-
-/**
- * The connections that give `capability` as the choices of a select, each with what `describe` says of its
- * integration, and, when `current` names one that does not give it, that connection too, listed as unavailable:
- * a connection the agent names that was removed or whose integration is not installed stays chosen, and says so.
- */
-export const connectionChoices = (
-  model: Pick<Model, "connections" | "integrations">,
-  capability: Integration.Capability,
-  current: string,
-  describe: (integration: Connection.IntegrationView) => string
-): ReadonlyArray<Choice<string>> => {
-  const giving = connectionItemsGiving(model, capability)
-  const choices = giving.map(({ connection }): Choice<string> => [
-    connection.id,
-    connection.name,
-    Option.match(findIntegration(model, connection.integration), {
-      onNone: () => ({}),
-      onSome: (integration) => ({ description: describe(integration) })
-    })
-  ])
-
-  return current === "" || giving.some(({ connection }) => connection.id === current)
-    ? choices
-    : [...choices, unavailableChoice(model, current)]
-}
-
-/** The connection `connectionId`, which does not give what a select asks for, as a choice that can't be chosen. */
-const unavailableChoice = (model: Pick<Model, "connections" | "integrations">, connectionId: string): Choice<string> =>
-  Option.match(connectionOf(model, connectionId), {
-    onNone: () => [
-      connectionId,
-      "Removed connection",
-      { description: "This connection was removed.", isDisabled: true }
-    ],
-    onSome: ({ connection }) => [
-      connectionId,
-      connection.name,
-      {
-        ...(areIntegrationsListed(model)
-          ? {
-              description: Option.isSome(findIntegration(model, connection.integration))
-                ? "Its integration doesn’t give this."
-                : "Its integration isn’t installed on this host."
-            }
-          : {}),
-        isDisabled: true
-      }
-    ]
   })
 
 /** A role a new agent may start with, and whether the person may give it. */

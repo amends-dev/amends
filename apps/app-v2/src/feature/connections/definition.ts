@@ -5,15 +5,13 @@
  * whether it works, rename it, change its settings and replace its key, remove it, and see why it can't be used; and
  * adding one, for a person who may, through an integration the host installs. Adding, replacing a key, and removing
  * happen in a dialog the workspace page lends the shell. The workspace page lists the host's integrations once and
- * informs the Block of them. Other features read here which connections give what they need, by
- * `connectionsGiving`. The Block reports when the person asks to browse, the connection they pick, and what they did,
+ * informs the Block of them. Shared connection records and capability queries live in `data/connections.ts`. The Block reports when the person asks to browse, the connection they pick, and what they did,
  * which the workspace page shows the list or the connection's page for, and confirms.
  */
 
 import { Connection as ConnectionContract, Integration } from "@amends-dev/connection"
 import { Grant } from "@amends-dev/core/authorization"
 import { Connection, ConnectionPermissions } from "@amends-dev/core/connection"
-import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { DialogBlock } from "@foldkit/ui/dialog"
@@ -23,21 +21,16 @@ import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
-import { connectionTarget, may, workspaceTarget } from "../../permissions.ts"
-import { foldAccents } from "../../seen.ts"
-import * as SettingsForm from "../../settingsForm.ts"
-
-/** A connection of the workspace, and whether a change to it is on its way. */
-export const ConnectionItem = Schema.Struct({ connection: ReplicaRecord.Connection, pending: Schema.Boolean })
-export type ConnectionItem = typeof ConnectionItem.Type
-
-/** The integrations the host installs, as it lists them: loading, loaded, or not reached, with why. */
-export const Integrations = defineTaggedUnion({
-  Loading: {},
-  Loaded: { integrations: Schema.Array(Connection.IntegrationView) },
-  Failed: { error: Schema.String }
-})
-export type Integrations = typeof Integrations.Type
+import {
+  ConnectionItem,
+  Integrations,
+  integrationsOf,
+  integrationOf,
+  areIntegrationsListed
+} from "../../data/connections.ts"
+import { connectionTarget, may, workspaceTarget } from "../../data/permissions.ts"
+import { foldAccents } from "../../data/search.ts"
+import * as SettingsForm from "./settingsForm.ts"
 
 /** Which connections the list page shows: all of them, or those whose integration gives one thing. */
 export const ConnectionsTab = Schema.Union([Schema.Literal("all"), Integration.Capability])
@@ -202,6 +195,7 @@ export const Model = Schema.Struct({
 export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
+  RequestedDismiss: {},
   ReceivedConnections: { connections: Schema.Array(ConnectionItem) },
   ReceivedMembers: { members: Schema.Array(Member.Member) },
   ReceivedGrants: { grants: Schema.Array(Grant.Grant) },
@@ -272,70 +266,9 @@ export type OutMessage = typeof OutMessage.Type
 
 export const ConnectionsDefinition = Block.makeDefinition("Connections", { Model, Message, OutMessage })
 
-/** The integrations the host installs, once it listed them. */
-export const integrationsOf = ({
-  integrations
-}: Pick<Model, "integrations">): ReadonlyArray<Connection.IntegrationView> =>
-  Integrations.matchOrElse(integrations, { Loaded: (loaded) => loaded.integrations }, () => [])
-
-/** The integration `integrationId`, once the host listed its integrations. */
-export const findIntegration = (
-  model: Pick<Model, "integrations">,
-  integrationId: string
-): Option.Option<Connection.IntegrationView> =>
-  Option.fromUndefinedOr(integrationsOf(model).find(({ id }) => id === integrationId))
-
-/** The connection `connectionId`, while the workspace has it. */
-export const findConnection = (
-  model: Pick<Model, "connections">,
-  connectionId: ConnectionContract.ConnectionId
-): Option.Option<ConnectionItem> =>
-  Option.fromUndefinedOr(model.connections.find(({ connection }) => connection.id === connectionId))
-
-/**
- * The connections whose integration gives `capability`, a connection that gives several in each of them. A
- * connection whose integration the host does not install, or does not list yet, gives nothing.
- */
-export const connectionItemsGiving = (
-  model: Pick<Model, "connections" | "integrations">,
-  capability: Integration.Capability
-): ReadonlyArray<ConnectionItem> => {
-  const integrations = integrationsOf(model)
-  return model.connections.filter(({ connection }) =>
-    integrations.some(({ id, provides }) => id === connection.integration && provides.includes(capability))
-  )
-}
-
-/**
- * The connections whose integration gives `capability`, each as its ID and what it is called, for
- * a choice among them. It reads the connections and integrations a Model keeps, so a Block that
- * keeps the same two fields, by `ConnectionItem` and `Integrations`, asks it of its own.
- */
-export const connectionsGiving = (
-  model: Pick<Model, "connections" | "integrations">,
-  capability: Integration.Capability
-): ReadonlyArray<readonly [ConnectionContract.ConnectionId, string]> =>
-  connectionItemsGiving(model, capability).map(({ connection }) => [connection.id, connection.name] as const)
-
-/** The integration of the connection, once the host listed its integrations and installs it. */
-export const integrationOf = (
-  model: Pick<Model, "integrations">,
-  { connection }: ConnectionItem
-): Option.Option<Connection.IntegrationView> => findIntegration(model, connection.integration)
-
-/** Whether the connection's integration is not installed on this host, as the server says. */
-export const isUninstalled = ({ connection }: ConnectionItem): boolean =>
-  Connection.Readiness.isAnyOf(["Uninstalled"])(connection.readiness)
-
 /** Whether the person may create connections. */
 export const mayCreate = (model: Pick<Model, "workspaceId" | "grants">): boolean =>
   may(model.grants, ConnectionPermissions.Create, workspaceTarget(model.workspaceId))
-
-/**
- * Whether the host has listed its integrations, which say what each connection gives and which a new one goes through.
- */
-export const areIntegrationsListed = (model: Pick<Model, "integrations">): boolean =>
-  Integrations.isAnyOf(["Loaded"])(model.integrations)
 
 /** Whether the person may add a connection now: they may create connections and the host listed its integrations. */
 export const mayAdd = (model: Pick<Model, "workspaceId" | "grants" | "integrations">): boolean =>

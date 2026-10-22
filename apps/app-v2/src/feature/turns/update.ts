@@ -1,10 +1,10 @@
 import { Turn, type TurnId } from "@amends-dev/core/turn"
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
+import { entriesOf } from "./activity.ts"
 import { FollowLogEnd, RetryTurn, ScrollLogToEnd, StopTurn } from "./command.ts"
 import { TurnsComposition } from "./composition.ts"
 import { findTurn, LogState, Message, type Model, OutMessage, type TurnItem, type TurnLog } from "./definition.ts"
-import { entriesOf } from "./log.ts"
 
 /**
  * The log as `logMessage` leaves it: its items as they stand once opened, each change in its place, and ended with

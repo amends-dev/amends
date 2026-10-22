@@ -10,6 +10,7 @@ import type { Html, HtmlBuilder } from "foldkit/html"
 import { button, buttonWith } from "./control.ts"
 import type { LogoMotion } from "./logo.ts"
 import { activityMark, type MarkContent, type MarkStatus, mark } from "./mark.ts"
+import { navigationTarget } from "./navigation.ts"
 
 const sectionLine = "mt-9 mb-2 flex items-center gap-3 text-item font-medium text-ink"
 
@@ -359,6 +360,7 @@ export const row = <Message, Requirements>(
     isCompact?: boolean
     isCurrent?: boolean
     onClick: Message
+    href?: string | undefined
   }>
 ): Html => {
   const description = [config.meta, config.cellsText].filter((part) => part !== undefined).join(" · ")
@@ -368,33 +370,27 @@ export const row = <Message, Requirements>(
   const { button: ownButton } = config
   const look = rowButtonLook({ hasCells, hasOwnButton: ownButton !== undefined })
 
-  const opener = Button.view(
-    {
-      onClick: config.onClick,
-      toView: (attributes) =>
-        h.button(
-          [
-            ...attributes.button,
-            ...(config.id === undefined ? [] : [h.Id(config.id)]),
-            h.AriaLabel(config.status === undefined ? config.title : `${config.title}, ${config.status.label}`),
-            ...(description === "" ? [] : [h.AriaDescription(description)]),
-            ...(config.isCurrent === true ? [h.AriaCurrent("true")] : []),
-            h.Class(hasCells ? `${look} ${height} ${rowFoldsCells}` : `${look} ${height}`)
-          ],
-          [
-            mark(h, { ...config.mark, size: markSize, status: config.status }),
-            renderText(h, config.title, config.meta),
-            config.cells === undefined
-              ? h.empty
-              : h.span(
-                  [h.AriaHidden(true), h.Class(`${rowCellsFolded} ${rowCellsStart[markSize]}`)],
-                  config.cells.map((cell) => h.span([h.Class(rowCell)], [cell]))
-                ),
-            renderAction(h, config.action, hasCells)
-          ]
-        )
-    },
-    h
+  const opener = navigationTarget(
+    h,
+    config,
+    [
+      ...(config.id === undefined ? [] : [h.Id(config.id)]),
+      h.AriaLabel(config.status === undefined ? config.title : `${config.title}, ${config.status.label}`),
+      ...(description === "" ? [] : [h.AriaDescription(description)]),
+      ...(config.isCurrent === true ? [h.AriaCurrent("true")] : []),
+      h.Class(hasCells ? `${look} ${height} ${rowFoldsCells}` : `${look} ${height}`)
+    ],
+    [
+      mark(h, { ...config.mark, size: markSize, status: config.status }),
+      renderText(h, config.title, config.meta),
+      config.cells === undefined
+        ? h.empty
+        : h.span(
+            [h.AriaHidden(true), h.Class(`${rowCellsFolded} ${rowCellsStart[markSize]}`)],
+            config.cells.map((cell) => h.span([h.Class(rowCell)], [cell]))
+          ),
+      renderAction(h, config.action, hasCells)
+    ]
   )
 
   if (ownButton === undefined) {

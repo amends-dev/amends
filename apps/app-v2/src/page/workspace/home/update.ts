@@ -2,12 +2,14 @@ import { isAsideInDialog } from "@amends-dev/design/shell"
 import type { Viewport } from "@amends-dev/design/viewport"
 import * as Update from "foldkit/update"
 import {
+  dismissOverlays,
   GroupsBinding,
   HomeComposition,
   hideAside,
   markAndOpenGroup,
   openThreadInGroup,
   showAside,
+  showDestination,
   showInbox,
   showTasks,
   showTriage,
@@ -39,6 +41,8 @@ export const update = HomeComposition.makeUpdate((model, message) =>
     ClickedInbox: () => Update.withOutMessage(Update.combine(model, [switchTo(showInbox)]), OutMessage.Navigated()),
     ClickedTriage: () => Update.withOutMessage(Update.combine(model, [switchTo(showTriage)]), OutMessage.Navigated()),
     ClickedTasks: () => Update.withOutMessage(Update.combine(model, [switchTo(showTasks)]), OutMessage.Navigated()),
+    RequestedDestination: ({ destination }) => Update.combine(model, [showDestination(destination)]),
+    RequestedDismiss: () => Update.combine(model, [dismissOverlays]),
     RequestedReset: () => Update.combine(model, [switchTo(showInbox)]),
     RequestedOpenGroup: ({ groupId }) => Update.combine(model, [markAndOpenGroup(groupId)]),
     RequestedOpenThread: ({ groupId, threadId }) => Update.combine(model, [openThreadInGroup(groupId, threadId)]),

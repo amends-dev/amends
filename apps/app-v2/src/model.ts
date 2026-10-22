@@ -14,6 +14,7 @@ import { Appearance } from "./appearance.ts"
 import { SignInBlock } from "./page/signIn/block.ts"
 import { WorkspaceBlock } from "./page/workspace/block.ts"
 import { WorkspacesBlock } from "./page/workspaces/block.ts"
+import { Route } from "./route.ts"
 
 /** The workspace the person opened. */
 export const Opened = Schema.Struct({ workspaceId: WorkspaceId.WorkspaceId, model: WorkspaceBlock.Model })
@@ -26,6 +27,7 @@ export const Page = defineTaggedUnion({
 export type Page = typeof Page.Type
 
 export const Model = Schema.Struct({
+  route: Route,
   page: Page,
   appearance: Appearance,
   viewport: Viewport,

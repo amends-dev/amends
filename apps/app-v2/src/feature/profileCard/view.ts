@@ -1,15 +1,27 @@
-import { type ProfileAction, profileCard } from "@amends-dev/design/profile"
+import { type Profile, type ProfileAction, profileCard } from "@amends-dev/design/profile"
 import * as Option from "effect/Option"
+import { motionOfState, statusOfAgent } from "../../view/agents.ts"
+import { initials } from "../../view/members.ts"
+import { ProfileCardBlock } from "./block.ts"
 import { AnchorProfileCard } from "./command.ts"
-import { ProfileCardComposition } from "./composition.ts"
 import { Card, type MemberProfile, Message } from "./definition.ts"
-import { shownProfile } from "./profile.ts"
+
+/** The design chooses a member's mark, status wording, and logo motion from their profile. */
+const shownProfile = (profile: MemberProfile): Profile => ({
+  name: profile.name,
+  mark: { text: initials(profile.name), tone: profile.kind === "Agent" ? "lilac" : "slate" },
+  kind: profile.kind,
+  isYou: profile.isYou,
+  isFormer: profile.isFormer,
+  status: statusOfAgent(profile.readiness, profile.activity),
+  motion: Option.getOrUndefined(Option.map(profile.activity, ({ state }) => motionOfState[state]))
+})
 
 /**
  * What the person can do about the member: nothing for one who left; change their own name for themself; otherwise
  * message them, and open the page of an agent.
  */
-export const actionsOf = (profile: MemberProfile): ReadonlyArray<ProfileAction<Message>> => {
+const actionsOf = (profile: MemberProfile): ReadonlyArray<ProfileAction<Message>> => {
   if (profile.isFormer) {
     return []
   }
@@ -33,7 +45,7 @@ const closeOnEscape = (key: string): Option.Option<Message> =>
  * gets it back when the card closes by Escape or its Close; the card also closes when the focus leaves it. Nothing
  * while no card is open or the member is being read.
  */
-export const view = ProfileCardComposition.makeView((model, h) =>
+export const view = ProfileCardBlock.makeView((model, h) =>
   Card.matchOrElse(
     model.card,
     {

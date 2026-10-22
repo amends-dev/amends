@@ -5,7 +5,7 @@
 import { TurnId } from "@amends-dev/core/turn"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import { followEnd, scrollToEnd } from "../../conversationScroll.ts"
+import { followEnd, scrollToEnd } from "../../control/conversationScroll.ts"
 import * as Stores from "../../store/Stores.ts"
 import { logListId, Message, TurnsDefinition } from "./definition.ts"
 

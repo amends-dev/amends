@@ -8,16 +8,15 @@ import { Command, expectNoOutMessage, expectOutMessage, given, message, model, s
 import { modifyFields } from "foldkit/struct"
 import { bob, membership, now, opening, saying } from "../../../test/fixtures.ts"
 import { recordingStores } from "../../../test/recordingStores.ts"
-import * as Drafts from "../../store/Drafts.ts"
 import {
   AssigneeFilter,
   AssigneeMenu,
   assigneeChoiceOf,
-  assigneeChoices,
   StatusFilterMenu,
-  statusChoices,
   type TaskStatusFilter
-} from "../../taskFilter.ts"
+} from "../../control/taskFilter.ts"
+import * as Drafts from "../../store/Drafts.ts"
+import { assigneeChoices, statusChoices } from "../../view/taskFilter.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { SaveDraft } from "../composer/command.ts"
 import { ScrollThreadsToEnd, StartThread } from "./command.ts"
@@ -25,20 +24,19 @@ import { AssigneeBinding, ComposerBinding, SortBinding, StatusBinding } from "./
 import {
   isFiltered,
   isReadFailed,
-  openingStacksUnder,
   threadsListId,
   Message,
-  membersLine,
   openTaskCount,
   OutMessage,
   showsConversation,
   type TaskSort,
   TaskSortMenu,
-  taskSortChoices,
   tasksOf
 } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
+import { openingStacksUnder } from "./view/timeline.ts"
+import { membersLine, taskSortChoices } from "./view/wording.ts"
 
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
 const memberId = MemberId.MemberId.make("member-1")
@@ -69,7 +67,7 @@ const fromComposer = (message: typeof ComposerBlock.Message.Type) =>
   ComposerBinding.embedView({
     slotId: "composer",
     model: listing.composer,
-    viewInputs: { placeholder: "Message #General", members: [] }
+    view: ComposerBlock.makeView((_model, h) => h.empty)
   }).toParentMessage(message)
 
 /** The status menu reporting that the person chose `status`, as the threads receive it. */

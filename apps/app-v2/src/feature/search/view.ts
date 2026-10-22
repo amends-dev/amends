@@ -5,8 +5,9 @@ import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { initials } from "../../seen.ts"
-import { DialogBinding, SearchComposition, type SearchViewBuilder } from "./composition.ts"
+import { initials } from "../../view/members.ts"
+import { SearchBlock } from "./block.ts"
+import { DialogBinding, type SearchViewBuilder } from "./composition.ts"
 import {
   activeItem,
   type Destination,
@@ -122,7 +123,7 @@ const searchPalette = (render: RenderInfo, model: Model, h: SearchViewBuilder): 
 }
 
 /** The search dialog, which the page lends the shell: its `dialog` element, with nothing in it while it is closed. */
-export const view = SearchComposition.makeView((model, h) =>
+export const view = SearchBlock.makeView((model, h) =>
   h.block(
     DialogBinding.embedView({
       slotId: "dialog",

@@ -6,13 +6,14 @@ import * as Layer from "effect/Layer"
 import { Runtime } from "foldkit"
 import { EffectsLayer } from "./command.ts"
 import { ApplicationComposition } from "./composition.ts"
-import { crashView } from "./crash.ts"
 import { Flags, flags } from "./flags.ts"
 import { init } from "./init.ts"
+import { Message } from "./message.ts"
 import { ApplicationLayer } from "./services.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
+import { crashView } from "./view/crash.ts"
 
 const application = ApplicationComposition.assembleApplication({
   init,
@@ -22,6 +23,10 @@ const application = ApplicationComposition.assembleApplication({
   EffectsLayer: Layer.mergeAll(EffectsLayer, subscriptions.layer),
   Flags,
   container: document.getElementById("root"),
+  routing: {
+    onUrlRequest: (request) => Message.ClickedLink({ request }),
+    onUrlChange: (url) => Message.ChangedUrl({ url })
+  },
   crash: { view: crashView },
   devTools: { Message: ApplicationComposition.Message }
 })

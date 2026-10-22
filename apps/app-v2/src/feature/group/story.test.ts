@@ -6,7 +6,7 @@ import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Effect, Layer, Option, Schema } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import { modifyFields } from "foldkit/struct"
-import { aliceInDesign, bob, bobInDesign, design, membership, now, scout } from "../../../test/fixtures.ts"
+import { aliceInDesign, bob, bobInDesign, design, membership, scout } from "../../../test/fixtures.ts"
 import { recordingStores } from "../../../test/recordingStores.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { unwritable } from "../../store/Stores.ts"
@@ -98,16 +98,7 @@ const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
   ThreadsBinding.embedView({
     slotId: "threads",
     model: opened.threads,
-    viewInputs: {
-      members: [],
-      groupName: "Design",
-      isTeam: true,
-      memberNames: [],
-      openThreadId: Option.none(),
-      openTriggerId: undefined,
-      present: [],
-      now
-    }
+    view: ThreadsBlock.makeView((_model, h) => h.empty)
   }).toParentMessage(message)
 
 describe("a group", () => {
@@ -620,7 +611,7 @@ const fromComposer = (message: typeof ComposerBlock.Message.Type) =>
     ThreadsComposerBinding.embedView({
       slotId: "composer",
       model: opened.threads.composer,
-      viewInputs: { placeholder: "Message #Design", members: [] }
+      view: ComposerBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 

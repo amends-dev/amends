@@ -6,9 +6,16 @@
 import { Viewport } from "@amends-dev/design/viewport"
 import * as Schema from "effect/Schema"
 import { defineMessageUnion } from "foldkit/message"
+import { UrlRequest } from "foldkit/navigation"
+import { Url } from "foldkit/url"
 
 export const Message = defineMessageUnion({
   ClickedSignOut: {},
+  ClickedWorkspaces: {},
+  ClickedRetryWorkspace: {},
+  ClickedLink: { request: UrlRequest },
+  ChangedUrl: { url: Url },
+  CompletedNavigation: {},
   CompletedSignOut: {},
   CompletedShowAppearance: {},
   CompletedKeepAppearance: {},

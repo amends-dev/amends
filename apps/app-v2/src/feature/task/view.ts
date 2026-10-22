@@ -5,16 +5,14 @@ import { mark, taskStatus } from "@amends-dev/design/mark"
 import { type PropertyChoice, propertyMenu } from "@amends-dev/design/menu"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { groupTarget, may, threadTarget } from "../../permissions.ts"
-import { memberMark, memberName, priorityLabel, statusLabel, statusShape } from "../../seen.ts"
-import { AssigneeFilter, assigneeChoiceOf, assigneeProperties } from "../../taskFilter.ts"
-import {
-  AssigneeBinding,
-  PriorityBinding,
-  StatusBinding,
-  TaskComposition,
-  type TaskViewBuilder
-} from "./composition.ts"
+import { AssigneeFilter, assigneeChoiceOf } from "../../control/taskFilter.ts"
+import { memberName } from "../../data/members.ts"
+import { groupTarget, may, threadTarget } from "../../data/permissions.ts"
+import { memberMark } from "../../view/members.ts"
+import { assigneeProperties } from "../../view/taskFilter.ts"
+import { priorityLabel, statusLabel, statusShape } from "../../view/tasks.ts"
+import { TaskBlock } from "./block.ts"
+import { AssigneeBinding, PriorityBinding, StatusBinding, type TaskViewBuilder } from "./composition.ts"
 import { assignable, Message, type Model, type ThreadTask } from "./definition.ts"
 
 /** The statuses a task can be changed to, each with the drawing that says it. */
@@ -107,7 +105,7 @@ const taskView = ({ task, pending }: ThreadTask, model: Model, h: TaskViewBuilde
   ])
 
 /** The task the thread tracks, or making it one, when the person may create tasks in its group. */
-export const view = TaskComposition.makeView((model, h) =>
+export const view = TaskBlock.makeView((model, h) =>
   Option.match(model.task, {
     onSome: (item) => taskView(item, model, h),
     onNone: () =>

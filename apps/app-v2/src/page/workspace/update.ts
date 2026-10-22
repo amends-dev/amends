@@ -2,6 +2,7 @@ import { isAsideInDialog } from "@amends-dev/design/shell"
 import type { Viewport } from "@amends-dev/design/viewport"
 import * as Update from "foldkit/update"
 import {
+  dismissOverlays,
   AgentsBinding,
   ChannelsBinding,
   ConnectionsBinding,
@@ -10,7 +11,7 @@ import {
   hideAside,
   MenuBinding,
   SearchBinding,
-  SettingsBinding,
+  showDestination,
   showAgents,
   showAside,
   showConnections,
@@ -45,17 +46,21 @@ const hasSidebarInPlace = (viewport: Viewport): boolean => viewport === "Desktop
 
 export const update = WorkspaceComposition.makeUpdate((model, message) =>
   Message.match(message, {
+    RequestedDestination: ({ destination }) => Update.combine(model, [dismissOverlays, showDestination(destination)]),
     ClickedWorkspaceSwitcher: () => ({ model, outMessage: OutMessage.ClosedWorkspace() }),
-    ClickedHome: () => Update.combine(model, [switchTo(showHome)]),
-    ClickedConnections: () => Update.combine(model, [switchTo(showConnections)]),
-    ClickedAgents: () => Update.combine(model, [switchTo(showAgents)]),
-    ClickedSettings: () => Update.combine(model, [switchTo(showSettings("Workspace"))]),
-    ClickedWorkspace: () => Update.combine(model, [goTo(showSettings("Workspace"))]),
-    ClickedMembers: () => Update.combine(model, [goTo(showSettings("Members"))]),
+    ClickedHome: () => Update.withOutMessage(Update.combine(model, [switchTo(showHome)]), OutMessage.Navigated()),
+    ClickedConnections: () =>
+      Update.withOutMessage(Update.combine(model, [switchTo(showConnections)]), OutMessage.Navigated()),
+    ClickedAgents: () => Update.withOutMessage(Update.combine(model, [switchTo(showAgents)]), OutMessage.Navigated()),
+    ClickedSettings: () =>
+      Update.withOutMessage(Update.combine(model, [switchTo(showSettings("Workspace"))]), OutMessage.Navigated()),
+    ClickedWorkspace: () =>
+      Update.withOutMessage(Update.combine(model, [goTo(showSettings("Workspace"))]), OutMessage.Navigated()),
+    ClickedMembers: () =>
+      Update.withOutMessage(Update.combine(model, [goTo(showSettings("Members"))]), OutMessage.Navigated()),
     ClickedMenu: () => Update.combine(model, [MenuBinding.requestOpen()]),
     ClickedSearch: () => Update.combine(model, [SearchBinding.requestOpen()]),
     RequestedSearch: () => Update.combine(model, [SearchBinding.requestOpen()]),
-    CompletedRequestNameChange: () => Update.combine(model, [SettingsBinding.requestNameChange()]),
     InformedOfViewport: ({ viewport }) =>
       Update.combine(model, [
         showViewport(viewport),

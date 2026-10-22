@@ -15,8 +15,8 @@ import * as Menu from "@foldkit/ui/menu"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
-import { may, memberTarget } from "../../permissions.ts"
-import { AssigneeMenu } from "../../taskFilter.ts"
+import { AssigneeMenu } from "../../control/taskFilter.ts"
+import { may, memberTarget } from "../../data/permissions.ts"
 
 /** The task, and whether a change to it is on its way. */
 export const ThreadTask = Schema.Struct({ task: Task.Task, pending: Schema.Boolean })

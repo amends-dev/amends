@@ -205,6 +205,7 @@
         "@amends-dev/design": "workspace:*",
         "@amends-dev/gateway": "workspace:*",
         "@amends-dev/http": "workspace:*",
+        "@amends-dev/markdown": "workspace:*",
         "@amends-dev/sync": "workspace:*",
         "@effect/platform-browser": "catalog:",
         "@foldkit/ui": "0.168.0-canary.bfd880b1e6ca",
@@ -227,12 +228,12 @@
       "version": "0.0.0",
       "dependencies": {
         "@amends-dev/icons": "workspace:*",
+        "@amends-dev/markdown": "workspace:*",
         "@foldkit/ui": "0.168.0-canary.bfd880b1e6ca",
         "@fontsource/figtree": "^5.3.0",
         "@fontsource/geist-mono": "^5.3.0",
         "effect": "catalog:",
         "foldkit": "0.168.0-canary.bfd880b1e6ca",
-        "marked": "^17.0.1",
       },
       "devDependencies": {
         "@foldkit/vite-plugin": "0.27.1-canary.bfd880b1e6ca",
@@ -254,6 +255,17 @@
       },
       "peerDependencies": {
         "solid-js": "^1.9.12",
+      },
+    },
+    "apps/markdown": {
+      "name": "@amends-dev/markdown",
+      "version": "0.0.0",
+      "dependencies": {
+        "effect": "catalog:",
+        "marked": "^17.0.1",
+      },
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
       },
     },
     "apps/site": {
@@ -595,6 +607,8 @@
     "@amends-dev/icons": ["@amends-dev/icons@workspace:apps/icons"],
 
     "@amends-dev/log": ["@amends-dev/log@workspace:packages/log"],
+
+    "@amends-dev/markdown": ["@amends-dev/markdown@workspace:apps/markdown"],
 
     "@amends-dev/sandbox": ["@amends-dev/sandbox@workspace:packages/sandbox"],
 

@@ -16,8 +16,8 @@ import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
-import { groupName } from "../../seen.ts"
-import { ConnectionItem, connectionsGiving, Integrations } from "../connections/definition.ts"
+import { ConnectionItem, connectionsGiving, Integrations } from "../../data/connections.ts"
+import { groupName } from "../../data/groups.ts"
 
 /** A channel of the workspace, and whether a change to it is on its way. */
 export const ChannelItem = Schema.Struct({ channel: Channel.Channel, pending: Schema.Boolean })

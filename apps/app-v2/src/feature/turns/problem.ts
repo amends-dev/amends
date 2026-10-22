@@ -31,30 +31,6 @@ export type TurnProblem = typeof TurnProblem.Type
 export const Refusal = Schema.Struct({ turnId: TurnId.TurnId, problem: TurnProblem })
 export type Refusal = typeof Refusal.Type
 
-/** The problem with a turn's agent, `agent` by name, in words. */
-export const problemText = (problem: TurnProblem, agent: string): string => {
-  switch (problem) {
-    case "stop-failed":
-      return "Couldn’t stop the turn. Try again."
-    case "retry-failed":
-      return "Couldn’t start another attempt. Try again."
-    case "finished":
-      return "This turn has already finished."
-    case "still-running":
-      return "This turn is still running."
-    case "replied":
-      return "This turn already replied."
-    case "superseded":
-      return "A newer turn followed this one."
-    case "departed":
-      return `${agent} no longer takes part in this thread.`
-    case "denied":
-      return `You can’t direct ${agent}.`
-    case "gone":
-      return "This turn is no longer available."
-  }
-}
-
 const notRetryableProblem: Readonly<Record<CoreError.NotRetryable["reason"], TurnProblem>> = {
   active: "still-running",
   completed: "replied",

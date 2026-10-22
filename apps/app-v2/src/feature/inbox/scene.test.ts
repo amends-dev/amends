@@ -53,7 +53,8 @@ import { Message, OutMessage, pageSize } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
-import { threadView, view } from "./view.ts"
+import { view } from "./view/list.ts"
+import { threadView } from "./view/thread.ts"
 
 const { workspace, member } = membership
 const asMember = { workspaceId: workspace.id, memberId: member.id }

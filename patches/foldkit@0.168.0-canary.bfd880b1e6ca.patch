@@ -1,3 +1,30 @@
+diff --git a/dist/block/deferredPolicy.d.ts b/dist/block/deferredPolicy.d.ts
+index 147fe02da1b0b258a97e341dfc3fdc7bcaa8ee52..9931c3d0579e94fa4fe8db3222287ffacc769bd1 100644
+--- a/dist/block/deferredPolicy.d.ts
++++ b/dist/block/deferredPolicy.d.ts
+@@ -29,11 +29,17 @@ type EmptyChannels = Readonly<{
+     requirements: never;
+     registration: never;
+ }>;
+-type PolicyChannels<Marker, Children extends ReadonlyArray<AnyBinding>, VisitedPlacements extends string> = Marker extends DeferredBindingPolicy<infer Placement, infer ChildId> ? Placement extends VisitedPlacements ? EmptyChannels : BindingAt<Children, Placement> extends infer BindingValue ? PolicyOfBinding<BindingValue> extends infer Policy ? ResolveCompositionOutput<PolicyFoldReturn<Policy>, Children, VisitedPlacements | Placement> extends infer FoldOutput ? Readonly<{
+-    message: CommandMessage<FoldOutput>;
+-    outMessage: ForwardedOutMessage<Policy> | OutputOutMessage<FoldOutput>;
+-    requirements: QualifyOwned<Placement, ChildId, Update.RequirementsOf<() => FoldOutput>>;
+-    registration: Update.RegistrationEvidenceOf<FoldOutput>;
++type OutputChannels<Output, Children extends ReadonlyArray<AnyBinding>, VisitedPlacements extends string> = DeferredChannels<Output, Children, VisitedPlacements> extends infer Channels ? Readonly<{
++    message: CommandMessage<Output> | FieldOf<Channels, 'message'>;
++    outMessage: OutputOutMessage<Output> | FieldOf<Channels, 'outMessage'>;
++    requirements: Update.RequirementsOf<() => Output> | FieldOf<Channels, 'requirements'>;
++    registration: Update.RegistrationEvidenceOf<Output> | FieldOf<Channels, 'registration'>;
++}> : never;
++type PolicyChannels<Marker, Children extends ReadonlyArray<AnyBinding>, VisitedPlacements extends string> = Marker extends DeferredBindingPolicy<infer Placement, infer ChildId> ? Placement extends VisitedPlacements ? EmptyChannels : BindingAt<Children, Placement> extends infer BindingValue ? PolicyOfBinding<BindingValue> extends infer Policy ? OutputChannels<Update.ResolvedOperationOutput<PolicyFoldReturn<Policy>>, Children, VisitedPlacements | Placement> extends infer Channels ? Readonly<{
++    message: FieldOf<Channels, 'message'>;
++    outMessage: ForwardedOutMessage<Policy> | FieldOf<Channels, 'outMessage'>;
++    requirements: QualifyOwned<Placement, ChildId, FieldOf<Channels, 'requirements'>>;
++    registration: FieldOf<Channels, 'registration'>;
+ }> : EmptyChannels : EmptyChannels : EmptyChannels : EmptyChannels;
+ type DeferredChannels<Output, Children extends ReadonlyArray<AnyBinding>, VisitedPlacements extends string> = PolicyChannels<Update.DeferredResultEvidenceOf<Output> extends infer Evidence ? Evidence extends Update.DeferredResultEvidence<infer Marker> ? Marker : never : never, Children, VisitedPlacements>;
+ type ResolvedReturn<Output, Children extends ReadonlyArray<AnyBinding>, VisitedPlacements extends string> = DeferredChannels<Output, Children, VisitedPlacements> extends infer Channels ? Channels extends Readonly<{
 diff --git a/dist/block/definition.d.ts b/dist/block/definition.d.ts
 index 6e48c6bae47ab6d3d224441e51c96d6c0c70da60..5783786bb0944ef786c096644e0a6ac92e45fdcd 100644
 --- a/dist/block/definition.d.ts

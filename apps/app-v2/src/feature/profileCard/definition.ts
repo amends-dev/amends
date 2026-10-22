@@ -5,26 +5,17 @@
  * chose on the card: to message a person, to open an agent, or to change their own name.
  */
 
+import { Agent } from "@amends-dev/core/agent"
 import { Identity } from "@amends-dev/core/identity"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
-import { logoMotions } from "@amends-dev/design/logo"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
-
-/** How a member stands, as the patch on their mark and the words after what they are say it. */
-export const Standing = Schema.Struct({
-  kind: Schema.Literals(["available", "offline", "attention", "blocked"]),
-  label: Schema.String,
-  detail: Schema.Option(Schema.String)
-})
-export type Standing = typeof Standing.Type
+import { AgentActivity } from "../../data/agents.ts"
 
 /**
- * A member as the card shows them: who they are, their name, whether they are a person or an agent, whether they are
- * the person and whether they left the workspace, the agent they are, if they are one, and for an agent how it stands
- * and how its logo moves while it is at work.
+ * A member's identity and membership, with an agent's readiness and current activity when available.
  */
 export const MemberProfile = Schema.Struct({
   memberId: MemberId.MemberId,
@@ -33,8 +24,8 @@ export const MemberProfile = Schema.Struct({
   isYou: Schema.Boolean,
   isFormer: Schema.Boolean,
   agentId: Schema.Option(Identity.AgentId),
-  standing: Schema.Option(Standing),
-  motion: Schema.Option(Schema.Literals(logoMotions))
+  readiness: Schema.Option(Agent.Readiness),
+  activity: Schema.Option(AgentActivity)
 })
 export type MemberProfile = typeof MemberProfile.Type
 

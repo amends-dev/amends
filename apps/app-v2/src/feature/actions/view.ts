@@ -1,7 +1,7 @@
 import { notice } from "@amends-dev/design/control"
 import { confirmation, confirmationStack, toast, toastStack } from "@amends-dev/design/toast"
 import * as Option from "effect/Option"
-import { ActionsComposition } from "./composition.ts"
+import { ActionsBlock } from "./block.ts"
 import { Message, Offer } from "./definition.ts"
 
 /** What the button after a confirmation's words says, by what it offers. */
@@ -12,7 +12,7 @@ const offerLabel = Offer.match({ OpenGroup: () => "Open" })
  * reading the actions failed, and beside it what the page confirmed to the person that they did, as confirmations,
  * which go by themselves and have no Dismiss, each with the one thing it offers to do next, if it offers one.
  */
-export const view = ActionsComposition.makeView((model, h) => {
+export const view = ActionsBlock.makeView((model, h) => {
   const refused = model.actions.flatMap((action) =>
     Option.match(action.rejection, { onNone: () => [], onSome: (why) => [{ ...action, why }] })
   )

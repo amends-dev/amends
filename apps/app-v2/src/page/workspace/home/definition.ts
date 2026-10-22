@@ -34,6 +34,7 @@ import { TasksBlock } from "../../../feature/tasks/block.ts"
 import { type Model as ThreadModel, titleOf } from "../../../feature/thread/definition.ts"
 import { UnsentConversationBlock } from "../../../feature/unsentConversation/block.ts"
 import { soleMemberId } from "../../../feature/unsentConversation/definition.ts"
+import { HomeDestination } from "../../../route.ts"
 
 /**
  * What Home's main pane shows: the inbox, the tasks in triage, every open task, the groups to browse, the group open,
@@ -108,6 +109,8 @@ export const Message = defineMessageUnion({
   ClickedTriage: {},
   ClickedTasks: {},
   RequestedReset: {},
+  RequestedDismiss: {},
+  RequestedDestination: { destination: HomeDestination },
   RequestedOpenGroup: { groupId: GroupId.GroupId },
   RequestedOpenThread: { groupId: GroupId.GroupId, threadId: ThreadId.ThreadId },
   RequestedConversationWith: { memberId: MemberId.MemberId },
@@ -117,6 +120,7 @@ export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
   Navigated: {},
+  ReplacedConversation: {},
   JoinedGroup: { groupId: GroupId.GroupId, place: Schema.String },
   CreatedGroup: { groupId: GroupId.GroupId },
   OpenedAgent: { agentId: Identity.AgentId },

@@ -34,7 +34,7 @@ import {
   unnamedInvitation
 } from "../../../test/fixtures.ts"
 import { panelIs } from "../../../test/panelSize.ts"
-import { calendarDate } from "../../seen.ts"
+import { calendarDate } from "../../view/time.ts"
 import {
   AcceptInvitation,
   CreateWorkspace,
@@ -55,7 +55,7 @@ import {
 } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { view } from "./view.ts"
+import { view } from "./view/main.ts"
 
 const sceneView = withViewInputs(view, { now })()
 

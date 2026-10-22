@@ -1,12 +1,55 @@
 import * as Option from "effect/Option"
+import { UrlRequest } from "foldkit/navigation"
+import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
-import { ApplicationComposition, WorkspaceBinding, signOut } from "./composition.ts"
+import { toString } from "foldkit/url"
+import { LoadExternal, Navigate } from "./command.ts"
+import {
+  ApplicationComposition,
+  signOut,
+  WorkspaceBinding,
+  WorkspacesBinding,
+  closeWorkspace,
+  restoreRoute
+} from "./composition.ts"
 import { ApplicationDefinition } from "./definition.ts"
 import { Message } from "./message.ts"
-import { openedWorkspaceId } from "./model.ts"
+import { Page, openedWorkspaceId } from "./model.ts"
+import { fromUrl, Route, sameRoute } from "./route.ts"
 
 export const update = ApplicationComposition.makeUpdate((model, message) =>
   Message.match(message, {
+    ClickedWorkspaces: () => Update.combine(model, [closeWorkspace]),
+    ClickedRetryWorkspace: () => Update.combine(model, [WorkspacesBinding.requestReload()]),
+    CompletedNavigation: () => ({ model }),
+    ClickedLink: ({ request }) =>
+      UrlRequest.match(request, {
+        Internal: ({ url }) => ({ model, commands: [Navigate({ url: toString(url), replace: false })] }),
+        External: ({ href }) => ({ model, commands: [LoadExternal({ href })] })
+      }),
+    ChangedUrl: ({ url }) => {
+      const route = fromUrl(url)
+      if (sameRoute(route, model.route)) return { model }
+      const next = modifyFields(model, {
+        route: () => route,
+        page: (page) =>
+          Page.matchOrElse(
+            page,
+            {
+              SignedIn: (page) =>
+                Page.SignedIn({
+                  ...page,
+                  workspace: Option.filter(
+                    page.workspace,
+                    ({ workspaceId }) => Route.isAnyOf(["Workspace"])(route) && route.workspaceId === workspaceId
+                  )
+                })
+            },
+            (page) => page
+          )
+      })
+      return Update.combine(next, [restoreRoute])
+    },
     ClickedSignOut: () => Update.combine(model, [signOut]),
     CompletedSignOut: () => ({ model }),
     CompletedShowAppearance: () => ({ model }),

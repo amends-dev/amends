@@ -6,10 +6,12 @@ import { pane, paneColumn, paneEmpty, paneToolbar } from "@amends-dev/design/pan
 import { taskHeadings, taskListEmpty } from "@amends-dev/design/taskList"
 import type * as DateTime from "effect/DateTime"
 import type { Html } from "foldkit/html"
-import { isOpen, pluralize } from "../../seen.ts"
-import { assigneeFilterMenu, statusChoices, statusFilterMenu } from "../../taskFilter.ts"
-import { noTasksMatch, taskRows } from "../../taskList.ts"
-import { AssigneeBinding, StatusBinding, TasksComposition, type TasksViewBuilder } from "./composition.ts"
+import { isOpen } from "../../data/tasks.ts"
+import { pluralize } from "../../view/counts.ts"
+import { assigneeFilterMenu, statusChoices, statusFilterMenu } from "../../view/taskFilter.ts"
+import { noTasksMatch, taskRows } from "../../view/taskList.ts"
+import { TasksBlock } from "./block.ts"
+import { AssigneeBinding, StatusBinding, type TasksViewBuilder } from "./composition.ts"
 import {
   isFiltered,
   matching,
@@ -129,11 +131,11 @@ const destinationView = (destination: Destination, model: Model, { now }: ViewIn
 }
 
 /** The tasks in triage, which wait for someone to decide on them. */
-export const triageView = TasksComposition.makeView.withInputs<ViewInputs>((model, inputs, h) =>
+export const triageView = TasksBlock.makeView.withInputs<ViewInputs>((model, inputs, h) =>
   destinationView(triageDestination, model, inputs, h)
 )
 
 /** Every task that is neither done nor dismissed. */
-export const tasksView = TasksComposition.makeView.withInputs<ViewInputs>((model, inputs, h) =>
+export const tasksView = TasksBlock.makeView.withInputs<ViewInputs>((model, inputs, h) =>
   destinationView(tasksDestination, model, inputs, h)
 )

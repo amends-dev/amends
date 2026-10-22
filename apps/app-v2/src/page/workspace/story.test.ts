@@ -1,6 +1,5 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { GroupId } from "@amends-dev/core/group"
-import { TurnId } from "@amends-dev/core/turn"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { currentSidebarRowSelector } from "@amends-dev/design/sidebar"
 import { describe, expect, it } from "@effect/vitest"
@@ -38,6 +37,7 @@ import {
   testApi,
   thread
 } from "../../../test/fixtures.ts"
+import { Integrations } from "../../data/connections.ts"
 import { ActionsBlock } from "../../feature/actions/block.ts"
 import { ExpireConfirmation } from "../../feature/actions/command.ts"
 import { Offer } from "../../feature/actions/definition.ts"
@@ -49,12 +49,7 @@ import { ComposerBlock } from "../../feature/composer/block.ts"
 import { ReadDraft, SaveDraft } from "../../feature/composer/command.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { CheckConnection } from "../../feature/connections/command.ts"
-import {
-  Adding,
-  Integrations,
-  startConfiguring,
-  Written as ConnectionWritten
-} from "../../feature/connections/definition.ts"
+import { Adding, startConfiguring, Written as ConnectionWritten } from "../../feature/connections/definition.ts"
 import { GroupBlock } from "../../feature/group/block.ts"
 import { FollowGroup, UnfollowGroup } from "../../feature/group/command.ts"
 import { ThreadBinding as GroupThreadBinding, ThreadsBinding } from "../../feature/group/composition.ts"
@@ -76,13 +71,14 @@ import {
   Written as SettingsWritten
 } from "../../feature/settings/definition.ts"
 import { TasksBlock } from "../../feature/tasks/block.ts"
+import { ThreadBlock } from "../../feature/thread/block.ts"
 import { TurnsBinding } from "../../feature/thread/composition.ts"
 import { init as initThread } from "../../feature/thread/init.ts"
 import { ThreadsBlock } from "../../feature/threads/block.ts"
 import { ComposerBinding as ThreadsComposerBinding } from "../../feature/threads/composition.ts"
 import { TurnsBlock } from "../../feature/turns/block.ts"
 import * as Drafts from "../../store/Drafts.ts"
-import { LoadIntegrations, RequestNameChange } from "./command.ts"
+import { LoadIntegrations } from "./command.ts"
 import {
   AgentsBinding,
   AsideBinding,
@@ -97,7 +93,7 @@ import { type AppAccountEntry, Message, Open, OutMessage, openMemberId } from ".
 import { HomeBlock } from "./home/block.ts"
 import { GroupBinding, GroupsBinding, InboxBinding, ProfileCardBinding, TasksBinding } from "./home/composition.ts"
 import { isThreadOpen, Open as HomeOpen } from "./home/definition.ts"
-import { view as homeView } from "./home/view.ts"
+import { view as homeView } from "./home/view/main.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -107,8 +103,6 @@ const groupId = GroupId.GroupId.make("general")
 const otherGroupId = GroupId.GroupId.make("design")
 
 const opened = init(workspaceId, memberId, "Studio", "Split").model
-
-const scoutTurnId = TurnId.TurnId.make("turn-1")
 
 const unreachable = "The host could not be reached. Try again."
 
@@ -192,7 +186,7 @@ const openConnectionsDialog = (model: typeof opened) =>
 const readConnections = (connections: typeof opened.connections) =>
   modifyFields(connections, {
     isLoaded: () => true,
-    integrations: () => Integrations.Loaded({ integrations: [searchApi] }),
+    integrations: () => Integrations.cases.Loaded.make({ integrations: [searchApi] }),
     grants: () => grantsOf([aliceOwns]),
     connections: () => [{ connection: searchConnection, pending: false }]
   })
@@ -263,7 +257,7 @@ const fromGroups = (message: typeof GroupsBlock.Message.Type) =>
     GroupsBinding.embedView({
       slotId: "groups",
       model: opened.home.groups,
-      viewInputs: { openThread: Option.none(), isBrowsing: false, unsentWith: Option.none() }
+      view: GroupsBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 
@@ -273,32 +267,44 @@ const fromInbox = (message: typeof InboxBlock.Message.Type) =>
     InboxBinding.embedView({
       slotId: "inbox",
       model: opened.home.inbox,
-      viewInputs: { now, workspaceName: "Studio", openTriggerId: undefined }
+      view: InboxBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 
 /** What the member's card reports, as Home and then the workspace receive it. */
 const fromProfileCard = (message: typeof ProfileCardBlock.Message.Type) =>
   fromHome(
-    ProfileCardBinding.embedView({ slotId: "profile-card", model: opened.home.profileCard }).toParentMessage(message)
+    ProfileCardBinding.embedView({
+      view: ProfileCardBlock.makeView((_model, h) => h.empty),
+      slotId: "profile-card",
+      model: opened.home.profileCard
+    }).toParentMessage(message)
   )
 
 /** What the tasks report, as Home and then the workspace receive it. */
 const fromTasks = (message: typeof TasksBlock.Message.Type) =>
   fromHome(
-    TasksBinding.embedView({ slotId: "tasks", model: opened.home.tasks, viewInputs: { now } }).toParentMessage(message)
+    TasksBinding.embedView({
+      slotId: "tasks",
+      model: opened.home.tasks,
+      view: TasksBlock.makeView((_model, h) => h.empty)
+    }).toParentMessage(message)
   )
 
 /** What the search reports, as the workspace receives it. */
 const fromSearch = (message: typeof SearchBlock.Message.Type) =>
-  SearchBinding.embedView({ slotId: "search", model: opened.search }).toParentMessage(message)
+  SearchBinding.embedView({
+    slotId: "search",
+    model: opened.search,
+    view: SearchBlock.makeView((_model, h) => h.empty)
+  }).toParentMessage(message)
 
 /** What the connections report, as the workspace receives it. */
 const fromConnections = (message: typeof ConnectionsBlock.Message.Type) =>
   ConnectionsBinding.embedView({
     slotId: "connections",
     model: opened.connections,
-    viewInputs: { workspaceName: "Studio", viewport: "Desktop" }
+    view: ConnectionsBlock.makeView((_model, h) => h.empty)
   }).toParentMessage(message)
 
 /** What the agents report, as the workspace receives it. */
@@ -306,16 +312,24 @@ const fromAgents = (message: typeof AgentsBlock.Message.Type) =>
   AgentsBinding.embedView({
     slotId: "agents",
     model: opened.agents,
-    viewInputs: { workspaceName: "Studio", viewport: "Desktop" }
+    view: AgentsBlock.makeView((_model, h) => h.empty)
   }).toParentMessage(message)
 
 /** What the settings report, as the workspace receives it. */
 const fromSettings = (message: typeof SettingsBlock.Message.Type) =>
-  SettingsBinding.embedView({ slotId: "settings", model: opened.settings }).toParentMessage(message)
+  SettingsBinding.embedView({
+    slotId: "settings",
+    model: opened.settings,
+    view: SettingsBlock.makeView((_model, h) => h.empty)
+  }).toParentMessage(message)
 
 /** What the channels report, as the workspace receives it. */
 const fromChannels = (message: typeof ChannelsBlock.Message.Type) =>
-  ChannelsBinding.embedView({ slotId: "channels", model: opened.channels }).toParentMessage(message)
+  ChannelsBinding.embedView({
+    slotId: "channels",
+    model: opened.channels,
+    view: ChannelsBlock.makeView((_model, h) => h.empty)
+  }).toParentMessage(message)
 
 /** What the navigation drawer's dialog reports, as the workspace receives it. */
 const fromMenu = (message: typeof DialogBlock.Message.Type) =>
@@ -349,7 +363,7 @@ const fromGroup = (message: typeof GroupBlock.Message.Type) =>
       key: groupId,
       slotId: "group",
       model: openGroupModel,
-      viewInputs: { now, workspaceName: "Studio", viewport: "Desktop", openTriggerId: undefined }
+      view: GroupBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 
@@ -359,16 +373,7 @@ const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
     ThreadsBinding.embedView({
       slotId: "threads",
       model: openGroupModel.threads,
-      viewInputs: {
-        members: [],
-        groupName: "General",
-        isTeam: true,
-        memberNames: [],
-        openThreadId: Option.none(),
-        openTriggerId: undefined,
-        present: [],
-        now
-      }
+      view: ThreadsBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 
@@ -380,7 +385,7 @@ const fromTurnsOfThread = (message: typeof TurnsBlock.Message.Type) =>
   TurnsBinding.embedView({
     slotId: "turn",
     model: openThreadModel.turns,
-    viewInputs: { turnId: scoutTurnId }
+    view: TurnsBlock.makeView((_model, h) => h.empty)
   }).toParentMessage(message)
 
 /** What the turns of the open group's thread report, as the thread, group, Home, and then the workspace receive it. */
@@ -390,7 +395,7 @@ const fromTurnsOfGroupThread = (message: typeof TurnsBlock.Message.Type) =>
       key: thread.id,
       slotId: "thread",
       model: openThreadModel,
-      viewInputs: { now, openTriggerId: undefined, highlightedMessageId: Option.none() }
+      view: ThreadBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(fromTurnsOfThread(message))
   )
 
@@ -401,7 +406,7 @@ const fromTurnsOfInboxThread = (message: typeof TurnsBlock.Message.Type) =>
       key: thread.id,
       slotId: "thread",
       model: openThreadModel,
-      viewInputs: { now, openTriggerId: undefined, highlightedMessageId: Option.none() }
+      view: ThreadBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(fromTurnsOfThread(message))
   )
 
@@ -525,16 +530,17 @@ describe("a workspace", () => {
     story(update, given(opened), message(choseAccountEntry("ChangeName")), expectNoOutMessage())
   })
 
-  it("reports that the header of the open group asked for the search, for the app to open, and opens none itself", () => {
+  it("opens search directly when the header of the open group asks for it", () => {
     story(
       update,
       given(opened),
       message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       message(fromGroup(GroupBlock.Message.ClickedSearch())),
-      expectOutMessage(OutMessage.RequestedSearch()),
+      expectNoOutMessage(),
+      dialogShown,
       model((model) => {
-        expect(model.search.dialog.isOpen).toBe(false)
+        expect(model.search.dialog.isOpen).toBe(true)
       })
     )
   })
@@ -545,7 +551,7 @@ describe("a workspace", () => {
       given(opened),
       message(Message.ClickedMembers()),
       message(choseAccountEntry("WorkspaceSettings")),
-      expectNoOutMessage(),
+      expectOutMessage(OutMessage.Navigated()),
       model((model) => {
         expect(Open.matchOrElse(model.open, { Settings: ({ page }) => page }, () => undefined)).toBe("Workspace")
       }),
@@ -1064,11 +1070,17 @@ describe("a workspace", () => {
       update,
       given(opened),
       model((model) => {
-        expect(integrationsOf(model)).toEqual([Integrations.Loading(), Integrations.Loading(), Integrations.Loading()])
+        expect(integrationsOf(model)).toEqual([
+          Integrations.cases.Loading.make({}),
+          Integrations.cases.Loading.make({}),
+          Integrations.cases.Loading.make({})
+        ])
       }),
       message(Message.ReceivedIntegrations({ integrations: [testApi] })),
       model((model) => {
-        expect(integrationsOf(model)).toEqual(Array(3).fill(Integrations.Loaded({ integrations: [testApi] })))
+        expect(integrationsOf(model)).toEqual(
+          Array(3).fill(Integrations.cases.Loaded.make({ integrations: [testApi] }))
+        )
       })
     )
   })
@@ -1079,7 +1091,7 @@ describe("a workspace", () => {
       given(opened),
       message(Message.FailedLoadIntegrations({ error: unreachable })),
       model((model) => {
-        expect(integrationsOf(model)).toEqual(Array(3).fill(Integrations.Failed({ error: unreachable })))
+        expect(integrationsOf(model)).toEqual(Array(3).fill(Integrations.cases.Failed.make({ error: unreachable })))
       })
     )
   })
@@ -1098,7 +1110,9 @@ describe("a workspace", () => {
         Command.expectExact(LoadIntegrations({ workspaceId })),
         Command.resolve(LoadIntegrations, Message.ReceivedIntegrations({ integrations: [testApi] })),
         model((model) => {
-          expect(integrationsOf(model)).toEqual(Array(3).fill(Integrations.Loaded({ integrations: [testApi] })))
+          expect(integrationsOf(model)).toEqual(
+            Array(3).fill(Integrations.cases.Loaded.make({ integrations: [testApi] }))
+          )
         })
       )
     }
@@ -1805,7 +1819,7 @@ const fromComposer = (message: typeof ComposerBlock.Message.Type) =>
     ThreadsComposerBinding.embedView({
       slotId: "composer",
       model: openGroupModel.threads.composer,
-      viewInputs: { placeholder: "Message #General", members: [] }
+      view: ComposerBlock.makeView((_model, h) => h.empty)
     }).toParentMessage(message)
   )
 
@@ -1861,8 +1875,8 @@ describe("a workspace, with the card of a member", () => {
     isYou: false,
     isFormer: false,
     agentId: Option.none(),
-    standing: Option.none(),
-    motion: Option.none()
+    readiness: Option.none(),
+    activity: Option.none()
   }
 
   /** The card of `profile` open, from the name in the inbox's notification, and read. */
@@ -1918,8 +1932,6 @@ describe("a workspace, with the card of a member", () => {
       given(settingsRead),
       ...showing({ ...person, memberId: membership.member.id, name: "Alice", isYou: true }),
       message(fromProfileCard(ProfileCardBlock.Message.ClickedChangeName())),
-      Command.expectExact(RequestNameChange({})),
-      Command.resolve(RequestNameChange, Message.CompletedRequestNameChange()),
       dialogShown,
       model((model) => {
         expect(model.settings.dialog.isOpen).toBe(true)

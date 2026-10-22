@@ -1,6 +1,6 @@
 import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Option from "effect/Option"
-import { Integrations } from "../connections/definition.ts"
+import { Integrations } from "../../data/connections.ts"
 import { AgentsComposition } from "./composition.ts"
 
 /**
@@ -15,7 +15,7 @@ export const init = AgentsComposition.makeInit((workspaceId: WorkspaceId.Workspa
     agents: [],
     members: [],
     connections: [],
-    integrations: Integrations.Loading(),
+    integrations: Integrations.cases.Loading.make({}),
     roles: [],
     workspace: Option.none(),
     grants: [],

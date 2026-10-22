@@ -24,16 +24,16 @@ import {
 import { modifyFields } from "foldkit/struct"
 import { art, bob, dana, membership, now, opening, saying, scout, task, thread } from "../../../test/fixtures.ts"
 import { chooseFromMenu, chooseMenuItem, closeMenu, openMenu } from "../../../test/menu.ts"
-import { shortTimeOf, timeOf } from "../../seen.ts"
+import { AssigneeMenu, StatusFilterMenu } from "../../control/taskFilter.ts"
 import * as Drafts from "../../store/Drafts.ts"
-import { AssigneeMenu, StatusFilterMenu } from "../../taskFilter.ts"
+import { shortTimeOf, timeOf } from "../../view/time.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { SaveDraft } from "../composer/command.ts"
 import { FocusComposer, ScrollThreadsToEnd, StartThread } from "./command.ts"
 import { Message, OutMessage, TaskSortMenu } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { composerView, tabsView, toolbarView, view } from "./view.ts"
+import { composerView, tabsView, toolbarView, view } from "./view/list.ts"
 
 const { member } = membership
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")

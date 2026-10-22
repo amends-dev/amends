@@ -77,23 +77,24 @@ import {
 import { Message, type Model, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import * as GroupView from "./view.ts"
+import { view as groupView } from "./view/main.ts"
+import { threadView as groupThreadView } from "./view/thread.ts"
 
 const { workspace, member } = membership
 
-const view = withViewInputs(GroupView.view, {
+const view = withViewInputs(groupView, {
   now,
   workspaceName: "Studio",
   viewport: "Desktop",
   openTriggerId: undefined
 })()
-const phoneView = withViewInputs(GroupView.view, {
+const phoneView = withViewInputs(groupView, {
   now,
   workspaceName: "Studio",
   viewport: "Phone",
   openTriggerId: undefined
 })()
-const threadView = withViewInputs(GroupView.threadView, { now, openTriggerId: undefined })()
+const threadView = withViewInputs(groupThreadView, { now, openTriggerId: undefined })()
 const threadId = ThreadId.ThreadId.make("thread-1")
 
 /** A public team the person does not belong to. */
@@ -656,8 +657,8 @@ describe("a group's header on a phone", () => {
   it("leaves it to the rail on any wider window, where the rail has the Search", () => {
     for (const wideView of [
       view,
-      withViewInputs(GroupView.view, { now, workspaceName: "Studio", viewport: "Tablet", openTriggerId: undefined })(),
-      withViewInputs(GroupView.view, { now, workspaceName: "Studio", viewport: "Split", openTriggerId: undefined })()
+      withViewInputs(groupView, { now, workspaceName: "Studio", viewport: "Tablet", openTriggerId: undefined })(),
+      withViewInputs(groupView, { now, workspaceName: "Studio", viewport: "Split", openTriggerId: undefined })()
     ]) {
       scene({ update, view: wideView }, given(opened), expect(role("button", { name: "Search" })).toBeAbsent())
     }
@@ -1688,7 +1689,7 @@ describe("a group's side pane opening the card of a member", () => {
       {
         update,
         view: (model, h) =>
-          h.div([], [withViewInputs(GroupView.threadView, { now, openTriggerId: "thread-message-2-name" })()(model, h)])
+          h.div([], [withViewInputs(groupThreadView, { now, openTriggerId: "thread-message-2-name" })()(model, h)])
       },
       given(withMessages),
       expect(within(role("complementary", { name: "Thread" }), role("button", { name: "Bob" }))).toHaveAttr(

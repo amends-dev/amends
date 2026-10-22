@@ -1,6 +1,6 @@
 import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
-import { assigneeFilterOf, AssigneeMenu, StatusFilterMenu } from "../../taskFilter.ts"
+import { assigneeFilterOf, AssigneeMenu, StatusFilterMenu } from "../../control/taskFilter.ts"
 import { TasksDefinition } from "./definition.ts"
 
 export const StatusBinding = TasksDefinition.bindChild(StatusFilterMenu, {

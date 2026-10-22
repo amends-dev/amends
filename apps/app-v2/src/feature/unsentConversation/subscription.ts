@@ -7,9 +7,9 @@ import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
-import type * as Store from "../../store/Store.ts"
+import { conversationAmong } from "../../data/groups.ts"
+import type * as GroupQuery from "../../store/query/groups.ts"
 import * as Stores from "../../store/Stores.ts"
-import { conversationAmong } from "../groups/conversation.ts"
 import { Message, UnsentConversationDefinition } from "./definition.ts"
 
 /**
@@ -17,7 +17,7 @@ import { Message, UnsentConversationDefinition } from "./definition.ts"
  * exactly the members `memberIds`, when there is one.
  */
 export const receivedConversation = (
-  groups: ReadonlyArray<Store.GroupView>,
+  groups: ReadonlyArray<GroupQuery.GroupView>,
   memberId: MemberId.MemberId,
   memberIds: ReadonlyArray<MemberId.MemberId>
 ) =>

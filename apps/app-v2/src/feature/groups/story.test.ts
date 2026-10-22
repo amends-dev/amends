@@ -583,7 +583,7 @@ describe("the groups", () => {
       model((model) => {
         expect(model.browse).toEqual({ tab: "Yours", query: "ann" })
       }),
-      expectNoOutMessage()
+      expectOutMessage(OutMessage.ChangedBrowseTab())
     )
   })
 

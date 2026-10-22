@@ -1,119 +1,41 @@
+/** Incoming connection facts, dialog coordination, and message routing. */
+
 import type { Connection as ConnectionContract, Integration } from "@amends-dev/connection"
 import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
-import * as Result from "effect/Result"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
-import * as SettingsForm from "../../settingsForm.ts"
-import {
-  AddConnection,
-  CheckConnection,
-  ConfigureConnection,
-  FocusField,
-  RemoveConnection,
-  RenameConnection,
-  ReplaceConnectionKey
-} from "./command.ts"
+import { findConnection, Integrations } from "../../data/connections.ts"
+import { FocusField } from "./command.ts"
 import { ConnectionsComposition, DialogBinding, leaveDialog } from "./composition.ts"
 import {
   Adding,
   byName,
   Check,
-  type CheckItem,
-  type Configuring,
   configuringOf,
-  type ConnectionsAction,
   ConnectionsDefinition,
-  type Edit,
-  type Failure,
-  findConnection,
-  findEdit,
-  findIntegration,
-  Integrations,
-  integrationOf,
   integrationsToAdd,
-  isNameChanged,
-  isSettingsChanged,
   mayAdd,
   mayManage,
   Message,
   type Model,
-  nameDraftOf,
   OutMessage,
-  type Reason,
   settingsDraftOf,
-  settingsToAdd,
   startConfiguring,
   Written
 } from "./definition.ts"
-
-/** A failure of `action` for `reason`, with nothing the integration said. */
-const failureOf = (action: ConnectionsAction, reason: Reason): Failure => ({
-  action,
-  reason,
-  description: Option.none()
-})
-
-/**
- * The model with the edit of the connection `connectionId` as `change` makes it, which is dropped once it holds
- * nothing.
- */
-const atEdit = (model: Model, connectionId: ConnectionContract.ConnectionId, change: (edit: Edit) => Edit): Model => {
-  const edit = change(
-    Option.getOrElse(findEdit(model, connectionId), () => ({
-      connectionId,
-      name: Option.none(),
-      settings: Option.none(),
-      saving: Option.none(),
-      failure: Option.none()
-    }))
-  )
-  const holdsNothing =
-    Option.isNone(edit.name) &&
-    Option.isNone(edit.settings) &&
-    Option.isNone(edit.saving) &&
-    Option.isNone(edit.failure)
-
-  return modifyFields(model, {
-    edits: (edits) => {
-      const others = edits.filter((other) => other.connectionId !== connectionId)
-      return holdsNothing ? others : [...others, edit]
-    }
-  })
-}
-
-/** The failure of an edit unless it is about `action`, which a change to that action's form makes out of date. */
-const unlessAbout = (action: ConnectionsAction) => Option.filter((failure: Failure) => failure.action !== action)
-
-/** `checks` with the check of `connectionId` as `check`, in place of the last one. */
-const withCheck = (
-  checks: ReadonlyArray<CheckItem>,
-  connectionId: ConnectionContract.ConnectionId,
-  check: Check
-): ReadonlyArray<CheckItem> => [...checks.filter((item) => item.connectionId !== connectionId), { connectionId, check }]
-
-/** Whether a check of `connectionId` is under way. */
-const isChecking = (model: Model, connectionId: ConnectionContract.ConnectionId): boolean =>
-  model.checks.some((item) => item.connectionId === connectionId && Check.isAnyOf(["Checking"])(item.check))
-
-/** The model with the form that adds a connection as `change` makes it, while one is open. */
-const atAdding = (model: Model, change: (adding: Adding) => Adding): Model =>
-  modifyFields(model, { adding: Option.map(change) })
-
-/** The model with the form that adds a connection, while the dialog shows it, as `change` makes it. */
-const atConfiguring = (model: Model, change: (configuring: Configuring) => Configuring): Model =>
-  atAdding(model, (adding) => Adding.matchOrElse(adding, { Configuring: change }, () => adding))
-
-/**
- * The model with what the person filled in to add a connection as `change` makes it, unless its request was sent. The
- * key of an earlier attempt and the failure it ended in are dropped, since the values they were for are not these.
- */
-const atDraft = (model: Model, change: (configuring: Configuring) => Configuring): Model =>
-  atConfiguring(model, (configuring) =>
-    Option.isSome(configuring.creating)
-      ? configuring
-      : modifyFields(change(configuring), { key: () => Option.none(), failure: () => Option.none() })
-  )
+import { withCheck, checkStep } from "./update/checks.ts"
+import {
+  atEdit,
+  unlessAbout,
+  atAdding,
+  atConfiguring,
+  atDraft,
+  completeEdit,
+  refuse,
+  withoutDialogFailures
+} from "./update/forms.ts"
+import { submitAdding, submitName, submitSettings, submitNewKey, submitRemoval } from "./update/submission.ts"
 
 /**
  * Ask for the dialog on the integrations to add a connection through, among those that give `capability` when given.
@@ -147,207 +69,6 @@ const closeDialog = Update.combine([leaveDialog, DialogBinding.requestClose()])
 /** Move focus to the field `id`. */
 const focusField = (id: string) =>
   ConnectionsDefinition.step((model: Model) => ({ model, commands: [FocusField({ id })] }))
-
-/** Check `connectionId` with its system, unless that is under way or the person may not manage it. */
-const checkStep = (connectionId: ConnectionContract.ConnectionId) =>
-  ConnectionsDefinition.step((model: Model) =>
-    Option.exists(findConnection(model, connectionId), (item) => mayManage(model, item)) &&
-    !isChecking(model, connectionId)
-      ? {
-          model: modifyFields(model, { checks: (checks) => withCheck(checks, connectionId, Check.Checking()) }),
-          commands: [CheckConnection({ workspaceId: model.workspaceId, connectionId })]
-        }
-      : { model }
-  )
-
-/**
- * Send the form that adds a connection, when it has what a connection needs, its integration is still listed, and its
- * request is not already sent. For an integration the host no longer lists, nothing is sent and the form says why.
- */
-const submitAdding = (model: Model, configuring: Configuring) => {
-  const name = configuring.name.trim()
-
-  if (Option.isSome(configuring.creating)) {
-    return { model }
-  }
-
-  return Option.match(findIntegration(model, configuring.integrationId), {
-    onNone: () => ({
-      model: atConfiguring(model, (open) =>
-        modifyFields(open, { failure: () => Option.some(failureOf("Create", "Uninstalled")) })
-      )
-    }),
-    onSome: (integration) =>
-      Option.match(settingsToAdd(integration, configuring), {
-        onNone: () => ({ model }),
-        onSome: (settings) => ({
-          model: atConfiguring(model, (open) =>
-            modifyFields(open, {
-              failure: () => Option.none(),
-              creating: () => Option.some({ name, connectionId: Option.none() })
-            })
-          ),
-          commands: [
-            AddConnection({
-              workspaceId: model.workspaceId,
-              integration: integration.id,
-              name,
-              auth: configuring.auth,
-              apiKey: configuring.apiKey,
-              settings,
-              key: configuring.key
-            })
-          ]
-        })
-      })
-  })
-}
-
-/**
- * Send the name the person typed for `connectionId` as an action, when there is a new one to save and nothing else is
- * being saved.
- */
-const submitName = (model: Model, connectionId: ConnectionContract.ConnectionId) =>
-  Option.match(findConnection(model, connectionId), {
-    onNone: () => ({ model }),
-    onSome: (item) => {
-      const { workspaceId, memberId } = model
-      const canSave =
-        mayManage(model, item) &&
-        !item.pending &&
-        isNameChanged(model, item) &&
-        Option.isNone(Option.flatMap(findEdit(model, connectionId), (edit) => edit.saving))
-
-      return canSave
-        ? {
-            model: atEdit(model, connectionId, (edit) =>
-              modifyFields(edit, { saving: () => Option.some("Rename" as const), failure: () => Option.none() })
-            ),
-            commands: [
-              RenameConnection({
-                workspaceId,
-                memberId,
-                connectionId,
-                name: nameDraftOf(model, item).trim(),
-                expectedName: item.connection.name
-              })
-            ]
-          }
-        : { model }
-    }
-  })
-
-/**
- * Send the settings the person edited for `connectionId` as an action, when they differ from the saved ones, make
- * settings, and nothing else is being saved.
- */
-const submitSettings = (model: Model, connectionId: ConnectionContract.ConnectionId) =>
-  Option.match(findConnection(model, connectionId), {
-    onNone: () => ({ model }),
-    onSome: (item) => {
-      const { workspaceId, memberId } = model
-      const settings = Option.flatMap(integrationOf(model, item), ({ settings: form }) =>
-        Option.flatMap(settingsDraftOf(model, item), (draft) => Result.getSuccess(SettingsForm.settingsOf(form, draft)))
-      )
-      const canSave =
-        mayManage(model, item) &&
-        !item.pending &&
-        isSettingsChanged(model, item) &&
-        Option.isNone(Option.flatMap(findEdit(model, connectionId), (edit) => edit.saving))
-
-      return canSave && Option.isSome(settings)
-        ? {
-            model: atEdit(model, connectionId, (edit) =>
-              modifyFields(edit, { saving: () => Option.some("Configure" as const), failure: () => Option.none() })
-            ),
-            commands: [ConfigureConnection({ workspaceId, memberId, connectionId, settings: settings.value })]
-          }
-        : { model }
-    }
-  })
-
-/**
- * Send the key the person typed in the dialog as a replacement, unless it is blank, its request is on its way, or the
- * connection is gone.
- */
-const submitNewKey = (model: Model) =>
-  Option.match(model.replacing, {
-    onNone: () => ({ model }),
-    onSome: ({ connectionId, apiKey, isSending }) =>
-      isSending || apiKey.trim() === "" || Option.isNone(findConnection(model, connectionId))
-        ? { model }
-        : {
-            model: modifyFields(model, {
-              replacing: Option.map((replacing) =>
-                modifyFields(replacing, { isSending: () => true, failure: () => Option.none() })
-              )
-            }),
-            commands: [ReplaceConnectionKey({ workspaceId: model.workspaceId, connectionId, apiKey })]
-          }
-  })
-
-/** Ask to remove the connection the confirmation names, unless its request is on its way or the connection is gone. */
-const submitRemoval = (model: Model) =>
-  Option.match(model.removing, {
-    onNone: () => ({ model }),
-    onSome: ({ connectionId, isSending }) =>
-      isSending || Option.isNone(findConnection(model, connectionId))
-        ? { model }
-        : {
-            model: modifyFields(model, {
-              removing: Option.map((removing) =>
-                modifyFields(removing, { isSending: () => true, failure: () => Option.none() })
-              )
-            }),
-            commands: [RemoveConnection({ workspaceId: model.workspaceId, memberId: model.memberId, connectionId })]
-          }
-  })
-
-/**
- * The model with the edit of `connectionId` as `change` makes it, once the store has kept the action it was for, so
- * that no failure of an earlier read or write is left to show.
- */
-const keepEdit = (model: Model, connectionId: ConnectionContract.ConnectionId, change: (edit: Edit) => Edit): Model =>
-  modifyFields(atEdit(model, connectionId, change), { notice: () => Option.none() })
-
-/** The model once the action `written` could not be made, for `reason`: said under the form that made it. */
-const refuse = (model: Model, written: Written, reason: Reason): Model =>
-  Written.match(written, {
-    Rename: ({ connectionId }) =>
-      atEdit(model, connectionId, (edit) =>
-        modifyFields(edit, {
-          saving: () => Option.none(),
-          failure: () => Option.some(failureOf("Rename", reason))
-        })
-      ),
-    Configure: ({ connectionId }) =>
-      atEdit(model, connectionId, (edit) =>
-        modifyFields(edit, {
-          saving: () => Option.none(),
-          failure: () => Option.some(failureOf("Configure", reason))
-        })
-      ),
-    Remove: () =>
-      modifyFields(model, {
-        removing: Option.map((removing) =>
-          modifyFields(removing, { isSending: () => false, failure: () => Option.some(failureOf("Remove", reason)) })
-        )
-      })
-  })
-
-/** The model with the failures the dialog shows dropped, which what the person sees being out of date makes stale. */
-const withoutDialogFailures = (model: Model): Model =>
-  modifyFields(model, {
-    adding: Option.map((adding) =>
-      Adding.matchOrElse(
-        adding,
-        { Configuring: (configuring) => Adding.Configuring({ ...configuring, failure: Option.none() }) },
-        () => adding
-      )
-    ),
-    replacing: Option.map((replacing) => modifyFields(replacing, { failure: () => Option.none() })),
-    removing: Option.map((removing) => modifyFields(removing, { failure: () => Option.none() }))
-  })
 
 export const update = ConnectionsComposition.makeUpdate((model, message) => {
   /**
@@ -458,19 +179,11 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
   const keep = (written: Written) =>
     Written.match(written, {
       Rename: ({ connectionId }) => ({
-        model: keepEdit(model, connectionId, (edit) =>
-          modifyFields(edit, { name: () => Option.none(), saving: () => Option.none(), failure: () => Option.none() })
-        ),
+        model: completeEdit(model, connectionId, "name"),
         outMessage: OutMessage.SavedName()
       }),
       Configure: ({ connectionId }) => ({
-        model: keepEdit(model, connectionId, (edit) =>
-          modifyFields(edit, {
-            settings: () => Option.none(),
-            saving: () => Option.none(),
-            failure: () => Option.none()
-          })
-        ),
+        model: completeEdit(model, connectionId, "settings"),
         outMessage: OutMessage.SavedSettings()
       }),
       Remove: ({ connectionId }) =>
@@ -488,6 +201,7 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
     })
 
   return Message.match(message, {
+    RequestedDismiss: () => Update.combine(model, [DialogBinding.requestClose()]),
     ReceivedConnections: ({ connections }) => {
       const sorted = connections.toSorted(byName)
       const isListed = (connectionId: ConnectionContract.ConnectionId) =>
@@ -504,10 +218,10 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
     ReceivedMembers: ({ members }) => ({ model: modifyFields(model, { members: () => members }) }),
     ReceivedGrants: ({ grants }) => ({ model: modifyFields(model, { grants: () => grants }) }),
     ReceivedIntegrations: ({ integrations }) => ({
-      model: modifyFields(model, { integrations: () => Integrations.Loaded({ integrations }) })
+      model: modifyFields(model, { integrations: () => Integrations.cases.Loaded.make({ integrations }) })
     }),
     FailedLoadIntegrations: ({ error }) => ({
-      model: modifyFields(model, { integrations: () => Integrations.Failed({ error }) })
+      model: modifyFields(model, { integrations: () => Integrations.cases.Failed.make({ error }) })
     }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
     ClickedRetry: () => ({
@@ -516,7 +230,7 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
     ClickedReloadIntegrations: () =>
       Integrations.isAnyOf(["Failed"])(model.integrations)
         ? {
-            model: modifyFields(model, { integrations: () => Integrations.Loading() }),
+            model: modifyFields(model, { integrations: () => Integrations.cases.Loading.make({}) }),
             outMessage: OutMessage.RequestedIntegrations()
           }
         : { model },
@@ -618,7 +332,8 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
     ConfirmedRemoval: () => submitRemoval(model),
     CompletedFocusField: () => ({ model }),
     ChoseBrowseTab: ({ tab }) => ({
-      model: modifyFields(model, { browse: () => ({ tab, query: "" }) })
+      model: modifyFields(model, { browse: () => ({ tab, query: "" }) }),
+      outMessage: OutMessage.RequestedBrowse()
     }),
     TypedBrowseQuery: ({ query }) => ({
       model: modifyFields(model, { browse: (browse) => modifyFields(browse, { query: () => query }) })

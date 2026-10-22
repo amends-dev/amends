@@ -145,7 +145,8 @@ export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
   OpenedWorkspace: { membership: WorkspaceDirectory.Membership },
-  EndedSession: {}
+  EndedSession: {},
+  ListedWorkspaces: {}
 })
 export type OutMessage = typeof OutMessage.Type
 

@@ -13,7 +13,7 @@ import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
-import { namesOf } from "../../seen.ts"
+import { namesOf } from "../../data/members.ts"
 import { ComposerBlock } from "../composer/block.ts"
 
 /**

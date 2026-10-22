@@ -59,12 +59,15 @@ import type { MemberProfile } from "../../../feature/profileCard/definition.ts"
 import { init as initThread } from "../../../feature/thread/init.ts"
 import { LogState } from "../../../feature/turns/definition.ts"
 import { init as initUnsent } from "../../../feature/unsentConversation/init.ts"
-import { timeOf } from "../../../seen.ts"
+import { timeOf } from "../../../view/time.ts"
 import { HomeBlock } from "./block.ts"
 import { Open, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { dialogView, profileCardView, sidebarView, threadView, view } from "./view.ts"
+import { view } from "./view/main.ts"
+import { dialogView, profileCardView } from "./view/overlay.ts"
+import { sidebarView } from "./view/sidebar.ts"
+import { threadView } from "./view/thread.ts"
 
 const { workspace, member } = membership
 
@@ -88,7 +91,7 @@ const sceneView: typeof mainView = (model, h) =>
   h.div(
     [],
     [
-      h.nav([h.AriaLabel("Studio")], [sidebarView(model, h)]),
+      h.nav([h.AriaLabel("Studio")], [sidebarView(model, {}, h)]),
       mainView(model, h),
       sideView(model, h),
       dialogView(model, h),
@@ -924,8 +927,8 @@ describe("Home, with the card of a member", () => {
     isYou: false,
     isFormer: false,
     agentId: Option.none(),
-    standing: Option.none(),
-    motion: Option.none()
+    readiness: Option.none(),
+    activity: Option.none()
   }
 
   const agent: MemberProfile = {

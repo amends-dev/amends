@@ -5,7 +5,7 @@ import * as Option from "effect/Option"
 import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
-import { MembersComboboxBlock } from "../../memberPicker.ts"
+import { MembersComboboxBlock } from "../../control/memberPicker.ts"
 import type { SlashCommand } from "../composer/definition.ts"
 import { ThreadBlock } from "../thread/block.ts"
 import { ThreadsBlock } from "../threads/block.ts"
@@ -83,6 +83,7 @@ const runSlashCommand = (command: SlashCommand) =>
 
 /** Picking a thread opens it in the group, and a slash command picked runs; opening a member's card changes nothing. */
 const foldThreadsOutMessage = ThreadsBlock.OutMessage.match({
+  ChangedTab: () => GroupDefinition.stepNoop(),
   SelectedThread: ({ threadId }) => openThread(threadId),
   RanSlashCommand: ({ command }) => runSlashCommand(command),
   OpenedProfile: () => GroupDefinition.stepNoop()
@@ -93,6 +94,7 @@ const foldThreadsOutMessage = ThreadsBlock.OutMessage.match({
  * is. What the slash commands report is said when they run.
  */
 const forwardThreadsOutMessage = ThreadsBlock.OutMessage.match({
+  ChangedTab: () => OutMessage.ChangedTab(),
   SelectedThread: () => OutMessage.OpenedThread(),
   RanSlashCommand: () => undefined,
   OpenedProfile: ({ memberId, triggerId }) => OutMessage.OpenedProfile({ memberId, triggerId })

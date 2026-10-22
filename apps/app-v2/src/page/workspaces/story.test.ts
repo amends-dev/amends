@@ -344,7 +344,7 @@ describe("creating a workspace", () => {
         LoadWorkspaces,
         Message.SucceededLoadWorkspaces({ memberships: [membership, acme], invitations: [] })
       ),
-      expectNoOutMessage(),
+      expectOutMessage(OutMessage.ListedWorkspaces()),
       model((model) => {
         expect(model.workspaces).toEqual(loaded([membership, acme], []))
       })
@@ -362,7 +362,7 @@ describe("creating a workspace", () => {
         expect(model.dialog.isOpen).toBe(false)
       }),
       message(Message.SucceededLoadWorkspaces({ memberships: [membership, acme], invitations: [] })),
-      expectNoOutMessage(),
+      expectOutMessage(OutMessage.ListedWorkspaces()),
       Command.expectNone(),
       model((model) => {
         expect(model.workspaces).toEqual(loaded([membership, acme], []))
@@ -751,7 +751,7 @@ describe("joining a workspace", () => {
         expect(model.dialog.isOpen).toBe(false)
       }),
       message(listedWithNorthstar),
-      expectNoOutMessage(),
+      expectOutMessage(OutMessage.ListedWorkspaces()),
       Command.expectNone(),
       model((model) => {
         expect(model.confirmations).toEqual([])
