@@ -12,6 +12,7 @@ import {
   selectColor,
   selectTool,
 } from './composition'
+import { ApplicationDefinition } from './definition'
 import {
   createEmptyGrid,
   erasePixels,
@@ -23,17 +24,17 @@ import {
 import { Message } from './message'
 import { Model } from './model'
 
-const applyEraser = (model: Model, x: number, y: number) => {
+const applyEraser = (model: typeof Model.Type, x: number, y: number) => {
   const positions = getMirroredPositions(x, y, model.gridSize, model.mirrorMode)
   return erasePixels(model.grid, positions)
 }
 
-const applyBrush = (model: Model, x: number, y: number) => {
+const applyBrush = (model: typeof Model.Type, x: number, y: number) => {
   const positions = getMirroredPositions(x, y, model.gridSize, model.mirrorMode)
   return setPixels(model.grid, positions, model.selectedColorIndex)
 }
 
-const applyFill = (model: Model, x: number, y: number) => {
+const applyFill = (model: typeof Model.Type, x: number, y: number) => {
   const positions = getMirroredPositions(x, y, model.gridSize, 'None')
   return Array.reduce(positions, model.grid, (currentGrid, [fillX, fillY]) =>
     floodFill(currentGrid, fillX, fillY, model.selectedColorIndex),
@@ -235,12 +236,10 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
     CompletedSaveCanvas: () => ({ model }),
 
     FailedExportPng: ({ error }) =>
-      Update.combine(model, [
-        stepModel => ({
-          model: modifyFields(stepModel, {
-            maybeExportError: () => Option.some(error),
-          }),
-        }),
+      Update.combineSteps(model, [
+        ApplicationDefinition.makeFieldsStep(() => ({
+          maybeExportError: () => Option.some(error),
+        })),
         ErrorDialogBinding.requestOpen(),
       ]),
 
@@ -248,13 +247,15 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
       Option.match(model.maybePendingGridSize, {
         onNone: () => ({ model }),
         onSome: pendingSize =>
-          Update.combine(model, [
-            stepModel => applyGridSizeChange(stepModel, pendingSize),
+          Update.combineSteps(model, [
+            ApplicationDefinition.makeStep(stepModel =>
+              applyGridSizeChange(stepModel, pendingSize),
+            ),
             GridSizeConfirmDialogBinding.requestClose(),
-            stepModel => ({
+            ApplicationDefinition.makeStep(stepModel => ({
               model: stepModel,
               commands: [saveCanvas(stepModel)],
-            }),
+            })),
           ]),
       }),
   }),

@@ -16,7 +16,10 @@ import {
   toolbarButtonClassName,
 } from './shared'
 
-export const statsTabView = (model: Model, h: ApplicationViewBuilder) => {
+export const statsTabView = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+) => {
   const statsAsyncData = statsQuery.read(model.stats)
   const isPending = AsyncData.isPending(statsAsyncData)
 
@@ -84,7 +87,11 @@ export const statsCards = (
     stats,
     fetchedAt,
     isRefreshing,
-  }: Readonly<{ stats: Stats; fetchedAt: number; isRefreshing: boolean }>,
+  }: Readonly<{
+    stats: typeof Stats.Type
+    fetchedAt: number
+    isRefreshing: boolean
+  }>,
   h: ApplicationViewBuilder,
 ) =>
   h.div(

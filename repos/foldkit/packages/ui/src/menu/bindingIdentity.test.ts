@@ -1,7 +1,6 @@
 import { Schema } from 'effect'
 import * as Block from 'foldkit/block'
 import { defineMessageUnion } from 'foldkit/message'
-import type * as Update from 'foldkit/update'
 import { expect, it } from 'vitest'
 
 import * as Animation from '../animation/block.js'
@@ -15,12 +14,10 @@ type Model = typeof Model.Type
 const Message = defineMessageUnion({
   RequestedOpen: {},
 })
-type Message = typeof Message.Type
 
 const OutMessage = defineMessageUnion({
   SelectedMenuItem: { value: Schema.Literals(['Edit', 'Delete']) },
 })
-type OutMessage = typeof OutMessage.Type
 
 const GenericMenuBindingIdentityDefinition = Block.makeDefinition(
   'GenericMenuBindingIdentity',
@@ -31,25 +28,22 @@ const GenericMenuBindingIdentityDefinition = Block.makeDefinition(
   },
 )
 
-const MenuBinding = GenericMenuBindingIdentityDefinition.bindChild(
+const MenuBinding = GenericMenuBindingIdentityDefinition.makeBinding(
   RefinedMenu,
   {
     field: 'menu',
     init: false,
-    outMessage: {
-      fold: RefinedMenu.OutMessage.match<
-        Update.StepWithOutMessage<Model, Message, OutMessage>
-      >({
-        Selected: ({ value }) =>
-          GenericMenuBindingIdentityDefinition.step(model => ({
-            model,
-            outMessage: OutMessage.SelectedMenuItem({ value }),
-          })),
-        Closed: () => GenericMenuBindingIdentityDefinition.stepNoop(),
-      }),
-    },
   },
-)
+).withOutMessagePolicy({
+  fold: GenericMenuBindingIdentityDefinition.makeOutMessageFold(RefinedMenu, {
+    Selected: ({ value }) =>
+      GenericMenuBindingIdentityDefinition.makeStep(model => ({
+        model,
+        outMessage: OutMessage.SelectedMenuItem({ value }),
+      })),
+    Closed: () => GenericMenuBindingIdentityDefinition.makeNoopStep(),
+  }),
+})
 
 const GenericMenuBindingIdentityComposition =
   GenericMenuBindingIdentityDefinition.makeComposition({
@@ -66,12 +60,15 @@ const update = GenericMenuBindingIdentityComposition.makeUpdate(model =>
   MenuBinding.requestOpen()(model),
 )
 const requestOpen = Message.RequestedOpen
-const block = GenericMenuBindingIdentityComposition.assembleBlock({
-  init,
-  update,
-  operations: { requestOpen },
-  EffectsLayer: RefinedMenu.EffectsLayer,
-})
+const prepare = () =>
+  GenericMenuBindingIdentityComposition.prepareBlock({
+    init,
+    update,
+    operations: { requestOpen },
+    EffectsLayer: RefinedMenu.EffectsLayer,
+  })
+const block: Block.FromAssemblyWithOutMessage<typeof Model, typeof prepare> =
+  Block.assemble(prepare)
 
 const deliverMenuMessage = (
   model: Model,

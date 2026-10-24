@@ -18,21 +18,38 @@ export const init = ApplicationComposition.makeInit((flags: Flags) => ({
   },
 }))
 
-// src/entry.ts
+// src/application.ts
 
-import { Runtime } from 'foldkit'
+import { Block } from 'foldkit'
 
-import { Flags, flags } from './flags'
+import { ApplicationComposition } from './composition'
 import { init } from './init'
+import type { Model } from './model'
 import { update } from './update'
 import { view } from './view'
 
-const application = ApplicationComposition.assembleApplication({
-  init,
-  update,
-  view,
+const prepare = () =>
+  ApplicationComposition.prepareBlock({
+    init,
+    update,
+    view,
+  })
+export const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)
+
+// src/entry.ts
+
+import { Program, Runtime } from 'foldkit'
+
+import { ApplicationBlock } from './application'
+import { Flags, flags } from './flags'
+
+const program = Program.make({
+  block: ApplicationBlock,
   Flags,
   container: document.getElementById('root'),
 })
 
-Runtime.run(application, { flags })
+Runtime.run(program, { flags })

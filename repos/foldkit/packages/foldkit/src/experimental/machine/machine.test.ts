@@ -917,7 +917,6 @@ const PlainIdle = Schema.Struct({ _tag: Schema.Literal('PlainIdle') })
 const PlainActive = Schema.Struct({ _tag: Schema.Literal('PlainActive') })
 
 const PlainState = Schema.Union([PlainIdle, PlainActive])
-type PlainState = typeof PlainState.Type
 
 const plainTagMachine = define({
   state: PlainState,
@@ -944,7 +943,6 @@ const NestedState = defineTaggedUnion({
 const NestedSettled = NestedState.subset(['NestedError', 'NestedOk'])
 const NestedActive = Schema.Union([NestedState.NestedLoading, NestedSettled])
 const NestedStateSchema = Schema.Union([NestedState.NestedIdle, NestedActive])
-type NestedStateSchema = typeof NestedStateSchema.Type
 
 const nestedUnionMachine = define({
   state: NestedStateSchema,
@@ -1002,7 +1000,6 @@ const SubmitState = defineTaggedUnion({
   Persisting: {},
   Submitted: {},
 })
-type SubmitState = typeof SubmitState.Type
 
 const SubmitAppModel = Schema.Struct({ submit: SubmitState })
 type SubmitAppModel = typeof SubmitAppModel.Type
@@ -1825,7 +1822,7 @@ describe('context', () => {
       remoteDataContext: fails,
     }
 
-    const result = Update.combine(model, [
+    const result = Update.combineSteps(model, [
       stepModel => ({
         model: modifyFields(stepModel, {
           remoteDataContext: () => succeeds,

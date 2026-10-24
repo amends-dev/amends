@@ -22,6 +22,7 @@ import {
   isIdentifier,
   isObjectLiteralExpression,
   isPropertyAssignment,
+  isPropertyAccessExpression,
   isVariableStatement,
 } from '../node_modules/typescript/dist/ast/index.js'
 
@@ -73,11 +74,11 @@ const assertBindingCompletions = async (): Promise<void> => {
   const api = new API({ cwd: packageRoot })
 
   try {
-    const snapshot = await api.updateSnapshot({
+    const snapshot = await api.createSnapshot({
       openProjects: [acceptedConfig],
       openFiles: [acceptedFixture],
     })
-    const project = snapshot.getProject(acceptedConfig)
+    const project = snapshot.getConfiguredProject(acceptedConfig)
 
     if (project === undefined) {
       return fail(`Could not open the declaration project ${acceptedConfig}.`)
@@ -92,7 +93,7 @@ const assertBindingCompletions = async (): Promise<void> => {
       )
     }
 
-    const completion = await project.checker.getCompletionsAtPosition(
+    const completion = await project.languageService.getCompletionsAtPosition(
       acceptedFixture,
       markerPosition + 'ChildBinding.'.length,
     )
@@ -116,11 +117,11 @@ const assertBindingConfigurationDocs = async (): Promise<void> => {
   const api = new API({ cwd: packageRoot })
 
   try {
-    const snapshot = await api.updateSnapshot({
+    const snapshot = await api.createSnapshot({
       openProjects: [config],
       openFiles: [fixture, initializerFixture],
     })
-    const project = snapshot.getProject(config)
+    const project = snapshot.getConfiguredProject(config)
     if (project === undefined) {
       return fail(`Could not open the Binding documentation project ${config}.`)
     }
@@ -142,14 +143,16 @@ const assertBindingConfigurationDocs = async (): Promise<void> => {
         binding: 'StatusBinding',
         fields: ['field', 'init'],
         nested: [],
+        policyFields: [],
       },
       {
         binding: 'SettingsBinding',
-        fields: ['field', 'delivery', 'init', 'outMessage'],
+        fields: ['field', 'delivery', 'init'],
         nested: [
           { property: 'delivery', fields: ['toUpdateContext'] },
           { property: 'init', fields: ['contextToArgs'] },
         ],
+        policyFields: ['forward'],
       },
       {
         binding: 'ProjectedStatusBinding',
@@ -157,6 +160,7 @@ const assertBindingConfigurationDocs = async (): Promise<void> => {
         nested: [
           { property: 'init', fields: ['contextToArgs', 'toParentFields'] },
         ],
+        policyFields: [],
       },
       {
         binding: 'RoomBinding',
@@ -174,6 +178,7 @@ const assertBindingConfigurationDocs = async (): Promise<void> => {
           { property: 'delivery', fields: ['when', 'toUpdateContext'] },
           { property: 'subscriptions', fields: ['when'] },
         ],
+        policyFields: [],
       },
     ]
 
@@ -191,11 +196,18 @@ const assertBindingConfigurationDocs = async (): Promise<void> => {
         declaration.initializer === undefined ||
         !isCallExpression(declaration.initializer)
       ) {
-        return fail(`Expected ${check.binding} to call bindChild.`)
+        return fail(`Expected ${check.binding} to call makeBinding.`)
       }
 
+      const bindingCall =
+        isPropertyAccessExpression(declaration.initializer.expression) &&
+        declaration.initializer.expression.name.text ===
+          'withOutMessagePolicy' &&
+        isCallExpression(declaration.initializer.expression.expression)
+          ? declaration.initializer.expression.expression
+          : declaration.initializer
       const configuration = Option.getOrElse(
-        Array.get(declaration.initializer.arguments, 1),
+        Array.get(bindingCall.arguments, 1),
         () => fail(`Missing ${check.binding} configuration.`),
       )
       if (!isObjectLiteralExpression(configuration)) {
@@ -257,6 +269,32 @@ const assertBindingConfigurationDocs = async (): Promise<void> => {
           if (String.isEmpty(documentation.trim())) {
             return fail(
               `Missing inferred configuration documentation for ${check.binding}.${nested.property}.${field}.`,
+            )
+          }
+        }
+      }
+
+      if (Array.isArrayNonEmpty(check.policyFields)) {
+        const policy = Option.getOrElse(
+          Array.get(declaration.initializer.arguments, 0),
+          () => fail(`Missing ${check.binding} OutMessage policy.`),
+        )
+        if (!isObjectLiteralExpression(policy)) {
+          return fail(`Expected an object policy for ${check.binding}.`)
+        }
+        const policyType = await project.checker.getContextualType(policy)
+        for (const field of check.policyFields) {
+          const symbol =
+            policyType === undefined
+              ? undefined
+              : await project.checker.getPropertyOfType(policyType, field)
+          const documentation =
+            symbol === undefined
+              ? ''
+              : await symbol.getDocumentationComment(project.checker)
+          if (String.isEmpty(documentation.trim())) {
+            return fail(
+              `Missing inferred policy documentation for ${check.binding}.${field}.`,
             )
           }
         }
@@ -409,10 +447,132 @@ const checks: ReadonlyArray<
   }>
 > = [
   {
+    name: 'mandatory-completion',
+    accepted: ['mandatory-completion.accepted.ts'],
+    rejected: ['mandatory-completion.rejected.ts'],
+    consumers: ['mandatory-completion.consume.ts'],
+  },
+  {
+    name: 'from-assembly',
+    accepted: [
+      'from-assembly.accepted.ts',
+      'from-assembly.generic.ts',
+      'from-assembly.barrel.ts',
+      'from-assembly.lifecycle.ts',
+      'generated-dispatch.accepted.ts',
+      'composed-init.accepted.ts',
+      'exposed-message.accepted.ts',
+    ],
+    rejected: [
+      'from-assembly.rejected.ts',
+      'from-assembly.overloaded-producer.ts',
+      'from-assembly.carrier-guards.ts',
+    ],
+    consumers: [
+      'from-assembly.assertions.ts',
+      'from-assembly.consume.ts',
+      'from-assembly.generic-consume.ts',
+      'from-assembly.schema-consume.ts',
+      'from-assembly.dispatch-consume.ts',
+      'from-assembly.precision-consume.ts',
+      'from-assembly.channels-consume.ts',
+    ],
+  },
+  {
+    name: 'generic-handler-contracts',
+    accepted: ['generic-handler-contracts.accepted.ts'],
+    rejected: ['generic-handler-contracts.rejected.ts'],
+    consumers: ['generic-handler-contracts.consume.ts'],
+  },
+  {
+    name: 'generic-outmessage-policy',
+    accepted: ['generic-outmessage-policy/accepted.ts'],
+    rejected: ['generic-outmessage-policy/rejected.ts'],
+    consumers: [
+      'generic-outmessage-policy/accepted.ts',
+      'generic-outmessage-policy/consumer.ts',
+      'generic-outmessage-policy/assertions.ts',
+    ],
+  },
+  {
+    name: 'outmessage-policy-selection',
+    accepted: ['outmessage-policy-selection.accepted.ts'],
+    rejected: ['outmessage-policy-selection.rejected.ts'],
+    consumers: ['outmessage-policy-selection.consume.ts'],
+  },
+  {
+    name: 'outmessage-forward',
+    accepted: ['outmessage-forward.accepted.ts'],
+    rejected: ['outmessage-forward.rejected.ts'],
+    consumers: ['outmessage-forward.consume.ts'],
+  },
+  {
+    name: 'outmessage-fold',
+    accepted: ['outmessage-fold.accepted.ts'],
+    rejected: ['outmessage-fold.rejected.ts'],
+    consumers: ['outmessage-fold.consume.ts'],
+  },
+  {
+    name: 'program-server',
+    accepted: ['program-server.accepted.ts'],
+    rejected: ['program-server.rejected.ts'],
+    consumers: ['program-server.consume.ts'],
+  },
+  {
+    name: 'program',
+    accepted: [
+      'program.accepted.ts',
+      'program-inferred-portability.accepted.ts',
+      'program-union-services.accepted.ts',
+    ],
+    rejected: ['program.rejected.ts', 'program-union-services.rejected.ts'],
+    consumers: [
+      'program.consume.ts',
+      'program-inferred-portability.consume.ts',
+      'program-union-services.consume.ts',
+    ],
+  },
+  {
+    name: 'optional-wrapped-keyed',
+    accepted: ['optional-wrapped-keyed.accepted.ts'],
+    rejected: ['optional-wrapped-keyed.rejected.ts'],
+    consumers: ['optional-wrapped-keyed.consume.ts'],
+  },
+  {
+    name: 'view-inputs',
+    accepted: ['view-inputs.accepted.ts'],
+    rejected: ['view-inputs.rejected.ts'],
+    consumers: ['view-inputs.consume.ts'],
+  },
+  {
+    name: 'assembly-view',
+    accepted: ['assembly-view.accepted.ts'],
+    rejected: ['assembly-view.rejected.ts'],
+    consumers: ['assembly-view.consume.ts'],
+  },
+  {
+    name: 'composed-init',
+    accepted: ['composed-init.accepted.ts'],
+    rejected: ['composed-init.rejected.ts'],
+    consumers: ['composed-init.consume.ts'],
+  },
+  {
     name: 'field-steps',
     accepted: ['field-steps.accepted.ts'],
     rejected: ['field-steps.rejected.ts'],
     consumers: ['field-steps.consume.ts'],
+  },
+  {
+    name: 'commands-steps',
+    accepted: ['commands-steps.accepted.ts'],
+    rejected: ['commands-steps.rejected.ts'],
+    consumers: ['commands-steps.consume.ts'],
+  },
+  {
+    name: 'outmessage-steps',
+    accepted: ['outmessage-steps.accepted.ts'],
+    rejected: ['outmessage-steps.rejected.ts'],
+    consumers: ['outmessage-steps.consume.ts'],
   },
   {
     name: 'generated-dispatch',
@@ -461,6 +621,12 @@ const checks: ReadonlyArray<
     accepted: ['strict-routing.accepted.ts'],
     rejected: ['strict-routing.rejected.ts'],
     consumers: ['strict-routing.consume.ts'],
+  },
+  {
+    name: 'route-step-program',
+    accepted: ['route-step-program.accepted.ts'],
+    rejected: ['route-step-program.rejected.ts'],
+    consumers: ['route-step-program.consume.ts'],
   },
   {
     name: 'message-free-keyed',
@@ -539,6 +705,12 @@ const checks: ReadonlyArray<
     accepted: ['binding-policy.accepted.ts'],
     rejected: ['binding-policy.rejected.ts'],
     consumers: ['binding-policy.consume.ts'],
+  },
+  {
+    name: 'schema-boundary',
+    accepted: ['schema-boundary.accepted.ts'],
+    consumers: ['schema-boundary.consumer.ts'],
+    rejected: ['schema-boundary.rejected.ts'],
   },
   {
     name: 'composition-safety',

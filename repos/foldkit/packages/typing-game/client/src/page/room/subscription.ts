@@ -6,7 +6,7 @@ import { RoomDefinition } from './definition'
 import { Message } from './message'
 import { capturesKeyboard } from './model'
 
-export const subscriptions = RoomDefinition.subscriptions(entry => ({
+export const subscriptions = RoomDefinition.makeSubscriptions(entry => ({
   roomUpdates: entry(
     'RoomUpdates',
     {

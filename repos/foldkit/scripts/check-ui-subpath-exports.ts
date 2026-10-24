@@ -6,6 +6,7 @@ import { foldkitAliases } from '../examples/vite.aliases.ts'
 const UI_SRC = 'packages/ui/src'
 const UI_INDEX = 'packages/ui/src/index.ts'
 const UI_PACKAGE = 'packages/ui/package.json'
+const FOLDKIT_PACKAGE = 'packages/foldkit/package.json'
 const ALIASES_FILE = 'examples/vite.aliases.ts'
 
 const components = readdirSync(UI_SRC, { withFileTypes: true })
@@ -17,12 +18,18 @@ const components = readdirSync(UI_SRC, { withFileTypes: true })
   .sort()
 
 type ExportEntry = Readonly<{ types?: string; import?: string }>
-const manifest = JSON.parse(readFileSync(UI_PACKAGE, 'utf8')) as Readonly<{
+const uiManifest = JSON.parse(readFileSync(UI_PACKAGE, 'utf8')) as Readonly<{
   exports: Readonly<Record<string, ExportEntry>>
 }>
-const subpaths = Object.keys(manifest.exports)
+const subpaths = Object.keys(uiManifest.exports)
   .filter(key => key !== '.')
   .map(key => key.slice('./'.length))
+
+const foldkitManifest = JSON.parse(
+  readFileSync(FOLDKIT_PACKAGE, 'utf8'),
+) as Readonly<{
+  exports: Readonly<Record<string, ExportEntry>>
+}>
 
 const rootExports = new Map<string, Set<string>>()
 for (const match of readFileSync(UI_INDEX, 'utf8').matchAll(
@@ -56,8 +63,70 @@ const aliases = new Map(
 
 const problems: Array<string> = []
 
+const foldkitExportAliases = Object.keys(foldkitManifest.exports).map(
+  subpath =>
+    subpath === '.' ? 'foldkit' : `foldkit/${subpath.slice('./'.length)}`,
+)
+
+for (const [subpath, entry] of Object.entries(foldkitManifest.exports)) {
+  const alias =
+    subpath === '.' ? 'foldkit' : `foldkit/${subpath.slice('./'.length)}`
+  if (entry.import === undefined) {
+    problems.push(`"${subpath}" in ${FOLDKIT_PACKAGE} has no import target`)
+    continue
+  }
+
+  const expectedAlias = resolve(
+    'packages/foldkit',
+    entry.import.replace(/^\.\/dist\//, 'src/').replace(/\.js$/, ''),
+  )
+  if (!existsSync(`${expectedAlias}.ts`)) {
+    problems.push(
+      `"${subpath}" in ${FOLDKIT_PACKAGE} has no source entry at ${expectedAlias}.ts`,
+    )
+  }
+  if (aliases.get(alias) !== expectedAlias) {
+    problems.push(
+      `'${alias}' in ${ALIASES_FILE} must point at ${expectedAlias}`,
+    )
+  }
+}
+
+const actualFoldkitAliasOrder = [...aliases.keys()].filter(alias =>
+  foldkitExportAliases.includes(alias),
+)
+for (const parentAlias of foldkitExportAliases) {
+  if (!aliases.has(parentAlias)) {
+    continue
+  }
+
+  const actualFamilyOrder = actualFoldkitAliasOrder.filter(
+    alias => alias === parentAlias || alias.startsWith(`${parentAlias}/`),
+  )
+  const expectedFamilyOrder = [
+    ...actualFamilyOrder.filter(alias => alias !== parentAlias),
+    parentAlias,
+  ]
+  if (actualFamilyOrder.join('\n') !== expectedFamilyOrder.join('\n')) {
+    problems.push(
+      `'${parentAlias}' in ${ALIASES_FILE} must appear after its public subpath aliases`,
+    )
+  }
+}
+
+for (const alias of aliases.keys()) {
+  if (
+    (alias === 'foldkit' || alias.startsWith('foldkit/')) &&
+    !foldkitExportAliases.includes(alias)
+  ) {
+    problems.push(
+      `'${alias}' in ${ALIASES_FILE} has no public export in ${FOLDKIT_PACKAGE}`,
+    )
+  }
+}
+
 for (const component of components) {
-  const entry = manifest.exports[`./${component}`]
+  const entry = uiManifest.exports[`./${component}`]
   const expectedTypes = `./dist/${component}/public.d.ts`
   const expectedImport = `./dist/${component}/public.js`
   if (entry === undefined) {
@@ -107,7 +176,7 @@ for (const alias of aliases.keys()) {
 
 if (problems.length > 0) {
   console.error(
-    'ERROR: @foldkit/ui components, subpath exports and aliases are out of sync:',
+    'ERROR: Foldkit package exports and source aliases are out of sync:',
   )
   console.error('')
   for (const problem of problems) {
@@ -127,5 +196,5 @@ if (problems.length > 0) {
 }
 
 console.log(
-  `OK: ${components.length} @foldkit/ui components have a subpath export, a root API export and an example alias.`,
+  `OK: ${foldkitExportAliases.length} Foldkit package exports and ${components.length} @foldkit/ui components have exact public source aliases in specificity order.`,
 )

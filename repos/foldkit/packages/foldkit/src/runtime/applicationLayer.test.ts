@@ -804,13 +804,13 @@ const checkApplicationLayerTypes = (): void => {
     container,
     subsriptions: {},
   }
-  // @ts-expect-error ApplicationComposition.assembleElement rejects unknown configuration fields.
+  // @ts-expect-error Program.makeElement rejects unknown configuration fields.
   Application.__makeElementFromConfig(misspelledSubscriptionsConfig)
 
   Application.__makeFromConfig({
     Model,
     init: () => ({ model: Model.make({ label: 'ready' }) }),
-    // @ts-expect-error ApplicationComposition.assembleApplication requires tagged Messages when update accepts a Message.
+    // @ts-expect-error Program.make requires tagged Messages when update accepts a Message.
     update: (model: Model, _message: number) => ({ model }),
     view: (model, h) => ({ title: '', body: h.div([], [model.label]) }),
     container,

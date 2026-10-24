@@ -1041,7 +1041,7 @@ describe('mount-factory-must-use-element', () => {
 })
 
 it('checks the element input of a named Block Mount', () => {
-  const definition = Testing.callOfMember('Editor', 'mount', [
+  const definition = Testing.callOfMember('Editor', 'makeMount', [
     Testing.strLiteral('MountEditor'),
     Testing.objectExpr([
       { key: 'messages', value: Testing.id('CompletedMountEditor') },

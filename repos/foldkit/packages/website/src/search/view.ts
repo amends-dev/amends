@@ -18,8 +18,8 @@ const resultItemId = (index: number): string => `search-result-${index}`
 
 const handleSearchInputKeyDown = (
   key: string,
-  model: Model,
-): Option.Option<Message> =>
+  model: typeof Model.Type,
+): Option.Option<typeof Message.Type> =>
   Match.value(key).pipe(
     Match.when('ArrowDown', () =>
       Option.some(Message.PressedArrowKey({ direction: 'Down' })),
@@ -47,7 +47,10 @@ const handleSearchInputKeyDown = (
     Match.orElse(() => Option.none()),
   )
 
-const searchInputView = (model: Model, h: SearchViewBuilder): Html => {
+const searchInputView = (
+  model: typeof Model.Type,
+  h: SearchViewBuilder,
+): Html => {
   const isListboxVisible =
     model.searchState._tag === 'Ok' || model.searchState._tag === 'Loading'
 
@@ -197,7 +200,10 @@ const resultListView = (
       ),
   })
 
-const resultsListView = (model: Model, h: SearchViewBuilder): Html =>
+const resultsListView = (
+  model: typeof Model.Type,
+  h: SearchViewBuilder,
+): Html =>
   SearchState.match<Html>(model.searchState, {
     Idle: () => emptyPrompt,
     Loading: ({ results }) =>
@@ -212,7 +218,7 @@ const resultsListView = (model: Model, h: SearchViewBuilder): Html =>
       }),
   })
 
-const resultCountAnnouncement = (model: Model): Html => {
+const resultCountAnnouncement = (model: typeof Model.Type): Html => {
   const results = resultsFromState(model.searchState)
   const count = results.length
 

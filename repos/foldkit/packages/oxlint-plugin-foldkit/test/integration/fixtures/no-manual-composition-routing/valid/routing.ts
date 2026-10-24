@@ -1,5 +1,5 @@
 import { Option } from 'effect'
-import { makeApplicationDefinition } from 'foldkit'
+import { Block } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 
 import { foreignComposition, foreignDefinition } from 'third-party'
@@ -7,17 +7,20 @@ import { foreignComposition, foreignDefinition } from 'third-party'
 const Message = defineMessageUnion({
   ClickedSave: {},
 })
-const ApplicationDefinition = makeApplicationDefinition({ Model, Message })
+const ApplicationDefinition = Block.makeDefinition('Application', {
+  Model,
+  Message,
+})
 
 defineMessageUnion({ ChangedSettings: {} })
 
-ApplicationDefinition.bindChild(SilentBlock, { field: 'silent' })
+ApplicationDefinition.makeBinding(SilentBlock, { field: 'silent' })
 
-ApplicationDefinition.bindChild(DialogBlock, {
+ApplicationDefinition.makeBinding(DialogBlock, {
   field: 'dialog',
 })
 
-ApplicationDefinition.bindChild(PickerBlock, {
+ApplicationDefinition.makeBinding(PickerBlock, {
   field: 'picker',
   delivery: {
     when: model => Option.isSome(model.maybePicker),
@@ -28,7 +31,7 @@ const sharedMapping = {
   field: 'shared',
 }
 
-ApplicationDefinition.bindChild(SharedBlock, { ...sharedMapping })
+ApplicationDefinition.makeBinding(SharedBlock, { ...sharedMapping })
 
 const ApplicationComposition = ApplicationDefinition.makeComposition()
 

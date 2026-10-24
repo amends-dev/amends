@@ -67,11 +67,13 @@ Commands describe one-shot work that produces one result. Subscriptions describe
 
 ### Defining Entries
 
-`FeatureDefinition.subscriptions` receives a function that builds a named record of entries for the Block. When a Layer-backed entry depends on the Model, `entry` takes three arguments:
+`FeatureDefinition.makeSubscriptions` receives a function that builds a named record of entries for the Block. When a Layer-backed entry depends on the Model, `entry` takes three arguments:
 
 - A stable handler name for the Layer requirement.
 - A field map defining the dependency Schema, in the same shape passed to `Schema.Struct`.
 - A config containing `messages`, `modelToDependencies`, and the `handler` generator that returns the Stream function. `messages` lists the Message Schemas that the handler Stream may emit. Use `messages: []` for scoped work that emits no Messages.
+
+If an adapter already exposes a dependency Struct, pass its `.fields` as the second argument: `dependenciesSchema.fields`. Passing the Struct itself produces a field-map error, often wrapped in `No overload matches this call`.
 
 `modelToDependencies` extracts the values that control the entry. The `handler` generator constructs the Stream factory, and the owned registry’s `subscriptions.layer` supplies its attached handlers to the application. Foldkit compares the extracted record structurally by default, so unrelated Model updates do not restart the timer.
 
@@ -79,7 +81,7 @@ When `isAutoCounting` changes to `true`, the new Stream starts ticking. When it 
 
 ### Completing the Block
 
-Include the record when completing its owning Block. The completed value carries the Subscription registrations and their handler recipes through parent Bindings to the root. The typed root owns `assembleApplication`; the entry supplies the implementation and container, calls `application.provide(layer)` when shared Services remain, and then starts the program:
+Include the record when completing its owning Block. The completed value carries the Subscription registrations and their handler recipes through parent Bindings to the root. Assemble `ApplicationBlock` with the same Block API; the entry supplies it and the container to `Program.make`, calls `program.provide(layer)` when shared Services remain, and then starts the Program:
 
 ::Snippet{name="counterEntryWithSubscriptions" label="Subscription application entry"}
 
@@ -91,9 +93,11 @@ The [websocket-chat example](/example-apps/websocket-chat) shows a more involved
 
 The declared Message Schemas constrain the Stream returned by both the attached handler and an external `toLayer` implementation. Emitting an undeclared Message is a type error. Scene uses these Schemas to validate `Subscription.emit(entry, message)` against the composed source, including its generated delivery through parents. An empty declaration requires a `Stream<never>` for work that emits no Messages.
 
+An external generic Stream helper can infer its result Message from one callback and then reject a different, valid variant returned by another callback. If the error compares two declared Message variants, inspect the helper's callback inference. Give the callback that determines the generic result an explicit return type for the union this entry declares. Use `typeof Message.Type` when the entry declares the full Message union. The entry's `messages` declaration still checks every variant the resulting Stream may emit.
+
 ### Handler Construction and Layers
 
-Each entry, such as `subscriptions.gameClockTicks`, is an individual owned definition. Its record key identifies the local runtime entry, while its handler name becomes part of the owned Layer requirement that assembly must satisfy. Several child Bindings can carry one definition into different placements while retaining separate Stream scopes. Naming also gives tools a declared identity to display; Subscription lifecycle events in DevTools are follow-up work. An entry with `handler` exposes `.layer`; include that recipe in the local `EffectsLayer` passed to `FeatureComposition.assembleBlock`.
+Each entry, such as `subscriptions.gameClockTicks`, is an individual owned definition. Its record key identifies the local runtime entry, while its handler name becomes part of the owned Layer requirement that assembly must satisfy. Several child Bindings can carry one definition into different placements while retaining separate Stream scopes. Naming also gives tools a declared identity to display; Subscription lifecycle events in DevTools are follow-up work. An entry with `handler` exposes `.layer`; include that recipe in the local `EffectsLayer` passed to `FeatureComposition.prepareBlock`.
 
 When every entry has an attached handler, the owned registry also exposes `subscriptions.layer`. Use it to include all the record's handlers in `EffectsLayer`. It merges the recipes passively; the Runtime still constructs them later. An empty record supplies an empty Layer. The aggregate preserves each handler's Service requirements and constructor errors.
 
@@ -113,7 +117,7 @@ In a whole-application execution test, retain that real Stream handler and repla
 
 Subscription names are local to their named Block. Two features can both declare `GameClockTicks`; their owners keep the definitions distinct. Names must be unique within one owner. Composition derives a path for each Binding placement, so repeated uses of one completed child share its handler recipe while retaining separate Stream scopes.
 
-A Subscription handler requirement contains its owned name, decoded dependency record, and declared Message union. `FeatureComposition.assembleBlock` checks that each local requirement is supplied by `EffectsLayer` or declared in `hostHandlers`; `block.provideHandlers` checks an external provider against those declared contracts. Use `Subscription.HandlerOf<typeof subscriptions.gameClockTicks>` for an explicit requirement; the expanded form is `Subscription.Handler<Name, Dependencies, DeclaredMessage>`, with all three arguments required.
+A Subscription handler requirement contains its owned name, decoded dependency record, and declared Message union. `FeatureComposition.prepareBlock` checks that each local requirement is supplied by `EffectsLayer` or declared in `hostHandlers`; `block.provideHandlers` checks an external provider against those declared contracts. Use `Subscription.HandlerOf<typeof subscriptions.gameClockTicks>` for an explicit requirement; the expanded form is `Subscription.Handler<Name, Dependencies, DeclaredMessage>`, with all three arguments required.
 
 Definitions created by different named Blocks receive different owned names even when their local names and protocols match. Each definition also retains a private runtime identity. An external implementation should use the declared entry's `toLayer` so it keeps that identity.
 
@@ -147,7 +151,7 @@ For a Layer-backed Subscription with no local Model dependencies, pass its stabl
 
 ::Snippet{name="subscriptionPersistent" label="Heartbeat without Model dependencies"}
 
-For work whose lifetime depends on the Model, define an entry with `FeatureDefinition.subscriptions` and derive its dependencies from the Model.
+For work whose lifetime depends on the Model, define an entry with `FeatureDefinition.makeSubscriptions` and derive its dependencies from the Model.
 
 ## Dom Streams
 
@@ -175,7 +179,7 @@ Most entries should use the first `dependencies` argument directly. Reach for `r
 
 When a parent embeds a Block with Subscriptions, its Binding lifts the child's Messages into the parent Message type and applies the same presence policy used by update. `None` in a direct Option field, `false` from `presentWhen`, or `None` from a custom `read` stops every child Stream without reading child dependencies.
 
-`ParentDefinition.bindChild(ChildBlock, { field, ... })` performs that lift once for a direct child field. Custom storage uses `read` and `write`. Include the Binding in the parent's `bindings` list, and the parent collects the lifted entries under placement-qualified keys. The same Composition routes the child's generated envelopes through its Binding and installs the collected graph through `assembleApplication({ init, update, view, ... })`.
+`ParentDefinition.makeBinding(ChildBlock, { field, ... })` performs that lift once for a direct child field. Custom storage uses `read` and `write`. Include the Binding in the parent's `bindings` list, and the parent collects the lifted entries under placement-qualified keys. The same Composition routes the child's generated envelopes through its Binding and installs the collected graph through `prepareBlock({ init, update, view, ... })`.
 
 ### Gating Child Subscriptions
 
@@ -183,6 +187,6 @@ The optional `when` field lets the parent add a Stream condition the child canno
 
 Use direct-field `presentWhen` when the condition governs the whole child rather than its Streams. That predicate makes the Binding absent for updates and every lifecycle channel. A custom accessor expresses the same policy by returning `None` from `read`.
 
-The child continues to own its dependency projection. For a direct array of child Models with declared Struct key fields, use `bindChild` with `field` and a string-valued `key`. An exact array of closed Struct wrappers adds a distinct required `childField`, leaving its key on the wrapper. Custom writes, opaque, union, or open/index-signature wrappers, and non-array enumeration retain general keyed accessors; Foldkit starts one independently scoped Stream set per active key. See [Subscription Organization](/patterns/subscription-organization) for the full composition pattern.
+The child continues to own its dependency projection. For a direct array of child Models with declared Struct key fields, use `makeBinding` with `field` and a string-valued `key`. An exact array of closed Struct wrappers adds a distinct required `childField`, leaving its key on the wrapper. Custom writes, opaque, union, or open/index-signature wrappers, and non-array enumeration retain general keyed accessors; Foldkit starts one independently scoped Stream set per active key. See [Subscription Organization](/patterns/subscription-organization) for the full composition pattern.
 
 The application now has state transitions, one-shot Commands, element-scoped Mounts, and ongoing Subscriptions. The remaining question is where the first Model and startup Commands come from. [Init & Flags](/core/init-and-flags) defines that boundary.

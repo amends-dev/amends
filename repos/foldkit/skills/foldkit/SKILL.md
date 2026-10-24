@@ -57,7 +57,7 @@ of a release tag. After an upgrade, use the same command with `pull` in place of
   current value. Use `() => value` for replacement from a Message, operation
   result, Command result, or another Model field.
 
-For any Block, Application Composition, child Binding, child startup policy,
+For any Block, Program, child Binding, child startup policy,
 Mount capability, OutMessage policy, handler recipe, or Service Layer work,
 read [references/composition.md](references/composition.md). It contains the
 decision tables, canonical stages, and safety invariants for that surface. Then

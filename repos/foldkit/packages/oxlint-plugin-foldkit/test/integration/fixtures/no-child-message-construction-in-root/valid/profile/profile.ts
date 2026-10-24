@@ -11,14 +11,14 @@ import {
 
 const Message = ProfileMessage
 
-export const SaveProfile = ProfileDefinition.command('SaveProfile', {
+export const SaveProfile = ProfileDefinition.makeCommand('SaveProfile', {
   messages: [Message.CompletedSave],
   handler: function* () {
     return () => Effect.succeed(Message.CompletedSave())
   },
 })
 
-export const SaveProfileWithExtensionImport = ProfileDefinition.command(
+export const SaveProfileWithExtensionImport = ProfileDefinition.makeCommand(
   'SaveProfileWithExtensionImport',
   {
     messages: [ExtensionMessage.CompletedSaveFromExtensionImport],
@@ -29,7 +29,7 @@ export const SaveProfileWithExtensionImport = ProfileDefinition.command(
   },
 )
 
-export const SaveProfileWithRedundantLocalPath = ProfileDefinition.command(
+export const SaveProfileWithRedundantLocalPath = ProfileDefinition.makeCommand(
   'SaveProfileWithRedundantLocalPath',
   {
     messages: [RedundantPathMessage.CompletedSaveFromRedundantLocalPath],
@@ -42,7 +42,7 @@ export const SaveProfileWithRedundantLocalPath = ProfileDefinition.command(
   },
 )
 
-export const ChildBinding = ProfileDefinition.bindChild(Child.block, {
+export const ChildBinding = ProfileDefinition.makeBinding(Child.block, {
   field: 'child',
   toParentMessage: message => Message.GotChildMessage({ message }),
 })

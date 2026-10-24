@@ -24,5 +24,3 @@ export const flags = Effect.gen(function* () {
     Effect.succeed(Flags.make({ maybeSession: Option.none() })),
   ),
 )
-
-export type Flags = typeof Flags.Type

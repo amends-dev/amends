@@ -5,25 +5,7 @@ import { DatePickerBlock } from '@foldkit/ui'
 
 import { WorkHistoryEntryDefinition } from './definition'
 
-const foldStartDateOutMessage = DatePickerBlock.OutMessage.match({
-  ChangedViewMonth: () => WorkHistoryEntryDefinition.stepNoop(),
-  SelectedDate: ({ date }) =>
-    Update.combine([
-      WorkHistoryEntryDefinition.stepFields(() => ({
-        maybeStartDate: () => Option.some(date),
-      })),
-      EndDatePickerBinding.informMinDateChanged(Option.some(date)),
-    ]),
-  ClearedDate: () =>
-    Update.combine([
-      WorkHistoryEntryDefinition.stepFields(() => ({
-        maybeStartDate: () => Option.none(),
-      })),
-      EndDatePickerBinding.informMinDateChanged(Option.none()),
-    ]),
-})
-
-export const StartDatePickerBinding = WorkHistoryEntryDefinition.bindChild(
+export const StartDatePickerBinding = WorkHistoryEntryDefinition.makeBinding(
   DatePickerBlock,
   {
     field: 'startDate',
@@ -32,40 +14,71 @@ export const StartDatePickerBinding = WorkHistoryEntryDefinition.bindChild(
         { id: `${entryId}-start`, today },
       ],
     },
-    outMessage: { fold: foldStartDateOutMessage },
   },
 )
 
-const foldEndDateOutMessage = DatePickerBlock.OutMessage.match({
-  ChangedViewMonth: () => WorkHistoryEntryDefinition.stepNoop(),
-  SelectedDate: ({ date }) =>
-    Update.combine([
-      WorkHistoryEntryDefinition.stepFields(() => ({
-        maybeEndDate: () => Option.some(date),
-      })),
-      StartDatePickerBinding.informMaxDateChanged(Option.some(date)),
-    ]),
-  ClearedDate: () =>
-    Update.combine([
-      WorkHistoryEntryDefinition.stepFields(() => ({
-        maybeEndDate: () => Option.none(),
-      })),
-      StartDatePickerBinding.informMaxDateChanged(Option.none()),
-    ]),
-})
-
-export const EndDatePickerBinding = WorkHistoryEntryDefinition.bindChild(
+export const EndDatePickerBinding = WorkHistoryEntryDefinition.makeBinding(
   DatePickerBlock,
   {
     field: 'endDate',
     init: {
       contextToArgs: ({ entryId, today }) => [{ id: `${entryId}-end`, today }],
     },
-    outMessage: { fold: foldEndDateOutMessage },
   },
 )
 
+const foldStartDateOutMessage = WorkHistoryEntryDefinition.makeOutMessageFold(
+  DatePickerBlock,
+  {
+    ChangedViewMonth: WorkHistoryEntryDefinition.makeNoopStep,
+    SelectedDate: ({ date }) =>
+      Update.combineSteps([
+        WorkHistoryEntryDefinition.makeFieldsStep(() => ({
+          maybeStartDate: () => Option.some(date),
+        })),
+        EndDatePickerBinding.informMinDateChanged(Option.some(date)),
+      ]),
+    ClearedDate: () =>
+      Update.combineSteps([
+        WorkHistoryEntryDefinition.makeFieldsStep(() => ({
+          maybeStartDate: () => Option.none(),
+        })),
+        EndDatePickerBinding.informMinDateChanged(Option.none()),
+      ]),
+  },
+)
+
+const foldEndDateOutMessage = WorkHistoryEntryDefinition.makeOutMessageFold(
+  DatePickerBlock,
+  {
+    ChangedViewMonth: WorkHistoryEntryDefinition.makeNoopStep,
+    SelectedDate: ({ date }) =>
+      Update.combineSteps([
+        WorkHistoryEntryDefinition.makeFieldsStep(() => ({
+          maybeEndDate: () => Option.some(date),
+        })),
+        StartDatePickerBinding.informMaxDateChanged(Option.some(date)),
+      ]),
+    ClearedDate: () =>
+      Update.combineSteps([
+        WorkHistoryEntryDefinition.makeFieldsStep(() => ({
+          maybeEndDate: () => Option.none(),
+        })),
+        StartDatePickerBinding.informMaxDateChanged(Option.none()),
+      ]),
+  },
+)
+
+const StartDatePickerBindingWithOutMessagePolicy =
+  StartDatePickerBinding.withOutMessagePolicy({ fold: foldStartDateOutMessage })
+
+const EndDatePickerBindingWithOutMessagePolicy =
+  EndDatePickerBinding.withOutMessagePolicy({ fold: foldEndDateOutMessage })
+
 export const WorkHistoryEntryComposition =
   WorkHistoryEntryDefinition.makeComposition({
-    bindings: [StartDatePickerBinding, EndDatePickerBinding],
+    bindings: [
+      StartDatePickerBindingWithOutMessagePolicy,
+      EndDatePickerBindingWithOutMessagePolicy,
+    ],
   })

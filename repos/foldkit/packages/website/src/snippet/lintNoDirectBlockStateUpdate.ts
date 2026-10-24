@@ -4,7 +4,7 @@ import { ApplicationDefinition } from './definition'
 import { Model } from './model'
 import * as Settings from './settings'
 
-const SettingsBinding = ApplicationDefinition.bindChild(
+const SettingsBinding = ApplicationDefinition.makeBinding(
   Settings.SettingsBlock,
   {
     field: 'settings',
@@ -19,6 +19,6 @@ const badReset = (model: Model) => ({
 })
 
 // ✅ Good: the child decides the transition and the Binding preserves it.
-const goodReset = ApplicationDefinition.step(() =>
+const goodReset = ApplicationDefinition.makeStep(() =>
   SettingsBinding.requestThemeChange('Light'),
 )

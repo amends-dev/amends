@@ -1,11 +1,9 @@
 import { Schema } from 'effect'
 
 import { ApplicationRoute } from './route'
-import { UiBlock } from './ui'
+import * as Ui from './ui'
 
 export const Model = Schema.Struct({
   route: ApplicationRoute,
-  uiModel: UiBlock.Model,
+  uiModel: Ui.UiBlock.Model,
 })
-
-export type Model = typeof Model.Type

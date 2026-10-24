@@ -65,7 +65,13 @@ The container has `role="region"` and `aria-live="polite"`. It stays in the DOM 
 
 ## Testing
 
-Use `Toast.test.drainEntry({ entryId })` in a [Story test](/testing/story) to resolve the animation and timer Commands for a newly shown toast that auto-dismisses. The entry is removed from the Model and the `DismissedToast` OutMessage is emitted.
+Use the completed Toast Block's `test.drainEntry` helper in a [Story test](/testing/story) to resolve the animation and timer Commands for a newly shown toast that auto-dismisses:
+
+::Snippet{name="uiToastDrainEntry" label="Draining a fresh Toast entry in Story"}
+
+Pass the exact `binding` and `entryId`. A keyed Toast Binding also requires its exact occurrence `key`. The optional timer `version` defaults to `0`. The helper selects the completed Toast factory, Binding placement, keyed occurrence, entry, and timer version before resolving enter generation `1`, the auto-dismiss timer, and leave generation `2`.
+
+`drainEntry` only handles a freshly shown, non-sticky entry whose enter lifecycle and initial auto-dismiss timer are still pending. It rejects a sticky entry, an entry whose lifecycle has already advanced, the wrong timer version, a key on an unkeyed Binding, a missing or wrong key on a keyed Binding, and an ancestor selection that still matches more than one pending timer. Resolve individual public Commands when a test starts from another lifecycle state.
 
 ## API Reference
 
@@ -126,8 +132,8 @@ If you render the Toast Model without `Toast.view`, you own the entry markup, ac
 
 ### OutMessage {#out-message}
 
-Messages emitted to the parent through the optional `outMessage` field. Handle the OutMessage in the Binding’s `outMessage.fold` policy.
+Messages emitted to the parent through the optional `outMessage` field. Handle the OutMessage in the Binding’s selected `fold` policy.
 
-| Name             | Type                   | Default | Description                                                                                                                                                                                                                                                                                          |
-| ---------------- | ---------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DismissedToast` | `{ payload: Payload }` | —       | Emitted when an entry finishes its leave animation and is removed from the Model. It carries the payload from your `Payload` Schema. Handle it in the Binding's `outMessage.fold` policy to update domain state or return an analytics Command. It reports removal, not the initial dismiss request. |
+| Name             | Type                   | Default | Description                                                                                                                                                                                                                                                                                        |
+| ---------------- | ---------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DismissedToast` | `{ payload: Payload }` | —       | Emitted when an entry finishes its leave animation and is removed from the Model. It carries the payload from your `Payload` Schema. Handle it in the Binding's selected `fold` policy to update domain state or return an analytics Command. It reports removal, not the initial dismiss request. |

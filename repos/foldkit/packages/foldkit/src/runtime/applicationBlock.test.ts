@@ -10,11 +10,12 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { makeNamespace } from '../block/define.js'
+import * as Block from '../block/public.js'
 import { defineMessageUnion } from '../message/index.js'
 import { modifyFields } from '../struct/index.js'
 import type * as Update from '../update/index.js'
-import { makeDefinition as makeApplicationDefinition } from './applicationPublic.js'
 import * as ModelPreservationBridge from './modelPreservationBridge.js'
+import * as Program from './programPublic.js'
 import { embed, run } from './start.js'
 
 class ValueSource extends Context.Service<
@@ -27,7 +28,7 @@ const ChildModel = Schema.Struct({ label: Schema.String })
 const ChildMessage = defineMessageUnion({
   CompletedReadValue: { value: Schema.String },
 })
-const ReadValue = ChildOwnerNamespace.command('ReadValue', {
+const ReadValue = ChildOwnerNamespace.makeCommand('ReadValue', {
   messages: [ChildMessage.CompletedReadValue],
   handler: function* () {
     const source = yield* ValueSource
@@ -41,26 +42,31 @@ const childComposition = ChildOwnerNamespace.makeDefinition({
   Model: ChildModel,
   Message: ChildMessage,
 }).makeComposition()
-const childBlock = childComposition.assembleBlock({
-  init: (label: string) => ({ model: { label }, commands: [ReadValue()] }),
-  update: childComposition.makeUpdate((model, { value }) => ({
-    model: modifyFields(model, { label: () => value }),
-  })),
-  view: childComposition.makeView((model, h) => h.span([], [model.label])),
-  EffectsLayer: ReadValue.layer,
-})
+const prepareChildBlock = () =>
+  childComposition.prepareBlock({
+    init: (label: string) => ({ model: { label }, commands: [ReadValue()] }),
+    update: childComposition.makeUpdate((model, { value }) => ({
+      model: modifyFields(model, { label: () => value }),
+    })),
+    view: childComposition.makeView((model, h) => h.span([], [model.label])),
+    EffectsLayer: ReadValue.layer,
+  })
+const childBlock: Block.FromAssemblyWithView<
+  typeof ChildModel,
+  typeof prepareChildBlock
+> = Block.assemble(prepareChildBlock)
 
 const Model = Schema.Struct({ left: ChildModel, right: ChildModel })
-const ApplicationDefinition = makeApplicationDefinition({
+const ApplicationDefinition = Block.makeDefinition('Application', {
   Model,
   Message: Schema.Never,
 })
-const LeftBinding = ApplicationDefinition.bindChild(childBlock, {
+const LeftBinding = ApplicationDefinition.makeBinding(childBlock, {
   placement: 'Left',
   field: 'left',
   init: { contextToArgs: () => ['left'] },
 })
-const RightBinding = ApplicationDefinition.bindChild(childBlock, {
+const RightBinding = ApplicationDefinition.makeBinding(childBlock, {
   placement: 'Right',
   field: 'right',
   init: { contextToArgs: () => ['right'] },
@@ -90,7 +96,7 @@ const HostChildModel = Schema.Struct({ value: Schema.String })
 const HostChildMessage = defineMessageUnion({
   CompletedReadHostValue: { value: Schema.String },
 })
-const ReadHostValue = HostChildOwnerNamespace.command('ReadHostValue', {
+const ReadHostValue = HostChildOwnerNamespace.makeCommand('ReadHostValue', {
   messages: [HostChildMessage.CompletedReadHostValue],
 })
 
@@ -98,15 +104,22 @@ const hostChildComposition = HostChildOwnerNamespace.makeDefinition({
   Model: HostChildModel,
   Message: HostChildMessage,
 }).makeComposition()
-const unresolvedHostChild = hostChildComposition.assembleBlock({
-  init: () => ({ model: { value: '' }, commands: [ReadHostValue()] }),
-  update: hostChildComposition.makeUpdate((model, { value }) => ({
-    model: modifyFields(model, { value: () => value }),
-  })),
-  view: hostChildComposition.makeView((model, h) => h.span([], [model.value])),
-  EffectsLayer: Layer.empty,
-  hostHandlers: [ReadHostValue],
-})
+const prepareUnresolvedHostChild = () =>
+  hostChildComposition.prepareBlock({
+    init: () => ({ model: { value: '' }, commands: [ReadHostValue()] }),
+    update: hostChildComposition.makeUpdate((model, { value }) => ({
+      model: modifyFields(model, { value: () => value }),
+    })),
+    view: hostChildComposition.makeView((model, h) =>
+      h.span([], [model.value]),
+    ),
+    EffectsLayer: Layer.empty,
+    hostHandlers: [ReadHostValue],
+  })
+const unresolvedHostChild: Block.FromAssemblyWithView<
+  typeof HostChildModel,
+  typeof prepareUnresolvedHostChild
+> = Block.assemble(prepareUnresolvedHostChild)
 const resolvedHostChild = unresolvedHostChild.provideHandlers(
   ReadHostValue.toLayer(
     Effect.gen(function* () {
@@ -120,11 +133,11 @@ const resolvedHostChild = unresolvedHostChild.provideHandlers(
 )
 
 const HostParentModel = Schema.Struct({ child: HostChildModel })
-const HostParentDefinition = makeApplicationDefinition({
+const HostParentDefinition = Block.makeDefinition('Application', {
   Model: HostParentModel,
   Message: Schema.Never,
 })
-const UnresolvedHostBinding = HostParentDefinition.bindChild(
+const UnresolvedHostBinding = HostParentDefinition.makeBinding(
   unresolvedHostChild,
   {
     read: (model: typeof HostParentModel.Type) => Option.some(model.child),
@@ -132,10 +145,14 @@ const UnresolvedHostBinding = HostParentDefinition.bindChild(
       modifyFields(model, { child: () => nextChild }),
   },
 )
-const ResolvedHostBinding = HostParentDefinition.bindChild(resolvedHostChild, {
-  read: (model: typeof HostParentModel.Type) => Option.some(model.child),
-  write: (model, nextChild) => modifyFields(model, { child: () => nextChild }),
-})
+const ResolvedHostBinding = HostParentDefinition.makeBinding(
+  resolvedHostChild,
+  {
+    read: (model: typeof HostParentModel.Type) => Option.some(model.child),
+    write: (model, nextChild) =>
+      modifyFields(model, { child: () => nextChild }),
+  },
+)
 const unresolvedHostComposition = HostParentDefinition.makeComposition({
   bindings: [UnresolvedHostBinding],
 })
@@ -188,7 +205,7 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-describe('registered Application composition completion', () => {
+describe('completed root Block hosting', () => {
   it('includes child recipes and lifts initialization Commands through the real runtime', async () => {
     const container = document.createElement('div')
     container.id = 'composed-element'
@@ -208,12 +225,21 @@ describe('registered Application composition completion', () => {
           }),
       ),
     )
-    const application = composition.assembleElement({
+
+    const prepare = () =>
+      composition.prepareBlock({
+        init,
+        update,
+        view,
+        EffectsLayer: Layer.empty,
+      })
+    const completedBlock: Block.FromAssemblyWithView<
+      typeof Model,
+      typeof prepare
+    > = Block.assemble(prepare)
+    const application = Program.makeElement({
+      block: completedBlock,
       container,
-      init,
-      update,
-      view,
-      EffectsLayer: Layer.empty,
     })
     expect(init().model).toEqual({
       left: { label: 'left' },
@@ -236,7 +262,7 @@ describe('registered Application composition completion', () => {
   it('routes a leaf Command result through every composed Message wrapper with its leaf resource', async () => {
     let resourceAcquisitions = 0
     const LeafOwnerNamespace = makeNamespace('NestedCommandLeaf')
-    const LeafValue = LeafOwnerNamespace.resource<string>()('Value')
+    const LeafValue = LeafOwnerNamespace.makeResource<string>()('Value')
     const LeafModel = Schema.Struct({ value: Schema.String })
     const LeafMessage = defineMessageUnion({
       ClickedReadValue: {},
@@ -246,7 +272,7 @@ describe('registered Application composition completion', () => {
       ReleasedValue: {},
       FailedAcquireValue: {},
     })
-    const ReadLeafValue = LeafOwnerNamespace.command('ReadLeafValue', {
+    const ReadLeafValue = LeafOwnerNamespace.makeCommand('ReadLeafValue', {
       messages: [LeafMessage.CompletedReadValue, LeafMessage.FailedReadValue],
       handler: function* () {
         return () =>
@@ -260,7 +286,7 @@ describe('registered Application composition completion', () => {
       Model: LeafModel,
       Message: LeafMessage,
     })
-    const leafManagedResources = LeafDefinition.managedResources(entry => ({
+    const leafManagedResources = LeafDefinition.makeManagedResources(entry => ({
       value: entry('Value', Schema.Option(Schema.Null), {
         resource: LeafValue,
         modelToMaybeRequirements: () => Option.some(null),
@@ -280,41 +306,46 @@ describe('registered Application composition completion', () => {
       }),
     }))
     const leafComposition = LeafDefinition.makeComposition()
-    const leafBlock = leafComposition.assembleBlock({
-      init: () => ({ model: { value: 'pending' } }),
-      update: leafComposition.makeUpdate((model, message) =>
-        LeafMessage.match(message, {
-          ClickedReadValue: () => ({ model, commands: [ReadLeafValue()] }),
-          CompletedReadValue: ({ value }) => ({
-            model: modifyFields(model, { value: () => value }),
+    const prepareLeafBlock = () =>
+      leafComposition.prepareBlock({
+        init: () => ({ model: { value: 'pending' } }),
+        update: leafComposition.makeUpdate((model, message) =>
+          LeafMessage.match(message, {
+            ClickedReadValue: () => ({ model, commands: [ReadLeafValue()] }),
+            CompletedReadValue: ({ value }) => ({
+              model: modifyFields(model, { value: () => value }),
+            }),
+            FailedReadValue: () => ({ model }),
+            AcquiredValue: () => ({ model }),
+            ReleasedValue: () => ({ model }),
+            FailedAcquireValue: () => ({ model }),
           }),
-          FailedReadValue: () => ({ model }),
-          AcquiredValue: () => ({ model }),
-          ReleasedValue: () => ({ model }),
-          FailedAcquireValue: () => ({ model }),
-        }),
-      ),
-      view: leafComposition.makeView((model, h) =>
-        h.div(
-          [],
-          [
-            h.button(
-              [
-                h.Id('read-nested-leaf'),
-                h.OnClick(LeafMessage.ClickedReadValue()),
-              ],
-              ['Read leaf'],
-            ),
-            h.span([h.Id('nested-leaf-value')], [model.value]),
-          ],
         ),
-      ),
-      managedResources: leafManagedResources,
-      EffectsLayer: Layer.merge(
-        ReadLeafValue.layer,
-        leafManagedResources.value.layer,
-      ),
-    })
+        view: leafComposition.makeView((model, h) =>
+          h.div(
+            [],
+            [
+              h.button(
+                [
+                  h.Id('read-nested-leaf'),
+                  h.OnClick(LeafMessage.ClickedReadValue()),
+                ],
+                ['Read leaf'],
+              ),
+              h.span([h.Id('nested-leaf-value')], [model.value]),
+            ],
+          ),
+        ),
+        managedResources: leafManagedResources,
+        EffectsLayer: Layer.merge(
+          ReadLeafValue.layer,
+          leafManagedResources.value.layer,
+        ),
+      })
+    const leafBlock: Block.FromAssemblyWithView<
+      typeof LeafModel,
+      typeof prepareLeafBlock
+    > = Block.assemble(prepareLeafBlock)
 
     const MiddleOwnerNamespace = makeNamespace('NestedCommandMiddle')
     const MiddleModel = Schema.Struct({ leaf: LeafModel })
@@ -322,35 +353,40 @@ describe('registered Application composition completion', () => {
       Model: MiddleModel,
       Message: Schema.Never,
     })
-    const LeafBinding = MiddleDefinition.bindChild(leafBlock, {
+    const LeafBinding = MiddleDefinition.makeBinding(leafBlock, {
       read: model => Option.some(model.leaf),
       write: (model, nextLeaf) => modifyFields(model, { leaf: () => nextLeaf }),
     })
     const middleComposition = MiddleDefinition.makeComposition({
       bindings: [LeafBinding],
     })
-    const middleBlock = middleComposition.assembleBlock({
-      init: middleComposition.makeInit(() =>
-        LeafBinding.init({ args: [], toParentModel: leaf => ({ leaf }) }),
-      ),
-      update: middleComposition.makeUpdate(),
-      view: middleComposition.makeView((model, h) =>
-        h.block(
-          LeafBinding.embedView({
-            slotId: 'nested-leaf',
-            model: model.leaf,
-          }),
+    const prepareMiddleBlock = () =>
+      middleComposition.prepareBlock({
+        init: middleComposition.makeInit(() =>
+          LeafBinding.init({ args: [], toParentModel: leaf => ({ leaf }) }),
         ),
-      ),
-      EffectsLayer: Layer.empty,
-    })
+        update: middleComposition.makeUpdate(),
+        view: middleComposition.makeView((model, h) =>
+          h.block(
+            LeafBinding.embedView({
+              slotId: 'nested-leaf',
+              model: model.leaf,
+            }),
+          ),
+        ),
+        EffectsLayer: Layer.empty,
+      })
+    const middleBlock: Block.FromAssemblyWithView<
+      typeof MiddleModel,
+      typeof prepareMiddleBlock
+    > = Block.assemble(prepareMiddleBlock)
 
     const RootModel = Schema.Struct({ middle: MiddleModel })
-    const RootDefinition = makeApplicationDefinition({
+    const RootDefinition = Block.makeDefinition('Application', {
       Model: RootModel,
       Message: Schema.Never,
     })
-    const MiddleBinding = RootDefinition.bindChild(middleBlock, {
+    const MiddleBinding = RootDefinition.makeBinding(middleBlock, {
       read: model => Option.some(model.middle),
       write: (model, nextMiddle) =>
         modifyFields(model, { middle: () => nextMiddle }),
@@ -373,13 +409,22 @@ describe('registered Application composition completion', () => {
     const container = document.createElement('div')
     container.id = 'nested-command-root'
     document.body.append(container)
-    const handle = embed(
-      nestedComposition.assembleElement({
-        container,
+
+    const prepare = () =>
+      nestedComposition.prepareBlock({
         init: nestedInit,
         update: nestedUpdate,
         view: nestedView,
         EffectsLayer: Layer.empty,
+      })
+    const completedBlock: Block.FromAssemblyWithView<
+      typeof RootModel,
+      typeof prepare
+    > = Block.assemble(prepare)
+    const handle = embed(
+      Program.makeElement({
+        block: completedBlock,
+        container,
       }),
     )
 
@@ -422,7 +467,7 @@ describe('registered Application composition completion', () => {
     const ServiceChildMessage = defineMessageUnion({
       CompletedReadSharedValue: { value: Schema.String },
     })
-    const ReadSharedValue = ServiceChildOwnerNamespace.command(
+    const ReadSharedValue = ServiceChildOwnerNamespace.makeCommand(
       'ReadSharedValue',
       {
         messages: [ServiceChildMessage.CompletedReadSharedValue],
@@ -443,19 +488,24 @@ describe('registered Application composition completion', () => {
       Model: ServiceChildModel,
       Message: ServiceChildMessage,
     }).makeComposition()
-    const serviceChildBlock = serviceChildComposition.assembleBlock({
-      init: () => ({
-        model: { value: 'pending' },
-        commands: [ReadSharedValue()],
-      }),
-      update: serviceChildComposition.makeUpdate((model, { value }) => ({
-        model: modifyFields(model, { value: () => value }),
-      })),
-      view: serviceChildComposition.makeView((model, h) =>
-        h.span([h.Id('service-child-value')], [model.value]),
-      ),
-      EffectsLayer: ReadSharedValue.layer,
-    })
+    const prepareServiceChildBlock = () =>
+      serviceChildComposition.prepareBlock({
+        init: () => ({
+          model: { value: 'pending' },
+          commands: [ReadSharedValue()],
+        }),
+        update: serviceChildComposition.makeUpdate((model, { value }) => ({
+          model: modifyFields(model, { value: () => value }),
+        })),
+        view: serviceChildComposition.makeView((model, h) =>
+          h.span([h.Id('service-child-value')], [model.value]),
+        ),
+        EffectsLayer: ReadSharedValue.layer,
+      })
+    const serviceChildBlock: Block.FromAssemblyWithView<
+      typeof ServiceChildModel,
+      typeof prepareServiceChildBlock
+    > = Block.assemble(prepareServiceChildBlock)
     const ServiceRootModel = Schema.Struct({
       maybeChild: Schema.Option(ServiceChildModel),
     })
@@ -463,11 +513,11 @@ describe('registered Application composition completion', () => {
       ClickedRemoveServiceChild: {},
       ClickedAddServiceChild: {},
     })
-    const ServiceRootDefinition = makeApplicationDefinition({
+    const ServiceRootDefinition = Block.makeDefinition('Application', {
       Model: ServiceRootModel,
       Message: ServiceRootMessage,
     })
-    const ServiceChildBinding = ServiceRootDefinition.bindChild(
+    const ServiceChildBinding = ServiceRootDefinition.makeBinding(
       serviceChildBlock,
       {
         read: model => model.maybeChild,
@@ -535,16 +585,23 @@ describe('registered Application composition completion', () => {
     const container = document.createElement('div')
     container.id = 'service-lifetime-root'
     document.body.append(container)
+
+    const prepare = () =>
+      serviceComposition.prepareBlock({
+        init: serviceInit,
+        update: serviceUpdate,
+        view: serviceView,
+        EffectsLayer: Layer.empty,
+      })
+    const completedBlock: Block.FromAssemblyWithView<
+      typeof ServiceRootModel,
+      typeof prepare
+    > = Block.assemble(prepare)
     const handle = embed(
-      serviceComposition
-        .assembleElement({
-          container,
-          init: serviceInit,
-          update: serviceUpdate,
-          view: serviceView,
-          EffectsLayer: Layer.empty,
-        })
-        .provide(SharedValueLayer),
+      Program.makeElement({
+        block: completedBlock,
+        container,
+      }).provide(SharedValueLayer),
     )
 
     try {
@@ -582,7 +639,7 @@ describe('registered Application composition completion', () => {
     const FeatureOwnerNamespace = makeNamespace('MountedResource')
     const ready = Deferred.makeUnsafe<void>()
     let acquisitions = 0
-    const Value = FeatureOwnerNamespace.resource<string>()('Value')
+    const Value = FeatureOwnerNamespace.makeResource<string>()('Value')
     const FeatureModel = Schema.Struct({ label: Schema.String })
     const FeatureMessage = defineMessageUnion({
       AcquiredValue: {},
@@ -595,7 +652,7 @@ describe('registered Application composition completion', () => {
       AcquiredValue: {},
       ObservedValue: { value: Schema.String },
     })
-    const ObserveValue = FeatureOwnerNamespace.mountStream('ObserveValue', {
+    const ObserveValue = FeatureOwnerNamespace.makeMountStream('ObserveValue', {
       messages: [
         FeatureMessage.CompletedObserveValue,
         FeatureMessage.FailedObserveValue,
@@ -623,7 +680,7 @@ describe('registered Application composition completion', () => {
     const featureComposition = FeatureDefinition.makeComposition({
       mounts: [ObserveValue],
     })
-    const managedResources = FeatureDefinition.managedResources(entry => ({
+    const managedResources = FeatureDefinition.makeManagedResources(entry => ({
       value: entry(
         'Value',
         Schema.Option(Schema.Struct({ label: Schema.String })),
@@ -643,34 +700,39 @@ describe('registered Application composition completion', () => {
         },
       ),
     }))
-    const featureBlock = featureComposition.assembleBlock({
-      init: (label: string) => ({ model: { label } }),
-      update: featureComposition.makeUpdate((model, message) =>
-        FeatureMessage.match(message, {
-          AcquiredValue: () => ({
-            model,
-            outMessage: FeatureOutMessage.AcquiredValue(),
+    const prepareFeatureBlock = () =>
+      featureComposition.prepareBlock({
+        init: (label: string) => ({ model: { label } }),
+        update: featureComposition.makeUpdate((model, message) =>
+          FeatureMessage.match(message, {
+            AcquiredValue: () => ({
+              model,
+              outMessage: FeatureOutMessage.AcquiredValue(),
+            }),
+            ReleasedValue: () => ({ model }),
+            FailedAcquireValue: () => ({ model }),
+            CompletedObserveValue: ({ value }) => ({
+              model,
+              outMessage: FeatureOutMessage.ObservedValue({ value }),
+            }),
+            FailedObserveValue: () => ({ model }),
           }),
-          ReleasedValue: () => ({ model }),
-          FailedAcquireValue: () => ({ model }),
-          CompletedObserveValue: ({ value }) => ({
-            model,
-            outMessage: FeatureOutMessage.ObservedValue({ value }),
-          }),
-          FailedObserveValue: () => ({ model }),
-        }),
-      ),
-      view: featureComposition.makeView((model, h) =>
-        h.div([h.OnMount(ObserveValue())], [model.label]),
-      ),
-      managedResources,
-      EffectsLayer: Layer.merge(
-        ObserveValue.layer,
-        managedResources.value.layer,
-      ),
-    })
+        ),
+        view: featureComposition.makeView((model, h) =>
+          h.div([h.OnMount(ObserveValue())], [model.label]),
+        ),
+        managedResources,
+        EffectsLayer: Layer.merge(
+          ObserveValue.layer,
+          managedResources.value.layer,
+        ),
+      })
+    const featureBlock: Block.FromAssemblyWithViewAndOutMessage<
+      typeof FeatureModel,
+      typeof prepareFeatureBlock
+    > = Block.assemble(prepareFeatureBlock)
     const RootModel = Schema.Struct({ left: FeatureModel, right: FeatureModel })
-    const RootDefinition = makeApplicationDefinition({
+    const RootDefinition = Block.makeDefinition('Application', {
       Model: RootModel,
       Message: Schema.Never,
     })
@@ -692,19 +754,17 @@ describe('registered Application composition completion', () => {
             return { model }
           },
       })
-    const LeftBinding = RootDefinition.bindChild(featureBlock, {
+    const LeftBinding = RootDefinition.makeBinding(featureBlock, {
       placement: 'Left',
       read: (model: typeof RootModel.Type) => Option.some(model.left),
       write: (model, nextLeft) => modifyFields(model, { left: () => nextLeft }),
-      outMessage: { fold: foldFeatureOutMessage('GotLeft') },
-    })
-    const RightBinding = RootDefinition.bindChild(featureBlock, {
+    }).withOutMessagePolicy({ fold: foldFeatureOutMessage('GotLeft') })
+    const RightBinding = RootDefinition.makeBinding(featureBlock, {
       placement: 'Right',
       read: (model: typeof RootModel.Type) => Option.some(model.right),
       write: (model, nextRight) =>
         modifyFields(model, { right: () => nextRight }),
-      outMessage: { fold: foldFeatureOutMessage('GotRight') },
-    })
+    }).withOutMessagePolicy({ fold: foldFeatureOutMessage('GotRight') })
     const rootComposition = RootDefinition.makeComposition({
       bindings: [LeftBinding, RightBinding],
     })
@@ -729,13 +789,22 @@ describe('registered Application composition completion', () => {
     const container = document.createElement('div')
     container.id = 'mounted-root'
     document.body.append(container)
-    const handle = embed(
-      rootComposition.assembleElement({
-        container,
+
+    const prepare = () =>
+      rootComposition.prepareBlock({
         init: rootInit,
         update: rootUpdate,
         view: rootView,
         EffectsLayer: Layer.empty,
+      })
+    const completedBlock: Block.FromAssemblyWithView<
+      typeof RootModel,
+      typeof prepare
+    > = Block.assemble(prepare)
+    const handle = embed(
+      Program.makeElement({
+        block: completedBlock,
+        container,
       }),
     )
 
@@ -752,38 +821,58 @@ describe('registered Application composition completion', () => {
 })
 
 const checkAssemblyTypes = (container: HTMLElement) => {
-  const application = composition.assembleElement({
+  const prepareBlock = () =>
+    composition.prepareBlock({
+      init,
+      update,
+      view,
+      EffectsLayer: Layer.empty,
+    })
+  const block: Block.FromAssemblyWithView<typeof Model, typeof prepareBlock> =
+    Block.assemble(prepareBlock)
+  const application = Program.makeElement({
+    block,
     container,
-    init,
-    update,
-    view,
-    EffectsLayer: Layer.empty,
   })
   // @ts-expect-error Shared Service requirements must be provided before running.
   run(application)
-  // @ts-expect-error ApplicationComposition.assembleApplication requires a Document view.
-  composition.assembleApplication({
+  // @ts-expect-error Program.make requires a Document view.
+  Program.make({
+    block,
     container,
-    init,
-    update,
-    view,
-    EffectsLayer: Layer.empty,
   })
+  const prepare = () =>
+    unresolvedHostComposition.prepareBlock({
+      init: unresolvedHostInit,
+      update: unresolvedHostUpdate,
+      view: unresolvedHostView,
+      EffectsLayer: Layer.empty,
+    })
+  const completedBlock: Block.FromAssemblyWithView<
+    typeof HostParentModel,
+    typeof prepare
+  > = Block.assemble(prepare)
 
   // @ts-expect-error Root completion requires inherited host handlers to be supplied first.
-  unresolvedHostComposition.assembleElement({
+  Program.makeElement({
+    block: completedBlock,
     container,
-    init: unresolvedHostInit,
-    update: unresolvedHostUpdate,
-    view: unresolvedHostView,
-    EffectsLayer: Layer.empty,
   })
-  const hostApplication = resolvedHostComposition.assembleElement({
+
+  const prepare2 = () =>
+    resolvedHostComposition.prepareBlock({
+      init: resolvedHostInit,
+      update: resolvedHostUpdate,
+      view: resolvedHostView,
+      EffectsLayer: Layer.empty,
+    })
+  const completedBlock2: Block.FromAssemblyWithView<
+    typeof HostParentModel,
+    typeof prepare2
+  > = Block.assemble(prepare2)
+  const hostApplication = Program.makeElement({
+    block: completedBlock2,
     container,
-    init: resolvedHostInit,
-    update: resolvedHostUpdate,
-    view: resolvedHostView,
-    EffectsLayer: Layer.empty,
   })
   hostApplication.provide(Layer.succeed(HostDependency, { value: 'provided' }))
 }

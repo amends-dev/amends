@@ -3,7 +3,7 @@ import { Dom } from 'foldkit'
 import { ApplicationDefinition } from './definition'
 import { Message } from './message'
 
-export const subscriptions = ApplicationDefinition.subscriptions(entry => ({
+export const subscriptions = ApplicationDefinition.makeSubscriptions(entry => ({
   navigationShortcutPresses: entry('NavigationShortcutPresses', {
     messages: [Message.EnteredNavigationShortcut],
     handler: function* () {

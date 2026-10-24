@@ -239,7 +239,7 @@ export const preview = ({
   education,
   skills,
   coverLetter,
-}: Model): Html => {
+}: typeof Model.Type): Html => {
   const fullName =
     String.isNonEmpty(firstName) || String.isNonEmpty(lastName)
       ? `${firstName} ${lastName}`.trim()

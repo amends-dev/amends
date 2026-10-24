@@ -45,9 +45,8 @@ export const init = AsyncCounterDemoComposition.makeInit(() => ({
   }),
 }))
 
-export const DelayAdvanceAsyncCounterPhase = AsyncCounterDemoDefinition.command(
-  'DelayAdvanceAsyncCounterPhase',
-  {
+export const DelayAdvanceAsyncCounterPhase =
+  AsyncCounterDemoDefinition.makeCommand('DelayAdvanceAsyncCounterPhase', {
     args: { generation: Schema.Number, duration: Schema.DurationFromMillis },
     messages: [Message.CompletedDelayAdvanceAsyncCounterPhase],
     handler: function* () {
@@ -58,8 +57,7 @@ export const DelayAdvanceAsyncCounterPhase = AsyncCounterDemoDefinition.command(
           ),
         )
     },
-  },
-)
+  })
 
 export const EffectsLayer = DelayAdvanceAsyncCounterPhase.layer
 
@@ -238,7 +236,7 @@ export const update = AsyncCounterDemoComposition.makeUpdate((model, message) =>
   }),
 )
 
-const phaseLabel = (phase: AnimationPhase): string =>
+const phaseLabel = (phase: typeof AnimationPhase.Type): string =>
   Match.value(phase).pipe(
     Match.when('Idle', () => 'Idle'),
     Match.whenOr(
@@ -265,7 +263,7 @@ const phaseLabel = (phase: AnimationPhase): string =>
     Match.exhaustive,
   )
 
-const phaseColorClass = (phase: AnimationPhase): string =>
+const phaseColorClass = (phase: typeof AnimationPhase.Type): string =>
   Match.value(phase).pipe(
     Match.when('Idle', () => 'text-gray-600 dark:text-gray-400'),
     Match.whenOr(
@@ -304,7 +302,10 @@ export const view = AsyncCounterDemoComposition.makeView((model, h) =>
   ),
 )
 
-const appPanel = (model: Model, h: AsyncCounterDemoViewBuilder): Html =>
+const appPanel = (
+  model: typeof Model.Type,
+  h: AsyncCounterDemoViewBuilder,
+): Html =>
   h.div(
     [h.Class('relative')],
     [
@@ -343,7 +344,7 @@ const stepperButtonClass = (isDisabled: boolean): string =>
 
 const RESET_DELAY_LABEL_ID = 'demo-reset-delay-label'
 
-const resetButtonLabel = (model: Model): string => {
+const resetButtonLabel = (model: typeof Model.Type): string => {
   if (model.isResetting) {
     return 'Resetting...'
   } else {
@@ -353,7 +354,7 @@ const resetButtonLabel = (model: Model): string => {
 }
 
 const stepperButton = (
-  model: Model,
+  model: typeof Model.Type,
   label: string,
   symbol: string,
   delta: number,
@@ -381,7 +382,7 @@ const stepperButton = (
 }
 
 const viewAndControlsView = (
-  model: Model,
+  model: typeof Model.Type,
   h: AsyncCounterDemoViewBuilder,
 ): Html =>
   h.div(
@@ -480,7 +481,7 @@ const viewAndControlsView = (
     ],
   )
 
-const phaseIndicatorView = (model: Model): Html => {
+const phaseIndicatorView = (model: typeof Model.Type): Html => {
   const isCommand = model.phase === 'ResetCommand'
 
   return DemoView.phaseIndicator(
@@ -490,7 +491,7 @@ const phaseIndicatorView = (model: Model): Html => {
   )
 }
 
-const progressBarView = (model: Model, isCommand: boolean): Html =>
+const progressBarView = (model: typeof Model.Type, isCommand: boolean): Html =>
   ih.div(
     [
       ih.AriaHidden(true),

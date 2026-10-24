@@ -8,22 +8,25 @@ import { Column } from './domain'
 import { Message } from './message'
 import { SavedBoardJsonString } from './model'
 
-export const GenerateCardId = ApplicationDefinition.command('GenerateCardId', {
-  args: { columnId: Schema.String, title: Schema.String },
-  messages: [Message.CompletedGenerateCardId],
-  handler: function* () {
-    const crypto = yield* Crypto.Crypto
+export const GenerateCardId = ApplicationDefinition.makeCommand(
+  'GenerateCardId',
+  {
+    args: { columnId: Schema.String, title: Schema.String },
+    messages: [Message.CompletedGenerateCardId],
+    handler: function* () {
+      const crypto = yield* Crypto.Crypto
 
-    return ({ columnId, title }) =>
-      Effect.gen(function* () {
-        const cardId = yield* Effect.orDie(crypto.randomUUIDv4)
+      return ({ columnId, title }) =>
+        Effect.gen(function* () {
+          const cardId = yield* Effect.orDie(crypto.randomUUIDv4)
 
-        return Message.CompletedGenerateCardId({ cardId, columnId, title })
-      })
+          return Message.CompletedGenerateCardId({ cardId, columnId, title })
+        })
+    },
   },
-})
+)
 
-export const SaveBoard = ApplicationDefinition.command('SaveBoard', {
+export const SaveBoard = ApplicationDefinition.makeCommand('SaveBoard', {
   args: { columns: Schema.Array(Column.Column) },
   messages: [Message.CompletedSaveBoard],
   handler: function* () {
@@ -40,7 +43,7 @@ export const SaveBoard = ApplicationDefinition.command('SaveBoard', {
   },
 })
 
-export const FocusAddCardInput = ApplicationDefinition.command(
+export const FocusAddCardInput = ApplicationDefinition.makeCommand(
   'FocusAddCardInput',
   {
     messages: [Message.CompletedFocusAddCardInput],

@@ -1,8 +1,8 @@
 import { Layer, Option, Schema } from 'effect'
-import { Runtime, Struct } from 'foldkit'
-import type { Element as ElementProgram } from 'foldkit/application'
+import { Program, Runtime, Struct } from 'foldkit'
 import * as Block from 'foldkit/block'
 import * as Command from 'foldkit/command'
+import type { Element as ElementProgram } from 'foldkit/program'
 import * as Update from 'foldkit/update'
 
 import {
@@ -264,14 +264,21 @@ export const emittedApplicationUpdate = applicationUpdate(
   emittedApplicationInit.model,
   ApplicationMessage.Incremented(),
 )
-export const EmittedApplicationElement = ApplicationComposition.assembleElement(
-  {
-    container: null,
+
+const prepare = () =>
+  ApplicationComposition.prepareBlock({
     init: applicationInit,
     update: applicationUpdate,
     view: applicationView,
-  },
-)
+  })
+const completedBlock: Block.FromAssemblyWithView<
+  typeof ApplicationComposition.Model,
+  typeof prepare
+> = Block.assemble(prepare)
+export const EmittedApplicationElement = Program.makeElement({
+  block: completedBlock,
+  container: null,
+})
 export const ReprovidedServiceApplicationElement =
   PendingServiceApplicationElement.provide(ApplicationClientLayer)
 export const providedServiceApplicationHandle = Runtime.embed(

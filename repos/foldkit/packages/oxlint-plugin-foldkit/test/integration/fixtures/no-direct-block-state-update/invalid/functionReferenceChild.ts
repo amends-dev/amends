@@ -8,7 +8,6 @@ export type Model = typeof Model.Type
 export const Message = defineMessageUnion({
   InformedOfThemeChange: { theme: Schema.String },
 })
-export type Message = typeof Message.Type
 
 const FunctionReferenceChildDefinition = Block.makeDefinition(
   'FunctionReferenceChild',
@@ -30,7 +29,7 @@ const update = FunctionReferenceChildComposition.makeUpdate((model, message) =>
 export const revealErrors = (model: Model): Model =>
   modifyFields(model, { theme: () => 'Error' })
 
-export const block = FunctionReferenceChildComposition.assembleBlock({
+export const block = FunctionReferenceChildComposition.prepareBlock({
   init,
   update,
   operations: {

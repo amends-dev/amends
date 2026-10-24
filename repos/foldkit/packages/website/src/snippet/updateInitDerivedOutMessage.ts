@@ -11,19 +11,18 @@ const DateRangeDefinition = Block.makeDefinition('DateRange', {
   OutMessage,
 })
 
-const EndDatePickerBinding = DateRangeDefinition.bindChild(
+const EndDatePickerBinding = DateRangeDefinition.makeBinding(
   DatePicker.DatePickerBlock,
   {
     field: 'endDatePicker',
-    outMessage: {
-      fold: foldEndDateOutMessage,
-      forward: DatePicker.DatePickerBlock.OutMessage.match({
-        SelectedDate: ({ date }) => OutMessage.SelectedEndDate({ date }),
-      }),
-    },
   },
-)
+).withOutMessagePolicy({
+  fold: foldEndDateOutMessage,
+  forward: DateRangeDefinition.makeOutMessageForward({
+    SelectedDate: ({ date }) => OutMessage.SelectedEndDate({ date }),
+  }),
+})
 
-const restoreEndDate = DateRangeDefinition.step(() =>
+const restoreEndDate = DateRangeDefinition.makeStep(() =>
   EndDatePickerBinding.requestRestore(),
 )

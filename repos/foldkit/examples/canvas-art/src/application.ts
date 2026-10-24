@@ -9,8 +9,7 @@ import {
   Stream,
   pipe,
 } from 'effect'
-import { Canvas, Dom, makeApplicationDefinition } from 'foldkit'
-import type { Block } from 'foldkit'
+import { Block, Canvas, Dom } from 'foldkit'
 import { Html } from 'foldkit/html'
 import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
@@ -46,14 +45,12 @@ const Ball = Schema.Struct({
   radius: Schema.Number,
   color: Schema.String,
 })
-type Ball = typeof Ball.Type
 
 export const Model = Schema.Struct({
   balls: Schema.Array(Ball),
   nextId: Schema.Number,
   isRunning: Schema.Boolean,
 })
-export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
   TickedFrame: { deltaTime: Schema.Number },
@@ -70,9 +67,7 @@ export const Message = defineMessageUnion({
   ClickedTogglePlay: {},
 })
 
-export type Message = typeof Message.Type
-
-export const ApplicationDefinition = makeApplicationDefinition({
+export const ApplicationDefinition = Block.makeDefinition('Application', {
   Model,
   Message,
 })
@@ -86,7 +81,7 @@ export const init = ApplicationComposition.makeInit(() => ({
   model: Model.make({ balls: [], nextId: 0, isRunning: true }),
 }))
 
-export const GenerateBall = ApplicationDefinition.command('GenerateBall', {
+export const GenerateBall = ApplicationDefinition.makeCommand('GenerateBall', {
   args: { x: Schema.Number, y: Schema.Number },
   messages: [Message.CompletedGenerateBall],
   handler: function* () {
@@ -120,7 +115,7 @@ export const GenerateBall = ApplicationDefinition.command('GenerateBall', {
 
 const advanceBall =
   (deltaSeconds: number) =>
-  (ball: Ball): Ball => {
+  (ball: typeof Ball.Type): typeof Ball.Type => {
     const nextX = ball.x + ball.vx * deltaSeconds
     const nextY = ball.y + ball.vy * deltaSeconds
     const minX = ball.radius
@@ -173,7 +168,7 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
   }),
 )
 
-export const subscriptions = ApplicationDefinition.subscriptions(entry => ({
+export const subscriptions = ApplicationDefinition.makeSubscriptions(entry => ({
   animationFrameTicks: entry(
     'AnimationFrameTicks',
     { isActive: Schema.Boolean },
@@ -205,7 +200,7 @@ const backgroundShape = Canvas.Rect({
   fill: '#0a0a0f',
 })
 
-const ballShape = (ball: Ball): Canvas.Shape =>
+const ballShape = (ball: typeof Ball.Type): Canvas.Shape =>
   Canvas.Circle({
     x: ball.x,
     y: ball.y,
@@ -213,12 +208,15 @@ const ballShape = (ball: Ball): Canvas.Shape =>
     fill: ball.color,
   })
 
-const sceneShapes = (model: Model): ReadonlyArray<Canvas.Shape> => [
+const sceneShapes = (model: typeof Model.Type): ReadonlyArray<Canvas.Shape> => [
   backgroundShape,
   ...Array.map(model.balls, ballShape),
 ]
 
-const controlsView = (model: Model, h: ApplicationViewBuilder): Html =>
+const controlsView = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+): Html =>
   h.div(
     [h.Class('flex gap-3 mt-4')],
     [
@@ -295,3 +293,16 @@ export const view = ApplicationComposition.makeView((model, h) => ({
     ],
   ),
 }))
+
+const prepare = () =>
+  ApplicationComposition.prepareBlock({
+    init,
+    update,
+    view,
+    subscriptions,
+    EffectsLayer,
+  })
+export const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

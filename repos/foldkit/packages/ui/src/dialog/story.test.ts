@@ -5,7 +5,6 @@ import * as Dom from 'foldkit/dom'
 import type { ChildAttribute } from 'foldkit/html'
 import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
-import * as Update from 'foldkit/update'
 import { expect } from 'vitest'
 
 import { describe, it } from '@effect/vitest'
@@ -44,30 +43,12 @@ const acknowledgeAcquireResources = Scene.Mount.resolve(
 const DialogEvent = Schema.Literals(['Opened', 'Closed'])
 
 const ParentModel = Schema.Struct({
-  dialog: DialogBlock.Model,
+  dialog: Model,
   dialogEvents: Schema.Array(DialogEvent),
 })
-type ParentModel = typeof ParentModel.Type
 
 const ParentMessage = defineMessageUnion({
   CompletedLoadParentData: {},
-})
-type ParentMessage = typeof ParentMessage.Type
-
-const foldDialogOutMessage = OutMessage.match<
-  Update.Step<ParentModel, ParentMessage>
->({
-  Opened: () => model => ({
-    model: modifyFields(model, {
-      dialogEvents: Array.append(DialogEvent.make('Opened')),
-    }),
-  }),
-  Closed: () => model => ({
-    model: modifyFields(model, {
-      dialogEvents: Array.append(DialogEvent.make('Closed')),
-    }),
-  }),
-  CompletedClose: () => model => ({ model }),
 })
 
 const DialogParentTestDefinition = Block.makeDefinition('DialogParentTest', {
@@ -75,20 +56,39 @@ const DialogParentTestDefinition = Block.makeDefinition('DialogParentTest', {
   Message: ParentMessage,
 })
 
-const LoadParentData = DialogParentTestDefinition.command('LoadParentData', {
-  messages: [ParentMessage.CompletedLoadParentData],
-})
+const foldDialogOutMessage = DialogParentTestDefinition.makeOutMessageFold(
+  DialogBlock,
+  {
+    Opened: () => model => ({
+      model: modifyFields(model, {
+        dialogEvents: Array.append(DialogEvent.make('Opened')),
+      }),
+    }),
+    Closed: () => model => ({
+      model: modifyFields(model, {
+        dialogEvents: Array.append(DialogEvent.make('Closed')),
+      }),
+    }),
+    CompletedClose: () => model => ({ model }),
+  },
+)
 
-const loadParentData = DialogParentTestDefinition.step(model => ({
+const LoadParentData = DialogParentTestDefinition.makeCommand(
+  'LoadParentData',
+  {
+    messages: [ParentMessage.CompletedLoadParentData],
+  },
+)
+
+const loadParentData = DialogParentTestDefinition.makeStep(model => ({
   model,
   commands: [LoadParentData()],
 }))
 
-const DialogBinding = DialogParentTestDefinition.bindChild(DialogBlock, {
+const DialogBinding = DialogParentTestDefinition.makeBinding(DialogBlock, {
   field: 'dialog',
-  outMessage: { fold: foldDialogOutMessage },
   init: { contextToArgs: () => [{ id: 'initial-dialog' }] },
-})
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
 const DialogParentTestComposition = DialogParentTestDefinition.makeComposition({
   bindings: [DialogBinding],

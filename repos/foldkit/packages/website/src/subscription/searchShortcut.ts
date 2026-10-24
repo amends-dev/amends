@@ -5,7 +5,7 @@ import { ApplicationDefinition } from '../definition'
 import { Message } from '../message'
 import { isSearchRoute } from '../route'
 
-export const subscriptions = ApplicationDefinition.subscriptions(entry => ({
+export const subscriptions = ApplicationDefinition.makeSubscriptions(entry => ({
   searchShortcutPresses: entry(
     'SearchShortcutPresses',
     { isSearchAvailable: Schema.Boolean },

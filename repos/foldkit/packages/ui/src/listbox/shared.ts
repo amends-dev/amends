@@ -126,6 +126,7 @@ export const Message = defineMessageUnion({
   CompletedFocusListboxItems: {},
   CompletedScrollListboxItemIntoView: {},
   CompletedClickListboxItem: {},
+  ClickedButton: {},
   IgnoredMouseClick: {},
   SuppressedSpaceScroll: {},
   SuppressedItemCommit: {},
@@ -152,6 +153,8 @@ export type RequestedItemClick = typeof Message.RequestedItemClick.Type
 export type Searched = typeof Message.Searched.Type
 export type CompletedDelayClearListboxSearch =
   typeof Message.CompletedDelayClearListboxSearch.Type
+/** A click on the Listbox trigger button. */
+export type ClickedButton = typeof Message.ClickedButton.Type
 export type IgnoredMouseClick = typeof Message.IgnoredMouseClick.Type
 export type SuppressedSpaceScroll = typeof Message.SuppressedSpaceScroll.Type
 export type SuppressedItemCommit = typeof Message.SuppressedItemCommit.Type
@@ -234,15 +237,18 @@ type HandlerReturn<Model> = Readonly<{
 }>
 
 /** Prevents page scrolling while the listbox is open in modal mode. */
-export const LockListboxScroll = ListboxNamespace.command('LockListboxScroll', {
-  messages: [Message.CompletedLockListboxScroll],
-  handler: function* () {
-    return () =>
-      Dom.lockScroll.pipe(Effect.as(Message.CompletedLockListboxScroll()))
+export const LockListboxScroll = ListboxNamespace.makeCommand(
+  'LockListboxScroll',
+  {
+    messages: [Message.CompletedLockListboxScroll],
+    handler: function* () {
+      return () =>
+        Dom.lockScroll.pipe(Effect.as(Message.CompletedLockListboxScroll()))
+    },
   },
-})
+)
 /** Re-enables page scrolling after the listbox closes. */
-export const UnlockListboxScroll = ListboxNamespace.command(
+export const UnlockListboxScroll = ListboxNamespace.makeCommand(
   'UnlockListboxScroll',
   {
     messages: [Message.CompletedUnlockListboxScroll],
@@ -253,7 +259,7 @@ export const UnlockListboxScroll = ListboxNamespace.command(
   },
 )
 /** Marks all elements outside the listbox as inert for modal behavior. */
-export const InertListboxOthers = ListboxNamespace.command(
+export const InertListboxOthers = ListboxNamespace.makeCommand(
   'InertListboxOthers',
   {
     args: { id: Schema.String },
@@ -267,7 +273,7 @@ export const InertListboxOthers = ListboxNamespace.command(
   },
 )
 /** Removes the inert attribute from elements outside the listbox. */
-export const RestoreListboxInert = ListboxNamespace.command(
+export const RestoreListboxInert = ListboxNamespace.makeCommand(
   'RestoreListboxInert',
   {
     args: { id: Schema.String },
@@ -281,7 +287,7 @@ export const RestoreListboxInert = ListboxNamespace.command(
   },
 )
 /** Moves focus back to the listbox button after closing. */
-export const FocusListboxButton = ListboxNamespace.command(
+export const FocusListboxButton = ListboxNamespace.makeCommand(
   'FocusListboxButton',
   {
     args: { id: Schema.String },
@@ -296,19 +302,22 @@ export const FocusListboxButton = ListboxNamespace.command(
   },
 )
 /** Moves focus to the listbox items container after opening. */
-export const FocusListboxItems = ListboxNamespace.command('FocusListboxItems', {
-  args: { id: Schema.String },
-  messages: [Message.CompletedFocusListboxItems],
-  handler: function* () {
-    return ({ id }) =>
-      Dom.focus(itemsSelector(id)).pipe(
-        Effect.ignore,
-        Effect.as(Message.CompletedFocusListboxItems()),
-      )
+export const FocusListboxItems = ListboxNamespace.makeCommand(
+  'FocusListboxItems',
+  {
+    args: { id: Schema.String },
+    messages: [Message.CompletedFocusListboxItems],
+    handler: function* () {
+      return ({ id }) =>
+        Dom.focus(itemsSelector(id)).pipe(
+          Effect.ignore,
+          Effect.as(Message.CompletedFocusListboxItems()),
+        )
+    },
   },
-})
+)
 /** Scrolls the active listbox item into view after keyboard navigation. */
-export const ScrollListboxItemIntoView = ListboxNamespace.command(
+export const ScrollListboxItemIntoView = ListboxNamespace.makeCommand(
   'ScrollListboxItemIntoView',
   {
     args: { id: Schema.String, index: Schema.Number },
@@ -323,19 +332,22 @@ export const ScrollListboxItemIntoView = ListboxNamespace.command(
   },
 )
 /** Programmatically clicks the active listbox item's DOM element. */
-export const ClickListboxItem = ListboxNamespace.command('ClickListboxItem', {
-  args: { id: Schema.String, index: Schema.Number },
-  messages: [Message.CompletedClickListboxItem],
-  handler: function* () {
-    return ({ id, index }) =>
-      Dom.clickElement(itemSelector(id, index)).pipe(
-        Effect.ignore,
-        Effect.as(Message.CompletedClickListboxItem()),
-      )
+export const ClickListboxItem = ListboxNamespace.makeCommand(
+  'ClickListboxItem',
+  {
+    args: { id: Schema.String, index: Schema.Number },
+    messages: [Message.CompletedClickListboxItem],
+    handler: function* () {
+      return ({ id, index }) =>
+        Dom.clickElement(itemSelector(id, index)).pipe(
+          Effect.ignore,
+          Effect.as(Message.CompletedClickListboxItem()),
+        )
+    },
   },
-})
+)
 /** Waits for the typeahead search debounce period before clearing the query. */
-export const DelayClearListboxSearch = ListboxNamespace.command(
+export const DelayClearListboxSearch = ListboxNamespace.makeCommand(
   'DelayClearListboxSearch',
   {
     args: { version: Schema.Number },
@@ -349,7 +361,7 @@ export const DelayClearListboxSearch = ListboxNamespace.command(
   },
 )
 /** Detects whether the listbox button moved or the leave animation ended. Whichever comes first; both outcomes signal the Animation block that leave is complete. */
-export const DetectListboxMovementOrAnimationEnd = ListboxNamespace.command(
+export const DetectListboxMovementOrAnimationEnd = ListboxNamespace.makeCommand(
   'DetectListboxMovementOrAnimationEnd',
   {
     args: { id: Schema.String, generation: Schema.Number },
@@ -382,7 +394,10 @@ export const makeUpdate = <ParentOutMessageSchema extends Schema.Top>(
     typeof Message,
     ParentOutMessageSchema
   >,
+  makeOutMessageFold: Block.MakeOutMessageFold<BaseModel, Message, OutMessage>,
   step: Block.DefineStep<BaseModel, Message, OutMessage>,
+  stepFields: Block.DefineStepFields<BaseModel>,
+  stepNoop: Block.DefineStepNoop<BaseModel>,
   selectionBehavior: 'CloseWithFocus' | 'KeepOpen',
   handleSelectedItem: (
     model: BaseModel,
@@ -400,25 +415,16 @@ export const makeUpdate = <ParentOutMessageSchema extends Schema.Top>(
       ],
     }))
 
-  type AnimationOutMessageStep = ReturnType<
-    typeof detectListboxMovementOrAnimationEnd
-  >
-
-  const ignoreTransitionedOut = step(model => ({ model }))
-
-  const foldAnimationOutMessage = Animation.AnimationBlock.OutMessage.match<
-    AnimationOutMessageStep | typeof ignoreTransitionedOut
-  >({
+  const foldAnimationOutMessage = makeOutMessageFold(Animation.AnimationBlock, {
     StartedLeaveAnimating: ({ generation }) =>
       detectListboxMovementOrAnimationEnd(generation),
-    TransitionedOut: () => ignoreTransitionedOut,
+    TransitionedOut: stepNoop,
   })
 
   const AnimationBinding = bindChild(Animation.AnimationBlock, {
     field: 'animation',
     init: false,
-    outMessage: { fold: foldAnimationOutMessage },
-  })
+  }).withOutMessagePolicy({ fold: foldAnimationOutMessage })
 
   const internalUpdate = (model: Model, message: RoutedMessage) => {
     const modalOpenCommands = Array.filter(
@@ -440,12 +446,10 @@ export const makeUpdate = <ParentOutMessageSchema extends Schema.Top>(
 
     const openListbox = (baseModel: Model) => {
       if (baseModel.isAnimated) {
-        return Update.combine([
-          () => ({ model: baseModel, commands: openCommands }),
+        return Update.combineSteps([
+          step(() => ({ model: baseModel, commands: openCommands })),
           AnimationBinding.requestShow(),
-          stepModel => ({
-            model: modifyBaseFields(stepModel, { isOpen: () => true }),
-          }),
+          stepFields(() => ({ isOpen: () => true })),
         ])
       }
 
@@ -469,8 +473,8 @@ export const makeUpdate = <ParentOutMessageSchema extends Schema.Top>(
       if (baseModel.isAnimated) {
         return step(() =>
           Function.compose(
-            Update.combine([
-              () => ({ model: closed, commands }),
+            Update.combineSteps([
+              step(() => ({ model: closed, commands })),
               AnimationBinding.requestHide(),
             ]),
             Update.withOutMessage(outMessage),
@@ -481,8 +485,14 @@ export const makeUpdate = <ParentOutMessageSchema extends Schema.Top>(
       return Update.withOutMessage({ model: closed, commands }, outMessage)
     }
 
-    const openWithActiveItem = (maybeActiveItemIndex: Option.Option<number>) =>
-      openListbox(
+    const openWithActiveItem = (
+      maybeActiveItemIndex: Option.Option<number>,
+    ) => {
+      if (model.isOpen) {
+        return { model }
+      }
+
+      return openListbox(
         modifyBaseFields(model, {
           maybeActiveItemIndex: () => maybeActiveItemIndex,
           activationTrigger: () =>
@@ -495,6 +505,7 @@ export const makeUpdate = <ParentOutMessageSchema extends Schema.Top>(
           maybeLastPointerPosition: () => Option.none(),
         }),
       )
+    }
 
     const selectItem = (item: string) => {
       const selection = handleSelectedItem(model, item)
@@ -633,8 +644,11 @@ export const makeUpdate = <ParentOutMessageSchema extends Schema.Top>(
           })
 
           if (model.isAnimated) {
-            return Update.combine([
-              () => ({ model: closed, commands: closeWithFocusCommands }),
+            return Update.combineSteps([
+              step(() => ({
+                model: closed,
+                commands: closeWithFocusCommands,
+              })),
               AnimationBinding.requestHide(),
             ])
           }
@@ -658,6 +672,23 @@ export const makeUpdate = <ParentOutMessageSchema extends Schema.Top>(
           maybeLastButtonPointerType: () => Option.none(),
         }),
       }),
+      ClickedButton: () => {
+        if (
+          Option.exists(model.maybeLastButtonPointerType, Equal.equals('mouse'))
+        ) {
+          return {
+            model: modifyBaseFields(model, {
+              maybeLastButtonPointerType: () => Option.none(),
+            }),
+          }
+        }
+
+        if (model.isOpen) {
+          return closeListbox(model, closeWithFocusCommands)
+        }
+
+        return openWithActiveItem(Option.none())
+      },
     })
   }
 
@@ -681,7 +712,7 @@ export const makeUpdate = <ParentOutMessageSchema extends Schema.Top>(
  *  Exposed so Scene tests can call
  *  `Scene.Mount.resolve(AnchorListbox, CompletedAnchorListbox())`.
  */
-export const AnchorListbox = ListboxNamespace.mount('AnchorListbox', {
+export const AnchorListbox = ListboxNamespace.makeMount('AnchorListbox', {
   args: { buttonId: Schema.String, anchor: AnchorConfig },
   messages: [Message.CompletedAnchorListbox],
   handler: function* () {
@@ -705,7 +736,7 @@ export const AnchorListbox = ListboxNamespace.mount('AnchorListbox', {
 /** The backdrop-portaling Mount this Listbox renders. Exposed so Scene tests can
  *  call `Scene.Mount.resolve(PortalListboxBackdrop, CompletedPortalListboxBackdrop())` to
  *  acknowledge the mount produced by the rendered backdrop. */
-export const PortalListboxBackdrop = ListboxNamespace.mount(
+export const PortalListboxBackdrop = ListboxNamespace.makeMount(
   'PortalListboxBackdrop',
   {
     messages: [Message.CompletedPortalListboxBackdrop],
@@ -864,7 +895,6 @@ export const makeView = <Model extends BaseModel>(behavior: ViewBehavior) => {
       animation: { transitionState },
       maybeActiveItemIndex,
       searchQuery,
-      maybeLastButtonPointerType,
     } = model
 
     const {
@@ -1016,21 +1046,6 @@ export const makeView = <Model extends BaseModel>(behavior: ViewBehavior) => {
     ): Option.Option<Message> =>
       Option.some(Message.PressedPointerOnButton({ pointerType, button }))
 
-    const handleButtonClick = (): Message => {
-      const isMouse = Option.exists(
-        maybeLastButtonPointerType,
-        type => type === 'mouse',
-      )
-
-      if (isMouse) {
-        return Message.IgnoredMouseClick()
-      } else if (isOpen) {
-        return Message.Closed()
-      } else {
-        return Message.Opened({ maybeActiveItemIndex: Option.none() })
-      }
-    }
-
     const handleSpaceKeyUp = (key: string): Option.Option<Message> =>
       OptionExt.when(key === ' ', Message.SuppressedSpaceScroll())
 
@@ -1125,7 +1140,7 @@ export const makeView = <Model extends BaseModel>(behavior: ViewBehavior) => {
             h.OnPointerDown(handleButtonPointerDown),
             h.OnKeyDownPreventDefault(handleButtonKeyDown),
             h.OnKeyUpPreventDefault(handleSpaceKeyUp),
-            h.OnClick(handleButtonClick()),
+            h.OnClick(Message.ClickedButton()),
           ]),
       ...(isVisible
         ? [

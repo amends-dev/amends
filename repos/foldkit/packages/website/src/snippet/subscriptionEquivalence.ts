@@ -5,17 +5,15 @@ import { defineMessageUnion } from 'foldkit/message'
 const Message = defineMessageUnion({
   AdvancedAutoScrollFrame: {},
 })
-type Message = typeof Message.Type
 
 const Model = Schema.Struct({
   isDragging: Schema.Boolean,
   clientY: Schema.Number,
 })
-type Model = typeof Model.Type
 
 const DragDefinition = Block.makeDefinition('Drag', { Model, Message })
 
-export const subscriptions = DragDefinition.subscriptions(entry => ({
+export const subscriptions = DragDefinition.makeSubscriptions(entry => ({
   autoScrollDuringDrag: entry(
     'AutoScrollDuringDrag',
     {

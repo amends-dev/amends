@@ -7,11 +7,11 @@ import { Message } from './message'
 import { Model } from './model'
 
 const ChatDefinition = Block.makeDefinition('Chat', { Model, Message })
-const ChatSocket = ChatDefinition.resource<WebSocket>()('ChatSocket')
+const ChatSocket = ChatDefinition.makeResource<WebSocket>()('ChatSocket')
 
 const RoomRequirements = Schema.Struct({ roomId: Schema.String })
 
-const managedResources = ChatDefinition.managedResources(entry => ({
+const managedResources = ChatDefinition.makeManagedResources(entry => ({
   chatSocket: entry('ManageChatSocket', Schema.Option(RoomRequirements), {
     resource: ChatSocket,
     modelToMaybeRequirements: model => model.maybeRoomRequirements,
@@ -29,7 +29,7 @@ const managedResources = ChatDefinition.managedResources(entry => ({
   }),
 }))
 
-const SendChatMessage = ChatDefinition.command('SendChatMessage', {
+const SendChatMessage = ChatDefinition.makeCommand('SendChatMessage', {
   args: { text: Schema.String },
   messages: [Message.SucceededSendChatMessage, Message.FailedSendChatMessage],
   handler: function* () {

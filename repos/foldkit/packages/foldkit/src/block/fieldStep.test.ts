@@ -2,10 +2,10 @@ import { Number, Schema } from 'effect'
 import { expect, expectTypeOf, it } from 'vitest'
 
 import { defineMessageUnion } from '../message/index.js'
-import { makeDefinition as makeApplicationDefinition } from '../runtime/applicationPublic.js'
 import { modifyFields } from '../struct/index.js'
 import * as Update from '../update/public.js'
 import { makeDefinition } from './define.js'
+import * as Block from './public.js'
 
 const Model = Schema.Struct({
   count: Schema.Number,
@@ -16,14 +16,14 @@ const FieldStepsDefinition = makeDefinition('FieldSteps', {
   Model,
   Message: Schema.Never,
 })
-const ApplicationDefinition = makeApplicationDefinition({
+const ApplicationDefinition = Block.makeDefinition('Application', {
   Model,
   Message: Schema.Never,
 })
 
 it('contextually types fields and preserves valid result refinements', () => {
   let evaluations = 0
-  const ready = FieldStepsDefinition.stepFields(model => {
+  const ready = FieldStepsDefinition.makeFieldsStep(model => {
     evaluations += 1
     expectTypeOf(model).toEqualTypeOf<typeof Model.Type>()
 
@@ -53,10 +53,9 @@ it('contextually types fields and preserves valid result refinements', () => {
   expect(evaluations).toBe(1)
   expectTypeOf<typeof next.model.status>().toEqualTypeOf<'Ready'>()
   expectTypeOf<Update.RequirementsOf<typeof ready>>().toEqualTypeOf<never>()
-  // @ts-expect-error Field Steps do not produce Commands.
-  next.commands
-  // @ts-expect-error Field Steps do not produce an OutMessage.
-  next.outMessage
+  expectTypeOf<typeof next.commands>().toEqualTypeOf<undefined>()
+  expectTypeOf<typeof next.outMessage>().toEqualTypeOf<undefined>()
+  expect(Object.keys(next)).toEqual(['model'])
 })
 
 it('combines ordinary field Steps sequentially for Blocks and Applications', () => {
@@ -65,9 +64,9 @@ it('combines ordinary field Steps sequentially for Blocks and Applications', () 
     label: 'Example',
     status: 'Idle',
   })
-  const update = Update.combine([
-    FieldStepsDefinition.stepFields(() => ({ count: Number.increment })),
-    ApplicationDefinition.stepFields(model => ({
+  const update = Update.combineSteps([
+    FieldStepsDefinition.makeFieldsStep(() => ({ count: Number.increment })),
+    ApplicationDefinition.makeFieldsStep(model => ({
       label: () => `${model.count}`,
     })),
   ])
@@ -87,15 +86,15 @@ it('returns the identical refined Model with no other result channels', () => {
     status: 'Ready',
     extra: true,
   })
-  const result = FieldStepsDefinition.stepNoop()(model)
+  const result = FieldStepsDefinition.makeNoopStep()(model)
 
   expect(result).toEqual({ model })
   expect(result.model).toBe(model)
   expectTypeOf<typeof result.model>().toEqualTypeOf<typeof RefinedModel.Type>()
   expectTypeOf<
-    Update.RequirementsOf<ReturnType<typeof FieldStepsDefinition.stepNoop>>
+    Update.RequirementsOf<ReturnType<typeof FieldStepsDefinition.makeNoopStep>>
   >().toEqualTypeOf<never>()
-  expect(ApplicationDefinition.stepNoop()(model).model).toBe(model)
+  expect(ApplicationDefinition.makeNoopStep()(model).model).toBe(model)
 })
 
 it('preserves a child transition when an OutMessage policy has no parent transition', () => {
@@ -108,17 +107,22 @@ it('preserves a child transition when an OutMessage policy has no parent transit
     OutMessage: ChildOutMessage,
   })
   const ChildComposition = ChildDefinition.makeComposition()
-  const ChildBlock = ChildComposition.assembleBlock({
-    init: ChildComposition.makeInit(() => ({ model: { count: 0 } })),
-    update: ChildComposition.makeUpdate((model, message) =>
-      ChildMessage.match(message, {
-        ClickedIncrement: () => ({
-          model: modifyFields(model, { count: Number.increment }),
-          outMessage: ChildOutMessage.Incremented(),
+  const prepareChildBlock = () =>
+    ChildComposition.prepareBlock({
+      init: ChildComposition.makeInit(() => ({ model: { count: 0 } })),
+      update: ChildComposition.makeUpdate((model, message) =>
+        ChildMessage.match(message, {
+          ClickedIncrement: () => ({
+            model: modifyFields(model, { count: Number.increment }),
+            outMessage: ChildOutMessage.Incremented(),
+          }),
         }),
-      }),
-    ),
-  })
+      ),
+    })
+  const ChildBlock: Block.FromAssemblyWithOutMessage<
+    typeof ChildModel,
+    typeof prepareChildBlock
+  > = Block.assemble(prepareChildBlock)
   const ParentModel = Schema.Struct({ child: ChildModel, label: Schema.String })
   type ParentModel = typeof ParentModel.Type
   type ParentMessage = never
@@ -128,12 +132,11 @@ it('preserves a child transition when an OutMessage policy has no parent transit
   })
   const foldChildOutMessage = (outMessage: typeof ChildOutMessage.Type) =>
     ChildOutMessage.match<Update.Step<ParentModel, ParentMessage>>(outMessage, {
-      Incremented: () => ParentDefinition.stepNoop(),
+      Incremented: () => ParentDefinition.makeNoopStep(),
     })
-  const ChildBinding = ParentDefinition.bindChild(ChildBlock, {
+  const ChildBinding = ParentDefinition.makeBinding(ChildBlock, {
     field: 'child',
-    outMessage: { fold: foldChildOutMessage },
-  })
+  }).withOutMessagePolicy({ fold: foldChildOutMessage })
   const ParentComposition = ParentDefinition.makeComposition({
     bindings: [ChildBinding],
   })
@@ -178,29 +181,29 @@ const TextDefinition = makeDefinition('TextFieldSteps', {
 })
 
 if (false) {
-  FieldStepsDefinition.stepFields(() => ({ count: Number.increment }))
-  VariantDefinition.stepFields(() => ({ id: () => 'next' }))
-  TextDefinition.stepNoop()('unchanged')
+  FieldStepsDefinition.makeFieldsStep(() => ({ count: Number.increment }))
+  VariantDefinition.makeFieldsStep(() => ({ id: () => 'next' }))
+  TextDefinition.makeNoopStep()('unchanged')
 
   // @ts-expect-error Unknown fields cannot be silently ignored.
-  FieldStepsDefinition.stepFields(() => ({ extra: () => 1 }))
+  FieldStepsDefinition.makeFieldsStep(() => ({ extra: () => 1 }))
   // @ts-expect-error Unknown fields remain invalid alongside known fields.
-  FieldStepsDefinition.stepFields(() => ({
+  FieldStepsDefinition.makeFieldsStep(() => ({
     count: Number.increment,
     extra: () => 1,
   }))
-  FieldStepsDefinition.stepFields(() => ({
+  FieldStepsDefinition.makeFieldsStep(() => ({
     // @ts-expect-error Field transformers must receive the declared field type.
     count: (value: string) => value.length,
   }))
   // @ts-expect-error Field transformers must preserve the declared field type.
-  FieldStepsDefinition.stepFields(() => ({ count: () => 'invalid' }))
+  FieldStepsDefinition.makeFieldsStep(() => ({ count: () => 'invalid' }))
   // @ts-expect-error A transformation cannot invalidate a tagged Model variant.
-  VariantDefinition.stepFields(() => ({ _tag: () => 'Flag' }))
+  VariantDefinition.makeFieldsStep(() => ({ _tag: () => 'Flag' }))
   // @ts-expect-error Primitive Models do not have struct field transformations.
-  TextDefinition.stepFields(() => ({}))
+  TextDefinition.makeFieldsStep(() => ({}))
   // @ts-expect-error The no-op accepts no callback or configuration.
-  FieldStepsDefinition.stepNoop(() => undefined)
+  FieldStepsDefinition.makeNoopStep(() => undefined)
   // @ts-expect-error A no-op still checks its owner's Model.
-  FieldStepsDefinition.stepNoop()({ count: 'invalid' })
+  FieldStepsDefinition.makeNoopStep()({ count: 'invalid' })
 }

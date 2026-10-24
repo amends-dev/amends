@@ -2,7 +2,7 @@
 'foldkit': minor
 ---
 
-Subscriptions declare the Message Schemas their Streams can emit. Create them through the owning definition's `subscriptions`. Use `entry('HeartbeatTicks', { messages: [Message.Ticked], handler: function* () { return () => stream } })` when there are no local Model dependencies, or put the same `handler` field in the callbacks config for a dependency-bearing entry. Foldkit applies `Effect.gen` internally. The entry exposes the attached recipe as `.layer`; `toLayer` remains available for an external alternative.
+Subscriptions declare the Message Schemas their Streams can emit. Create them through the owning definition's `makeSubscriptions`. Use `entry('HeartbeatTicks', { messages: [Message.Ticked], handler: function* () { return () => stream } })` when there are no local Model dependencies, or put the same `handler` field in the callbacks config for a dependency-bearing entry. Foldkit applies `Effect.gen` internally. The entry exposes the attached recipe as `.layer`; `toLayer` remains available for an external alternative.
 
 The handler name identifies the Layer requirement that application assembly must satisfy. The record key identifies the runtime registration whose Stream Foldkit starts and stops. Several lifted registrations can share one definition and handler Layer while keeping separate Stream scopes. Subscription lifecycle display in DevTools remains follow-up work.
 
@@ -26,7 +26,7 @@ const subscriptions = Subscription.make<Model, Message>()(_entry => ({
 **After**
 
 ```ts
-const subscriptions = FeatureDefinition.subscriptions(entry => ({
+const subscriptions = FeatureDefinition.makeSubscriptions(entry => ({
   animationFrameTicks: entry(
     // A named handler replaces the anonymous animation-frame helper.
     'AnimationFrameTicks',
@@ -50,13 +50,18 @@ const subscriptions = FeatureDefinition.subscriptions(entry => ({
 const EffectsLayer = subscriptions.layer
 const FeatureComposition = FeatureDefinition.makeComposition()
 
-export const FeatureBlock = FeatureComposition.assembleBlock({
-  init,
-  update,
-  view,
-  subscriptions,
-  EffectsLayer,
-})
+const prepare = () =>
+  FeatureComposition.prepareBlock({
+    init,
+    update,
+    view,
+    subscriptions,
+    EffectsLayer,
+  })
+export const FeatureBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)
 ```
 
 Build inbound Port handlers from `Port.stream(port)`. This example assumes `ports.inbound.stepChanged` is an inbound Port and `Feature` is the owning Block definition.
@@ -79,7 +84,7 @@ const subscriptions = Subscription.aggregate(
 **After**
 
 ```ts
-const subscriptions = FeatureDefinition.subscriptions(entry => ({
+const subscriptions = FeatureDefinition.makeSubscriptions(entry => ({
   hostStep: entry('HostStepChanges', {
     messages: [Message.ChangedStep],
     handler: function* () {
@@ -95,11 +100,16 @@ const subscriptions = FeatureDefinition.subscriptions(entry => ({
 const EffectsLayer = subscriptions.layer
 const FeatureComposition = FeatureDefinition.makeComposition()
 
-export const FeatureBlock = FeatureComposition.assembleBlock({
-  init,
-  update,
-  view,
-  subscriptions,
-  EffectsLayer,
-})
+const prepare = () =>
+  FeatureComposition.prepareBlock({
+    init,
+    update,
+    view,
+    subscriptions,
+    EffectsLayer,
+  })
+export const FeatureBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)
 ```

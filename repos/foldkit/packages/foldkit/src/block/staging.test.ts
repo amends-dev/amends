@@ -4,6 +4,7 @@ import { expect, expectTypeOf, it } from 'vitest'
 import { defineMessageUnion } from '../message/index.js'
 import { modifyFields } from '../struct/index.js'
 import { makeDefinition, makeNamespace } from './define.js'
+import * as Block from './public.js'
 
 class ObserveDependency extends Context.Service<ObserveDependency, object>()(
   'BlockStaging/ObserveDependency',
@@ -21,7 +22,7 @@ const ChildMessage = defineMessageUnion({
 })
 type ChildMessage = typeof ChildMessage.Type
 
-const Observe = ChildNamespace.mount('Observe', {
+const Observe = ChildNamespace.makeMount('Observe', {
   messages: [ChildMessage.CompletedObserve],
   handler: function* () {
     yield* ObserveDependency
@@ -31,7 +32,7 @@ const Observe = ChildNamespace.mount('Observe', {
   },
 })
 
-const Measure = ChildNamespace.mount('Measure', {
+const Measure = ChildNamespace.makeMount('Measure', {
   messages: [ChildMessage.CompletedMeasure],
 })
 
@@ -57,25 +58,29 @@ const defaultView = observeComposition.makeView.withInputs<
   h.div([h.OnMount(Observe())], [`${label}: ${model.value}`]),
 )
 
-const Child = observeComposition.assembleBlock({
-  init: () => ({ model: ChildModel.make({ value: 'initial' }) }),
-  update: observeComposition.makeUpdate(model => ({ model })),
-  view: defaultView,
-  EffectsLayer: Observe.layer,
-})
+const prepareChild = () =>
+  observeComposition.prepareBlock({
+    init: () => ({ model: ChildModel.make({ value: 'initial' }) }),
+    update: observeComposition.makeUpdate(model => ({ model })),
+    view: defaultView,
+    EffectsLayer: Observe.layer,
+  })
+const Child: Block.FromAssemblyWithView<
+  typeof ChildModel,
+  typeof prepareChild
+> = Block.assemble(prepareChild)
 
 const ParentModel = Schema.Struct({ child: ChildModel })
-type ParentModel = typeof ParentModel.Type
 const Parent = makeDefinition('StagedParent', {
   Model: ParentModel,
   Message: Schema.Never,
 })
 
-const DirectChildBinding = Parent.bindChild(Child, {
+const DirectChildBinding = Parent.makeBinding(Child, {
   field: 'child',
 })
 
-const ExplicitChildBinding = Parent.bindChild(Child, {
+const ExplicitChildBinding = Parent.makeBinding(Child, {
   read: model => Option.some(model.child),
   write: (_model, child) => ParentModel.make({ child }),
 })
@@ -111,7 +116,7 @@ if (false) {
     ]),
   )
 
-  graphlessComposition.assembleBlock({
+  graphlessComposition.prepareBlock({
     init: Child.init,
     update: Child.update,
     // @ts-expect-error A graphless Composition cannot complete a Mount-capable view.
@@ -163,9 +168,9 @@ it('creates independent immutable graphs from one typed Base', () => {
   void graphlessView
   expect(observeComposition.owner).toBe(ChildBaseDefinition.owner)
   expect(observeComposition.makeUpdate).toBeTypeOf('function')
-  expect(observeComposition).not.toHaveProperty('step')
-  expect(observeComposition).not.toHaveProperty('subscriptions')
-  expect(observeComposition).not.toHaveProperty('managedResources')
+  expect(observeComposition).not.toHaveProperty('makeStep')
+  expect(observeComposition).not.toHaveProperty('makeSubscriptions')
+  expect(observeComposition).not.toHaveProperty('makeManagedResources')
   expect(measureComposition.owner).toBe(ChildBaseDefinition.owner)
   expect(observeComposition).not.toBe(measureComposition)
   expect(observeComposition.mounts).toEqual([Observe])
@@ -224,7 +229,7 @@ it('retains contextual update and Step inference after registration', () => {
     expectTypeOf(message).toEqualTypeOf<ChildMessage>()
     return { model }
   })
-  const setValue = ChildBaseDefinition.step((model, value: string) => {
+  const setValue = ChildBaseDefinition.makeStep((model, value: string) => {
     expectTypeOf(model).toEqualTypeOf<ChildModel>()
     return { model: modifyFields(model, { value: () => value }) }
   })

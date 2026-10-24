@@ -48,7 +48,7 @@ const streamChatSocketMessages = (socket: Socket.WebSocketLike) =>
     ).pipe(Effect.flatMap(() => Effect.never)),
   )
 
-export const subscriptions = ApplicationDefinition.subscriptions(entry => ({
+export const subscriptions = ApplicationDefinition.makeSubscriptions(entry => ({
   chatSocketMessages: entry(
     'ChatSocketMessages',
     { isConnected: Schema.Boolean },

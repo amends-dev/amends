@@ -8,7 +8,7 @@ import { ProductsComposition } from './composition'
 import { Message } from './definition'
 
 export type ViewInputs = Readonly<{
-  cart: Cart.Cart
+  cart: typeof Cart.Cart.Type
 }>
 
 export const view = ProductsComposition.makeView.withInputs<ViewInputs>(

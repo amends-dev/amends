@@ -1,7 +1,12 @@
 import { Array, Option, Predicate, Schema, SchemaAST } from 'effect'
 
 import type * as Update from '../update/index.js'
+import { assertCompletedBlock } from './assemblyState.js'
 import { type BindableBlock, type Binding, bind } from './binding.js'
+import {
+  attachOutMessagePolicy,
+  deferredOutMessagePolicy,
+} from './bindingOutMessagePolicy.js'
 import {
   type ChildEnvelope,
   type KeyedChildEnvelope,
@@ -35,6 +40,7 @@ import {
   normalizeKeyedFieldConfig,
   wrappedKeyedInitialPolicyOf,
 } from './keyedFieldConnection.js'
+import type { OutMessageHelperEvidence } from './outMessageHelperEvidence.js'
 import type { ValidateConcreteComposition } from './requirements.js'
 import type { Qualify } from './scope.js'
 
@@ -100,6 +106,19 @@ type PolicyStepReturn<ParentModel, ParentMessage, ParentOutMessageValue> =
     outMessage?: ParentOutMessageValue
   }>
 
+type ParentOwnedOutMessageFold<
+  ParentModel,
+  ChildMessage,
+  ParentMessage,
+  ChildOutMessage,
+  ParentOutMessageValue,
+> = (
+  outMessage: ChildOutMessage,
+  context: Update.FoldContext<ChildMessage, ParentMessage, ParentModel>,
+) => (
+  model: ParentModel,
+) => PolicyStepReturn<ParentModel, ParentMessage, ParentOutMessageValue>
+
 type ParentOwnedOutMessagePolicy<
   ParentModel,
   ChildMessage,
@@ -108,32 +127,32 @@ type ParentOwnedOutMessagePolicy<
   ParentOutMessageValue,
 > =
   | Readonly<{
-      fold: (
-        outMessage: ChildOutMessage,
-        context: Update.FoldContext<ChildMessage, ParentMessage, ParentModel>,
-      ) => (
-        model: ParentModel,
-      ) => PolicyStepReturn<ParentModel, ParentMessage, ParentOutMessageValue>
+      /** Handles a child fact locally. The returned Step receives the parent
+       * Model after the next child Model has been written. */
+      fold: ParentOwnedOutMessageFold<
+        ParentModel,
+        ChildMessage,
+        ParentMessage,
+        ChildOutMessage,
+        ParentOutMessageValue
+      >
       forward?: never
     }>
   | ([ParentOutMessageValue] extends [never]
       ? never
       : Readonly<{
+          /** Maps a child fact to the declared parent OutMessage, or returns
+           * undefined for a named variant that stops at this boundary. */
           forward: (
             outMessage: ChildOutMessage,
           ) => ParentOutMessageValue | undefined
-          fold?: (
-            outMessage: ChildOutMessage,
-            context: Update.FoldContext<
-              ChildMessage,
-              ParentMessage,
-              ParentModel
-            >,
-          ) => (
-            model: ParentModel,
-          ) => PolicyStepReturn<
+          /** Also handles the fact locally. An OutMessage returned by this
+           * Step takes precedence over the forwarded OutMessage. */
+          fold?: ParentOwnedOutMessageFold<
             ParentModel,
+            ChildMessage,
             ParentMessage,
+            ChildOutMessage,
             ParentOutMessageValue
           >
         }>)
@@ -147,6 +166,8 @@ type ParentOwnedKeyedOutMessagePolicy<
   Key,
 > =
   | Readonly<{
+      /** Handles a child fact locally. The returned Step receives the parent
+       * Model after the next child Model has been written. */
       fold: (
         key: Key,
         outMessage: ChildOutMessage,
@@ -159,10 +180,14 @@ type ParentOwnedKeyedOutMessagePolicy<
   | ([ParentOutMessageValue] extends [never]
       ? never
       : Readonly<{
+          /** Maps a child fact to the declared parent OutMessage, or returns
+           * undefined for a named variant that stops at this boundary. */
           forward: (
             key: Key,
             outMessage: ChildOutMessage,
           ) => ParentOutMessageValue | undefined
+          /** Also handles the fact locally. An OutMessage returned by this
+           * Step takes precedence over the forwarded OutMessage. */
           fold?: (
             key: Key,
             outMessage: ChildOutMessage,
@@ -895,9 +920,17 @@ type ValidateStaticInitialPolicy<
       toItem: infer ToItem extends (...args: ReadonlyArray<any>) => any
     }>
   }>
-    ? ValidationResult<
-        ValidateInitialResolver<Instances> & ValidateWrappedToItem<ToItem>
-      >
+    ? Config extends Readonly<{
+        field: infer Field extends keyof ParentModel
+      }>
+      ? ParentModel[Field] extends Option.Option<unknown>
+        ? InvalidBindChildConfig<'Option-wrapped keyed child initialization remains parent-owned; use Binding.init with toParentModel'>
+        : ValidationResult<
+            ValidateInitialResolver<Instances> & ValidateWrappedToItem<ToItem>
+          >
+      : ValidationResult<
+          ValidateInitialResolver<Instances> & ValidateWrappedToItem<ToItem>
+        >
     : Config extends Readonly<{ key: unknown; init: unknown }>
       ? InvalidBindChildConfig<'Keyed child initialization requires an instances policy'>
       : Config extends Readonly<{
@@ -947,42 +980,12 @@ type ValidateStaticInitialPolicy<
                 : readonly []
               : readonly []
 
-type ValidateOutMessagePolicyPresence<BlockValue extends BindableBlock, Keys> =
-  BlockValue extends Readonly<{ OutMessage: Readonly<{ Type: unknown }> }>
-    ? 'outMessage' extends Keys
-      ? readonly []
-      : InvalidBindChildConfig<'A child declaring OutMessage requires an outMessage policy'>
-    : readonly []
-
-type RequiredOutMessagePolicy<BlockValue extends BindableBlock> =
-  BlockValue extends Readonly<{ OutMessage: Readonly<{ Type: unknown }> }>
-    ? Readonly<{ outMessage: unknown }>
-    : unknown
-
 type ValidateConcreteCompositionArguments<BlockValue extends BindableBlock> =
   unknown extends ValidateConcreteComposition<BlockValue>
     ? readonly []
     : readonly [error: ValidateConcreteComposition<BlockValue>]
 
-type ValidateStaticBindChildSource<
-  BlockValue extends BindableBlock,
-  ParentModelSchema extends AnySchema,
-  Keys,
-  Field extends string,
-  KeyField extends string,
-  ChildField extends string,
-  Config,
-> = ValidateStaticBindingConfig<
-  BlockValue,
-  ParentModelSchema,
-  Keys,
-  Field,
-  KeyField,
-  ChildField,
-  Config
->
-
-type ValidateStaticBindingConfig<
+type ValidateStaticBindingConfigWithoutPolicy<
   BlockValue extends BindableBlock,
   ParentModelSchema extends AnySchema,
   Keys,
@@ -991,52 +994,47 @@ type ValidateStaticBindingConfig<
   ChildField extends string,
   Config,
 > =
-  ValidateOutMessagePolicyPresence<BlockValue, Keys> extends readonly []
-    ? IsAny<Config> extends true
-      ? InvalidBindChildConfig<'Binding config cannot use any'>
-      : IsUnknown<Config> extends true
-        ? InvalidBindChildConfig<'Binding config cannot use unknown'>
-        : true extends IsUnion<Config>
-          ? InvalidBindChildConfig<'Binding config must be one concrete object type'>
-          : ValidateBindChildConfigKeys<Config> extends readonly []
-            ? ValidateInitialKeys<Config> extends readonly []
-              ? ValidateProjectedInitialModel<
-                  ParentModelSchema['Type'],
-                  Config
+  IsAny<Config> extends true
+    ? InvalidBindChildConfig<'Binding config cannot use any'>
+    : IsUnknown<Config> extends true
+      ? InvalidBindChildConfig<'Binding config cannot use unknown'>
+      : true extends IsUnion<Config>
+        ? InvalidBindChildConfig<'Binding config must be one concrete object type'>
+        : ValidateBindChildConfigKeys<Config> extends readonly []
+          ? ValidateInitialKeys<Config> extends readonly []
+            ? ValidateProjectedInitialModel<
+                ParentModelSchema['Type'],
+                Config
+              > extends readonly []
+              ? ValidateStaticStorage<
+                  BlockValue,
+                  ParentModelSchema,
+                  Keys,
+                  Field,
+                  KeyField,
+                  ChildField
                 > extends readonly []
-                ? ValidateStaticStorage<
+                ? ValidateStaticMessageMapping<
+                    BlockValue,
+                    Keys
+                  > extends readonly []
+                  ? ValidateStaticInitialPolicy<
+                      BlockValue,
+                      ParentModelSchema['Type'],
+                      Config
+                    >
+                  : ValidateStaticMessageMapping<BlockValue, Keys>
+                : ValidateStaticStorage<
                     BlockValue,
                     ParentModelSchema,
                     Keys,
                     Field,
                     KeyField,
                     ChildField
-                  > extends readonly []
-                  ? ValidateStaticMessageMapping<
-                      BlockValue,
-                      Keys
-                    > extends readonly []
-                    ? ValidateStaticInitialPolicy<
-                        BlockValue,
-                        ParentModelSchema['Type'],
-                        Config
-                      >
-                    : ValidateStaticMessageMapping<BlockValue, Keys>
-                  : ValidateStaticStorage<
-                      BlockValue,
-                      ParentModelSchema,
-                      Keys,
-                      Field,
-                      KeyField,
-                      ChildField
-                    >
-                : ValidateProjectedInitialModel<
-                    ParentModelSchema['Type'],
-                    Config
                   >
-              : ValidateInitialKeys<Config>
-            : ValidateBindChildConfigKeys<Config>
-    : ValidateOutMessagePolicyPresence<BlockValue, Keys>
+              : ValidateProjectedInitialModel<ParentModelSchema['Type'], Config>
+            : ValidateInitialKeys<Config>
+          : ValidateBindChildConfigKeys<Config>
 
 type ContextualKeyedOutMessageConfig<
   BlockValue extends BindableBlock,
@@ -1081,76 +1079,25 @@ type StaticOutMessageContext<
 type ContextualPolicyFunction<Callback> = Callback extends (
   ...args: ReadonlyArray<any>
 ) => any
-  ? { call(...args: Parameters<Callback>): any }['call']
+  ? (...args: Parameters<Callback>) => any
   : Callback
+
+type ContextualPolicyFold<Fold> = Fold extends (
+  ...args: ReadonlyArray<any>
+) => any
+  ? ContextualPolicyFunction<Fold>
+  : Fold
 
 type ContextualOutMessagePolicy<Policy> = Policy extends unknown
-  ? { [Key in keyof Policy]: ContextualPolicyFunction<Policy[Key]> }
+  ? {
+      [Key in keyof Policy]: Key extends 'fold'
+        ? ContextualPolicyFold<Policy[Key]>
+        : ContextualPolicyFunction<Policy[Key]>
+    }
   : never
 
-type PolicyFunctionDomain<Callback> = Callback extends (
-  ...args: infer Arguments
-) => any
-  ? (...args: Arguments) => any
-  : Callback
-
-type PolicyDomains<Policy> = Policy extends unknown
-  ? { [Key in keyof Policy]: PolicyFunctionDomain<Policy[Key]> }
-  : never
-
-type ValidateOutMessagePolicyDomain<Config, Context> =
-  Config extends Readonly<{ outMessage: infer Policy }>
-    ? PolicyDomains<Policy> extends PolicyDomains<Context>
-      ? readonly []
-      : InvalidBindChildConfig<'OutMessage policy must accept every child OutMessage and collection key'>
-    : readonly []
-
-type ValidateGeneralKeyedPolicy<
-  BlockValue extends BindableBlock,
-  ParentModelSchema extends AnySchema,
-  ParentMessageSchema extends AnySchema,
-  ParentOutMessageSchema extends AnySchema | undefined,
-  KeyValue extends InstanceKey,
-  Config,
-> =
-  Config extends Readonly<{ outMessage: infer Policy }>
-    ? PolicyDomains<Policy> extends PolicyDomains<
-        KeyedOutMessageContext<
-          'readAll',
-          BlockValue,
-          ParentModelSchema,
-          ParentMessageSchema,
-          ParentOutMessageSchema,
-          KeyValue,
-          never,
-          never
-        >
-      >
-      ? readonly []
-      : InvalidBindChildConfig<'OutMessage policy must accept every child OutMessage and collection key'>
-    : readonly []
-
-type ValidateGeneralKeyedSource<
-  BlockValue extends BindableBlock,
-  ParentModelSchema extends AnySchema,
-  ParentMessageSchema extends AnySchema,
-  ParentOutMessageSchema extends AnySchema | undefined,
-  KeyValue extends InstanceKey,
-  Keys,
-  Config,
-> =
-  ValidateOutMessagePolicyPresence<BlockValue, Keys> extends readonly []
-    ? ValidateBindChildConfigKeys<Config> extends readonly []
-      ? ValidateGeneralKeyedPolicy<
-          BlockValue,
-          ParentModelSchema,
-          ParentMessageSchema,
-          ParentOutMessageSchema,
-          KeyValue,
-          Config
-        >
-      : ValidateBindChildConfigKeys<Config>
-    : ValidateOutMessagePolicyPresence<BlockValue, Keys>
+type ValidateGeneralKeyedSourceWithoutPolicy<Config> =
+  ValidateBindChildConfigKeys<Config>
 
 type GeneralKeyedConfigKey =
   | 'placement'
@@ -1298,7 +1245,17 @@ type KeySchemaForConfig<
                 ? ItemFields[KeyField]
                 : never
               : never
-            : never
+            : ParentFields[Field] extends Schema.Option<
+                  infer ItemSchema extends Schema.Top
+                >
+              ? ItemSchema extends Readonly<{
+                  fields: infer ItemFields extends Schema.Struct.Fields
+                }>
+                ? KeyField extends keyof ItemFields
+                  ? ItemFields[KeyField]
+                  : never
+                : never
+              : never
           : never
         : never
       : Config extends Readonly<{ key: infer KeyField extends string }>
@@ -1882,6 +1839,232 @@ type BindChildResultForConfig<
                   PolicyOfConfig<Config>
                 >
 
+declare const PendingOutMessagePolicyTypeId: unique symbol
+
+/** @internal Marks a Binding whose policy must be selected before Composition. */
+export interface UnselectedOutMessagePolicy {
+  readonly [PendingOutMessagePolicyTypeId]: true
+}
+
+type KeyOfBindingConfig<
+  BlockValue extends BindableBlock,
+  ParentModelSchema extends AnySchema,
+  Config,
+> =
+  Config extends Readonly<{
+    readAll: (...args: ReadonlyArray<any>) => ReadonlyArray<unknown>
+    keySchema: infer KeySchema extends Schema.Top
+  }>
+    ? Extract<KeySchema['Type'], InstanceKey>
+    : Config extends Readonly<{
+          readAll: (...args: ReadonlyArray<any>) => ReadonlyArray<unknown>
+          key: (...args: ReadonlyArray<any>) => infer Key extends InstanceKey
+        }>
+      ? Key
+      : Config extends Readonly<{
+            childField: string
+            field: infer Field extends keyof ParentModelSchema['Type'] & string
+            key: infer KeyField extends string
+          }>
+        ? KeyAt<WrappedItemAt<ParentModelSchema['Type'], Field>, KeyField>
+        : Config extends Readonly<{
+              field: string
+              key: infer KeyField extends keyof BlockValue['Model']['Type'] &
+                string
+            }>
+          ? KeyAt<BlockValue['Model']['Type'], KeyField>
+          : never
+
+type OutMessagePolicyForBindingConfig<
+  BlockValue extends BindableBlock,
+  ParentModelSchema extends AnySchema,
+  ParentMessageSchema extends AnySchema,
+  ParentOutMessageSchema extends AnySchema | undefined,
+  Config,
+> =
+  Config extends Readonly<{ key: unknown }>
+    ? ContextualKeyedOutMessageConfig<
+        BlockValue,
+        ParentModelSchema['Type'],
+        ParentMessageSchema['Type'],
+        ParentOutMessage<ParentOutMessageSchema>,
+        KeyOfBindingConfig<BlockValue, ParentModelSchema, Config>
+      > extends Readonly<{ outMessage: infer Policy }>
+      ? Policy
+      : never
+    : StaticOutMessageContext<
+        BlockValue,
+        ParentModelSchema,
+        ParentMessageSchema,
+        ParentOutMessageSchema
+      >
+
+type InvalidOutMessageHelperMember<BlockValue, Key, Candidate> =
+  Candidate extends OutMessageHelperEvidence<
+    infer HelperOutMessage,
+    infer HelperRole
+  >
+    ? IsAny<HelperOutMessage> extends true
+      ? Key
+      : IsUnknown<HelperOutMessage> extends true
+        ? Key
+        : Equal<Key, HelperRole> extends true
+          ? BlockValue extends Readonly<{
+              OutMessage: Readonly<{
+                Type: infer ChildOutMessage
+                match: (...args: ReadonlyArray<any>) => any
+              }>
+            }>
+            ? Equal<HelperOutMessage, ChildOutMessage> extends true
+              ? never
+              : Key
+            : Key
+          : Key
+    : never
+
+type InvalidOutMessageHelperPolicyKeys<BlockValue, Policy> =
+  Policy extends unknown
+    ? {
+        [Key in keyof Policy]-?: InvalidOutMessageHelperMember<
+          BlockValue,
+          Key,
+          NonNullable<Policy[Key]>
+        >
+      }[keyof Policy]
+    : never
+
+type ValidateOutMessageHelperPolicy<BlockValue, Policy> = [
+  InvalidOutMessageHelperPolicyKeys<BlockValue, Policy>,
+] extends [never]
+  ? unknown
+  : Readonly<{
+      'OutMessage helpers must use the exact tagged-union child OutMessage contract': InvalidOutMessageHelperPolicyKeys<
+        BlockValue,
+        Policy
+      >
+    }>
+
+/** Selects the exact parent-owned OutMessage policy for a child Binding. */
+export interface WithOutMessagePolicy<
+  BlockValue extends BindableBlock,
+  ParentModelSchema extends AnySchema,
+  ParentMessageSchema extends AnySchema,
+  ParentOutMessageSchema extends AnySchema | undefined,
+  Config,
+  ChildInitContext,
+> {
+  <const Policy>(
+    policy: Policy &
+      ContextualOutMessagePolicy<
+        OutMessagePolicyForBindingConfig<
+          BlockValue,
+          ParentModelSchema,
+          ParentMessageSchema,
+          ParentOutMessageSchema,
+          Config
+        >
+      > &
+      ValidateOutMessageHelperPolicy<BlockValue, NoInfer<Policy>>,
+  ): SelectedChildBinding<
+    BlockValue,
+    ParentModelSchema,
+    ParentMessageSchema,
+    ParentOutMessageSchema,
+    Config,
+    ChildInitContext,
+    Policy
+  >
+}
+
+/** A fully usable child Binding with an exact selected OutMessage policy. */
+export type SelectedChildBinding<
+  BlockValue extends BindableBlock,
+  ParentModelSchema extends AnySchema,
+  ParentMessageSchema extends AnySchema,
+  ParentOutMessageSchema extends AnySchema | undefined,
+  Config,
+  ChildInitContext,
+  Policy,
+> = BindChildResultForConfig<
+  BlockValue,
+  ParentModelSchema,
+  ParentMessageSchema,
+  ParentOutMessageSchema,
+  Config & Readonly<{ outMessage: Policy }>,
+  ChildInitContext
+> &
+  Readonly<{
+    /** Selects another Composition-local policy for the same child occurrence.
+     * The returned full Binding is immutable and the current Binding remains
+     * unchanged. */
+    withOutMessagePolicy: WithOutMessagePolicy<
+      BlockValue,
+      ParentModelSchema,
+      ParentMessageSchema,
+      ParentOutMessageSchema,
+      Config,
+      ChildInitContext
+    >
+  }>
+
+/** A full child Binding whose parent-owned OutMessage policy must be selected
+ * before Composition registration. */
+export type BindingWithoutOutMessagePolicy<
+  BlockValue extends BindableBlock,
+  ParentModelSchema extends AnySchema,
+  ParentMessageSchema extends AnySchema,
+  ParentOutMessageSchema extends AnySchema | undefined,
+  Config,
+  ChildInitContext,
+> = BindChildResultForConfig<
+  BlockValue,
+  ParentModelSchema,
+  ParentMessageSchema,
+  ParentOutMessageSchema,
+  Config & Readonly<{ outMessage: UnselectedOutMessagePolicy }>,
+  ChildInitContext
+> &
+  Readonly<{
+    /** Selects a Composition-local OutMessage policy for this child occurrence.
+     * The returned full Binding is immutable and this Binding remains
+     * unchanged. Composition reports an error when this Binding is registered
+     * without selecting a policy. */
+    withOutMessagePolicy: WithOutMessagePolicy<
+      BlockValue,
+      ParentModelSchema,
+      ParentMessageSchema,
+      ParentOutMessageSchema,
+      Config,
+      ChildInitContext
+    >
+  }>
+
+type BindChildConstructorResult<
+  BlockValue extends BindableBlock,
+  ParentModelSchema extends AnySchema,
+  ParentMessageSchema extends AnySchema,
+  ParentOutMessageSchema extends AnySchema | undefined,
+  Config,
+  ChildInitContext,
+> =
+  BlockValue extends Readonly<{ OutMessage: Readonly<{ Type: unknown }> }>
+    ? BindingWithoutOutMessagePolicy<
+        BlockValue,
+        ParentModelSchema,
+        ParentMessageSchema,
+        ParentOutMessageSchema,
+        Config,
+        ChildInitContext
+      >
+    : BindChildResultForConfig<
+        BlockValue,
+        ParentModelSchema,
+        ParentMessageSchema,
+        ParentOutMessageSchema,
+        Config,
+        ChildInitContext
+      >
+
 /** Creates a static, optional, or keyed child Binding in this Definition's
  * parent Model, Message, and OutMessage context.
  *
@@ -1890,7 +2073,7 @@ type BindChildResultForConfig<
  * Model and Message types happen to match. Its Composition validates policy
  * outputs and the sibling Bindings used by those policies. Creating the Binding
  * records passive composition policy; a Runtime starts its lifecycle work later. */
-export interface BindChild<
+interface BindChildConstructor<
   ParentModelSchema extends AnySchema,
   ParentMessageSchema extends AnySchema,
   ParentOutMessageSchema extends AnySchema | undefined = undefined,
@@ -1913,7 +2096,7 @@ export interface BindChild<
   >(
     block: BlockValue,
     config: Source &
-      RequiredOutMessagePolicy<BlockValue> &
+      Readonly<{ outMessage?: never }> &
       BindChildContextualProperties<
         Keys,
         BlockValue,
@@ -1952,7 +2135,7 @@ export interface BindChild<
               : never
           >),
     ...validation: readonly [
-      ...ValidateStaticBindChildSource<
+      ...ValidateStaticBindingConfigWithoutPolicy<
         BlockValue,
         ParentModelSchema,
         NoInfer<Keys>,
@@ -1961,29 +2144,9 @@ export interface BindChild<
         NoInfer<ChildField>,
         NoInfer<Source>
       >,
-      ...ValidateOutMessagePolicyDomain<
-        NoInfer<Source>,
-        'key' extends NoInfer<Keys>
-          ? KeyedOutMessageContext<
-              NoInfer<Keys>,
-              BlockValue,
-              ParentModelSchema,
-              ParentMessageSchema,
-              ParentOutMessageSchema,
-              NoInfer<KeyValue>,
-              NoInfer<Field>,
-              NoInfer<KeyField>
-            >
-          : StaticOutMessageContext<
-              BlockValue,
-              ParentModelSchema,
-              ParentMessageSchema,
-              ParentOutMessageSchema
-            >
-      >,
       ...ValidateConcreteCompositionArguments<BlockValue>,
     ]
-  ): BindChildResultForConfig<
+  ): BindChildConstructorResult<
     BlockValue,
     ParentModelSchema,
     ParentMessageSchema,
@@ -2003,7 +2166,7 @@ export interface BindChild<
   >(
     block: BlockValue,
     config: Source &
-      RequiredOutMessagePolicy<BlockValue> &
+      Readonly<{ outMessage?: never }> &
       GeneralKeyedContextualProperties<
         Keys,
         BlockValue,
@@ -2034,18 +2197,10 @@ export interface BindChild<
         keySchema?: never
       }>,
     ...validation: readonly [
-      ...ValidateGeneralKeyedSource<
-        BlockValue,
-        ParentModelSchema,
-        ParentMessageSchema,
-        ParentOutMessageSchema,
-        KeyValue,
-        NoInfer<Keys>,
-        NoInfer<Source>
-      >,
+      ...ValidateGeneralKeyedSourceWithoutPolicy<NoInfer<Source>>,
       ...ValidateConcreteCompositionArguments<BlockValue>,
     ]
-  ): BindChildResultForConfig<
+  ): BindChildConstructorResult<
     BlockValue,
     ParentModelSchema,
     ParentMessageSchema,
@@ -2068,7 +2223,7 @@ export interface BindChild<
   >(
     block: BlockValue,
     config: Source &
-      RequiredOutMessagePolicy<BlockValue> &
+      Readonly<{ outMessage?: never }> &
       GeneralKeyedContextualProperties<
         Keys,
         BlockValue,
@@ -2110,18 +2265,10 @@ export interface BindChild<
               KeyValue
             >),
     ...validation: readonly [
-      ...ValidateGeneralKeyedSource<
-        BlockValue,
-        ParentModelSchema,
-        ParentMessageSchema,
-        ParentOutMessageSchema,
-        KeyValue,
-        NoInfer<Keys>,
-        NoInfer<Source>
-      >,
+      ...ValidateGeneralKeyedSourceWithoutPolicy<NoInfer<Source>>,
       ...ValidateConcreteCompositionArguments<BlockValue>,
     ]
-  ): BindChildResultForConfig<
+  ): BindChildConstructorResult<
     BlockValue,
     ParentModelSchema,
     ParentMessageSchema,
@@ -2130,6 +2277,20 @@ export interface BindChild<
     ChildInitContext
   >
 }
+
+/** Creates a child Binding before selecting its exact parent-owned policy with
+ * `withOutMessagePolicy`. */
+export interface BindChild<
+  ParentModelSchema extends AnySchema,
+  ParentMessageSchema extends AnySchema,
+  ParentOutMessageSchema extends AnySchema | undefined = undefined,
+  ChildInitContext = never,
+> extends BindChildConstructor<
+  ParentModelSchema,
+  ParentMessageSchema,
+  ParentOutMessageSchema,
+  ChildInitContext
+> {}
 
 const assertGeneralKeyedConfig = (config: object): void => {
   const allowedFields = new Set([
@@ -2627,58 +2788,18 @@ const registerAccessorInitialPolicy = (
   })
 }
 
-const assertOutMessagePolicy = (
-  block: BindableBlock,
-  parentOutMessage: AnySchema | undefined,
+const assertBindingConfig: (
   config: unknown,
-): void => {
-  if (!Predicate.isObject(config)) {
+) => asserts config is object = config => {
+  if (!Predicate.isObject(config) || globalThis.Array.isArray(config)) {
     throw new Error(
       '[foldkit] A child Binding requires a configuration object.',
     )
   }
 
-  const isOutMessageDeclared = Schema.isSchema(Reflect.get(block, 'OutMessage'))
-  const isPolicySupplied = Object.hasOwn(config, 'outMessage')
-
-  if (!isOutMessageDeclared) {
-    if (isPolicySupplied) {
-      throw new Error(
-        '[foldkit] A child Block without OutMessage cannot supply an outMessage policy.',
-      )
-    }
-    return
-  }
-
-  const policy = Reflect.get(config, 'outMessage')
-  if (!Predicate.isObject(policy)) {
+  if (Object.hasOwn(config, 'outMessage')) {
     throw new Error(
-      '[foldkit] A child Block declaring OutMessage requires an outMessage policy with a fold or forward function.',
-    )
-  }
-
-  const isFoldSupplied = 'fold' in policy
-  const isForwardSupplied = 'forward' in policy
-  if (!isFoldSupplied && !isForwardSupplied) {
-    throw new Error(
-      '[foldkit] An OutMessage policy requires a fold or forward function.',
-    )
-  }
-
-  if (isFoldSupplied && !Predicate.isFunction(Reflect.get(policy, 'fold'))) {
-    throw new Error('[foldkit] Binding outMessage.fold must be a function.')
-  }
-
-  if (
-    isForwardSupplied &&
-    !Predicate.isFunction(Reflect.get(policy, 'forward'))
-  ) {
-    throw new Error('[foldkit] Binding outMessage.forward must be a function.')
-  }
-
-  if (isForwardSupplied && parentOutMessage === undefined) {
-    throw new Error(
-      '[foldkit] Binding outMessage.forward requires an OutMessage Schema on the parent Definition.',
+      '[foldkit] Definition.makeBinding no longer accepts outMessage. Select a callable policy with Binding.withOutMessagePolicy({ fold, forward }).',
     )
   }
 }
@@ -2698,8 +2819,33 @@ export const makeBindChild = <
   }>,
 ): BindChild<ParentModelSchema, ParentMessageSchema, ParentOutMessageSchema> =>
   /* eslint-disable-next-line @typescript-eslint/consistent-type-assertions */
-  ((block: BindableBlock, config: unknown): unknown => {
-    assertOutMessagePolicy(block, parentContract.OutMessage, config)
+  ((block: BindableBlock, providedConfig: unknown): unknown => {
+    assertCompletedBlock(block)
+    assertBindingConfig(providedConfig)
+    const hasOutMessage = Schema.isSchema(Reflect.get(block, 'OutMessage'))
+    let currentBinding: Readonly<{ placement: string }> | undefined
+    const readBinding = () => {
+      if (currentBinding === undefined) {
+        throw new Error(
+          '[foldkit] A child Binding cannot handle OutMessages before construction finishes.',
+        )
+      }
+      return currentBinding
+    }
+    const config = hasOutMessage
+      ? { ...providedConfig, outMessage: deferredOutMessagePolicy(readBinding) }
+      : providedConfig
+    const finishBinding = <
+      BindingValue extends Readonly<{ placement: string }>,
+    >(
+      binding: BindingValue,
+    ) => {
+      currentBinding = binding
+      if (hasOutMessage) {
+        attachOutMessagePolicy(binding)
+      }
+      return Object.freeze(binding)
+    }
 
     if (Predicate.isObject(config)) {
       const hasDelivery = Object.hasOwn(config, 'delivery')
@@ -2776,7 +2922,7 @@ export const makeBindChild = <
       if (generated !== undefined) {
         registerGeneratedDelivery(binding, generated.envelope)
       }
-      return Object.freeze(binding)
+      return finishBinding(binding)
     }
 
     if (
@@ -2829,7 +2975,7 @@ export const makeBindChild = <
       if (init !== undefined) {
         registerBindingInitialPolicy(binding, init)
       }
-      return Object.freeze(binding)
+      return finishBinding(binding)
     }
 
     if (!Predicate.isObject(config)) {
@@ -2889,7 +3035,7 @@ export const makeBindChild = <
         config,
       )
     }
-    return Object.freeze(binding)
+    return finishBinding(binding)
   }) as unknown as BindChild<
     ParentModelSchema,
     ParentMessageSchema,

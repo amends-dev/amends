@@ -31,7 +31,7 @@ const longCode = pipe(
 const applicationCode = `const application = true\n${longCode}`
 const serverCode = `const entryServer = true\n${longCode}`
 
-const sources: ExampleSources = {
+const sources: typeof ExampleSources.Type = {
   files: [
     {
       path: 'src/application.ts',

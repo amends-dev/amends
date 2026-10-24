@@ -5,10 +5,11 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'rolldown'
 import { transform } from 'rolldown/experimental'
@@ -34,8 +35,14 @@ const workDir = mkdtempSync(join(tmpdir(), 'foldkit-oxlint-integration-'))
 const bundlePath = join(workDir, 'plugin.mjs')
 
 beforeAll(async () => {
+  symlinkSync(
+    join(pluginRoot, 'node_modules'),
+    join(workDir, 'node_modules'),
+    'dir',
+  )
   await build({
     input: join(pluginRoot, 'src', 'index.ts'),
+    external: ['oxc-parser'],
     platform: 'node',
     output: { file: bundlePath, format: 'esm' },
   })
@@ -123,6 +130,34 @@ describe('real-oxlint rule fixtures', () => {
     })
   }
 
+  it('reports proven completed Block Models only in Schema inputs', () => {
+    const diagnostics = diagnosticsFor(
+      'no-completed-block-model-in-schema',
+      'invalid',
+    )
+    const diagnosticsByFixture = new Map<string, number>()
+    for (const diagnostic of diagnostics) {
+      const fixture = basename(diagnostic.filename)
+      diagnosticsByFixture.set(
+        fixture,
+        (diagnosticsByFixture.get(fixture) ?? 0) + 1,
+      )
+    }
+    expect([...diagnosticsByFixture.entries()].sort()).toEqual([
+      ['block-returning-methods.ts', 12],
+      ['explicit-header.ts', 17],
+      ['imports.ts', 4],
+      ['inline.ts', 1],
+      ['local.ts', 2],
+      ['namespaces-and-literals.ts', 2],
+      ['widened-header.ts', 16],
+      ['wrapped.ts', 6],
+    ])
+    expect(
+      countDiagnostics('no-completed-block-model-in-schema', 'valid'),
+    ).toBe(0)
+  })
+
   it('reports every direct decision-time operation in its invalid fixture', () => {
     expect(countDiagnostics('no-impure-call-at-decision-time', 'invalid')).toBe(
       31,
@@ -163,6 +198,10 @@ describe('real-oxlint rule fixtures', () => {
 
   it('reports disabled, missing, and manual child routing', () => {
     expect(countDiagnostics('no-manual-composition-routing', 'invalid')).toBe(8)
+  })
+
+  it('recognizes root and subpath Program aliases', () => {
+    expect(countDiagnostics('no-disabling-dev-guardrails', 'invalid')).toBe(4)
   })
 
   it('reports direct child Message construction and local constructor aliases', () => {
@@ -215,15 +254,6 @@ describe('real-oxlint rule fixtures', () => {
     expect(countDiagnostics('keyed-required-for-mapped-rows', 'invalid')).toBe(
       3,
     )
-    expect(
-      countDiagnostics('got-prefix-requires-block-payload', 'invalid'),
-    ).toBe(8)
-    expect(
-      countDiagnostics('wrap-child-output-in-got-message', 'invalid'),
-    ).toBe(3)
-    expect(
-      countDiagnostics('got-wrapper-carries-only-routing', 'invalid'),
-    ).toBe(2)
     expect(countDiagnostics('no-noop-message', 'invalid')).toBe(2)
   })
 

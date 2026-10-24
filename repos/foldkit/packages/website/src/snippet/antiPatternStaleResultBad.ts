@@ -7,7 +7,6 @@ import { modifyFields } from 'foldkit/struct'
 const Message = defineMessageUnion({
   SucceededSearch: { suggestions: Schema.Array(Schema.String) },
 })
-type Message = typeof Message.Type
 
 const update = ApplicationComposition.makeUpdate((model, message) =>
   Message.match(message, {

@@ -69,34 +69,31 @@ type FruitParentModel = typeof FruitParentModel.Type
 const FruitParentMessage = defineMessageUnion({
   RequestedSelectFruitAndClose: { item: Fruit },
 })
-type FruitParentMessage = typeof FruitParentMessage.Type
 
 const FruitComboboxTestDefinition = Block.makeDefinition('FruitComboboxTest', {
   Model: FruitParentModel,
   Message: FruitParentMessage,
 })
 
-const foldFruitComboboxOutMessage = FruitCombobox.OutMessage.match<
-  Update.Step<FruitParentModel, FruitParentMessage>
->({
-  Selected: ({ value }) =>
-    FruitComboboxTestDefinition.step(model => ({
-      model: modifyFields(model, {
-        maybeSelectedFruit: () => Option.some(value),
+const foldFruitComboboxOutMessage =
+  FruitComboboxTestDefinition.makeOutMessageFold(FruitCombobox, {
+    Selected:
+      ({ value }) =>
+      model => ({
+        model: modifyFields(model, {
+          maybeSelectedFruit: () => Option.some(value),
+        }),
       }),
-    })),
-  ClearedSelection: () =>
-    FruitComboboxTestDefinition.step(model => ({ model })),
-})
+    ClearedSelection: () => model => ({ model }),
+  })
 
-const FruitComboboxBinding = FruitComboboxTestDefinition.bindChild(
+const FruitComboboxBinding = FruitComboboxTestDefinition.makeBinding(
   FruitCombobox,
   {
     field: 'combobox',
     init: false,
-    outMessage: { fold: foldFruitComboboxOutMessage },
   },
-)
+).withOutMessagePolicy({ fold: foldFruitComboboxOutMessage })
 
 const FruitComboboxTestComposition =
   FruitComboboxTestDefinition.makeComposition({
@@ -105,7 +102,7 @@ const FruitComboboxTestComposition =
 
 const fruitParentUpdate = FruitComboboxTestComposition.makeUpdate(
   (model, { item }) =>
-    Update.combine([
+    Update.combineSteps([
       FruitComboboxBinding.requestSelectItem(item, item),
       FruitComboboxBinding.requestClose(''),
     ])(model),
@@ -113,17 +110,22 @@ const fruitParentUpdate = FruitComboboxTestComposition.makeUpdate(
 const requestSelectFruitAndClose = (item: Fruit) =>
   Tuple.make(FruitParentMessage.RequestedSelectFruitAndClose({ item }))
 
-const FruitComboboxTestBlock = FruitComboboxTestComposition.assembleBlock({
-  init: FruitComboboxTestComposition.makeInit(() => ({
-    model: {
-      combobox: FruitCombobox.init({ id: 'fruit' }).model,
-      maybeSelectedFruit: Option.none(),
-    },
-  })),
-  update: fruitParentUpdate,
-  operations: { requestSelectFruitAndClose },
-  EffectsLayer: FruitCombobox.EffectsLayer,
-})
+const prepare = () =>
+  FruitComboboxTestComposition.prepareBlock({
+    init: FruitComboboxTestComposition.makeInit(() => ({
+      model: {
+        combobox: FruitCombobox.init({ id: 'fruit' }).model,
+        maybeSelectedFruit: Option.none(),
+      },
+    })),
+    update: fruitParentUpdate,
+    operations: { requestSelectFruitAndClose },
+    EffectsLayer: FruitCombobox.EffectsLayer,
+  })
+const FruitComboboxTestBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof FruitParentModel,
+  typeof prepare
+> = Block.assemble(prepare)
 
 type TestHtmlBuilder = Parameters<typeof view>[2]
 
@@ -1348,6 +1350,61 @@ describe('Combobox', () => {
         ),
         Story.model(model => {
           expect(model.isOpen).toBe(true)
+        }),
+      )
+    })
+
+    it('emits no Commands when requestOpen receives an open modal Model', () => {
+      const openModal = modifyFields(
+        init({ id: 'test', isModal: true }).model,
+        {
+          isOpen: () => true,
+          maybeActiveItemIndex: () => Option.some(1),
+          activationTrigger: () => 'Keyboard',
+          inputValue: () => 'Ap',
+        },
+      )
+
+      for (const reopened of [
+        TestCombobox.operations.requestOpen(openModal),
+        update(
+          openModal,
+          Message.Opened({ maybeActiveItemIndex: Option.none() }),
+        ),
+      ]) {
+        expect(reopened.commands ?? []).toEqual([])
+        expect(reopened.outMessage).toBeUndefined()
+        expect(reopened.model.isOpen).toBe(true)
+        expect(reopened.model.maybeActiveItemIndex).toStrictEqual(
+          Option.some(1),
+        )
+        expect(reopened.model.activationTrigger).toBe('Keyboard')
+        expect(reopened.model.inputValue).toBe('Ap')
+      }
+    })
+
+    it('emits no Commands when focus opens a modal combobox the toggle already opened', () => {
+      Story.story(
+        update,
+        givenClosedModal,
+        Story.message(
+          Message.PressedToggleButton({
+            restingInputValue: '',
+            isClearable: true,
+          }),
+        ),
+        Story.Command.resolveAllExact(
+          [FocusInput, Message.CompletedFocusInput()],
+          [LockScroll, Message.CompletedLockScroll()],
+          [InertOthers, Message.CompletedInertOthers()],
+        ),
+        Story.message(Message.Opened({ maybeActiveItemIndex: Option.some(0) })),
+        Story.expectNoOutMessage(),
+        Story.Command.expectNone(),
+        Story.model(model => {
+          expect(model.isOpen).toBe(true)
+          expect(model.maybeActiveItemIndex).toStrictEqual(Option.none())
+          expect(model.activationTrigger).toBe('Pointer')
         }),
       )
     })

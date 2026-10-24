@@ -5,6 +5,7 @@ import * as Command from '../command/index.js'
 import { modifyFields } from '../struct/index.js'
 import * as Update from '../update/index.js'
 import { makeDefinition } from './define.js'
+import * as Block from './public.js'
 import type { Scoped } from './scope.js'
 
 const SilentModel = Schema.Struct({ ready: Schema.Boolean })
@@ -14,28 +15,33 @@ const Silent = makeDefinition('MessageFreeKeyedRuntimeChild', {
   Model: SilentModel,
   Message: Schema.Never,
 })
-const WaitForever = Silent.command('WaitForever', {
+const WaitForever = Silent.makeCommand('WaitForever', {
   messages: [],
   handler: function* () {
     return () => Effect.never
   },
 })
-const markReady = Silent.step(model => ({
+const markReady = Silent.makeStep(model => ({
   model: modifyFields(model, { ready: () => true }),
   commands: [WaitForever()],
 }))
 const SilentComposition = Silent.makeComposition()
 const silentUpdate = SilentComposition.makeUpdate()
-const SilentBlock = SilentComposition.assembleBlock({
-  view: SilentComposition.makeView((_model, h) => h.empty),
-  init: () => ({
-    model: SilentModel.make({ ready: false }),
-    commands: [WaitForever()],
-  }),
-  update: silentUpdate,
-  operations: {},
-  EffectsLayer: WaitForever.layer,
-})
+const prepareSilentBlock = () =>
+  SilentComposition.prepareBlock({
+    view: SilentComposition.makeView((_model, h) => h.empty),
+    init: () => ({
+      model: SilentModel.make({ ready: false }),
+      commands: [WaitForever()],
+    }),
+    update: silentUpdate,
+    operations: {},
+    EffectsLayer: WaitForever.layer,
+  })
+const SilentBlock: Block.FromAssemblyWithView<
+  typeof SilentModel,
+  typeof prepareSilentBlock
+> = Block.assemble(prepareSilentBlock)
 
 if (false) {
   const mutatingExposeConfig = {
@@ -49,7 +55,7 @@ if (false) {
     EffectsLayer: WaitForever.layer,
   }
   // @ts-expect-error A Message-free Block cannot expose a mutating operation.
-  SilentComposition.assembleBlock(mutatingExposeConfig)
+  SilentComposition.prepareBlock(mutatingExposeConfig)
 }
 
 const Entry = Schema.Struct({ id: Schema.String, child: SilentModel })
@@ -59,7 +65,7 @@ const Parent = makeDefinition('MessageFreeKeyedRuntimeParent', {
   Model: ParentModel,
   Message: Schema.Never,
 })
-const SilentBinding = Parent.bindChild(SilentBlock, {
+const SilentBinding = Parent.makeBinding(SilentBlock, {
   readAll: model => model.entries,
   key: entry => entry.id,
   read: entry => entry.child,
@@ -76,22 +82,27 @@ const SilentBinding = Parent.bindChild(SilentBlock, {
 const ParentComposition = Parent.makeComposition({
   bindings: [SilentBinding],
 })
-const ParentBlock = ParentComposition.assembleBlock({
-  view: ParentComposition.makeView((_model, h) => h.empty),
-  init: ParentComposition.makeInit(() =>
-    SilentBinding.init({
-      key: 'active',
-      args: [],
-      toParentModel: child =>
-        ParentModel.make({
-          entries: [Entry.make({ id: 'active', child })],
-        }),
-    }),
-  ),
-  update: ParentComposition.makeUpdate(),
-  operations: {},
-  EffectsLayer: Layer.empty,
-})
+const prepareParentBlock = () =>
+  ParentComposition.prepareBlock({
+    view: ParentComposition.makeView((_model, h) => h.empty),
+    init: ParentComposition.makeInit(() =>
+      SilentBinding.init({
+        key: 'active',
+        args: [],
+        toParentModel: child =>
+          ParentModel.make({
+            entries: [Entry.make({ id: 'active', child })],
+          }),
+      }),
+    ),
+    update: ParentComposition.makeUpdate(),
+    operations: {},
+    EffectsLayer: Layer.empty,
+  })
+const ParentBlock: Block.FromAssemblyWithView<
+  typeof ParentModel,
+  typeof prepareParentBlock
+> = Block.assemble(prepareParentBlock)
 
 it('keeps a Message-free general keyed child routeless across every channel', () => {
   const initial = ParentBlock.init().model
@@ -127,7 +138,7 @@ it('keeps local Message-free Steps internal to the child', () => {
 
 it('rejects generated delivery configuration for a Message-free child', () => {
   expect(() =>
-    Reflect.apply(Parent.bindChild, undefined, [
+    Reflect.apply(Parent.makeBinding, undefined, [
       SilentBlock,
       {
         readAll: (model: ParentModel) => model.entries,

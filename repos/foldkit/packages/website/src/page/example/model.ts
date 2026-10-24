@@ -16,4 +16,3 @@ export const Model = Schema.Struct({
   isLivePreviewOpen: Schema.Boolean,
   currentSources: CurrentSourcesAsyncData.schema,
 })
-export type Model = typeof Model.Type

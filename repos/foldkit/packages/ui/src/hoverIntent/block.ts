@@ -67,7 +67,7 @@ export const init = HoverIntentComposition.makeInit(
 // COMMAND
 
 /** Waits before opening, then emits the version that scheduled the wait. */
-export const WaitBeforeOpening = HoverIntentDefinition.command(
+export const WaitBeforeOpening = HoverIntentDefinition.makeCommand(
   'WaitBeforeOpening',
   {
     args: { delay: Schema.DurationFromMillis, version: Schema.Number },
@@ -82,7 +82,7 @@ export const WaitBeforeOpening = HoverIntentDefinition.command(
 )
 
 /** Waits before closing, then emits the version that scheduled the wait. */
-export const WaitBeforeClosing = HoverIntentDefinition.command(
+export const WaitBeforeClosing = HoverIntentDefinition.makeCommand(
   'WaitBeforeClosing',
   {
     args: { delay: Schema.DurationFromMillis, version: Schema.Number },
@@ -130,7 +130,7 @@ const finishClosing = (model: Model) => {
   }
 }
 
-const scheduleOpen = HoverIntentDefinition.step(model => {
+const scheduleOpen = HoverIntentDefinition.makeStep(model => {
   const version = Number.increment(model.pendingOpenVersion)
   return {
     model: modifyFields(model, { pendingOpenVersion: () => version }),
@@ -139,7 +139,7 @@ const scheduleOpen = HoverIntentDefinition.step(model => {
 })
 
 const scheduleClose = (delay: Duration.Duration) =>
-  HoverIntentDefinition.step(model => {
+  HoverIntentDefinition.makeStep(model => {
     const version = Number.increment(model.pendingCloseVersion)
     return {
       model: modifyFields(model, { pendingCloseVersion: () => version }),
@@ -360,13 +360,18 @@ export const view = HoverIntentComposition.makeView.withInputs<ViewInputs>(
   },
 )
 
+const prepare = () =>
+  HoverIntentComposition.prepareBlock({
+    init,
+    update,
+    view,
+    operations: {
+      requestClose: Message.RequestedClose,
+    },
+    EffectsLayer,
+  })
 /** Complete HoverIntent Block definition for connecting to a parent. */
-export const HoverIntentBlock = HoverIntentComposition.assembleBlock({
-  init,
-  update,
-  view,
-  operations: {
-    requestClose: Message.RequestedClose,
-  },
-  EffectsLayer,
-})
+export const HoverIntentBlock: Block.FromAssemblyWithViewAndOutMessage<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

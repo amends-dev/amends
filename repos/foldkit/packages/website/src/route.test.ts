@@ -15,6 +15,11 @@ const PARAMETERIZED_ROUTERS: ReadonlySet<string> = new Set([
   'blogPostRouter',
 ])
 
+const PREVIEW_ROUTERS = new Set([
+  'previewMigrationRouter',
+  'previewUpgradeRouter',
+])
+
 const expectedTag = (routerName: string): string => {
   const base = routerName.slice(0, -'Router'.length)
   return base.charAt(0).toUpperCase() + base.slice(1)
@@ -28,6 +33,7 @@ const parameterlessRouters: ReadonlyArray<readonly [string, string]> =
     if (
       !name.endsWith('Router') ||
       PARAMETERIZED_ROUTERS.has(name) ||
+      (!Route.previewDocumentationEnabled && PREVIEW_ROUTERS.has(name)) ||
       !isUrlBuilder(value)
     ) {
       return []
@@ -129,7 +135,7 @@ describe('section predicates', () => {
   const cases: ReadonlyArray<
     Readonly<{
       name: string
-      route: Route.ApplicationRoute
+      route: typeof Route.ApplicationRoute.Type
       isDocsSection: boolean
       isBlog: boolean
       isSearch: boolean

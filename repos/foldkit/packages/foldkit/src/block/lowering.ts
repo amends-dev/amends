@@ -1,8 +1,8 @@
-import { Context, Record } from 'effect'
+import { Context, Predicate, Record } from 'effect'
 
 import type { AnyAuthoredView } from '../html/block.js'
 import type { BindableBlock } from './binding.js'
-import { runtimeBindingOf } from './composition.js'
+import { runtimeBindingOf, runtimeBindingsOf } from './composition.js'
 import { requireDefaultView } from './defaultView.js'
 import type { AnyBlock } from './definition.js'
 import {
@@ -31,21 +31,43 @@ export const lowerBlock = (
   Readonly<{ view: AnyAuthoredView }> => {
   const segment = block.owner.id
   const allowedIdentities = hostIdentitiesOf(block)
-  const lowerReturn = (output: any) =>
-    output.commands === undefined
-      ? output
-      : {
-          model: output.model,
-          commands: output.commands.map((command: any) =>
-            qualifyCommand(
-              segment,
-              command,
-              block.owner,
-              undefined,
-              allowedIdentities,
-            ),
-          ),
-        }
+  const lowerReturn = (output: any) => {
+    if (!Predicate.isObject(output) || !Reflect.has(output, 'model')) {
+      throw new Error(
+        '[foldkit] A Program root init and update must return its Model.',
+      )
+    }
+
+    if (Reflect.get(output, 'outMessage') !== undefined) {
+      throw new Error(
+        '[foldkit] A Program root init and update cannot emit an OutMessage.',
+      )
+    }
+
+    const commands = Reflect.get(output, 'commands')
+    if (commands === undefined) {
+      return output
+    }
+
+    if (!globalThis.Array.isArray(commands)) {
+      throw new Error(
+        '[foldkit] A Program root init and update commands field must be an array.',
+      )
+    }
+
+    return {
+      model: Reflect.get(output, 'model'),
+      commands: commands.map((command: any) =>
+        qualifyCommand(
+          segment,
+          command,
+          block.owner,
+          undefined,
+          allowedIdentities,
+        ),
+      ),
+    }
+  }
   const subscriptions = Record.map(block.subscriptions, entry => {
     const lowered = {
       ...qualifyEntry(segment, entry),
@@ -77,17 +99,17 @@ export const lowerBlock = (
   return {
     Model: block.Model,
     init: (...args: ReadonlyArray<any>) =>
-      withOperationGraph(block.bindings, () =>
+      withOperationGraph(runtimeBindingsOf(block), () =>
         lowerReturn(block.init(...args)),
       ),
     update: (...args: ReadonlyArray<any>) =>
-      withOperationGraph(block.bindings, () =>
+      withOperationGraph(runtimeBindingsOf(block), () =>
         lowerReturn(block.update(...args)),
       ),
     view: scopeView(segment, requireDefaultView(block), {
       owner: block.owner,
       mounts: block[LocalMountsTypeId],
-      bindings: block.bindings,
+      bindings: runtimeBindingsOf(block),
     }),
     mounts: block.mounts,
     subscriptions,
@@ -116,7 +138,7 @@ export const assertComposedHandlers = (
         )
       }
     }
-    for (const binding of block.bindings) {
+    for (const binding of runtimeBindingsOf(block)) {
       check(runtimeBindingOf(binding).block, [...path, binding.placement])
     }
   }

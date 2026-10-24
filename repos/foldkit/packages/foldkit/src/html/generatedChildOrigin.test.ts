@@ -7,6 +7,7 @@ import {
   type ActiveInstance,
   CurrentInstance,
 } from '../block/instanceContext.js'
+import * as Block from '../block/public.js'
 import { defineMessageUnion } from '../message/index.js'
 import { beginRender, createBoundaryRegistry } from './boundary.js'
 import { __htmlBuilder } from './index.js'
@@ -22,17 +23,22 @@ const ChildDefinition = makeDefinition('OriginViewChild', {
   Message: ChildMessage,
 })
 const ChildComposition = ChildDefinition.makeComposition()
-const ChildBlock = ChildComposition.assembleBlock({
-  init: ChildComposition.makeInit(() => ({ model: { count: 0 } })),
-  update: ChildComposition.makeUpdate(model => ({ model })),
-  view: ChildComposition.makeView((_model, h) =>
-    h.button([
-      h.OnClick(ChildMessage.ClickedIncrement()),
-      h.OnBlur(ChildMessage.BlurredButton()),
-    ]),
-  ),
-  EffectsLayer: Layer.empty,
-})
+const prepareChildBlock = () =>
+  ChildComposition.prepareBlock({
+    init: ChildComposition.makeInit(() => ({ model: { count: 0 } })),
+    update: ChildComposition.makeUpdate(model => ({ model })),
+    view: ChildComposition.makeView((_model, h) =>
+      h.button([
+        h.OnClick(ChildMessage.ClickedIncrement()),
+        h.OnBlur(ChildMessage.BlurredButton()),
+      ]),
+    ),
+    EffectsLayer: Layer.empty,
+  })
+const ChildBlock: Block.FromAssemblyWithView<
+  typeof ChildModel,
+  typeof prepareChildBlock
+> = Block.assemble(prepareChildBlock)
 
 const ParentModel = Schema.Struct({ child: ChildModel })
 const ParentMessage = defineMessageUnion({ ClickedParent: {} })
@@ -40,7 +46,9 @@ const ParentDefinition = makeDefinition('OriginViewParent', {
   Model: ParentModel,
   Message: ParentMessage,
 })
-const ChildBinding = ParentDefinition.bindChild(ChildBlock, { field: 'child' })
+const ChildBinding = ParentDefinition.makeBinding(ChildBlock, {
+  field: 'child',
+})
 const ParentComposition = ParentDefinition.makeComposition({
   bindings: [ChildBinding],
 })
@@ -128,6 +136,7 @@ it('drops cleanup blur from an unmounted view while its Model occurrence remains
   /* eslint-disable-next-line @typescript-eslint/consistent-type-assertions */
   const blurOld = oldVNode.data?.on?.blur as (event: FocusEvent) => void
   oldVNode.data?.hook?.destroy?.(oldVNode)
+  oldVNode.data?.hook?.postdestroy?.(oldVNode)
 
   expect(child.isActive).toBe(true)
   expect(() => blurOld(new FocusEvent('blur'))).not.toThrow()

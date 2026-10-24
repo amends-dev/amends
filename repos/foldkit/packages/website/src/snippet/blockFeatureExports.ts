@@ -1,25 +1,36 @@
 // page/settings/block.ts
-const requestReset = Message.RequestedReset
+import { Block } from 'foldkit'
 
-export const SettingsBlock = SettingsComposition.assembleBlock({
-  init,
-  update,
-  view,
-  operations: { requestReset },
-  EffectsLayer: SaveTheme.layer,
-})
+import type { Model } from './model'
+
+const requestReset = Message.RequestedReset
+const prepare = () =>
+  SettingsComposition.prepareBlock({
+    init,
+    update,
+    view,
+    operations: { requestReset },
+    EffectsLayer: SaveTheme.layer,
+  })
+export const SettingsBlock: Block.FromAssemblyWithViewAndOutMessage<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)
 
 // page/settings/index.ts
 export { SettingsBlock } from './block'
 
-// Parent
+// Parent model.ts
+import { Schema } from 'effect'
+
 import { SettingsBlock } from './page/settings'
 
-SettingsBlock.Model
-SettingsBlock.Message
-SettingsBlock.OutMessage.match
-ApplicationDefinition.bindChild(SettingsBlock, {
+export const Model = Schema.Struct({ settings: SettingsBlock.Model })
+
+// Parent composition.ts
+import { SettingsBlock } from './page/settings'
+
+ApplicationDefinition.makeBinding(SettingsBlock, {
   field: 'settings',
   init: false,
-  outMessage: { fold: foldSettingsOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldSettingsOutMessage })

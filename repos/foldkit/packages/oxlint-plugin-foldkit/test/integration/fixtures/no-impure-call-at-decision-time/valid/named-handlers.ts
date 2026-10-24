@@ -50,7 +50,7 @@ const connectionLifecycle = {
 }
 const connectionLifecycleAlias = connectionLifecycle
 
-export const managedResources = ManagedResource.make<Model, Message>()(
+export const managedResources = ManagedResource.make<typeof Model.Type, Message>()(
   entry => ({
     connection: entry(
       'NamedConnection',

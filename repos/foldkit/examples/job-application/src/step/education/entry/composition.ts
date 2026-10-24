@@ -1,35 +1,27 @@
 import { Option } from 'effect'
-import { type Update } from 'foldkit'
-import { modifyFields } from 'foldkit/struct'
 
 import {
   EducationEntryDefinition,
   GraduationYearListboxBlock,
-  Message,
-  type Model,
 } from './definition'
 
-const foldGraduationYearListboxOutMessage =
-  GraduationYearListboxBlock.OutMessage.match<Update.Step<Model, Message>>({
-    Selected:
-      ({ value }) =>
-      model => ({
-        model: modifyFields(model, {
-          maybeGraduationYear: () => Option.some(value),
-        }),
-      }),
-  })
-
-export const GraduationYearListboxBinding = EducationEntryDefinition.bindChild(
-  GraduationYearListboxBlock,
-  {
+export const GraduationYearListboxBinding =
+  EducationEntryDefinition.makeBinding(GraduationYearListboxBlock, {
     field: 'graduationYearListbox',
     init: {
       contextToArgs: entryId => [{ id: `${entryId}-graduation-year` }],
     },
-    outMessage: { fold: foldGraduationYearListboxOutMessage },
-  },
-)
+  }).withOutMessagePolicy({
+    fold: EducationEntryDefinition.makeOutMessageFold(
+      GraduationYearListboxBlock,
+      {
+        Selected: ({ value }) =>
+          EducationEntryDefinition.makeFieldsStep(() => ({
+            maybeGraduationYear: () => Option.some(value),
+          })),
+      },
+    ),
+  })
 
 export const EducationEntryComposition =
   EducationEntryDefinition.makeComposition({

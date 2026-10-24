@@ -4,7 +4,6 @@ import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
 
 const CurrentUser = Schema.Struct({ name: Schema.String })
-type CurrentUser = typeof CurrentUser.Type
 const Theme = Schema.Literals(['Light', 'Dark'])
 
 const AccountSettingsModel = Schema.Struct({
@@ -26,7 +25,7 @@ const accountSettingsInit = AccountSettingsComposition.makeInit(() => ({
   }),
 }))
 const accountSettingsUpdate = AccountSettingsComposition.makeUpdate(
-  (model, message, currentUser: CurrentUser) =>
+  (model, message, currentUser: typeof CurrentUser.Type) =>
     AccountSettingsMessage.match(message, {
       ChangedTheme: ({ theme }) => ({
         model: modifyFields(model, {
@@ -39,11 +38,13 @@ const accountSettingsUpdate = AccountSettingsComposition.makeUpdate(
 const accountSettingsView = AccountSettingsComposition.makeView((model, h) =>
   h.p([], [`${model.theme}; audit: ${Array.join(model.auditTrail, ', ')}`]),
 )
-const AccountSettingsBlock = AccountSettingsComposition.assembleBlock({
-  init: accountSettingsInit,
-  update: accountSettingsUpdate,
-  view: accountSettingsView,
-})
+const prepare = () =>
+  AccountSettingsComposition.prepareBlock({
+    init: accountSettingsInit,
+    update: accountSettingsUpdate,
+    view: accountSettingsView,
+  })
+const AccountSettingsBlock = Block.assemble(prepare)
 
 const ProfileModel = Schema.Struct({
   currentUser: CurrentUser,
@@ -55,7 +56,7 @@ const ProfileDefinition = Block.makeDefinition('Profile', {
   Message: ProfileMessage,
 })
 
-export const AccountSettingsBinding = ProfileDefinition.bindChild(
+export const AccountSettingsBinding = ProfileDefinition.makeBinding(
   AccountSettingsBlock,
   {
     field: 'accountSettings',

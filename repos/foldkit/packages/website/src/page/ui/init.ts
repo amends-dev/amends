@@ -16,15 +16,16 @@ const chatBodies = [
 
 const INITIAL_VIRTUAL_LIST_CHAT_MESSAGE_COUNT = 24
 
-const initialVirtualListChatMessages: ReadonlyArray<VirtualListChatMessage> =
-  Array.makeBy(INITIAL_VIRTUAL_LIST_CHAT_MESSAGE_COUNT, index => ({
-    id: index,
-    body: Option.getOrElse(
-      Array.get(chatBodies, index % chatBodies.length),
-      () => 'Message',
-    ),
-    isExpanded: index % 7 === 0,
-  }))
+const initialVirtualListChatMessages: ReadonlyArray<
+  typeof VirtualListChatMessage.Type
+> = Array.makeBy(INITIAL_VIRTUAL_LIST_CHAT_MESSAGE_COUNT, index => ({
+  id: index,
+  body: Option.getOrElse(
+    Array.get(chatBodies, index % chatBodies.length),
+    () => 'Message',
+  ),
+  isExpanded: index % 7 === 0,
+}))
 
 export const init = UiComposition.makeInit((today: Calendar.CalendarDate) => ({
   childInitContext: today,

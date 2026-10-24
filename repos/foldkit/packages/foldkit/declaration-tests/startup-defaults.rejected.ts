@@ -18,25 +18,25 @@ import {
 
 // @ts-expect-error The startup selector is named contextToArgs.
 // oxfmt-ignore
-DeclarationStartupDefaultsParentDefinition.bindChild(ChildBlock, { field: 'automatic', init: { args: () => [] } })
+DeclarationStartupDefaultsParentDefinition.makeBinding(ChildBlock, { field: 'automatic', init: { args: () => [] } })
 
 // @ts-expect-error The removed args key cannot accompany contextToArgs.
 // oxfmt-ignore
-DeclarationStartupDefaultsParentDefinition.bindChild(ChildBlock, { field: 'automatic', init: { contextToArgs: () => [], args: () => [] } })
+DeclarationStartupDefaultsParentDefinition.makeBinding(ChildBlock, { field: 'automatic', init: { contextToArgs: () => [], args: () => [] } })
 
 // @ts-expect-error A required-argument child needs init.contextToArgs or init: false.
 // oxfmt-ignore
-DeclarationStartupDefaultsParentDefinition.bindChild(RequiredChildBlock, { field: 'automatic',   })
+DeclarationStartupDefaultsParentDefinition.makeBinding(RequiredChildBlock, { field: 'automatic',   })
 
 // @ts-expect-error Child init arguments retain their exact tuple.
 // oxfmt-ignore
-DeclarationStartupDefaultsParentDefinition.bindChild(RequiredChildBlock, { field: 'automatic', init: { contextToArgs: () => ['wrong'] } })
+DeclarationStartupDefaultsParentDefinition.makeBinding(RequiredChildBlock, { field: 'automatic', init: { contextToArgs: () => ['wrong'] } })
 
 // @ts-expect-error A selector must accept every value allowed by ChildInitContext.
 // oxfmt-ignore
-DeclarationStartupDefaultsParentDefinition.bindChild(ChildBlock, { field: 'automatic', placement: 'narrowStartup', init: { contextToArgs: (_childInitContext: Readonly<{ count: 1 }>) => [] } })
+DeclarationStartupDefaultsParentDefinition.makeBinding(ChildBlock, { field: 'automatic', placement: 'narrowStartup', init: { contextToArgs: (_childInitContext: Readonly<{ count: 1 }>) => [] } })
 
-DeclarationStartupDefaultsParentDefinition.bindChild(ChildBlock, {
+DeclarationStartupDefaultsParentDefinition.makeBinding(ChildBlock, {
   field: 'automatic',
   placement: 'readonlyStartup',
   init: {
@@ -50,11 +50,11 @@ DeclarationStartupDefaultsParentDefinition.bindChild(ChildBlock, {
 
 // @ts-expect-error Optional child initialization requires an explicit presence selector.
 // oxfmt-ignore
-DeclarationStartupDefaultsParentDefinition.bindChild(ChildBlock, { field: 'maybeChild', init: true })
+DeclarationStartupDefaultsParentDefinition.makeBinding(ChildBlock, { field: 'maybeChild', init: true })
 
 // @ts-expect-error Keyed init false cannot replace an occurrence policy.
 // oxfmt-ignore
-DeclarationStartupDefaultsParentDefinition.bindChild(ChildBlock, { field: 'entries', key: 'id', childField: 'child', init: false })
+DeclarationStartupDefaultsParentDefinition.makeBinding(ChildBlock, { field: 'entries', key: 'id', childField: 'child', init: false })
 
 const optionalInitConfig: Readonly<{
   field: 'automatic'
@@ -62,7 +62,7 @@ const optionalInitConfig: Readonly<{
 }> = {
   field: 'automatic',
 }
-DeclarationStartupDefaultsParentDefinition.bindChild(
+DeclarationStartupDefaultsParentDefinition.makeBinding(
   ChildBlock,
   // @ts-expect-error An optional init policy cannot ambiguously change default startup.
   optionalInitConfig,
@@ -75,7 +75,7 @@ const unionInitConfig: Readonly<{
   field: 'automatic',
   init: true,
 }
-DeclarationStartupDefaultsParentDefinition.bindChild(
+DeclarationStartupDefaultsParentDefinition.makeBinding(
   ChildBlock,
   // @ts-expect-error A union init policy does not establish one concrete startup policy.
   unionInitConfig,
@@ -114,7 +114,7 @@ DeclarationStartupGenericParentDefinition.makeComposition({
 
 // @ts-expect-error Application startup selectors use the exact declared ChildInitContext.
 // oxfmt-ignore
-ApplicationDefinition.bindChild(ChildBlock, { field: 'child', init: { contextToArgs: (_childInitContext: Readonly<{ entryIds: readonly [] }>) => [] } })
+ApplicationDefinition.makeBinding(ChildBlock, { field: 'child', init: { contextToArgs: (_childInitContext: Readonly<{ entryIds: readonly [] }>) => [] } })
 
 // @ts-expect-error A keyed startup Binding cannot be registered under an unrelated parent Model.
 DeclarationStartupGenericParentDefinition.makeComposition({
@@ -133,14 +133,14 @@ const DeclarationIncompatibleStartupParentDefinition = Block.makeDefinition(
   },
 )
 const FirstDiscriminantBinding =
-  DeclarationIncompatibleStartupParentDefinition.bindChild(ChildBlock, {
+  DeclarationIncompatibleStartupParentDefinition.makeBinding(ChildBlock, {
     field: 'first',
     init: {
       contextToArgs: (_childInitContext: Readonly<{ kind: 'First' }>) => [],
     },
   })
 const SecondDiscriminantBinding =
-  DeclarationIncompatibleStartupParentDefinition.bindChild(ChildBlock, {
+  DeclarationIncompatibleStartupParentDefinition.makeBinding(ChildBlock, {
     field: 'second',
     init: {
       contextToArgs: (_childInitContext: Readonly<{ kind: 'Second' }>) => [],
@@ -159,12 +159,12 @@ const DeclarationPrimitiveStartupParentDefinition = Block.makeDefinition(
   },
 )
 const StringStartupBinding =
-  DeclarationPrimitiveStartupParentDefinition.bindChild(ChildBlock, {
+  DeclarationPrimitiveStartupParentDefinition.makeBinding(ChildBlock, {
     field: 'first',
     init: { contextToArgs: (_childInitContext: string) => [] },
   })
 const NumberStartupBinding =
-  DeclarationPrimitiveStartupParentDefinition.bindChild(ChildBlock, {
+  DeclarationPrimitiveStartupParentDefinition.makeBinding(ChildBlock, {
     field: 'second',
     init: { contextToArgs: (_childInitContext: number) => [] },
   })

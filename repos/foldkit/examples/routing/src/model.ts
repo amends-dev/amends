@@ -1,11 +1,9 @@
 import { Schema } from 'effect'
 
-import { PeopleBlock } from './page'
+import * as People from './page/people'
 import { ApplicationRoute } from './route'
 
 export const Model = Schema.Struct({
   route: ApplicationRoute,
-  peoplePage: PeopleBlock.Model,
+  peoplePage: People.PeopleBlock.Model,
 })
-
-export type Model = typeof Model.Type

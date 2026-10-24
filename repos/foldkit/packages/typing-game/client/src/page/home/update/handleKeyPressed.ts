@@ -5,7 +5,7 @@ import { CreateRoom, FocusRoomIdInput, FocusUsernameInput } from '../command'
 import { HOME_ACTIONS, HomeAction, HomeStep, Model } from '../model'
 
 export const handleKeyPressed =
-  (model: Model) =>
+  (model: typeof Model.Type) =>
   ({ key }: { key: string }) =>
     Match.value(model.homeStep).pipe(
       Match.tag('SelectAction', whenSelectAction(model, key)),
@@ -13,7 +13,7 @@ export const handleKeyPressed =
     )
 
 const whenSelectAction =
-  (model: Model, key: string) =>
+  (model: typeof Model.Type, key: string) =>
   (selectAction: typeof HomeStep.SelectAction.Type) =>
     Match.value(key).pipe(
       Match.when('ArrowUp', () =>
@@ -29,7 +29,7 @@ const whenSelectAction =
 const moveSelection =
   (f: (index: number) => number) =>
   (
-    model: Model,
+    model: typeof Model.Type,
     { username, selectedAction }: typeof HomeStep.SelectAction.Type,
   ) => ({
     model: modifyFields(model, {
@@ -42,7 +42,7 @@ const moveSelection =
   })
 
 const cycleAction =
-  (f: (a: number) => number) => (selectedAction: HomeAction) => {
+  (f: (a: number) => number) => (selectedAction: typeof HomeAction.Type) => {
     const homeActionsLength = Array.length(HOME_ACTIONS)
 
     return pipe(
@@ -62,7 +62,8 @@ const cycleAction =
   }
 
 const confirmSelection =
-  (model: Model) => (selectAction: typeof HomeStep.SelectAction.Type) =>
+  (model: typeof Model.Type) =>
+  (selectAction: typeof HomeStep.SelectAction.Type) =>
     Match.value(selectAction.selectedAction).pipe(
       Match.when('CreateRoom', () => ({
         model,

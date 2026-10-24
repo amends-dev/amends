@@ -10,14 +10,14 @@ import {
   SilentParentDefinition,
 } from './strict-routing.accepted.js'
 
-ParentDefinition.bindChild(ContextChildBlock, {
+ParentDefinition.makeBinding(ContextChildBlock, {
   // @ts-expect-error The missing context selector makes the contextual config ineligible.
   field: 'contextualChild',
   // @ts-expect-error A contextual child requires generated delivery context.
   delivery: {},
 })
 
-ParentDefinition.bindChild(ContextChildBlock, {
+ParentDefinition.makeBinding(ContextChildBlock, {
   // @ts-expect-error The incomplete delivery makes the contextual config ineligible.
   field: 'contextualChild',
   // @ts-expect-error Generated delivery must supply the complete update context tuple.
@@ -26,14 +26,14 @@ ParentDefinition.bindChild(ContextChildBlock, {
   },
 })
 
-ParentDefinition.bindChild(ChildBlock, {
+ParentDefinition.makeBinding(ChildBlock, {
   // @ts-expect-error A context-free child cannot declare generated update context.
   field: 'child',
   // @ts-expect-error A context-free child cannot declare generated update context.
   delivery: { toUpdateContext: () => [] },
 })
 
-const ConflictingBinding = ParentDefinition.bindChild(ContextChildBlock, {
+const ConflictingBinding = ParentDefinition.makeBinding(ContextChildBlock, {
   field: 'contextualChild',
   placement: 'child',
   delivery: {
@@ -60,13 +60,13 @@ ParentComposition.makeUpdate(
   (model, _message: GeneratedChildMessage) => ({ model }),
 )
 
-const omittedSilentInitialization = SilentParentDefinition.step(model =>
+const omittedSilentInitialization = SilentParentDefinition.makeStep(model =>
   SilentBinding.init({ args: [], toParentModel: () => model }),
 )
 const OmittedSilentComposition = SilentParentDefinition.makeComposition()
 
 // @ts-expect-error Connected initialization requires its storage-only Binding to be registered.
-OmittedSilentComposition.assembleBlock({
+OmittedSilentComposition.prepareBlock({
   init: OmittedSilentComposition.makeInit(() => ({
     model: { silent: { ready: false } },
   })),

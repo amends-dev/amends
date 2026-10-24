@@ -26,9 +26,9 @@ export const modifyFields: {
   <O, const T extends EvolveTransform<O>>(
     t: StrictKeys<O, T>,
   ): (obj: O) => Evolved<O, T>
-  <O, const T extends EvolveTransform<O>>(
+  <O, const T extends EvolveTransform<NoInfer<O>>>(
     obj: O,
-    t: StrictKeys<O, T>,
+    t: StrictKeys<NoInfer<O>, T>,
   ): Evolved<O, T>
 } = Struct.evolve
 

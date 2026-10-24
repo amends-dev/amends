@@ -1,8 +1,10 @@
-import { Option, Schema } from 'effect'
-import { expect, expectTypeOf } from 'vitest'
+import { Equal, Option, Schema } from 'effect'
+import { expect, expectTypeOf, vi } from 'vitest'
 
 import { describe, it } from '@effect/vitest'
 
+import type { Command } from '../command/index.js'
+import type { Step } from '../update/index.js'
 import { defineRouteUnion } from './index.js'
 import {
   type Transition,
@@ -12,7 +14,11 @@ import {
   exited,
   exitedAny,
   isEntering,
+  isExiting,
+  isStaying,
   make,
+  match,
+  matchOrElse,
   stayed,
 } from './transition.js'
 
@@ -20,6 +26,7 @@ const ApplicationRoute = defineRouteUnion({
   Home: {},
   Notes: {},
   NoteDetail: { id: Schema.String },
+  People: { searchText: Schema.Option(Schema.String) },
 })
 
 type ApplicationRoute = typeof ApplicationRoute.Type
@@ -310,5 +317,288 @@ describe('types', () => {
     // @ts-expect-error 'Missing' is not a tag of ApplicationRoute
     exited(transition, 'Missing')
     expect(isEntering(transition, 'Notes')).toBe(true)
+  })
+})
+
+const note = ApplicationRoute.NoteDetail({ id: '1' })
+const nextNote = ApplicationRoute.NoteDetail({ id: '2' })
+const transitionCases = [
+  {
+    name: 'cold load into the selected tag',
+    transition: coldLoad<ApplicationRoute>(note),
+    expected: 'Entered',
+  },
+  {
+    name: 'cold load outside the selected tag',
+    transition: coldLoad<ApplicationRoute>(ApplicationRoute.Home()),
+    expected: 'Unrelated',
+  },
+  {
+    name: 'entry into the selected tag',
+    transition: make<ApplicationRoute>(ApplicationRoute.Home(), note),
+    expected: 'Entered',
+  },
+  {
+    name: 'exit from the selected tag',
+    transition: make<ApplicationRoute>(note, ApplicationRoute.Home()),
+    expected: 'Exited',
+  },
+  {
+    name: 'same tag with changed payload',
+    transition: make<ApplicationRoute>(note, nextNote),
+    expected: 'Stayed',
+  },
+  {
+    name: 'same tag with equal payload',
+    transition: make<ApplicationRoute>(note, note),
+    expected: 'Stayed',
+  },
+  {
+    name: 'navigation between unrelated tags',
+    transition: make<ApplicationRoute>(
+      ApplicationRoute.Home(),
+      ApplicationRoute.Notes(),
+    ),
+    expected: 'Unrelated',
+  },
+  {
+    name: 'navigation within an unrelated tag',
+    transition: make<ApplicationRoute>(
+      ApplicationRoute.Home(),
+      ApplicationRoute.Home(),
+    ),
+    expected: 'Unrelated',
+  },
+]
+
+describe('transition classification', () => {
+  it.each(transitionCases)(
+    'classifies $name as $expected',
+    ({ transition, expected }) => {
+      const handlers = {
+        Entered: vi.fn(
+          (nextRoute: typeof ApplicationRoute.NoteDetail.Type) => nextRoute.id,
+        ),
+        Exited: vi.fn(
+          (previousRoute: typeof ApplicationRoute.NoteDetail.Type) =>
+            previousRoute.id,
+        ),
+        Stayed: vi.fn(
+          (
+            routes: Readonly<{
+              previousRoute: typeof ApplicationRoute.NoteDetail.Type
+              nextRoute: typeof ApplicationRoute.NoteDetail.Type
+            }>,
+          ) => `${routes.previousRoute.id}:${routes.nextRoute.id}`,
+        ),
+        Unrelated: vi.fn(() => 'unrelated'),
+      }
+
+      match(transition, 'NoteDetail', handlers)
+
+      for (const [caseName, handler] of Object.entries(handlers)) {
+        expect(handler).toHaveBeenCalledTimes(caseName === expected ? 1 : 0)
+      }
+
+      expect(isExiting(transition, 'NoteDetail')).toBe(expected === 'Exited')
+      expect(isStaying(transition, 'NoteDetail')).toBe(expected === 'Stayed')
+
+      if (expected === 'Entered') {
+        expect(handlers.Entered).toHaveBeenCalledWith(transition.nextRoute)
+      }
+
+      if (Option.isSome(transition.maybePreviousRoute)) {
+        if (expected === 'Exited') {
+          expect(handlers.Exited).toHaveBeenCalledWith(
+            transition.maybePreviousRoute.value,
+          )
+        }
+
+        if (expected === 'Stayed') {
+          expect(handlers.Stayed).toHaveBeenCalledWith({
+            previousRoute: transition.maybePreviousRoute.value,
+            nextRoute: transition.nextRoute,
+          })
+        }
+      }
+    },
+  )
+
+  it('passes changed searchText values to Stayed', () => {
+    const classifySearch = (transition: Transition<ApplicationRoute>) =>
+      match(transition, 'People', {
+        Entered: () => 'fetch',
+        Exited: () => 'unchanged',
+        Stayed: ({ previousRoute, nextRoute }) => {
+          expectTypeOf(previousRoute).toEqualTypeOf<
+            typeof ApplicationRoute.People.Type
+          >()
+          expectTypeOf(nextRoute).toEqualTypeOf<
+            typeof ApplicationRoute.People.Type
+          >()
+
+          return Equal.equals(previousRoute.searchText, nextRoute.searchText)
+            ? 'unchanged'
+            : 'fetch'
+        },
+        Unrelated: () => 'unchanged',
+      })
+
+    const people = ApplicationRoute.People({ searchText: Option.some('alice') })
+    const nextPeople = ApplicationRoute.People({
+      searchText: Option.some('bob'),
+    })
+
+    expect(classifySearch(make<ApplicationRoute>(people, nextPeople))).toBe(
+      'fetch',
+    )
+    expect(classifySearch(make<ApplicationRoute>(people, people))).toBe(
+      'unchanged',
+    )
+  })
+
+  it.each(transitionCases)(
+    'falls back only for omitted cases ($expected)',
+    ({ transition, expected }) => {
+      const onEntered = vi.fn(() => undefined)
+      const fallback = vi.fn(() => 'fallback')
+
+      const result = matchOrElse(
+        transition,
+        'NoteDetail',
+        { Entered: onEntered },
+        fallback,
+      )
+
+      expect(onEntered).toHaveBeenCalledTimes(expected === 'Entered' ? 1 : 0)
+      expect(fallback).toHaveBeenCalledTimes(expected === 'Entered' ? 0 : 1)
+      expect(result).toBe(expected === 'Entered' ? undefined : 'fallback')
+    },
+  )
+
+  it.each(transitionCases)(
+    'uses each supplied handler ($expected)',
+    ({ transition, expected }) => {
+      const fallback = vi.fn(() => 'fallback')
+      const result = matchOrElse(
+        transition,
+        'NoteDetail',
+        {
+          Entered: nextRoute => `Entered:${nextRoute.id}`,
+          Exited: previousRoute => `Exited:${previousRoute.id}`,
+          Stayed: ({ previousRoute, nextRoute }) =>
+            `Stayed:${previousRoute.id}:${nextRoute.id}`,
+          Unrelated: () => 'Unrelated',
+        },
+        fallback,
+      )
+
+      expect(result.startsWith(expected)).toBe(true)
+      expect(fallback).not.toHaveBeenCalled()
+      expect(matchOrElse(transition, 'NoteDetail', {}, () => 'empty')).toBe(
+        'empty',
+      )
+    },
+  )
+})
+
+describe('matcher types', () => {
+  it('narrows route payloads and infers a union of branch returns', () => {
+    const transition = make<ApplicationRoute>(note, nextNote)
+    const handlers = {
+      Entered: () => 1,
+      Exited: () => 'exited',
+      Stayed: () => true,
+      Unrelated: () => undefined,
+    }
+    const result = match(transition, 'NoteDetail', {
+      Entered: nextRoute => {
+        expectTypeOf(nextRoute).toEqualTypeOf<
+          typeof ApplicationRoute.NoteDetail.Type
+        >()
+        return 1
+      },
+      Exited: previousRoute => {
+        expectTypeOf(previousRoute).toEqualTypeOf<
+          typeof ApplicationRoute.NoteDetail.Type
+        >()
+        return 'exited'
+      },
+      Stayed: ({ previousRoute, nextRoute }) => {
+        expectTypeOf(previousRoute).toEqualTypeOf<
+          typeof ApplicationRoute.NoteDetail.Type
+        >()
+        expectTypeOf(nextRoute).toEqualTypeOf<
+          typeof ApplicationRoute.NoteDetail.Type
+        >()
+        return true
+      },
+      Unrelated: () => undefined,
+    })
+    expectTypeOf(result).toEqualTypeOf<number | string | boolean | undefined>()
+
+    const partial = matchOrElse(
+      transition,
+      'NoteDetail',
+      {
+        Entered: nextRoute => {
+          expectTypeOf(nextRoute).toEqualTypeOf<
+            typeof ApplicationRoute.NoteDetail.Type
+          >()
+          return 1
+        },
+        Exited: previousRoute => {
+          expectTypeOf(previousRoute).toEqualTypeOf<
+            typeof ApplicationRoute.NoteDetail.Type
+          >()
+          return 'exited'
+        },
+        Stayed: ({ previousRoute, nextRoute }) => {
+          expectTypeOf(previousRoute).toEqualTypeOf<
+            typeof ApplicationRoute.NoteDetail.Type
+          >()
+          expectTypeOf(nextRoute).toEqualTypeOf<
+            typeof ApplicationRoute.NoteDetail.Type
+          >()
+          return true
+        },
+      },
+      () => undefined,
+    )
+    expectTypeOf(partial).toEqualTypeOf<number | string | boolean | undefined>()
+
+    // NOTE: In the TypeScript 7.1 all-source program, dropping both type
+    // dependencies makes unrelated Service constraints resolve incorrectly.
+    // Matcher-produced Steps are checked in the route-step-program fixtures.
+    type MatcherStep = Step<ApplicationRoute, ApplicationRoute>
+    expectTypeOf<
+      NonNullable<ReturnType<MatcherStep>['commands']>[number]
+    >().toEqualTypeOf<Command<ApplicationRoute>>()
+
+    if (false) {
+      // @ts-expect-error Invalid route tag
+      match(transition, 'Missing', handlers)
+      // @ts-expect-error Invalid route tag
+      matchOrElse(transition, 'Missing', {}, () => undefined)
+      // @ts-expect-error Exhaustive matching requires Unrelated
+      match(transition, 'NoteDetail', {
+        Entered: () => 1,
+        Exited: () => 2,
+        Stayed: () => 3,
+      })
+      // @ts-expect-error Fallback is required
+      matchOrElse(transition, 'NoteDetail', {})
+      matchOrElse(
+        transition,
+        'NoteDetail',
+        // @ts-expect-error Invalid handler payload
+        { Entered: (route: typeof ApplicationRoute.Home.Type) => route },
+        () => undefined,
+      )
+      // @ts-expect-error Invalid route tag
+      isExiting(transition, 'Missing')
+      // @ts-expect-error Invalid route tag
+      isStaying(transition, 'Missing')
+    }
   })
 })

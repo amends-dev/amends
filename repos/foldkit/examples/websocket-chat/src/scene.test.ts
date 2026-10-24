@@ -9,6 +9,7 @@ import {
   placeholder,
   role,
   scene,
+  subscriptions as sceneSubscriptions,
   text,
   type,
 } from 'foldkit/scene'
@@ -20,6 +21,7 @@ import {
   TimestampReceivedMessage,
   TimestampSentMessage,
 } from './command'
+import { ApplicationComposition } from './composition'
 import { managedResources } from './managedResource'
 import { Message } from './message'
 import { ConnectionState, Model } from './model'
@@ -156,7 +158,14 @@ describe('view', () => {
 
   test('a message arriving on the socket Subscription lands in the conversation', () => {
     scene(
-      { update, view, subscriptions },
+      {
+        update,
+        view,
+        subscriptions: sceneSubscriptions(
+          ApplicationComposition,
+          subscriptions,
+        ),
+      },
       given(
         modifyFields(idleModel, {
           connection: () => ConnectionState.Connected(),

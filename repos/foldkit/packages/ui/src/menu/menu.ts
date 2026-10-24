@@ -97,6 +97,7 @@ export const Message = defineMessageUnion({
   CompletedRestoreMenuInert: {},
   CompletedScrollMenuItemIntoView: {},
   CompletedClickMenuItem: {},
+  ClickedButton: {},
   IgnoredMouseClick: {},
   SuppressedSpaceScroll: {},
   CompletedAnchorMenu: {},
@@ -168,6 +169,8 @@ export type RequestedItemClick = typeof Message.RequestedItemClick.Type
 export type Searched = typeof Message.Searched.Type
 export type CompletedDelayClearMenuSearch =
   typeof Message.CompletedDelayClearMenuSearch.Type
+/** A click on the Menu trigger button. */
+export type ClickedButton = typeof Message.ClickedButton.Type
 export type IgnoredMouseClick = typeof Message.IgnoredMouseClick.Type
 export type SuppressedSpaceScroll = typeof Message.SuppressedSpaceScroll.Type
 export type PressedPointerOnButton = typeof Message.PressedPointerOnButton.Type
@@ -233,7 +236,7 @@ const itemSelector = (id: string, index: number): string =>
   idSelector(`${id}-item-${index}`)
 
 /** Prevents page scrolling while the menu is open. */
-export const LockMenuScroll = MenuNamespace.command('LockMenuScroll', {
+export const LockMenuScroll = MenuNamespace.makeCommand('LockMenuScroll', {
   messages: [Message.CompletedLockMenuScroll],
   handler: function* () {
     return () =>
@@ -241,7 +244,7 @@ export const LockMenuScroll = MenuNamespace.command('LockMenuScroll', {
   },
 })
 /** Re-enables page scrolling after the menu closes. */
-export const UnlockMenuScroll = MenuNamespace.command('UnlockMenuScroll', {
+export const UnlockMenuScroll = MenuNamespace.makeCommand('UnlockMenuScroll', {
   messages: [Message.CompletedUnlockMenuScroll],
   handler: function* () {
     return () =>
@@ -249,7 +252,7 @@ export const UnlockMenuScroll = MenuNamespace.command('UnlockMenuScroll', {
   },
 })
 /** Marks all elements outside the menu as inert for modal behavior. */
-export const InertMenuOthers = MenuNamespace.command('InertMenuOthers', {
+export const InertMenuOthers = MenuNamespace.makeCommand('InertMenuOthers', {
   args: { id: Schema.String },
   messages: [Message.CompletedInertMenuOthers],
   handler: function* () {
@@ -260,7 +263,7 @@ export const InertMenuOthers = MenuNamespace.command('InertMenuOthers', {
   },
 })
 /** Removes the inert attribute from elements outside the Menu. */
-export const RestoreMenuInert = MenuNamespace.command('RestoreMenuInert', {
+export const RestoreMenuInert = MenuNamespace.makeCommand('RestoreMenuInert', {
   args: { id: Schema.String },
   messages: [Message.CompletedRestoreMenuInert],
   handler: function* () {
@@ -269,7 +272,7 @@ export const RestoreMenuInert = MenuNamespace.command('RestoreMenuInert', {
   },
 })
 /** Moves focus to the menu items container after opening. */
-export const FocusMenuItems = MenuNamespace.command('FocusMenuItems', {
+export const FocusMenuItems = MenuNamespace.makeCommand('FocusMenuItems', {
   args: { id: Schema.String },
   messages: [Message.CompletedFocusMenuItems],
   handler: function* () {
@@ -281,7 +284,7 @@ export const FocusMenuItems = MenuNamespace.command('FocusMenuItems', {
   },
 })
 /** Moves focus back to the menu button after closing. */
-export const FocusMenuButton = MenuNamespace.command('FocusMenuButton', {
+export const FocusMenuButton = MenuNamespace.makeCommand('FocusMenuButton', {
   args: { id: Schema.String },
   messages: [Message.CompletedFocusMenuButton],
   handler: function* () {
@@ -293,7 +296,7 @@ export const FocusMenuButton = MenuNamespace.command('FocusMenuButton', {
   },
 })
 /** Scrolls the active menu item into view after keyboard navigation. */
-export const ScrollMenuItemIntoView = MenuNamespace.command(
+export const ScrollMenuItemIntoView = MenuNamespace.makeCommand(
   'ScrollMenuItemIntoView',
   {
     args: { id: Schema.String, index: Schema.Number },
@@ -308,7 +311,7 @@ export const ScrollMenuItemIntoView = MenuNamespace.command(
   },
 )
 /** Programmatically clicks the active menu item's DOM element. */
-export const ClickMenuItem = MenuNamespace.command('ClickMenuItem', {
+export const ClickMenuItem = MenuNamespace.makeCommand('ClickMenuItem', {
   args: { id: Schema.String, index: Schema.Number },
   messages: [Message.CompletedClickMenuItem],
   handler: function* () {
@@ -320,7 +323,7 @@ export const ClickMenuItem = MenuNamespace.command('ClickMenuItem', {
   },
 })
 /** Waits for the typeahead search debounce period before clearing the query. */
-export const DelayClearMenuSearch = MenuNamespace.command(
+export const DelayClearMenuSearch = MenuNamespace.makeCommand(
   'DelayClearMenuSearch',
   {
     args: { version: Schema.Number },
@@ -334,7 +337,7 @@ export const DelayClearMenuSearch = MenuNamespace.command(
   },
 )
 /** Detects whether the menu button moved or the leave animation ended. Whichever comes first; both outcomes signal the Animation block that leave is complete. */
-export const DetectMenuMovementOrAnimationEnd = MenuNamespace.command(
+export const DetectMenuMovementOrAnimationEnd = MenuNamespace.makeCommand(
   'DetectMenuMovementOrAnimationEnd',
   {
     args: { id: Schema.String, generation: Schema.Number },
@@ -358,27 +361,24 @@ export const DetectMenuMovementOrAnimationEnd = MenuNamespace.command(
 )
 
 const detectMenuMovementOrAnimationEnd = (generation: number) =>
-  MenuDefinition.step(model => ({
+  MenuDefinition.makeStep(model => ({
     model,
     commands: [DetectMenuMovementOrAnimationEnd({ id: model.id, generation })],
   }))
 
-type AnimationOutMessageStep = ReturnType<
-  typeof detectMenuMovementOrAnimationEnd
->
-
-const foldAnimationOutMessage =
-  Animation.AnimationBlock.OutMessage.match<AnimationOutMessageStep>({
+const foldAnimationOutMessage = MenuDefinition.makeOutMessageFold(
+  Animation.AnimationBlock,
+  {
     StartedLeaveAnimating: ({ generation }) =>
       detectMenuMovementOrAnimationEnd(generation),
-    TransitionedOut: () => MenuDefinition.stepNoop(),
-  })
+    TransitionedOut: MenuDefinition.makeNoopStep,
+  },
+)
 
-const AnimationBinding = MenuDefinition.bindChild(Animation.AnimationBlock, {
+const AnimationBinding = MenuDefinition.makeBinding(Animation.AnimationBlock, {
   field: 'animation',
   init: false,
-  outMessage: { fold: foldAnimationOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldAnimationOutMessage })
 
 const internalUpdate =
   (animationBinding: typeof AnimationBinding) =>
@@ -405,12 +405,13 @@ const internalUpdate =
 
     const openMenu = (baseModel: Model) => {
       if (model.isAnimated) {
-        return Update.combine([
-          () => ({ model: baseModel, commands: openCommands }),
+        return Update.combineSteps([
+          MenuDefinition.makeStep(() => ({
+            model: baseModel,
+            commands: openCommands,
+          })),
           animationBinding.requestShow(),
-          stepModel => ({
-            model: modifyFields(stepModel, { isOpen: () => true }),
-          }),
+          MenuDefinition.makeFieldsStep(() => ({ isOpen: () => true })),
         ])
       }
 
@@ -433,10 +434,10 @@ const internalUpdate =
       const closeOutMessage = outMessage ?? OutMessage.Closed()
 
       if (model.isAnimated) {
-        return MenuDefinition.step(() =>
+        return MenuDefinition.makeStep(() =>
           Function.compose(
-            Update.combine([
-              () => ({ model: closed, commands }),
+            Update.combineSteps([
+              MenuDefinition.makeStep(() => ({ model: closed, commands })),
               animationBinding.requestHide(),
             ]),
             Update.withOutMessage(closeOutMessage),
@@ -447,8 +448,14 @@ const internalUpdate =
       return Update.withOutMessage({ model: closed, commands }, closeOutMessage)
     }
 
-    const openWithActiveItem = (maybeActiveItemIndex: Option.Option<number>) =>
-      openMenu(
+    const openWithActiveItem = (
+      maybeActiveItemIndex: Option.Option<number>,
+    ) => {
+      if (model.isOpen) {
+        return { model }
+      }
+
+      return openMenu(
         modifyFields(model, {
           maybeActiveItemIndex: () => maybeActiveItemIndex,
           activationTrigger: () =>
@@ -461,6 +468,7 @@ const internalUpdate =
           maybeLastPointerPosition: () => Option.none(),
         }),
       )
+    }
 
     const selectItem = (index: number, item: string) =>
       closeMenu(
@@ -597,10 +605,13 @@ const internalUpdate =
           })
 
           if (model.isAnimated) {
-            return MenuDefinition.step(() =>
+            return MenuDefinition.makeStep(() =>
               Function.compose(
-                Update.combine([
-                  () => ({ model: closed, commands: closeWithFocusCommands }),
+                Update.combineSteps([
+                  MenuDefinition.makeStep(() => ({
+                    model: closed,
+                    commands: closeWithFocusCommands,
+                  })),
                   animationBinding.requestHide(),
                 ]),
                 Update.withOutMessage(OutMessage.Closed()),
@@ -673,6 +684,23 @@ const internalUpdate =
           maybeLastButtonPointerType: () => Option.none(),
         }),
       }),
+      ClickedButton: () => {
+        if (
+          Option.exists(model.maybeLastButtonPointerType, Equal.equals('mouse'))
+        ) {
+          return {
+            model: modifyFields(model, {
+              maybeLastButtonPointerType: () => Option.none(),
+            }),
+          }
+        }
+
+        if (model.isOpen) {
+          return closeMenu(model, closeWithFocusCommands)
+        }
+
+        return openWithActiveItem(Option.none())
+      },
     })
   }
 
@@ -693,7 +721,7 @@ const internalUpdate =
  *  Exposed so Scene tests can call
  *  `Scene.Mount.resolve(AnchorMenu, Message.CompletedAnchorMenu())`.
  */
-export const AnchorMenu = MenuNamespace.mount('AnchorMenu', {
+export const AnchorMenu = MenuNamespace.makeMount('AnchorMenu', {
   args: { buttonId: Schema.String, anchor: AnchorConfig },
   messages: [Message.CompletedAnchorMenu],
   handler: function* () {
@@ -717,19 +745,22 @@ export const AnchorMenu = MenuNamespace.mount('AnchorMenu', {
 /** The backdrop-portaling Mount this Menu renders. Exposed so Scene tests can
  *  call `Scene.Mount.resolve(PortalMenuBackdrop, Message.CompletedPortalMenuBackdrop())` to
  *  acknowledge the mount produced by the rendered backdrop. */
-export const PortalMenuBackdrop = MenuNamespace.mount('PortalMenuBackdrop', {
-  messages: [Message.CompletedPortalMenuBackdrop],
-  handler: function* () {
-    return ({ element }) =>
-      Effect.gen(function* () {
-        yield* Effect.acquireRelease(
-          Effect.sync(() => portalBackdrop(element)),
-          cleanup => Effect.sync(cleanup),
-        )
-        return Message.CompletedPortalMenuBackdrop()
-      })
+export const PortalMenuBackdrop = MenuNamespace.makeMount(
+  'PortalMenuBackdrop',
+  {
+    messages: [Message.CompletedPortalMenuBackdrop],
+    handler: function* () {
+      return ({ element }) =>
+        Effect.gen(function* () {
+          yield* Effect.acquireRelease(
+            Effect.sync(() => portalBackdrop(element)),
+            cleanup => Effect.sync(cleanup),
+          )
+          return Message.CompletedPortalMenuBackdrop()
+        })
+    },
   },
-})
+)
 
 /** Mount definitions rendered by Menu. */
 export const mounts = [AnchorMenu, PortalMenuBackdrop]
@@ -746,7 +777,7 @@ export const init = MenuComposition.makeInit((config: InitConfig) => ({
 }))
 type MenuViewBuilder = Block.ViewBuilderFor<typeof MenuComposition>
 const defaultUpdate = internalUpdate(AnimationBinding)
-const authoredUpdate = MenuDefinition.step(
+const authoredUpdate = MenuDefinition.makeStep(
   (model, message: Parameters<typeof defaultUpdate>[1]) =>
     defaultUpdate(model, message),
 )
@@ -855,7 +886,6 @@ const menuViewImpl = (
     animation: { transitionState },
     maybeActiveItemIndex,
     searchQuery,
-    maybeLastButtonPointerType,
   } = model
 
   const {
@@ -977,21 +1007,6 @@ const menuViewImpl = (
       }),
     )
 
-  const handleButtonClick = (): Message => {
-    const isMouse = Option.exists(
-      maybeLastButtonPointerType,
-      type => type === 'mouse',
-    )
-
-    if (isMouse) {
-      return Message.IgnoredMouseClick()
-    } else if (isOpen) {
-      return Message.Closed()
-    } else {
-      return Message.Opened({ maybeActiveItemIndex: Option.none() })
-    }
-  }
-
   const handleSpaceKeyUp = (key: string): Option.Option<Message> =>
     OptionExt.when(key === ' ', Message.SuppressedSpaceScroll())
 
@@ -1086,7 +1101,7 @@ const menuViewImpl = (
           h.OnPointerDown(handleButtonPointerDown),
           h.OnKeyDownPreventDefault(handleButtonKeyDown),
           h.OnKeyUpPreventDefault(handleSpaceKeyUp),
-          h.OnClick(handleButtonClick()),
+          h.OnClick(Message.ClickedButton()),
         ]),
     ...(isVisible
       ? [
@@ -1316,14 +1331,19 @@ type RefineOutMessage<Return, OutMessage> =
         ? Omit<Return, 'outMessage'> & Readonly<{ outMessage?: OutMessage }>
         : never
 
+const prepareMenuBlock = () =>
+  MenuComposition.prepareBlock({
+    init,
+    update,
+    view,
+    operations,
+    EffectsLayer,
+  })
 /** Complete default Menu Block definition. */
-export const block = MenuComposition.assembleBlock({
-  init,
-  update,
-  view,
-  operations,
-  EffectsLayer,
-})
+export const block: Block.FromAssemblyWithViewAndOutMessage<
+  typeof Model,
+  typeof prepareMenuBlock
+> = Block.assemble(prepareMenuBlock)
 
 /** Programmatically opens the Menu through Menu update. */
 export const open = block.operations.requestOpen
@@ -1343,14 +1363,21 @@ const makeBlockParts = <Item extends string>() => {
     Message,
     OutMessage: RefinedOutMessage,
   })
-  const ItemAnimationBinding = MenuDefinition.bindChild(
+  const foldItemAnimationOutMessage = MenuDefinition.makeOutMessageFold(
+    Animation.AnimationBlock,
+    {
+      StartedLeaveAnimating: ({ generation }) =>
+        detectMenuMovementOrAnimationEnd(generation),
+      TransitionedOut: MenuDefinition.makeNoopStep,
+    },
+  )
+  const ItemAnimationBinding = MenuDefinition.makeBinding(
     Animation.AnimationBlock,
     {
       field: 'animation',
       init: false,
-      outMessage: { fold: foldAnimationOutMessage },
     },
-  )
+  ).withOutMessagePolicy({ fold: foldItemAnimationOutMessage })
   const itemUpdate = internalUpdate(ItemAnimationBinding)
   type GenericReturn = RefineOutMessage<
     ReturnType<typeof itemUpdate>,
@@ -1367,7 +1394,7 @@ const makeBlockParts = <Item extends string>() => {
   const init = MenuComposition.makeInit((config: InitConfig) => ({
     model: makeInitialModel(config),
   }))
-  const authoredUpdate = MenuDefinition.step(
+  const authoredUpdate = MenuDefinition.makeStep(
     (model, message: Parameters<typeof itemUpdate>[1]) =>
       castReturn(itemUpdate(model, message)),
   )
@@ -1413,7 +1440,13 @@ export interface Completed<
 const makeBlock = <Item extends string>(): Completed<Item> => {
   const { composition, implementation } = makeBlockParts<Item>()
 
-  return composition.assembleBlock(implementation)
+  const prepare = () => composition.prepareBlock(implementation)
+  const completedBlock: Block.FromAssemblyWithViewAndOutMessage<
+    typeof Model,
+    typeof prepare
+  > = Block.assemble(prepare)
+
+  return completedBlock
 }
 
 /**

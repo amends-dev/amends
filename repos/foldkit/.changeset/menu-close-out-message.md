@@ -23,6 +23,6 @@ After:
 ```ts
 const foldMenuOutMessage = MenuBlock.OutMessage.match({
   Selected: foldSelection,
-  Closed: () => ApplicationDefinition.stepNoop(),
+  Closed: ApplicationDefinition.makeNoopStep,
 })
 ```

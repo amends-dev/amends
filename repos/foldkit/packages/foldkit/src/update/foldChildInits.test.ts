@@ -107,7 +107,6 @@ const WorkspaceOutMessage = defineMessageUnion({
     maybeDocumentId: Schema.Option(Schema.String),
   },
 })
-type WorkspaceOutMessage = typeof WorkspaceOutMessage.Type
 
 const toGotSearchMessage = (message: SearchMessage) =>
   AppMessage.GotSearchMessage({ message })

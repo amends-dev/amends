@@ -21,6 +21,10 @@ import {
   type HtmlBuilder,
   defineView as defineHtmlView,
 } from '../html/index.js'
+import type {
+  InvalidViewInputsDiagnostic,
+  ValidViewInputs,
+} from '../html/viewInputs.js'
 import * as ManagedResource from '../managedResource/index.js'
 import * as Mount from '../mount/index.js'
 import * as Subscription from '../subscription/subscription.js'
@@ -31,6 +35,13 @@ import {
 } from '../update/operationRecipe.js'
 import type * as PublicUpdate from '../update/public.js'
 import type { VNode } from '../vdom.js'
+import {
+  type AssemblyDraft,
+  type CompletionProof,
+  assertCompletedBlock,
+  completeDerivedBlock,
+  makeAssemblyDraft,
+} from './assemblyState.js'
 import { type BindChild, makeBindChild } from './bindChild.js'
 import {
   type AggregatedChildren,
@@ -44,13 +55,19 @@ import {
   assertValidBindingOperationNames,
 } from './binding.js'
 import {
+  bindingRequiresOutMessagePolicy,
+  selectedBindingOutMessagePolicyOf,
+} from './bindingOutMessagePolicy.js'
+import {
   type DispatchSchemaFor,
   generatedEnvelopeSchemas,
   makeDispatchSchema,
 } from './childEnvelope.js'
+import { type MakeCommandsStep, makeCommandsStep } from './commandsStep.js'
 import {
   assertBindingParentContracts,
   descendantOwnersOf,
+  registerRuntimeBindings,
 } from './composition.js'
 import { type DefaultViewTypeId, registerDefaultView } from './defaultView.js'
 import {
@@ -79,6 +96,7 @@ import {
   type AnyBindingInitRecipe,
   type BindingInitRecipeReturn,
   isBindingInitRecipe,
+  isRegisteredBindingInitRecipe,
   runBindingInitRecipe,
 } from './initRecipe.js'
 import type {
@@ -90,6 +108,22 @@ import { makeInit } from './initializationRuntime.js'
 import { isOperationMessageConstructor, prepareOperation } from './operation.js'
 import { withOperationGraph } from './operationGraph.js'
 import { makeOperationMessageValidator } from './operationMessage.js'
+import {
+  type MakeOutMessageFold,
+  makeOutMessageFold,
+} from './outMessageFold.js'
+import {
+  type MakeOutMessageForward,
+  makeOutMessageForward,
+} from './outMessageForward.js'
+import {
+  type RuntimeOutMessagePolicy,
+  registerOperationGraphOutMessagePolicies,
+} from './outMessagePolicyRuntime.js'
+import {
+  type MakeOutMessageStep,
+  makeOutMessageStep,
+} from './outMessageStep.js'
 import type { Owner } from './owner.js'
 import { makeOwnedName } from './ownerName.js'
 import type { ValidateBindingPolicies } from './policyEvidence.js'
@@ -103,10 +137,18 @@ import type {
 } from './requirements.js'
 import type { ValidateConstructionRequirements } from './scope.js'
 import { selectLayer } from './scope.js'
-import { withViewIdentity } from './viewScope.js'
+import { registerViewInputs, withViewIdentity } from './viewScope.js'
 
 type AnySchema = Schema.Codec<any, any, any, any>
 type AnyFunction = (...args: ReadonlyArray<any>) => any
+
+const compositions = new WeakSet<object>()
+
+/** @internal Tests whether a value is a Composition created by Foldkit. */
+export const isComposition = (value: unknown): value is object =>
+  (typeof value === 'object' || typeof value === 'function') &&
+  value !== null &&
+  compositions.has(value)
 
 type ReturnOf<Function extends AnyFunction> = Function extends (
   ...args: ReadonlyArray<never>
@@ -191,24 +233,40 @@ type IsAny<Value> = 0 extends 1 & Value ? true : false
 type IsUnknown<Value> =
   IsAny<Value> extends true ? false : unknown extends Value ? true : false
 
-type ValidViewInputs<ViewInputs> =
+declare const InvalidViewInputsTypeId: unique symbol
+
+/** @internal Retains invalid generic ViewInputs as a required input instead of
+ * allowing `never` to collapse a Block view to its two-argument form. */
+export interface InvalidViewInputs<ViewInputs> {
+  readonly [InvalidViewInputsTypeId]: ViewInputs
+}
+
+/** @internal Preserves deferred generic validation in authored view types. */
+export type AuthoredViewInputs<ViewInputs> = [
+  ValidViewInputs<ViewInputs>,
+] extends [never]
+  ? InvalidViewInputs<ViewInputs>
+  : ValidViewInputs<ViewInputs>
+
+type ViewWithInputs<Model, Message, ViewInputs, RequiredViewRequirements> =
   IsAny<ViewInputs> extends true
     ? never
     : [ViewInputs] extends [never]
       ? never
       : [ViewInputs] extends [void]
         ? never
-        : ViewInputs
-
-type ViewWithInputs<Model, Message, ViewInputs, RequiredViewRequirements> = [
-  ValidViewInputs<ViewInputs>,
-] extends [never]
-  ? never
-  : (
-      model: Model,
-      viewInputs: NoInfer<ValidViewInputs<ViewInputs>>,
-      h: HtmlBuilder<Message, RequiredViewRequirements>,
-    ) => VNode | null
+        : [ViewInputs] extends [ValidViewInputs<ViewInputs>]
+          ? (
+              model: Model,
+              viewInputs: NoInfer<ViewInputs>,
+              h: HtmlBuilder<Message, RequiredViewRequirements>,
+            ) => VNode | null
+          : ((
+              model: Model,
+              viewInputs: NoInfer<ViewInputs>,
+              h: HtmlBuilder<Message, RequiredViewRequirements>,
+            ) => VNode | null) &
+              InvalidViewInputsDiagnostic<ViewInputs>
 
 type OwnedReturn<Model, Message, OutMessage> = Readonly<{
   model: Model
@@ -343,7 +401,7 @@ export type RefineViewInputs<View extends AnyBlockView, ViewInputs> =
         BlockView<
           Model,
           Message,
-          ValidViewInputs<ViewInputs>,
+          AuthoredViewInputs<ViewInputs>,
           RequiredViewRequirements
         >,
         OwnerValue,
@@ -389,18 +447,12 @@ export interface DefineView<
   /** Authors a view with explicit parent-owned values or callbacks supplied for
    * each render. View inputs do not become part of the child Model. */
   readonly withInputs: <ViewInputs = never>(
-    view: [ValidViewInputs<ViewInputs>] extends [never]
-      ? never
-      : (
-          model: Model,
-          viewInputs: NoInfer<ValidViewInputs<ViewInputs>>,
-          h: HtmlBuilder<Message, RequiredViewRequirements>,
-        ) => VNode | null,
+    view: ViewWithInputs<Model, Message, ViewInputs, RequiredViewRequirements>,
   ) => OwnedAuthoredView<
     BlockView<
       Model,
       Message,
-      ValidViewInputs<ViewInputs>,
+      AuthoredViewInputs<ViewInputs>,
       RequiredViewRequirements
     >,
     OwnerValue,
@@ -418,7 +470,7 @@ export interface DefineView<
  * initialization recipe. The helper preserves graph obligations until the
  * matching Composition interprets them under its registered graph.
  *
- * Public parent-driven operations belong in `assembleBlock({ operations })`. Each
+ * Public parent-driven operations belong in `prepareBlock({ operations })`. Each
  * exposed producer returns a local Message and its update context instead of a
  * Model transformation.
  */
@@ -434,17 +486,19 @@ export interface DefineStep<Model, Message, OutMessage> {
     step: ((model: Model, ...context: Context) => Output) &
       ValidateDeferredStepOutput<Model, Message, OutMessage, Output> &
       ValidateAnnotatedContext<Context>,
-  ): DefinedStep<
-    Model,
-    DeferredStepMessage<Message, Output>,
-    Context,
-    OutMessageOfReturn<DeferredStepReturn<Output>>,
-    CommandRequirements<DeferredStepReturn<Output>>,
-    | Update.RegistrationEvidenceOf<DeferredStepReturn<Output>>
-    | Update.GraphRequirementOf<Extract<Output, AnyFunction>>,
-    DeferredStepKind<Output>,
-    | Update.ResultEvidenceChannelOf<DeferredStepReturn<Output>>
-    | Update.GraphRequirementOf<Extract<Output, AnyFunction>>
+  ): NoInfer<
+    DefinedStep<
+      Model,
+      DeferredStepMessage<Message, Output>,
+      Context,
+      OutMessageOfReturn<DeferredStepReturn<Output>>,
+      CommandRequirements<DeferredStepReturn<Output>>,
+      | Update.RegistrationEvidenceOf<DeferredStepReturn<Output>>
+      | Update.GraphRequirementOf<Extract<Output, AnyFunction>>,
+      DeferredStepKind<Output>,
+      | Update.ResultEvidenceChannelOf<DeferredStepReturn<Output>>
+      | Update.GraphRequirementOf<Extract<Output, AnyFunction>>
+    >
   >
 }
 
@@ -565,6 +619,10 @@ type ValidateDeferredStepOutput<Model, Message, OutMessage, Output> =
       : Output extends Update.AnyResultRecipe
         ? ValidateResultRecipe<Model, Message, OutMessage, Output>
         : ValidateDeferredReturn<Model, Message, OutMessage, Output>
+
+/** @internal Validates one inferred output through the Definition Step contract. */
+export type ValidateDefinitionStepOutput<Model, Message, OutMessage, Output> =
+  ValidateDeferredStepOutput<Model, Message, OutMessage, Output>
 
 type EmittedMessage<Messages extends ReadonlyArray<Schema.Top>> =
   Messages[number]['Type']
@@ -1155,7 +1213,7 @@ type ImplementationHostHandlers<Implementation> =
     : readonly []
 
 /**
- * The channels supplied to a Block Composition's `assembleBlock` method. The
+ * The channels supplied to a Block Composition's `prepareBlock` method. The
  * block retains the exact types of the supplied functions,
  * registrations, and local Layer recipe. Check an implementation with
  * `satisfies Implementation<Model, Message, OutMessage>` to retain its inferred
@@ -1199,7 +1257,7 @@ type ImplementationChannels<Model, Message, OutMessage, Operations> = Readonly<{
   /** The complete local handler recipe for this Block. Child Bindings contribute
    * their recipes automatically. Ordinary Service requirements remain for the
    * application root to provide. This field is explicit on the broad
-   * `Implementation` contract. An inferred concrete `assembleBlock` argument may
+   * `Implementation` contract. An inferred concrete `prepareBlock` argument may
    * omit it, in which case completion uses `Layer.empty`. */
   EffectsLayer: Layer.Layer<never, any, any> | Layer.Layer<any, any, any>
   /** Handler service contracts intentionally left for the host to provide before
@@ -1209,7 +1267,7 @@ type ImplementationChannels<Model, Message, OutMessage, Operations> = Readonly<{
 
 /**
  * The implementation channels accepted by a Block Composition. Use this type
- * with `satisfies` so `assembleBlock` can retain each channel's exact inferred
+ * with `satisfies` so `prepareBlock` can retain each channel's exact inferred
  * service requirements.
  */
 export type Implementation<
@@ -1797,7 +1855,7 @@ type SelectedEffectsImplementation<ImplementationValue, SelectedEffectsLayer> =
       : ImplementationValue[Key]
   }>
 
-interface BlockOperations<
+interface ReplaceEffectsLayer<
   OwnerValue extends Owner<string>,
   ModelSchema extends Schema.Codec<any, any, any, any>,
   MessageSchema extends Schema.Codec<any, any, any, any>,
@@ -1810,21 +1868,7 @@ interface BlockOperations<
     EffectsLayer: AnyLayer
   }>,
 > {
-  /** Authors an alternate embedded view against this completed Block's fixed
-   * child and Mount graph. Parents can select it through a Binding. */
-  readonly makeView: DefineView<
-    OwnerValue,
-    ModelSchema['Type'],
-    MessageSchema['Type'],
-    DefinitionViewRequirements<Mounts, Children>
-  >
-  /**
-   * Selects a replacement local Layer recipe and retains the selected child
-   * graph. The returned block keeps the Owner, operations, lifecycle
-   * registrations, and host handler contract. Selection builds no services
-   * and never constructs the previous local recipe.
-   */
-  readonly replaceEffectsLayer: <
+  <
     const SelectedEffectsLayer extends
       | Layer.Layer<never, any, any>
       | Layer.Layer<any, any, any>,
@@ -1852,7 +1896,7 @@ interface BlockOperations<
           >
         >
       >,
-  ) => Block<
+  ): Block<
     OwnerValue,
     ModelSchema,
     MessageSchema,
@@ -1860,6 +1904,44 @@ interface BlockOperations<
     Mounts,
     Children,
     SelectedEffectsImplementation<ImplementationValue, SelectedEffectsLayer>
+  >
+}
+
+interface BlockOperations<
+  OwnerValue extends Owner<string>,
+  ModelSchema extends Schema.Codec<any, any, any, any>,
+  MessageSchema extends Schema.Codec<any, any, any, any>,
+  OutMessageSchema extends Schema.Codec<any, any, any, any> | undefined,
+  Mounts extends ReadonlyArray<Mount.LayeredMountDefinition>,
+  Children extends ReadonlyArray<AnyBinding>,
+  ImplementationValue extends Readonly<{
+    init: AnyFunction
+    update: AnyFunction
+    EffectsLayer: AnyLayer
+  }>,
+> {
+  /** Authors an alternate embedded view against this completed Block's fixed
+   * child and Mount graph. Parents can select it through a Binding. */
+  readonly makeView: DefineView<
+    OwnerValue,
+    ModelSchema['Type'],
+    MessageSchema['Type'],
+    DefinitionViewRequirements<Mounts, Children>
+  >
+  /**
+   * Selects a replacement local Layer recipe and retains the selected child
+   * graph. The returned block keeps the Owner, operations, lifecycle
+   * registrations, and host handler contract. Selection builds no services
+   * and never constructs the previous local recipe.
+   */
+  readonly replaceEffectsLayer: ReplaceEffectsLayer<
+    OwnerValue,
+    ModelSchema,
+    MessageSchema,
+    OutMessageSchema,
+    Mounts,
+    Children,
+    ImplementationValue
   >
   /**
    * Supplies the declared host-owned handler services with an ordinary Layer.
@@ -1973,6 +2055,7 @@ interface BlockContract<
   }>,
 >
   extends
+    CompletionProof,
     BlockContractFields<
       OwnerValue,
       ModelSchema,
@@ -2116,12 +2199,11 @@ export interface CompletedBlockWithoutViewOrOutMessage<
     NoOutMessage,
     NoDefaultView {}
 
-type CompletedArguments<DefinitionValue, ImplementationValue> =
+type CompletedWithViewArguments<DefinitionValue, ImplementationValue> =
   DefinitionValue extends Readonly<{
     owner: infer OwnerValue extends Owner<string>
     Model: infer ModelSchema extends AnySchema
     Message: infer MessageSchema extends AnySchema
-    OutMessage: infer OutMessageSchema extends AnySchema
     [LocalMountsTypeId]: infer Mounts extends
       ReadonlyArray<Mount.LayeredMountDefinition>
     bindings: infer Children extends ReadonlyArray<AnyBinding>
@@ -2137,7 +2219,6 @@ type CompletedArguments<DefinitionValue, ImplementationValue> =
           OwnerValue: OwnerValue
           ModelSchema: ModelSchema
           MessageSchema: MessageSchema
-          OutMessageSchema: OutMessageSchema
           Mounts: Mounts
           Children: Children
           ImplementationValue: PublicImplementationValue<
@@ -2149,11 +2230,21 @@ type CompletedArguments<DefinitionValue, ImplementationValue> =
       : never
     : never
 
-type CompletedArgument<
+type CompletedWithViewArgument<
   DefinitionValue,
   ImplementationValue,
-  Key extends keyof CompletedArguments<DefinitionValue, ImplementationValue>,
-> = CompletedArguments<DefinitionValue, ImplementationValue>[Key]
+  Key extends keyof CompletedWithViewArguments<
+    DefinitionValue,
+    ImplementationValue
+  >,
+> = CompletedWithViewArguments<DefinitionValue, ImplementationValue>[Key]
+
+type OutMessageSchemaOf<DefinitionValue> =
+  DefinitionValue extends Readonly<{
+    OutMessage: infer OutMessageSchema extends AnySchema
+  }>
+    ? OutMessageSchema
+    : never
 
 /**
  * A completed Block derived from a Definition and implementation that both
@@ -2163,13 +2254,53 @@ export interface CompletedWithViewAndOutMessage<
   DefinitionValue,
   ImplementationValue,
 > extends CompletedBlockWithViewAndOutMessage<
-  CompletedArgument<DefinitionValue, ImplementationValue, 'OwnerValue'>,
-  CompletedArgument<DefinitionValue, ImplementationValue, 'ModelSchema'>,
-  CompletedArgument<DefinitionValue, ImplementationValue, 'MessageSchema'>,
-  CompletedArgument<DefinitionValue, ImplementationValue, 'OutMessageSchema'>,
-  CompletedArgument<DefinitionValue, ImplementationValue, 'Mounts'>,
-  CompletedArgument<DefinitionValue, ImplementationValue, 'Children'>,
-  CompletedArgument<DefinitionValue, ImplementationValue, 'ImplementationValue'>
+  CompletedWithViewArgument<DefinitionValue, ImplementationValue, 'OwnerValue'>,
+  CompletedWithViewArgument<
+    DefinitionValue,
+    ImplementationValue,
+    'ModelSchema'
+  >,
+  CompletedWithViewArgument<
+    DefinitionValue,
+    ImplementationValue,
+    'MessageSchema'
+  >,
+  OutMessageSchemaOf<DefinitionValue>,
+  CompletedWithViewArgument<DefinitionValue, ImplementationValue, 'Mounts'>,
+  CompletedWithViewArgument<DefinitionValue, ImplementationValue, 'Children'>,
+  CompletedWithViewArgument<
+    DefinitionValue,
+    ImplementationValue,
+    'ImplementationValue'
+  >
+> {}
+
+/**
+ * A completed Block derived from a Definition and implementation that publish
+ * a default view without an OutMessage Schema.
+ */
+export interface CompletedWithView<
+  DefinitionValue,
+  ImplementationValue,
+> extends CompletedBlockWithView<
+  CompletedWithViewArgument<DefinitionValue, ImplementationValue, 'OwnerValue'>,
+  CompletedWithViewArgument<
+    DefinitionValue,
+    ImplementationValue,
+    'ModelSchema'
+  >,
+  CompletedWithViewArgument<
+    DefinitionValue,
+    ImplementationValue,
+    'MessageSchema'
+  >,
+  CompletedWithViewArgument<DefinitionValue, ImplementationValue, 'Mounts'>,
+  CompletedWithViewArgument<DefinitionValue, ImplementationValue, 'Children'>,
+  CompletedWithViewArgument<
+    DefinitionValue,
+    ImplementationValue,
+    'ImplementationValue'
+  >
 > {}
 
 /**
@@ -2264,7 +2395,7 @@ export type CompletedBlock<
         >
 
 /**
- * The completed Block produced by a Composition's `assembleBlock` method.
+ * The completed Block contract retained by a Composition's assembly draft.
  * It derives the exact graph and implementation channels from the Definition
  * and implementation values.
  */
@@ -2336,30 +2467,31 @@ export type CompletedForValidation<DefinitionValue, ImplementationValue> =
     : never
 
 /**
- * Structural bound for any completed Block.
+ * Bound for any Block that has passed checked completion.
  */
-export type AnyBlock = Readonly<{
-  owner: Owner<any>
-  Model: AnySchema
-  Message: AnySchema
-  mounts: ReadonlyArray<Mount.LayeredMountDefinition>
-  [LocalMountsTypeId]: ReadonlyArray<Mount.LayeredMountDefinition>
-  bindings: ReadonlyArray<AnyBinding>
-  init: AnyFunction
-  update: AnyFunction
-  operations: Readonly<Record<string, AnyFunction>>
-  subscriptions: AnySubscriptions
-  managedResources: AnyManagedResources
-  EffectsLayer: AnyLayer
-  [LocalEffectsLayerTypeId]: AnyLayer
-  __blockHandlerRequirements?: unknown
-  hostHandlers: ReadonlyArray<unknown>
-  makeView: AnyFunction
-  [DefaultViewTypeId]?: AnyAuthoredView
-  OutMessage?: AnySchema
-  replaceEffectsLayer: AnyFunction
-  provideHandlers: AnyFunction
-}>
+export type AnyBlock = CompletionProof &
+  Readonly<{
+    owner: Owner<any>
+    Model: AnySchema
+    Message: AnySchema
+    mounts: ReadonlyArray<Mount.LayeredMountDefinition>
+    [LocalMountsTypeId]: ReadonlyArray<Mount.LayeredMountDefinition>
+    bindings: ReadonlyArray<AnyBinding>
+    init: AnyFunction
+    update: AnyFunction
+    operations: Readonly<Record<string, AnyFunction>>
+    subscriptions: AnySubscriptions
+    managedResources: AnyManagedResources
+    EffectsLayer: AnyLayer
+    [LocalEffectsLayerTypeId]: AnyLayer
+    __blockHandlerRequirements?: unknown
+    hostHandlers: ReadonlyArray<unknown>
+    makeView: AnyFunction
+    [DefaultViewTypeId]?: AnyAuthoredView
+    OutMessage?: AnySchema
+    replaceEffectsLayer: AnyFunction
+    provideHandlers: AnyFunction
+  }>
 
 type ManagedExposedOperationsImplementation<
   Init,
@@ -2377,11 +2509,29 @@ type ManagedExposedOperationsImplementation<
 > &
   Readonly<{ operations: ExposedOperations }>
 
-type AssembleBlockDefinition<OwnerValue extends Owner<string>> = Readonly<{
+type PrepareBlockDefinition<OwnerValue extends Owner<string>> = Readonly<{
   owner: OwnerValue
 }>
 
-type AssembleBlockCompositionForValidation<
+type PrepareBlockComposition<
+  OwnerValue extends Owner<string>,
+  ModelSchema extends AnySchema,
+  MessageSchema extends AnySchema,
+  OutMessageSchema extends AnySchema | undefined,
+  Mounts extends ReadonlyArray<Mount.LayeredMountDefinition>,
+  Children extends ReadonlyArray<AnyBinding>,
+> = Readonly<{
+  owner: OwnerValue
+  Model: ModelSchema
+  Message: MessageSchema
+  [LocalMountsTypeId]: Mounts
+  bindings: Children
+}> &
+  (OutMessageSchema extends AnySchema
+    ? Readonly<{ OutMessage: OutMessageSchema }>
+    : NoOutMessage)
+
+type PrepareBlockCompositionForValidation<
   Mounts extends ReadonlyArray<Mount.LayeredMountDefinition>,
   Children extends ReadonlyArray<AnyBinding>,
   ImplementationValue,
@@ -2391,7 +2541,7 @@ type AssembleBlockCompositionForValidation<
   CheckedImplementationValue<ImplementationValue>
 >
 
-type ValidateAssembleBlockComposition<
+type ValidatePrepareBlockComposition<
   OwnerValue extends Owner<string>,
   _ModelSchema extends AnySchema,
   _MessageSchema extends AnySchema,
@@ -2400,8 +2550,8 @@ type ValidateAssembleBlockComposition<
   Children extends ReadonlyArray<AnyBinding>,
   ImplementationValue,
 > = ValidateImplementationComposition<
-  AssembleBlockDefinition<OwnerValue>,
-  AssembleBlockCompositionForValidation<Mounts, Children, ImplementationValue>
+  PrepareBlockDefinition<OwnerValue>,
+  PrepareBlockCompositionForValidation<Mounts, Children, ImplementationValue>
 > &
   ValidateBindingOperationNames<
     ImplementationExposedOperations<ImplementationValue>
@@ -2413,7 +2563,7 @@ type ValidateAssembleBlockComposition<
       >
     : unknown)
 
-type PublicAssembleBlockImplementation<
+type PublicPrepareBlockImplementation<
   ModelSchema extends AnySchema,
   MessageSchema extends AnySchema,
   ImplementationValue,
@@ -2423,18 +2573,209 @@ type PublicAssembleBlockImplementation<
   CheckedImplementationValue<ImplementationValue>
 >
 
-/** Completes a Composition with its implementation channels and returns a
- * passive Block. `init` and `update` are required. At an inferred concrete
+type ImplementationInput<
+  ModelSchema extends AnySchema,
+  MessageSchema extends AnySchema,
+  OutMessageSchema,
+> = Omit<
+  DefinitionImplementation<ModelSchema, MessageSchema, OutMessageSchema>,
+  'EffectsLayer'
+> &
+  Readonly<{ EffectsLayer?: AnyLayer }>
+
+type ValidateImplementationLayerPresence<ImplementationValue> =
+  'EffectsLayer' extends keyof ImplementationValue
+    ? ImplementationValue extends Readonly<{ EffectsLayer: AnyLayer }>
+      ? unknown
+      : Readonly<{
+          'An optional EffectsLayer cannot establish exact requirements': never
+        }>
+    : unknown
+
+type ValidateImplementationView<
+  OwnerValue extends Owner<string>,
+  ModelSchema extends AnySchema,
+  MessageSchema extends AnySchema,
+  Mounts extends ReadonlyArray<Mount.LayeredMountDefinition>,
+  Children extends ReadonlyArray<AnyBinding>,
+  ImplementationValue extends object,
+> =
+  ImplementationValue extends Readonly<{
+    view: DefinitionView<
+      OwnerValue,
+      ModelSchema,
+      MessageSchema,
+      Mounts,
+      Children
+    >
+  }>
+    ? ValidateDefinitionView<ImplementationValue['view']>
+    : ValidateView<
+        ImplementationValue,
+        OwnerValue,
+        ModelSchema['Type'],
+        MessageSchema['Type'],
+        DefinitionViewRequirements<Mounts, Children>
+      >
+
+type ImplementationRecipeValidation<
+  OwnerValue extends Owner<string>,
+  ModelSchema extends AnySchema,
+  MessageSchema extends AnySchema,
+  OutMessageSchema extends AnySchema | undefined,
+  Mounts extends ReadonlyArray<Mount.LayeredMountDefinition>,
+  Children extends ReadonlyArray<AnyBinding>,
+  ImplementationValue extends object,
+> = ImplementationInput<ModelSchema, MessageSchema, OutMessageSchema> &
+  ExactImplementationKeys<ImplementationValue> &
+  ValidateImplementationLayerPresence<ImplementationValue> &
+  ValidateInit<ImplementationValue> &
+  ValidateImplementationView<
+    OwnerValue,
+    ModelSchema,
+    MessageSchema,
+    Mounts,
+    Children,
+    ImplementationValue
+  > &
+  ValidatePrepareBlockComposition<
+    OwnerValue,
+    ModelSchema,
+    MessageSchema,
+    OutMessageSchema,
+    Mounts,
+    Children,
+    CompletedImplementationValue<ImplementationValue>
+  >
+
+type ImplementationRecipeArguments<ImplementationValue, Validation> =
+  string extends keyof ImplementationValue
+    ? readonly [error: never]
+    : [ImplementationValue] extends [never]
+      ? readonly [error: never]
+      : [ImplementationValue] extends [Validation]
+        ? readonly []
+        : readonly [error: never]
+
+type ValidateHeadlessAssembly<
+  OwnerValue extends Owner<string>,
+  ModelSchema extends AnySchema,
+  MessageSchema extends AnySchema,
+  OutMessageSchema extends AnySchema | undefined,
+  Mounts extends ReadonlyArray<Mount.LayeredMountDefinition>,
+  Children extends ReadonlyArray<AnyBinding>,
+  ImplementationValue extends object,
+> = [ImplementationValue] extends [unknown]
+  ? ValidatePrepareBlockComposition<
+      OwnerValue,
+      ModelSchema,
+      MessageSchema,
+      OutMessageSchema,
+      Mounts,
+      Children,
+      ImplementationValue
+    >
+  : unknown
+
+type ValidateDefaultEffectsAssembly<
+  OwnerValue extends Owner<string>,
+  ModelSchema extends AnySchema,
+  MessageSchema extends AnySchema,
+  OutMessageSchema extends AnySchema | undefined,
+  Mounts extends ReadonlyArray<Mount.LayeredMountDefinition>,
+  Children extends ReadonlyArray<AnyBinding>,
+  ImplementationValue extends object,
+> = [ImplementationValue] extends [unknown]
+  ? ValidateInit<ImplementationValue> &
+      ValidateView<
+        ImplementationValue,
+        OwnerValue,
+        ModelSchema['Type'],
+        MessageSchema['Type'],
+        DefinitionViewRequirements<Mounts, Children>
+      > &
+      ValidatePrepareBlockComposition<
+        OwnerValue,
+        ModelSchema,
+        MessageSchema,
+        OutMessageSchema,
+        Mounts,
+        Children,
+        DefaultEffectsImplementation<ImplementationValue>
+      >
+  : unknown
+
+type ValidateInferredAssembly<
+  OwnerValue extends Owner<string>,
+  ModelSchema extends AnySchema,
+  MessageSchema extends AnySchema,
+  OutMessageSchema extends AnySchema | undefined,
+  Mounts extends ReadonlyArray<Mount.LayeredMountDefinition>,
+  Children extends ReadonlyArray<AnyBinding>,
+  ImplementationValue extends object,
+> = [ImplementationValue] extends [unknown]
+  ? ValidateInit<ImplementationValue> &
+      ValidateView<
+        ImplementationValue,
+        OwnerValue,
+        ModelSchema['Type'],
+        MessageSchema['Type'],
+        DefinitionViewRequirements<Mounts, Children>
+      > &
+      ValidatePrepareBlockComposition<
+        OwnerValue,
+        ModelSchema,
+        MessageSchema,
+        OutMessageSchema,
+        Mounts,
+        Children,
+        ImplementationValue
+      >
+  : unknown
+
+type ValidateShapedAssembly<
+  Init,
+  OwnerValue extends Owner<string>,
+  ModelSchema extends AnySchema,
+  MessageSchema extends AnySchema,
+  OutMessageSchema extends AnySchema | undefined,
+  Mounts extends ReadonlyArray<Mount.LayeredMountDefinition>,
+  Children extends ReadonlyArray<AnyBinding>,
+  ImplementationValue,
+> = [Init] extends [unknown]
+  ? ValidatePrepareBlockComposition<
+      OwnerValue,
+      ModelSchema,
+      MessageSchema,
+      OutMessageSchema,
+      Mounts,
+      Children,
+      ImplementationValue
+    >
+  : unknown
+
+/** Prepares a Composition's implementation channels as an opaque, passive
+ * draft. Assemble its private producer through a matching `FromAssembly`
+ * annotation and `Block.assemble(prepare)` before using the Block.
+ *
+ * Call this method inside a private zero-argument `prepare` function. The
+ * matching `FromAssembly` annotation names `typeof Model` and `typeof prepare`.
+ * That explicit boundary lets a parent read the canonical `ChildBlock.Model`
+ * Schema without inferring it through the child's complete implementation,
+ * reducing TypeScript checking and editor work. See `Block.FromAssemblyWithView`
+ * for the full pattern. It does not guarantee that every editor operation is fast.
+ *
+ * `init` and `update` are required. At an inferred concrete
  * call, an omitted `EffectsLayer` defaults to `Layer.empty`. Omitted local view,
  * exposed operations, lifecycle registrations, and host handlers become their
  * empty completed forms while registered children still contribute their
  * channels.
  *
- * Completion does not build Layers, run init, call exposed producers, or start
+ * Assembly does not build Layers, run init, call exposed producers, or start
  * lifecycle work. `EffectsLayer` contains the Block's local handler recipes;
  * child Bindings contribute their recipes automatically, and ordinary Service
  * requirements remain for the application root to provide. */
-export interface AssembleBlock<
+export interface PrepareBlock<
   OwnerValue extends Owner<string>,
   ModelSchema extends Schema.Codec<any, any, any, any>,
   MessageSchema extends Schema.Codec<any, any, any, any>,
@@ -2442,6 +2783,41 @@ export interface AssembleBlock<
   Mounts extends ReadonlyArray<Mount.LayeredMountDefinition>,
   Children extends ReadonlyArray<AnyBinding>,
 > {
+  <
+    const ImplementationValue extends ImplementationInput<
+      ModelSchema,
+      MessageSchema,
+      OutMessageSchema
+    >,
+  >(
+    implementation: ImplementationValue,
+    ...validation: ImplementationRecipeArguments<
+      NoInfer<ImplementationValue>,
+      ImplementationRecipeValidation<
+        OwnerValue,
+        ModelSchema,
+        MessageSchema,
+        OutMessageSchema,
+        Mounts,
+        Children,
+        NoInfer<ImplementationValue>
+      >
+    >
+  ): AssemblyDraft<
+    CompletedBlock<
+      OwnerValue,
+      ModelSchema,
+      MessageSchema,
+      OutMessageSchema,
+      Mounts,
+      Children,
+      PublicPrepareBlockImplementation<
+        ModelSchema,
+        MessageSchema,
+        CompletedImplementationValue<ImplementationValue>
+      >
+    >
+  >
   <
     const ImplementationValue extends DefinitionImplementation<
       ModelSchema,
@@ -2452,7 +2828,7 @@ export interface AssembleBlock<
     implementation: ImplementationValue &
       Readonly<{ view?: never }> &
       ExactImplementationKeys<ImplementationValue> &
-      ValidateAssembleBlockComposition<
+      ValidateHeadlessAssembly<
         OwnerValue,
         ModelSchema,
         MessageSchema,
@@ -2461,17 +2837,19 @@ export interface AssembleBlock<
         Children,
         ImplementationValue
       >,
-  ): CompletedBlock<
-    OwnerValue,
-    ModelSchema,
-    MessageSchema,
-    OutMessageSchema,
-    Mounts,
-    Children,
-    PublicAssembleBlockImplementation<
+  ): AssemblyDraft<
+    CompletedBlock<
+      OwnerValue,
       ModelSchema,
       MessageSchema,
-      ImplementationValue
+      OutMessageSchema,
+      Mounts,
+      Children,
+      PublicPrepareBlockImplementation<
+        ModelSchema,
+        MessageSchema,
+        ImplementationValue
+      >
     >
   >
   <
@@ -2501,7 +2879,7 @@ export interface AssembleBlock<
       hostHandlers?: never
       EffectsLayer: EffectsLayer &
         NoInfer<
-          ValidateAssembleBlockComposition<
+          ValidatePrepareBlockComposition<
             OwnerValue,
             ModelSchema,
             MessageSchema,
@@ -2525,17 +2903,19 @@ export interface AssembleBlock<
       NoInfer<
         DefinitionImplementation<ModelSchema, MessageSchema, OutMessageSchema>
       >,
-  ): CompletedBlock<
-    OwnerValue,
-    ModelSchema,
-    MessageSchema,
-    OutMessageSchema,
-    Mounts,
-    Children,
-    PublicAssembleBlockImplementation<
+  ): AssemblyDraft<
+    CompletedBlock<
+      OwnerValue,
       ModelSchema,
       MessageSchema,
-      ViewImplementation<Init, UpdateFunction, View, EffectsLayer>
+      OutMessageSchema,
+      Mounts,
+      Children,
+      PublicPrepareBlockImplementation<
+        ModelSchema,
+        MessageSchema,
+        ViewImplementation<Init, UpdateFunction, View, EffectsLayer>
+      >
     >
   >
   <
@@ -2572,7 +2952,7 @@ export interface AssembleBlock<
       hostHandlers?: never
       EffectsLayer: EffectsLayer &
         NoInfer<
-          ValidateAssembleBlockComposition<
+          ValidatePrepareBlockComposition<
             OwnerValue,
             ModelSchema,
             MessageSchema,
@@ -2602,22 +2982,24 @@ export interface AssembleBlock<
       NoInfer<
         DefinitionImplementation<ModelSchema, MessageSchema, OutMessageSchema>
       >,
-  ): CompletedBlock<
-    OwnerValue,
-    ModelSchema,
-    MessageSchema,
-    OutMessageSchema,
-    Mounts,
-    Children,
-    PublicAssembleBlockImplementation<
+  ): AssemblyDraft<
+    CompletedBlock<
+      OwnerValue,
       ModelSchema,
       MessageSchema,
-      ViewSubscriptionsImplementation<
-        Init,
-        UpdateFunction,
-        View,
-        Subscriptions,
-        EffectsLayer
+      OutMessageSchema,
+      Mounts,
+      Children,
+      PublicPrepareBlockImplementation<
+        ModelSchema,
+        MessageSchema,
+        ViewSubscriptionsImplementation<
+          Init,
+          UpdateFunction,
+          View,
+          Subscriptions,
+          EffectsLayer
+        >
       >
     >
   >
@@ -2655,7 +3037,7 @@ export interface AssembleBlock<
         subscriptions: Subscriptions
         EffectsLayer: EffectsLayer &
           NoInfer<
-            ValidateAssembleBlockComposition<
+            ValidatePrepareBlockComposition<
               OwnerValue,
               ModelSchema,
               MessageSchema,
@@ -2686,24 +3068,66 @@ export interface AssembleBlock<
       NoInfer<
         DefinitionImplementation<ModelSchema, MessageSchema, OutMessageSchema>
       >,
-  ): CompletedBlock<
-    OwnerValue,
-    ModelSchema,
-    MessageSchema,
-    OutMessageSchema,
-    Mounts,
-    Children,
-    PublicAssembleBlockImplementation<
+  ): AssemblyDraft<
+    CompletedBlock<
+      OwnerValue,
       ModelSchema,
       MessageSchema,
-      ViewSubscriptionImplementation<
-        Init,
-        UpdateFunction,
-        View,
-        Subscriptions,
-        EffectsLayer,
-        AdditionalImplementation
+      OutMessageSchema,
+      Mounts,
+      Children,
+      PublicPrepareBlockImplementation<
+        ModelSchema,
+        MessageSchema,
+        ViewSubscriptionImplementation<
+          Init,
+          UpdateFunction,
+          View,
+          Subscriptions,
+          EffectsLayer,
+          AdditionalImplementation
+        >
       >
+    >
+  >
+  <
+    const CompositionValue extends PrepareBlockComposition<
+      OwnerValue,
+      ModelSchema,
+      MessageSchema,
+      undefined,
+      Mounts,
+      Children
+    >,
+    const ImplementationValue extends Readonly<{ view: AnyAuthoredView }>,
+  >(
+    this: CompositionValue,
+    implementation: ImplementationValue &
+      NoInfer<
+        Omit<
+          DefinitionImplementation<
+            ModelSchema,
+            MessageSchema,
+            OutMessageSchema
+          >,
+          'EffectsLayer'
+        > &
+          Readonly<{ EffectsLayer?: never }>
+      > &
+      ExactImplementationKeys<ImplementationValue> &
+      ValidateDefaultEffectsAssembly<
+        OwnerValue,
+        ModelSchema,
+        MessageSchema,
+        OutMessageSchema,
+        Mounts,
+        Children,
+        ImplementationValue
+      >,
+  ): AssemblyDraft<
+    CompletedWithView<
+      CompositionValue,
+      DefaultEffectsImplementation<ImplementationValue>
     >
   >
   <const ImplementationValue extends object>(
@@ -2720,34 +3144,28 @@ export interface AssembleBlock<
           Readonly<{ EffectsLayer?: never }>
       > &
       ExactImplementationKeys<ImplementationValue> &
-      ValidateInit<ImplementationValue> &
-      ValidateView<
-        ImplementationValue,
-        OwnerValue,
-        ModelSchema['Type'],
-        MessageSchema['Type'],
-        DefinitionViewRequirements<Mounts, Children>
-      > &
-      ValidateAssembleBlockComposition<
+      ValidateDefaultEffectsAssembly<
         OwnerValue,
         ModelSchema,
         MessageSchema,
         OutMessageSchema,
         Mounts,
         Children,
-        DefaultEffectsImplementation<ImplementationValue>
+        ImplementationValue
       >,
-  ): CompletedBlock<
-    OwnerValue,
-    ModelSchema,
-    MessageSchema,
-    OutMessageSchema,
-    Mounts,
-    Children,
-    PublicAssembleBlockImplementation<
+  ): AssemblyDraft<
+    CompletedBlock<
+      OwnerValue,
       ModelSchema,
       MessageSchema,
-      DefaultEffectsImplementation<ImplementationValue>
+      OutMessageSchema,
+      Mounts,
+      Children,
+      PublicPrepareBlockImplementation<
+        ModelSchema,
+        MessageSchema,
+        DefaultEffectsImplementation<ImplementationValue>
+      >
     >
   >
   <
@@ -2769,22 +3187,14 @@ export interface AssembleBlock<
       > extends ErasedImplementation
         ? unknown
         : never),
-  ): never
+  ): AssemblyDraft<never>
   <const ImplementationValue extends object>(
     implementation: ImplementationValue &
       NoInfer<
         DefinitionImplementation<ModelSchema, MessageSchema, OutMessageSchema>
       > &
       ExactImplementationKeys<ImplementationValue> &
-      ValidateInit<ImplementationValue> &
-      ValidateView<
-        ImplementationValue,
-        OwnerValue,
-        ModelSchema['Type'],
-        MessageSchema['Type'],
-        DefinitionViewRequirements<Mounts, Children>
-      > &
-      ValidateAssembleBlockComposition<
+      ValidateInferredAssembly<
         OwnerValue,
         ModelSchema,
         MessageSchema,
@@ -2793,17 +3203,19 @@ export interface AssembleBlock<
         Children,
         ImplementationValue
       >,
-  ): CompletedBlock<
-    OwnerValue,
-    ModelSchema,
-    MessageSchema,
-    OutMessageSchema,
-    Mounts,
-    Children,
-    PublicAssembleBlockImplementation<
+  ): AssemblyDraft<
+    CompletedBlock<
+      OwnerValue,
       ModelSchema,
       MessageSchema,
-      ImplementationValue
+      OutMessageSchema,
+      Mounts,
+      Children,
+      PublicPrepareBlockImplementation<
+        ModelSchema,
+        MessageSchema,
+        ImplementationValue
+      >
     >
   >
   <
@@ -2841,7 +3253,8 @@ export interface AssembleBlock<
       EffectsLayer: EffectsLayer
     }> &
       NoInfer<
-        ValidateAssembleBlockComposition<
+        ValidateShapedAssembly<
+          Init,
           OwnerValue,
           ModelSchema,
           MessageSchema,
@@ -2871,23 +3284,25 @@ export interface AssembleBlock<
       NoInfer<
         DefinitionImplementation<ModelSchema, MessageSchema, OutMessageSchema>
       >,
-  ): CompletedBlock<
-    OwnerValue,
-    ModelSchema,
-    MessageSchema,
-    OutMessageSchema,
-    Mounts,
-    Children,
-    PublicAssembleBlockImplementation<
+  ): AssemblyDraft<
+    CompletedBlock<
+      OwnerValue,
       ModelSchema,
       MessageSchema,
-      ManagedExposedOperationsImplementation<
-        Init,
-        UpdateFunction,
-        View,
-        ManagedResources,
-        ExposedOperations,
-        EffectsLayer
+      OutMessageSchema,
+      Mounts,
+      Children,
+      PublicPrepareBlockImplementation<
+        ModelSchema,
+        MessageSchema,
+        ManagedExposedOperationsImplementation<
+          Init,
+          UpdateFunction,
+          View,
+          ManagedResources,
+          ExposedOperations,
+          EffectsLayer
+        >
       >
     >
   >
@@ -2922,7 +3337,7 @@ export interface AssembleBlock<
       managedResources: ManagedResources
       EffectsLayer: EffectsLayer &
         NoInfer<
-          ValidateAssembleBlockComposition<
+          ValidatePrepareBlockComposition<
             OwnerValue,
             ModelSchema,
             MessageSchema,
@@ -2952,22 +3367,24 @@ export interface AssembleBlock<
       NoInfer<
         DefinitionImplementation<ModelSchema, MessageSchema, OutMessageSchema>
       >,
-  ): CompletedBlock<
-    OwnerValue,
-    ModelSchema,
-    MessageSchema,
-    OutMessageSchema,
-    Mounts,
-    Children,
-    PublicAssembleBlockImplementation<
+  ): AssemblyDraft<
+    CompletedBlock<
+      OwnerValue,
       ModelSchema,
       MessageSchema,
-      ManagedImplementation<
-        Init,
-        UpdateFunction,
-        View,
-        ManagedResources,
-        EffectsLayer
+      OutMessageSchema,
+      Mounts,
+      Children,
+      PublicPrepareBlockImplementation<
+        ModelSchema,
+        MessageSchema,
+        ManagedImplementation<
+          Init,
+          UpdateFunction,
+          View,
+          ManagedResources,
+          EffectsLayer
+        >
       >
     >
   >
@@ -3005,7 +3422,7 @@ export interface AssembleBlock<
       managedResources: ManagedResources
       EffectsLayer: EffectsLayer &
         NoInfer<
-          ValidateAssembleBlockComposition<
+          ValidatePrepareBlockComposition<
             OwnerValue,
             ModelSchema,
             MessageSchema,
@@ -3036,23 +3453,25 @@ export interface AssembleBlock<
       NoInfer<
         DefinitionImplementation<ModelSchema, MessageSchema, OutMessageSchema>
       >,
-  ): CompletedBlock<
-    OwnerValue,
-    ModelSchema,
-    MessageSchema,
-    OutMessageSchema,
-    Mounts,
-    Children,
-    PublicAssembleBlockImplementation<
+  ): AssemblyDraft<
+    CompletedBlock<
+      OwnerValue,
       ModelSchema,
       MessageSchema,
-      ManagedSubscriptionImplementation<
-        Init,
-        UpdateFunction,
-        View,
-        Subscriptions,
-        ManagedResources,
-        EffectsLayer
+      OutMessageSchema,
+      Mounts,
+      Children,
+      PublicPrepareBlockImplementation<
+        ModelSchema,
+        MessageSchema,
+        ManagedSubscriptionImplementation<
+          Init,
+          UpdateFunction,
+          View,
+          Subscriptions,
+          ManagedResources,
+          EffectsLayer
+        >
       >
     >
   >
@@ -3088,7 +3507,8 @@ export interface AssembleBlock<
       EffectsLayer: EffectsLayer
     }> &
       NoInfer<
-        ValidateAssembleBlockComposition<
+        ValidateShapedAssembly<
+          Init,
           OwnerValue,
           ModelSchema,
           MessageSchema,
@@ -3117,22 +3537,24 @@ export interface AssembleBlock<
       NoInfer<
         DefinitionImplementation<ModelSchema, MessageSchema, OutMessageSchema>
       >,
-  ): CompletedBlock<
-    OwnerValue,
-    ModelSchema,
-    MessageSchema,
-    OutMessageSchema,
-    Mounts,
-    Children,
-    PublicAssembleBlockImplementation<
+  ): AssemblyDraft<
+    CompletedBlock<
+      OwnerValue,
       ModelSchema,
       MessageSchema,
-      ViewExposedOperationsImplementation<
-        Init,
-        UpdateFunction,
-        View,
-        ExposedOperations,
-        EffectsLayer
+      OutMessageSchema,
+      Mounts,
+      Children,
+      PublicPrepareBlockImplementation<
+        ModelSchema,
+        MessageSchema,
+        ViewExposedOperationsImplementation<
+          Init,
+          UpdateFunction,
+          View,
+          ExposedOperations,
+          EffectsLayer
+        >
       >
     >
   >
@@ -3191,8 +3613,17 @@ export type Definition<
   bindings: Children
   /** Authors an internal Model transformation for update, init, or child
    * OutMessage policy composition. Declare parent-driven operations as local
-   * Message producers under `assembleBlock({ operations })`. */
-  step: DefineStep<
+   * Message producers under `prepareBlock({ operations })`. */
+  makeStep: DefineStep<
+    ModelSchema['Type'],
+    MessageSchema['Type'],
+    OutMessageSchema extends Schema.Codec<any, any, any, any>
+      ? OutMessageSchema['Type']
+      : never
+  >
+  /** Builds an exhaustive child OutMessage fold against this Definition's
+   * Model, Message, and optional OutMessage contracts. */
+  makeOutMessageFold: MakeOutMessageFold<
     ModelSchema['Type'],
     MessageSchema['Type'],
     OutMessageSchema extends Schema.Codec<any, any, any, any>
@@ -3200,24 +3631,26 @@ export type Definition<
       : never
   >
   /** Authors a Model-only Step from transformations of this Block's fields. */
-  stepFields: DefineStepFields<ModelSchema['Type']>
+  makeFieldsStep: DefineStepFields<ModelSchema['Type']>
   /** Creates a Step preserving the incoming Model, with no Commands or OutMessage. */
-  stepNoop: DefineStepNoop<ModelSchema['Type']>
+  makeNoopStep: DefineStepNoop<ModelSchema['Type']>
+  /** Creates a Model-preserving Step returning the supplied Commands. */
+  makeCommandsStep: MakeCommandsStep<ModelSchema['Type'], MessageSchema['Type']>
   /** Defines Subscription entries owned directly by this Block. */
-  subscriptions: DefineSubscriptions<
+  makeSubscriptions: DefineSubscriptions<
     OwnerValue['id'],
     ModelSchema['Type'],
     MessageSchema['Type']
   >
   /** Defines ManagedResource entries owned directly by this Block. */
-  managedResources: DefineManagedResources<
+  makeManagedResources: DefineManagedResources<
     OwnerValue['id'],
     ModelSchema['Type'],
     MessageSchema['Type']
   >
   /** Creates child Bindings fixed to this Definition's parent Model, Message,
    * and OutMessage contracts. */
-  bindChild: BindChild<
+  makeBinding: BindChild<
     ModelSchema,
     MessageSchema,
     OutMessageSchema,
@@ -3242,7 +3675,18 @@ export type Definition<
       }>
     : unknown) &
   (OutMessageSchema extends Schema.Codec<any, any, any, any>
-    ? Readonly<{ OutMessage: OutMessageSchema }>
+    ? Readonly<{
+        OutMessage: OutMessageSchema
+        /** Builds an exhaustive child OutMessage mapper into this Definition's
+         * declared parent OutMessage contract. */
+        makeOutMessageForward: MakeOutMessageForward<OutMessageSchema['Type']>
+        /** Creates a Step preserving the incoming Model and emitting the supplied
+         * declared OutMessage, with no Commands. */
+        makeOutMessageStep: MakeOutMessageStep<
+          ModelSchema['Type'],
+          OutMessageSchema['Type']
+        >
+      }>
     : NoOutMessage)
 
 /** A passive Definition with its child and Mount graph registered. A Composition
@@ -3306,9 +3750,12 @@ export type Composition<
     DispatchSchemaFor<MessageSchema, Children>['Type'],
     DefinitionViewRequirements<Mounts, Children>
   >
-  /** Completes this Composition with its implementation channels and returns
-   * a passive Block. */
-  readonly assembleBlock: AssembleBlock<
+  /** Prepares an opaque, passive draft inside a private zero-argument `prepare`
+   * function. Assemble it with a matching `FromAssembly` annotation and
+   * `Block.assemble(prepare)`. The explicit Model Schema and producer establish
+   * a TypeScript performance boundary for parent Model Schema construction.
+   * See `Block.FromAssemblyWithView` for the full pattern and its limits. */
+  readonly prepareBlock: PrepareBlock<
     OwnerValue,
     ModelSchema,
     DispatchSchemaFor<MessageSchema, Children>,
@@ -3504,7 +3951,7 @@ const makeDefineView = <
       > {
     const ownedView = withViewIdentity(owner, mounts, bindings, view)
     /* eslint-disable-next-line @typescript-eslint/consistent-type-assertions */
-    return defineHtmlView(ownedView as any) as
+    const authoredView = defineHtmlView(ownedView as any) as
       | OwnedAuthoredView<
           BlockView<Model, Message, void, RequiredViewRequirements>,
           OwnerValue,
@@ -3519,6 +3966,9 @@ const makeDefineView = <
           Message,
           RequiredViewRequirements
         >
+
+    registerViewInputs(authoredView, false)
+    return authoredView
   }
 
   const withInputs = <ViewInputs = never>(
@@ -3527,7 +3977,7 @@ const makeDefineView = <
     BlockView<
       Model,
       Message,
-      ValidViewInputs<ViewInputs>,
+      AuthoredViewInputs<ViewInputs>,
       RequiredViewRequirements
     >,
     OwnerValue,
@@ -3537,11 +3987,11 @@ const makeDefineView = <
   > => {
     const ownedView = withViewIdentity(owner, mounts, bindings, view)
     /* eslint-disable-next-line @typescript-eslint/consistent-type-assertions */
-    return defineHtmlView(ownedView as any) as OwnedAuthoredView<
+    const authoredView = defineHtmlView(ownedView as any) as OwnedAuthoredView<
       BlockView<
         Model,
         Message,
-        ValidViewInputs<ViewInputs>,
+        AuthoredViewInputs<ViewInputs>,
         RequiredViewRequirements
       >,
       OwnerValue,
@@ -3549,6 +3999,9 @@ const makeDefineView = <
       Message,
       RequiredViewRequirements
     >
+
+    registerViewInputs(authoredView, true)
+    return authoredView
   }
 
   defineView.withInputs = withInputs
@@ -3572,25 +4025,33 @@ const makeDefineStep = <Model, Message, OutMessage>(): DefineStep<
     step: ((model: Model, ...context: Context) => Output) &
       ValidateDeferredStepOutput<Model, Message, OutMessage, Output> &
       ValidateAnnotatedContext<Context>,
-  ): DefinedStep<
-    Model,
-    DeferredStepMessage<Message, Output>,
-    Context,
-    OutMessageOfReturn<DeferredStepReturn<Output>>,
-    CommandRequirements<DeferredStepReturn<Output>>,
-    | Update.RegistrationEvidenceOf<DeferredStepReturn<Output>>
-    | Update.GraphRequirementOf<Extract<Output, AnyFunction>>,
-    DeferredStepKind<Output>,
-    | Update.ResultEvidenceChannelOf<DeferredStepReturn<Output>>
-    | Update.GraphRequirementOf<Extract<Output, AnyFunction>>
+  ): NoInfer<
+    DefinedStep<
+      Model,
+      DeferredStepMessage<Message, Output>,
+      Context,
+      OutMessageOfReturn<DeferredStepReturn<Output>>,
+      CommandRequirements<DeferredStepReturn<Output>>,
+      | Update.RegistrationEvidenceOf<DeferredStepReturn<Output>>
+      | Update.GraphRequirementOf<Extract<Output, AnyFunction>>,
+      DeferredStepKind<Output>,
+      | Update.ResultEvidenceChannelOf<DeferredStepReturn<Output>>
+      | Update.GraphRequirementOf<Extract<Output, AnyFunction>>
+    >
   >
   function defineStep(step: AnyFunction): AnyFunction {
     return (model: unknown, ...context: ReadonlyArray<unknown>) => {
       const output = step(model, ...context)
       const deferred = Predicate.isFunction(output) ? output(model) : output
-      return isBindingInitRecipe(deferred)
-        ? makeResultRecipe(() => runBindingInitRecipe(deferred))
-        : deferred
+      if (!isBindingInitRecipe(deferred)) {
+        return deferred
+      }
+
+      if (isRegisteredBindingInitRecipe(deferred)) {
+        return runBindingInitRecipe(deferred)
+      }
+
+      return makeResultRecipe(() => runBindingInitRecipe(deferred))
     }
   }
 
@@ -3642,13 +4103,13 @@ const makeDefineSubscriptions = <Id extends string, Model, Message>(
 
     if (!isSubscriptionEntryRecord(builtSubscriptions)) {
       throw new Error(
-        '[foldkit] Definition.subscriptions callback must return a Subscription entry record.',
+        '[foldkit] Definition.makeSubscriptions callback must return a Subscription entry record.',
       )
     }
 
     if (Object.hasOwn(builtSubscriptions, 'layer')) {
       throw new Error(
-        '[foldkit] Definition.subscriptions reserves "layer" for its aggregate handler Layer.',
+        '[foldkit] Definition.makeSubscriptions reserves "layer" for its aggregate handler Layer.',
       )
     }
 
@@ -3669,7 +4130,7 @@ const makeDefineSubscriptions = <Id extends string, Model, Message>(
 
         if (!isLayer) {
           throw new Error(
-            `[foldkit] Definition.subscriptions entry "${key}" has a "layer" value that is not an Effect Layer.`,
+            `[foldkit] Definition.makeSubscriptions entry "${key}" has a "layer" value that is not an Effect Layer.`,
           )
         }
 
@@ -3783,15 +4244,20 @@ export const makeDefinition = (
     bindings?: ReadonlyArray<AnyBinding>
   }>,
   authoring?: Readonly<{
-    step: AnyFunction
-    stepFields: AnyFunction
-    stepNoop: AnyFunction
-    subscriptions: AnyFunction
-    managedResources: AnyFunction
+    makeStep: AnyFunction
+    makeFieldsStep: AnyFunction
+    makeNoopStep: AnyFunction
+    makeCommandsStep: AnyFunction
+    makeSubscriptions: AnyFunction
+    makeManagedResources: AnyFunction
   }>,
 ): any => {
   const localMounts = Object.freeze(globalThis.Array.from(config.mounts ?? []))
-  const bindings = Object.freeze(globalThis.Array.from(config.bindings ?? []))
+  const publicBindings = Object.freeze(
+    globalThis.Array.from(config.bindings ?? []),
+  )
+  const normalized = normalizeCompositionGraph({ bindings: publicBindings })
+  const bindings = Object.freeze(normalized.bindings)
 
   const parentContract = {
     ownerToken: owner.token,
@@ -3802,6 +4268,7 @@ export const makeDefinition = (
   }
 
   assertBindingParentContracts(parentContract, owner.id, bindings)
+  registerOperationGraphOutMessagePolicies(bindings, normalized.policies)
 
   const childChannels = aggregateChildren(bindings)
   const mounts = mergeMounts(localMounts, childChannels.mounts)
@@ -3818,13 +4285,16 @@ export const makeDefinition = (
     bindings,
     authoring !== undefined,
   )
-  const defineStep = authoring?.step ?? makeDefineStep()
-  const stepFields = authoring?.stepFields ?? makeStepFields()
-  const stepNoop = authoring?.stepNoop ?? makeStepNoop
+  const defineStep = authoring?.makeStep ?? makeDefineStep()
+  const defineOutMessageFold = makeOutMessageFold()
+  const defineOutMessageForward = makeOutMessageForward()
+  const stepFields = authoring?.makeFieldsStep ?? makeStepFields()
+  const stepNoop = authoring?.makeNoopStep ?? makeStepNoop
+  const commandsStep = authoring?.makeCommandsStep ?? makeCommandsStep()
   const defineSubscriptions =
-    authoring?.subscriptions ?? makeDefineSubscriptions(owner)
+    authoring?.makeSubscriptions ?? makeDefineSubscriptions(owner)
   const defineManagedResources =
-    authoring?.managedResources ?? makeDefineManagedResources(owner)
+    authoring?.makeManagedResources ?? makeDefineManagedResources(owner)
   const bindChild = makeBindChild<
     typeof config.Model,
     typeof config.Message,
@@ -3894,7 +4364,7 @@ export const makeDefinition = (
     return completed
   }
 
-  function assembleBlock(
+  function prepareBlock(
     implementation: {
       readonly view?: AnyAuthoredView
       readonly init: AnyFunction
@@ -3907,7 +4377,7 @@ export const makeDefinition = (
     },
     retainedHostIdentities?: ReadonlyArray<DefinitionIdentity>,
     areHostHandlersProvided = false,
-  ): AnyBlock {
+  ): Omit<AnyBlock, keyof CompletionProof> {
     if (Reflect.has(implementation, 'expose')) {
       throw new Error(
         `[foldkit] Block "${owner.id}" declares the removed "expose" field. Use "operations" for public operations.`,
@@ -3967,22 +4437,30 @@ export const makeDefinition = (
     assertDistinctManagedResourceOwners(managedResources)
 
     function replaceEffectsLayer(EffectsLayer: AnyLayer): AnyBlock {
-      return assembleBlock(
-        { ...implementation, EffectsLayer },
-        hostIdentities,
-        areHostHandlersProvided,
+      assertCompletedBlock(block)
+
+      return completeDerivedBlock(
+        prepareBlock(
+          { ...implementation, EffectsLayer },
+          hostIdentities,
+          areHostHandlersProvided,
+        ),
       )
     }
 
     function provideHandlers(HandlersLayer: AnyLayer): AnyBlock {
-      return assembleBlock(
-        {
-          ...implementation,
-          EffectsLayer: Layer.merge(localEffectsLayer, HandlersLayer),
-          hostHandlers: [],
-        },
-        hostIdentities,
-        true,
+      assertCompletedBlock(block)
+
+      return completeDerivedBlock(
+        prepareBlock(
+          {
+            ...implementation,
+            EffectsLayer: Layer.merge(localEffectsLayer, HandlersLayer),
+            hostHandlers: [],
+          },
+          hostIdentities,
+          true,
+        ),
       )
     }
 
@@ -3996,7 +4474,7 @@ export const makeDefinition = (
       makeView: defineView,
       mounts,
       [LocalMountsTypeId]: localMounts,
-      bindings,
+      bindings: publicBindings,
       init: implementation.init,
       update: completedUpdate,
       operations,
@@ -4009,6 +4487,7 @@ export const makeDefinition = (
       provideHandlers,
     }
 
+    registerRuntimeBindings(block, bindings)
     registerDefaultView(block, implementation.view)
     localChannels.set(block, {
       subscriptions: Subscription.aggregate(implementation.subscriptions ?? {}),
@@ -4028,20 +4507,26 @@ export const makeDefinition = (
       : { ChildInitContext: config.ChildInitContext }),
     ...(config.OutMessage === undefined
       ? {}
-      : { OutMessage: config.OutMessage }),
+      : {
+          OutMessage: config.OutMessage,
+          makeOutMessageForward: defineOutMessageForward,
+          makeOutMessageStep: makeOutMessageStep(),
+        }),
     mounts,
     [LocalMountsTypeId]: localMounts,
-    bindings,
+    bindings: publicBindings,
     makeView: defineView,
     makeInit: init,
     makeUpdate: update,
-    step: defineStep,
-    stepFields,
-    stepNoop,
-    subscriptions: defineSubscriptions,
-    managedResources: defineManagedResources,
-    bindChild,
-    assembleBlock,
+    makeStep: defineStep,
+    makeOutMessageFold: defineOutMessageFold,
+    makeFieldsStep: stepFields,
+    makeNoopStep: stepNoop,
+    makeCommandsStep: commandsStep,
+    makeSubscriptions: defineSubscriptions,
+    makeManagedResources: defineManagedResources,
+    makeBinding: bindChild,
+    prepareBlock,
   }
 }
 type RuntimeCompositionGraph = Readonly<{
@@ -4081,6 +4566,34 @@ const assertCompositionGraph: (
   }
 }
 
+const normalizeCompositionGraph = (graph: RuntimeCompositionGraph) => {
+  const bindings: Array<AnyBinding> = []
+  const policies: Array<readonly [object, RuntimeOutMessagePolicy]> = []
+
+  for (const entry of graph.bindings ?? []) {
+    if (!Predicate.isObject(entry)) {
+      throw new Error(
+        '[foldkit] Composition bindings must be child Binding values.',
+      )
+    }
+    const selection = selectedBindingOutMessagePolicyOf(entry)
+    if (selection === undefined) {
+      if (bindingRequiresOutMessagePolicy(entry)) {
+        throw new Error(
+          `[foldkit] Child Binding "${entry.placement}" requires withOutMessagePolicy before Composition registration.`,
+        )
+      }
+      bindings.push(entry)
+    } else {
+      /* eslint-disable-next-line @typescript-eslint/consistent-type-assertions */
+      bindings.push(selection.binding as AnyBinding)
+      policies.push([selection.binding, selection.outMessage])
+    }
+  }
+
+  return { bindings, policies }
+}
+
 /** @internal Creates a typed definition before its composition graph. */
 export const makeBaseDefinition = (
   owner: Owner<any>,
@@ -4096,8 +4609,7 @@ export const makeBaseDefinition = (
   const makeComposition = (graph: RuntimeCompositionGraph = {}) => {
     assertCompositionGraph(graph)
     const composition = makeDefinition(owner, { ...config, ...graph }, base)
-
-    return {
+    const publicComposition = {
       owner: composition.owner,
       Model: composition.Model,
       Message: composition.Message,
@@ -4110,8 +4622,12 @@ export const makeBaseDefinition = (
       makeInit: composition.makeInit,
       makeUpdate: composition.makeUpdate,
       makeView: composition.makeView,
-      assembleBlock: composition.assembleBlock,
+      prepareBlock: (implementation: unknown) =>
+        makeAssemblyDraft(composition.prepareBlock(implementation)),
     }
+
+    compositions.add(publicComposition)
+    return publicComposition
   }
 
   return {
@@ -4121,16 +4637,24 @@ export const makeBaseDefinition = (
     ...(base.ChildInitContext === undefined
       ? {}
       : { ChildInitContext: base.ChildInitContext }),
-    ...(base.OutMessage === undefined ? {} : { OutMessage: base.OutMessage }),
+    ...(base.OutMessage === undefined
+      ? {}
+      : {
+          OutMessage: base.OutMessage,
+          makeOutMessageForward: base.makeOutMessageForward,
+          makeOutMessageStep: base.makeOutMessageStep,
+        }),
     mounts: base.mounts,
     [LocalMountsTypeId]: base[LocalMountsTypeId],
     bindings: base.bindings,
-    step: base.step,
-    stepFields: base.stepFields,
-    stepNoop: base.stepNoop,
-    subscriptions: base.subscriptions,
-    managedResources: base.managedResources,
-    bindChild: base.bindChild,
+    makeStep: base.makeStep,
+    makeOutMessageFold: base.makeOutMessageFold,
+    makeFieldsStep: base.makeFieldsStep,
+    makeNoopStep: base.makeNoopStep,
+    makeCommandsStep: base.makeCommandsStep,
+    makeSubscriptions: base.makeSubscriptions,
+    makeManagedResources: base.makeManagedResources,
+    makeBinding: base.makeBinding,
     makeComposition,
   }
 }

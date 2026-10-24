@@ -1,13 +1,9 @@
-import { ApplicationComposition } from './composition'
-import { init } from './init'
-import { update } from './update'
-import { view } from './view'
-ApplicationComposition.assembleApplication({
-  init,
-  update,
-  view,
+import { Program } from 'foldkit'
+
+import { ApplicationBlock } from './block'
+
+Program.make({
+  block: ApplicationBlock,
   container: document.getElementById('root'),
-  devTools: {
-    Message: ApplicationComposition.Message,
-  },
+  devTools: { dispatch: true },
 })

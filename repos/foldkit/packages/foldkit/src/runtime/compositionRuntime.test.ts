@@ -8,6 +8,7 @@ import {
 import { runtimeBindingOf } from '../block/composition.js'
 import { makeNamespace } from '../block/define.js'
 import { CurrentInstance } from '../block/instanceContext.js'
+import * as Block from '../block/public.js'
 import {
   invocationContext,
   qualifyCommand,
@@ -27,7 +28,7 @@ import type { SlowSubscriptionDependenciesContext } from './slowPhase.js'
 const ChildOwnerNamespace = makeNamespace('LifecycleChild')
 const ChildModel = Schema.Struct({ id: Schema.Number })
 const ChildMessage = defineMessageUnion({ EmittedPulse: {} })
-const ChildValue = ChildOwnerNamespace.resource<string>()('Value')
+const ChildValue = ChildOwnerNamespace.makeResource<string>()('Value')
 class LifecycleLog extends Context.Service<
   LifecycleLog,
   Readonly<{
@@ -41,7 +42,7 @@ const ChildDefinition = ChildOwnerNamespace.makeDefinition({
   Model: ChildModel,
   Message: ChildMessage,
 })
-const subscriptions = ChildDefinition.subscriptions(entry => ({
+const subscriptions = ChildDefinition.makeSubscriptions(entry => ({
   pulses: entry(
     'Pulses',
     { id: Schema.Number },
@@ -62,7 +63,7 @@ const subscriptions = ChildDefinition.subscriptions(entry => ({
     },
   ),
 }))
-const childManagedResources = ChildDefinition.managedResources(entry => ({
+const childManagedResources = ChildDefinition.makeManagedResources(entry => ({
   value: entry('Value', Schema.Option(Schema.Struct({ id: Schema.Number })), {
     resource: ChildValue,
     modelToMaybeRequirements: model => Option.some({ id: model.id }),
@@ -85,18 +86,23 @@ const childManagedResources = ChildDefinition.managedResources(entry => ({
   }),
 }))
 const childComposition = ChildDefinition.makeComposition()
-const childBlock = childComposition.assembleBlock({
-  init: (id: number) => ({ model: { id } }),
-  update: childComposition.makeUpdate(model => ({ model })),
-  subscriptions,
-  managedResources: childManagedResources,
-  EffectsLayer: Layer.merge(
-    subscriptions.pulses.layer,
-    childManagedResources.value.layer,
-  ),
-})
+const prepareChildBlock = () =>
+  childComposition.prepareBlock({
+    init: (id: number) => ({ model: { id } }),
+    update: childComposition.makeUpdate(model => ({ model })),
+    subscriptions,
+    managedResources: childManagedResources,
+    EffectsLayer: Layer.merge(
+      subscriptions.pulses.layer,
+      childManagedResources.value.layer,
+    ),
+  })
+const childBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ChildModel,
+  typeof prepareChildBlock
+> = Block.assemble(prepareChildBlock)
 const RootNamespace = makeNamespace('LifecycleApp')
-const RootValue = RootNamespace.resource<string>()('Value')
+const RootValue = RootNamespace.makeResource<string>()('Value')
 const RootModel = Schema.Struct({
   maybeChild: Schema.Option(ChildModel),
   entries: Schema.Array(ChildModel),
@@ -110,13 +116,13 @@ const RootBaseDefinition = RootNamespace.makeDefinition({
   Model: RootModel,
   Message: RootMessage,
 })
-const OptionalChildBinding = RootBaseDefinition.bindChild(childBlock, {
+const OptionalChildBinding = RootBaseDefinition.makeBinding(childBlock, {
   read: (model: RootModel) => model.maybeChild,
   write: (model, nextChild) =>
     modifyFields(model, { maybeChild: () => Option.some(nextChild) }),
   subscriptions: { when: model => model.subscriptionState === 'Active' },
 })
-const EntriesBinding = RootBaseDefinition.bindChild(childBlock, {
+const EntriesBinding = RootBaseDefinition.makeBinding(childBlock, {
   placement: 'Entries',
   readAll: (model: RootModel) => model.entries,
   key: entry => entry.id,
@@ -131,7 +137,7 @@ const EntriesBinding = RootBaseDefinition.bindChild(childBlock, {
 const root = RootBaseDefinition.makeComposition({
   bindings: [OptionalChildBinding, EntriesBinding],
 })
-const rootManagedResources = RootBaseDefinition.managedResources(entry => ({
+const rootManagedResources = RootBaseDefinition.makeManagedResources(entry => ({
   value: entry('Value', Schema.Option(Schema.Null), {
     resource: RootValue,
     modelToMaybeRequirements: () => Option.some(null),
@@ -151,12 +157,17 @@ const initialModel = RootModel.make({
   entries: [],
   subscriptionState: 'Active',
 })
-const block = root.assembleBlock({
-  init: () => ({ model: initialModel }),
-  update: root.makeUpdate(model => ({ model })),
-  managedResources: rootManagedResources,
-  EffectsLayer: rootManagedResources.value.layer,
-})
+const prepareBlock = () =>
+  root.prepareBlock({
+    init: () => ({ model: initialModel }),
+    update: root.makeUpdate(model => ({ model })),
+    managedResources: rootManagedResources,
+    EffectsLayer: rootManagedResources.value.layer,
+  })
+const block: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof RootModel,
+  typeof prepareBlock
+> = Block.assemble(prepareBlock)
 
 const NestedParentNamespace = makeNamespace('NestedLifecycleParent')
 const NestedParentModel = Schema.Struct({
@@ -168,28 +179,36 @@ const NestedParentBaseDefinition = NestedParentNamespace.makeDefinition({
   Model: NestedParentModel,
   Message: Schema.Never,
 })
-const NestedEntriesBinding = NestedParentBaseDefinition.bindChild(childBlock, {
-  placement: 'entries',
-  readAll: (model: NestedParentModel) => model.entries,
-  key: (entry): number => entry.id,
-  read: entry => entry,
-  writeAt: (model, key, nextChild) =>
-    modifyFields(model, {
-      entries: entries =>
-        entries.map(entry => (entry.id === key ? nextChild : entry)),
-    }),
-  keySchema: Schema.Number,
-})
+const NestedEntriesBinding = NestedParentBaseDefinition.makeBinding(
+  childBlock,
+  {
+    placement: 'entries',
+    readAll: (model: NestedParentModel) => model.entries,
+    key: (entry): number => entry.id,
+    read: entry => entry,
+    writeAt: (model, key, nextChild) =>
+      modifyFields(model, {
+        entries: entries =>
+          entries.map(entry => (entry.id === key ? nextChild : entry)),
+      }),
+    keySchema: Schema.Number,
+  },
+)
 const nestedParent = NestedParentBaseDefinition.makeComposition({
   bindings: [NestedEntriesBinding],
 })
-const nestedParentBlock = nestedParent.assembleBlock({
-  init: (id: number, entries: ReadonlyArray<typeof ChildModel.Type>) => ({
-    model: { id, entries },
-  }),
-  update: nestedParent.makeUpdate(),
-  EffectsLayer: Layer.empty,
-})
+const prepareNestedParentBlock = () =>
+  nestedParent.prepareBlock({
+    init: (id: number, entries: ReadonlyArray<typeof ChildModel.Type>) => ({
+      model: { id, entries },
+    }),
+    update: nestedParent.makeUpdate(),
+    EffectsLayer: Layer.empty,
+  })
+const nestedParentBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof NestedParentModel,
+  typeof prepareNestedParentBlock
+> = Block.assemble(prepareNestedParentBlock)
 const NestedRootNamespace = makeNamespace('NestedLifecycleApp')
 const NestedRootModel = Schema.Struct({
   parents: Schema.Array(NestedParentModel),
@@ -199,7 +218,7 @@ const NestedRootBaseDefinition = NestedRootNamespace.makeDefinition({
   Model: NestedRootModel,
   Message: Schema.Never,
 })
-const NestedParentsBinding = NestedRootBaseDefinition.bindChild(
+const NestedParentsBinding = NestedRootBaseDefinition.makeBinding(
   nestedParentBlock,
   {
     placement: 'parents',
@@ -220,11 +239,16 @@ const nestedRoot = NestedRootBaseDefinition.makeComposition({
 const nestedInitialModel = NestedRootModel.make({
   parents: [{ id: 1, entries: [{ id: 10 }] }],
 })
-const nestedBlock = nestedRoot.assembleBlock({
-  init: () => ({ model: nestedInitialModel }),
-  update: nestedRoot.makeUpdate(),
-  EffectsLayer: Layer.empty,
-})
+const prepareNestedBlock = () =>
+  nestedRoot.prepareBlock({
+    init: () => ({ model: nestedInitialModel }),
+    update: nestedRoot.makeUpdate(),
+    EffectsLayer: Layer.empty,
+  })
+const nestedBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof NestedRootModel,
+  typeof prepareNestedBlock
+> = Block.assemble(prepareNestedBlock)
 
 registerGeneratedDelivery(
   OptionalChildBinding,

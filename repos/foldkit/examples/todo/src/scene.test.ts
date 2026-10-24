@@ -19,14 +19,14 @@ import { EditingState, type Model } from './model'
 import { update } from './update'
 import { view } from './view'
 
-const emptyModel: Model = {
+const emptyModel: typeof Model.Type = {
   todos: [],
   newTodoText: '',
   filter: 'All',
   editing: EditingState.NotEditing(),
 }
 
-const modelWithTodos: Model = modifyFields(emptyModel, {
+const modelWithTodos: typeof Model.Type = modifyFields(emptyModel, {
   todos: () => [
     { id: 'abc', text: 'Buy milk', completed: false, createdAt: 1000 },
     { id: 'def', text: 'Walk the dog', completed: false, createdAt: 2000 },

@@ -3,6 +3,7 @@ import { expect, it } from 'vitest'
 
 import { defineMessageUnion } from '../message/index.js'
 import { makeDefinition } from './define.js'
+import * as Block from './public.js'
 
 const LeafModel = Schema.Struct({ count: Schema.Number })
 const LeafMessage = defineMessageUnion({ CompletedObserveLeaf: {} })
@@ -10,7 +11,7 @@ const MountCapabilityLeaf = makeDefinition('MountCapabilityLeaf', {
   Model: LeafModel,
   Message: LeafMessage,
 })
-const ObserveLeaf = MountCapabilityLeaf.mount('ObserveLeaf', {
+const ObserveLeaf = MountCapabilityLeaf.makeMount('ObserveLeaf', {
   messages: [LeafMessage.CompletedObserveLeaf],
   handler: function* () {
     return () => Effect.succeed(LeafMessage.CompletedObserveLeaf())
@@ -22,19 +23,24 @@ const leafRegistered = MountCapabilityLeaf.makeComposition({
 const leafView = leafRegistered.makeView((model, h) =>
   h.div([h.OnMount(ObserveLeaf())], [globalThis.String(model.count)]),
 )
-const leafBlock = leafRegistered.assembleBlock({
-  init: () => ({ model: LeafModel.make({ count: 0 }) }),
-  update: leafRegistered.makeUpdate(model => ({ model })),
-  view: leafView,
-  EffectsLayer: ObserveLeaf.layer,
-})
+const prepareLeafBlock = () =>
+  leafRegistered.prepareBlock({
+    init: () => ({ model: LeafModel.make({ count: 0 }) }),
+    update: leafRegistered.makeUpdate(model => ({ model })),
+    view: leafView,
+    EffectsLayer: ObserveLeaf.layer,
+  })
+const leafBlock: Block.FromAssemblyWithView<
+  typeof LeafModel,
+  typeof prepareLeafBlock
+> = Block.assemble(prepareLeafBlock)
 
 const MiddleModel = Schema.Struct({ leaf: LeafModel })
 const MountCapabilityMiddle = makeDefinition('MountCapabilityMiddle', {
   Model: MiddleModel,
   Message: Schema.Never,
 })
-const LeafBinding = MountCapabilityMiddle.bindChild(leafBlock, {
+const LeafBinding = MountCapabilityMiddle.makeBinding(leafBlock, {
   field: 'leaf',
   init: false,
 })
@@ -53,23 +59,28 @@ const middleView = middleRegistered.makeView((model, h) =>
     }),
   ),
 )
-const middleBlock = middleRegistered.assembleBlock({
-  init: middleRegistered.makeInit(() =>
-    LeafBinding.init({
-      args: [],
-      toParentModel: leaf => MiddleModel.make({ leaf }),
-    }),
-  ),
-  update: middleRegistered.makeUpdate(),
-  view: middleView,
-})
+const prepareMiddleBlock = () =>
+  middleRegistered.prepareBlock({
+    init: middleRegistered.makeInit(() =>
+      LeafBinding.init({
+        args: [],
+        toParentModel: leaf => MiddleModel.make({ leaf }),
+      }),
+    ),
+    update: middleRegistered.makeUpdate(),
+    view: middleView,
+  })
+const middleBlock: Block.FromAssemblyWithView<
+  typeof MiddleModel,
+  typeof prepareMiddleBlock
+> = Block.assemble(prepareMiddleBlock)
 
 const RootModel = Schema.Struct({ middle: MiddleModel })
 const MountCapabilityRoot = makeDefinition('MountCapabilityRoot', {
   Model: RootModel,
   Message: Schema.Never,
 })
-const MiddleBinding = MountCapabilityRoot.bindChild(middleBlock, {
+const MiddleBinding = MountCapabilityRoot.makeBinding(middleBlock, {
   field: 'middle',
   init: false,
 })
@@ -88,23 +99,28 @@ const rootView = rootRegistered.makeView((model, h) =>
     }),
   ),
 )
-const rootBlock = rootRegistered.assembleBlock({
-  init: rootRegistered.makeInit(() =>
-    MiddleBinding.init({
-      args: [],
-      toParentModel: middle => RootModel.make({ middle }),
-    }),
-  ),
-  update: rootRegistered.makeUpdate(),
-  view: rootView,
-})
+const prepareRootBlock = () =>
+  rootRegistered.prepareBlock({
+    init: rootRegistered.makeInit(() =>
+      MiddleBinding.init({
+        args: [],
+        toParentModel: middle => RootModel.make({ middle }),
+      }),
+    ),
+    update: rootRegistered.makeUpdate(),
+    view: rootView,
+  })
+const rootBlock: Block.FromAssemblyWithView<
+  typeof RootModel,
+  typeof prepareRootBlock
+> = Block.assemble(prepareRootBlock)
 
 const SiblingMessage = defineMessageUnion({ CompletedObserveSibling: {} })
 const MountCapabilitySibling = makeDefinition('MountCapabilitySibling', {
   Model: MiddleModel,
   Message: SiblingMessage,
 })
-const ObserveSibling = MountCapabilitySibling.mount('ObserveSibling', {
+const ObserveSibling = MountCapabilitySibling.makeMount('ObserveSibling', {
   messages: [SiblingMessage.CompletedObserveSibling],
 })
 

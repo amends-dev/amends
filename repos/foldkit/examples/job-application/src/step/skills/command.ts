@@ -2,7 +2,7 @@ import { Crypto, Effect } from 'effect'
 
 import { Message, SkillsDefinition } from './definition'
 
-export const GenerateSkillsEntryId = SkillsDefinition.command(
+export const GenerateSkillsEntryId = SkillsDefinition.makeCommand(
   'GenerateSkillsEntryId',
   {
     messages: [

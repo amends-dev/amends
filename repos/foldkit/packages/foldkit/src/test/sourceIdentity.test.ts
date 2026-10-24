@@ -35,10 +35,10 @@ const FirstOwnerNamespace = makeNamespace('SharedFeature')
 const SecondOwnerNamespace = makeNamespace('SharedFeature')
 const FirstDefinition = FirstOwnerNamespace.makeDefinition({ Model, Message })
 const SecondDefinition = SecondOwnerNamespace.makeDefinition({ Model, Message })
-const subscriptions = FirstDefinition.subscriptions(entry => ({
+const subscriptions = FirstDefinition.makeSubscriptions(entry => ({
   values: entry('Values', { messages: [Message.CompletedRead] }),
 }))
-const otherSubscriptions = SecondDefinition.subscriptions(entry => ({
+const otherSubscriptions = SecondDefinition.makeSubscriptions(entry => ({
   values: entry('Values', { messages: [Message.CompletedRead] }),
 }))
 const lifted = Subscription.lift(subscriptions)<

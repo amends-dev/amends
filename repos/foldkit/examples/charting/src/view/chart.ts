@@ -9,8 +9,8 @@ import { CHART_HOST_ID, MountChart } from '../mount'
 import { formatInteger } from './format'
 
 export const chartPanelView = (
-  model: Model,
-  telemetry: Telemetry,
+  model: typeof Model.Type,
+  telemetry: typeof Telemetry.Type,
   h: ApplicationViewBuilder,
 ): Html =>
   h.section(
@@ -30,8 +30,8 @@ export const chartPanelView = (
   )
 
 export const chartFooterView = (
-  model: Model,
-  telemetry: Telemetry,
+  model: typeof Model.Type,
+  telemetry: typeof Telemetry.Type,
   h: ApplicationViewBuilder,
 ): Html =>
   h.div(
@@ -58,7 +58,10 @@ export const chartFooterView = (
     ],
   )
 
-export const chartFooterLabel = (model: Model, telemetry: Telemetry): string =>
+export const chartFooterLabel = (
+  model: typeof Model.Type,
+  telemetry: typeof Telemetry.Type,
+): string =>
   Option.getOrElse(
     selectedDatumLabel(telemetry, model.maybeSelectedDatumId),
     () =>
@@ -68,7 +71,7 @@ export const chartFooterLabel = (model: Model, telemetry: Telemetry): string =>
   )
 
 export const chartStatusView = (
-  model: Model,
+  model: typeof Model.Type,
   h: ApplicationViewBuilder,
 ): Html =>
   Option.match(model.maybeChartError, {

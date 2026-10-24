@@ -1,16 +1,7 @@
 import { Effect, Function, Option } from 'effect'
-import { Runtime } from 'foldkit'
+import { Program, Runtime } from 'foldkit'
 
-import {
-  ApplicationComposition,
-  EffectsLayer,
-  Flags,
-  init,
-  ports,
-  subscriptions,
-  update,
-  view,
-} from './application'
+import { ApplicationBlock, Flags, ports } from './application'
 
 const INITIAL_COUNT = 10
 
@@ -72,18 +63,14 @@ export const startHost = (): void => {
   const hostCountDisplay = getElement('host-count')
   const widgetSlot = getElement('widget-slot')
 
-  const flags: Flags = { initialCount: INITIAL_COUNT }
-  const element = ApplicationComposition.assembleElement({
-    init,
-    update,
-    view,
-    subscriptions,
-    EffectsLayer,
+  const flags: typeof Flags.Type = { initialCount: INITIAL_COUNT }
+  const element = Program.makeElement({
+    block: ApplicationBlock,
     Flags,
     flags: Effect.succeed(flags),
     ports,
     container: widgetSlot,
-    devTools: { Message: ApplicationComposition.Message },
+    devTools: { dispatch: true },
   })
 
   type WidgetHandle = Runtime.EmbedHandle<typeof element.ports>

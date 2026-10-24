@@ -10,10 +10,11 @@ import {
 import { afterEach, expect, it, vi } from 'vitest'
 
 import { defineMessageUnion } from '../message/index.js'
-import { makeDefinition as makeApplicationDefinition } from '../runtime/applicationPublic.js'
+import * as Program from '../runtime/programPublic.js'
 import { __startProgram } from '../runtime/start.js'
 import { modifyFields } from '../struct/index.js'
 import { makeNamespace } from './define.js'
+import * as Block from './public.js'
 
 type LifecycleEvent =
   | 'Mount acquired'
@@ -51,7 +52,6 @@ const buildGraph = (
   const ChildNamespace = makeNamespace('LifecycleChild')
 
   const ChildModel = Schema.Struct({ id: Schema.String })
-  type ChildModel = typeof ChildModel.Type
 
   const ChildMessage = defineMessageUnion({
     AcquiredSession: {},
@@ -59,16 +59,15 @@ const buildGraph = (
     FailedAcquireSession: {},
     ReleasedSession: {},
   })
-  type ChildMessage = typeof ChildMessage.Type
 
-  const Session = ChildNamespace.resource<string>()('Session')
+  const Session = ChildNamespace.makeResource<string>()('Session')
 
   const ChildChannelsDefinition = ChildNamespace.makeDefinition({
     Model: ChildModel,
     Message: ChildMessage,
   })
 
-  const subscriptions = ChildChannelsDefinition.subscriptions(entry => ({
+  const subscriptions = ChildChannelsDefinition.makeSubscriptions(entry => ({
     activity: entry('ObserveActivity', {
       messages: [],
       handler: function* () {
@@ -104,35 +103,37 @@ const buildGraph = (
     }),
   }))
 
-  const managedResources = ChildChannelsDefinition.managedResources(entry => ({
-    session: entry('ManageSession', Schema.Option(Schema.Null), {
-      resource: Session,
-      modelToMaybeRequirements: () => Option.some(null),
-      onAcquired: () => ChildMessage.AcquiredSession(),
-      onReleased: () => ChildMessage.ReleasedSession(),
-      onAcquireError: () => ChildMessage.FailedAcquireSession(),
-      handler: function* () {
-        yield* trackHandler(
-          'ManagedResource handler built',
-          'ManagedResource handler released',
-        )
+  const managedResources = ChildChannelsDefinition.makeManagedResources(
+    entry => ({
+      session: entry('ManageSession', Schema.Option(Schema.Null), {
+        resource: Session,
+        modelToMaybeRequirements: () => Option.some(null),
+        onAcquired: () => ChildMessage.AcquiredSession(),
+        onReleased: () => ChildMessage.ReleasedSession(),
+        onAcquireError: () => ChildMessage.FailedAcquireSession(),
+        handler: function* () {
+          yield* trackHandler(
+            'ManagedResource handler built',
+            'ManagedResource handler released',
+          )
 
-        return {
-          acquire: () =>
-            Effect.sync(() => {
-              events.push('ManagedResource acquired')
-              return 'session'
-            }),
-          release: () =>
-            Effect.sync(() => {
-              events.push('ManagedResource released')
-            }),
-        }
-      },
+          return {
+            acquire: () =>
+              Effect.sync(() => {
+                events.push('ManagedResource acquired')
+                return 'session'
+              }),
+            release: () =>
+              Effect.sync(() => {
+                events.push('ManagedResource released')
+              }),
+          }
+        },
+      }),
     }),
-  }))
+  )
 
-  const ObservePanel = ChildNamespace.mount('ObservePanel', {
+  const ObservePanel = ChildNamespace.makeMount('ObservePanel', {
     messages: [ChildMessage.CompletedObservePanel],
     handler: function* () {
       yield* trackHandler('Mount handler built', 'Mount handler released')
@@ -163,24 +164,29 @@ const buildGraph = (
   const childView = childComposition.makeView((model, h) =>
     h.div([h.OnMount(ObservePanel())], [`child:${model.id}`]),
   )
-  const Child = childComposition.assembleBlock({
-    view: childView,
-    init: () => ({ model: ChildModel.make({ id: 'one' }) }),
-    update: (model, message) =>
-      ChildMessage.match(message, {
-        AcquiredSession: () => ({ model }),
-        CompletedObservePanel: () => ({ model }),
-        FailedAcquireSession: () => ({ model }),
-        ReleasedSession: () => ({ model }),
-      }),
-    subscriptions,
-    managedResources,
-    EffectsLayer: Layer.mergeAll(
-      subscriptions.activity.layer,
-      managedResources.session.layer,
-      ObservePanel.layer,
-    ),
-  })
+  const prepareChild = () =>
+    childComposition.prepareBlock({
+      view: childView,
+      init: () => ({ model: ChildModel.make({ id: 'one' }) }),
+      update: (model, message) =>
+        ChildMessage.match(message, {
+          AcquiredSession: () => ({ model }),
+          CompletedObservePanel: () => ({ model }),
+          FailedAcquireSession: () => ({ model }),
+          ReleasedSession: () => ({ model }),
+        }),
+      subscriptions,
+      managedResources,
+      EffectsLayer: Layer.mergeAll(
+        subscriptions.activity.layer,
+        managedResources.session.layer,
+        ObservePanel.layer,
+      ),
+    })
+  const Child: Block.FromAssemblyWithView<
+    typeof ChildModel,
+    typeof prepareChild
+  > = Block.assemble(prepareChild)
 
   const ParentModel = Schema.Struct({
     maybeChild: Schema.Option(ChildModel),
@@ -190,15 +196,14 @@ const buildGraph = (
   const ParentMessage = defineMessageUnion({
     RemovedChild: {},
   })
-  type ParentMessage = typeof ParentMessage.Type
 
-  const ParentBaseDefinition = makeApplicationDefinition({
+  const ParentBaseDefinition = Block.makeDefinition('Application', {
     Model: ParentModel,
     Message: ParentMessage,
   })
   const ChildBinding = (() => {
     if (mode === 'Route') {
-      return ParentBaseDefinition.bindChild(Child, {
+      return ParentBaseDefinition.makeBinding(Child, {
         placement: 'child',
         field: 'maybeChild',
         presentWhen: (model: ParentModel) => model.route === 'Home',
@@ -206,7 +211,7 @@ const buildGraph = (
     }
 
     if (mode === 'Subscriptions') {
-      return ParentBaseDefinition.bindChild(Child, {
+      return ParentBaseDefinition.makeBinding(Child, {
         placement: 'child',
         field: 'maybeChild',
         subscriptions: {
@@ -215,7 +220,7 @@ const buildGraph = (
       })
     }
 
-    return ParentBaseDefinition.bindChild(Child, {
+    return ParentBaseDefinition.makeBinding(Child, {
       placement: 'child',
       field: 'maybeChild',
     })
@@ -273,12 +278,21 @@ it.each(['Option', 'Route'] as const)(
     container.id = 'block-lifecycle-test'
     document.body.appendChild(container)
 
-    const provided = composition.assembleElement({
+    const prepare = () =>
+      composition.prepareBlock({
+        init,
+        update,
+        view,
+        EffectsLayer: Layer.empty,
+      })
+    const completedBlock: Block.FromAssemblyWithView<
+      typeof composition.Model,
+      typeof prepare
+    > = Block.assemble(prepare)
+
+    const provided = Program.makeElement({
+      block: completedBlock,
       container,
-      init,
-      update,
-      view,
-      EffectsLayer: Layer.empty,
     })
 
     expect(events).toEqual([])
@@ -351,11 +365,20 @@ it('gates only Subscription Streams while the direct-field child remains present
   const container = document.createElement('div')
   container.id = 'block-subscription-only-lifecycle-test'
   document.body.appendChild(container)
-  const application = composition.assembleElement({
+  const prepare = () =>
+    composition.prepareBlock({
+      init,
+      update,
+      view,
+    })
+  const completedBlock: Block.FromAssemblyWithView<
+    typeof composition.Model,
+    typeof prepare
+  > = Block.assemble(prepare)
+
+  const application = Program.makeElement({
+    block: completedBlock,
     container,
-    init,
-    update,
-    view,
   })
   const fiber = Effect.runFork(__startProgram(application, undefined, 'Fresh'))
 

@@ -25,7 +25,11 @@ import type {
   WithoutBindingEvidence,
 } from './binding.js'
 import { assertValidBindingOperationNames } from './binding.js'
-import { assertInitializedParentModel, registerBinding } from './composition.js'
+import {
+  assertInitializedParentModel,
+  registerBinding,
+  runtimeBindingsOf,
+} from './composition.js'
 import { type DefaultViewTypeId, defaultViewOf } from './defaultView.js'
 import {
   type BindingDeliveryEvidence,
@@ -369,7 +373,12 @@ export type KeyedBinding<
 > = WithoutBindingEvidence<
   Omit<
     Binding<BlockValue, ParentModel, ParentMessage, Placement, Policy>,
-    'placement' | 'init' | 'fold' | 'embedView' | keyof BlockValue['operations']
+    | 'placement'
+    | 'init'
+    | 'fold'
+    | 'embedView'
+    | 'withOutMessagePolicy'
+    | keyof BlockValue['operations']
   >
 > &
   BindingEvidence<
@@ -760,7 +769,7 @@ export const bindEach = <const BlockValue extends BindableBlock>(
   ): RuntimeKeyedChildFold => ({
     update: (childModel, operation) =>
       scopeReturn(
-        withOperationGraph(block.bindings, () =>
+        withOperationGraph(runtimeBindingsOf(block), () =>
           producer(childModel, ...operation.args),
         ),
         operation.key,
@@ -836,7 +845,7 @@ export const bindEach = <const BlockValue extends BindableBlock>(
   )
   const initialize = (key: InstanceKey, ...args: ReadonlyArray<any>) => {
     assertRegisteredInitialization(binding, placement)
-    const initialChild = withOperationGraph(block.bindings, () =>
+    const initialChild = withOperationGraph(runtimeBindingsOf(block), () =>
       block.init(...args),
     )
     config.validateChildKey?.(key, initialChild.model)
@@ -856,7 +865,7 @@ export const bindEach = <const BlockValue extends BindableBlock>(
       const args = [...initial.args]
       const commands = [...(initial.commands ?? [])]
 
-      return makeBindingInitRecipe(() => {
+      return makeBindingInitRecipe(binding, () => {
         const childInit = initialize(key, ...args)
         const model = toParentModel(childInit.model)
         assertInitializedParentModel(binding, placement, model)
@@ -911,7 +920,7 @@ export const bindEach = <const BlockValue extends BindableBlock>(
           identity: {
             owner: block.owner,
             mounts: block[LocalMountsTypeId],
-            bindings: block.bindings,
+            bindings: runtimeBindingsOf(block),
           },
         },
       } as unknown as BoundBlockConfig<View, any>

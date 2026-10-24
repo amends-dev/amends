@@ -2,26 +2,12 @@ import { Context, Effect, Layer, type Scope, Stream } from 'effect'
 
 import type { DefinitionIdentity } from '../block/identity.js'
 import type { ValidateConstructionRequirements } from '../block/scope.js'
+import type { Handler } from './public.js'
 
-declare const HandlerTypeId: unique symbol
+export type { Handler } from './public.js'
 
 /** @internal The capability shared by all Layer-backed Mount handlers. */
-export interface AnyHandler {
-  readonly [HandlerTypeId]: Readonly<{ name: string }>
-}
-
-/** The service required by a Mount whose implementation is supplied by a Layer. */
-export interface Handler<
-  Name extends string,
-  Input,
-  ResultMessage,
-> extends AnyHandler {
-  readonly [HandlerTypeId]: Readonly<{
-    name: Name
-    input: (input: Input) => Input
-    result: (result: ResultMessage) => ResultMessage
-  }>
-}
+export type AnyHandler = Handler<any, any, any>
 
 type EffectHandler<Input, Message, R> = (
   input: Input,

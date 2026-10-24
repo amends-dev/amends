@@ -1,4 +1,4 @@
-import { Array, Layer, Schema } from 'effect'
+import { Array, Schema } from 'effect'
 import { type Update } from 'foldkit'
 import * as Block from 'foldkit/block'
 import * as File from 'foldkit/file'
@@ -160,10 +160,14 @@ export const view = FileDropComposition.makeView.withInputs<ViewInputs>(
   },
 )
 
+const prepare = () =>
+  FileDropComposition.prepareBlock({
+    init,
+    update,
+    view,
+  })
 /** Complete FileDrop Block definition for connecting to a parent. */
-export const FileDropBlock = FileDropComposition.assembleBlock({
-  init,
-  update,
-  view,
-  EffectsLayer: Layer.empty,
-})
+export const FileDropBlock: Block.FromAssemblyWithViewAndOutMessage<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

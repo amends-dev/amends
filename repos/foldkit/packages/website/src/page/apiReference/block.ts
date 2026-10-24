@@ -1,21 +1,23 @@
-import { Option } from 'effect'
+import { Block } from 'foldkit'
 
 import { ApiReferenceComposition } from './composition'
-import type { ApiData } from './domain'
 import { init } from './init'
 import { Message } from './message'
+import type { Model } from './model'
 import { EffectsLayer, update } from './update'
 import { view } from './view'
 
-export const ApiReferenceBlock = ApiReferenceComposition.assembleBlock({
-  init,
-  update,
-  view,
-  operations: {
-    requestLoadInitialData: (
-      maybeApiData: Option.Option<ApiData> = Option.none(),
-    ) => [Message.RequestedLoadInitialData({ maybeApiData })],
-    informRouteChanged: Message.InformedOfRouteChange,
-  },
-  EffectsLayer,
-})
+const prepare = () =>
+  ApiReferenceComposition.prepareBlock({
+    init,
+    update,
+    view,
+    operations: {
+      informRouteChanged: Message.InformedOfRouteChange,
+    },
+    EffectsLayer,
+  })
+export const ApiReferenceBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

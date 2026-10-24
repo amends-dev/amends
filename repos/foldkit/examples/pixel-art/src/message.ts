@@ -24,5 +24,3 @@ export const Message = defineMessageUnion({
   ConfirmedGridSizeChange: {},
   CompletedSaveCanvas: {},
 })
-
-export type Message = typeof Message.Type

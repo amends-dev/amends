@@ -81,7 +81,7 @@ Two ViewInputs fields cover the cases a `<label for>` does not. Pass `ariaLabel`
 
 ### InitConfig {#init-config}
 
-Configuration object passed to `Menu.init()`.
+Configuration passed to the Binding for the completed Block returned by `Menu.create()`.
 
 | Name         | Type      | Default | Description                                                 |
 | ------------ | --------- | ------- | ----------------------------------------------------------- |
@@ -123,9 +123,9 @@ Pass the child Model as `model` and these fields as `viewInputs` to the Menu Bin
 
 ### OutMessage {#out-message}
 
-Messages emitted to the parent through the optional `outMessage` field. Handle the OutMessage in the Binding’s `outMessage.fold` policy.
+Messages emitted to the parent through the optional `outMessage` field. Handle the OutMessage in the Binding’s selected `fold` policy.
 
-| Name       | Type                             | Default | Description                                                                                                                                                                                                                                                                                                                                                             |
-| ---------- | -------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Selected` | `{ value: Item; index: number }` | —       | Emitted when a menu item is selected. Carries both the value (typed as your `Item` union via `Menu.create<Item>()`) and its index into the items array supplied at view time. Menu closes itself on selection; the parent does not need to call `menu.requestClose()`. Handle it in the Binding's `outMessage.fold` policy to dispatch the corresponding domain action. |
-| `Closed`   | `{}`                             | —       | Emitted when an open Menu closes without selection, including keyboard, button, backdrop, blur, pointer, and programmatic close paths. It is emitted by the update that changes the Menu Model to closed, before animation and cleanup Commands complete. A close request against an already closed Menu emits nothing.                                                 |
+| Name       | Type                             | Default | Description                                                                                                                                                                                                                                                                                                                                                           |
+| ---------- | -------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Selected` | `{ value: Item; index: number }` | —       | Emitted when a menu item is selected. Carries both the value (typed as your `Item` union via `Menu.create<Item>()`) and its index into the items array supplied at view time. Menu closes itself on selection; the parent does not need to call `menu.requestClose()`. Handle it in the Binding's selected `fold` policy to dispatch the corresponding domain action. |
+| `Closed`   | `{}`                             | —       | Emitted when an open Menu closes without selection, including keyboard, button, backdrop, blur, pointer, and programmatic close paths. It is emitted by the update that changes the Menu Model to closed, before animation and cleanup Commands complete. A close request against an already closed Menu emits nothing.                                               |

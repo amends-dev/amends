@@ -182,7 +182,7 @@ const identityStep = () =>
   )
 
 const foldSettingsAtCombine = (model: string) =>
-  Testing.callOfMember('Update', 'combine', [
+  Testing.callOfMember('Update', 'combineSteps', [
     Testing.id(model),
     {
       type: 'ArrayExpression',
@@ -198,7 +198,7 @@ const foldSettingsAtCombine = (model: string) =>
 
 const foldSettingsAtDataLastCombine = (model: string) => ({
   type: 'CallExpression',
-  callee: Testing.callOfMember('Update', 'combine', [
+  callee: Testing.callOfMember('Update', 'combineSteps', [
     {
       type: 'ArrayExpression',
       elements: [
@@ -214,7 +214,7 @@ const foldSettingsAtDataLastCombine = (model: string) => ({
 })
 
 const foldSettingsCombine = (model: string) =>
-  Testing.callOfMember('Update', 'combine', [
+  Testing.callOfMember('Update', 'combineSteps', [
     Testing.id(model),
     {
       type: 'ArrayExpression',
@@ -224,7 +224,7 @@ const foldSettingsCombine = (model: string) =>
 
 const foldSettingsDataLastCombine = (model: string) => ({
   type: 'CallExpression',
-  callee: Testing.callOfMember('Update', 'combine', [
+  callee: Testing.callOfMember('Update', 'combineSteps', [
     {
       type: 'ArrayExpression',
       elements: [Testing.callExpr('foldSettings', [Testing.id('message')])],
@@ -236,7 +236,7 @@ const foldSettingsDataLastCombine = (model: string) => ({
 const foldSettingsReturnedStep = Testing.varDecl(
   'const',
   'foldSettingsStep',
-  Testing.callOfMember('Update', 'combine', [
+  Testing.callOfMember('Update', 'combineSteps', [
     {
       type: 'ArrayExpression',
       elements: [Testing.callExpr('foldSettings', [Testing.id('message')])],
@@ -248,7 +248,7 @@ const applyFoldSettingsStep = (model: string) =>
   Testing.callExpr('foldSettingsStep', [Testing.id(model)])
 
 const foldSettingsNestedCombine = () =>
-  Testing.callOfMember('Update', 'combine', [
+  Testing.callOfMember('Update', 'combineSteps', [
     Testing.id('outerModel'),
     {
       type: 'ArrayExpression',
@@ -261,7 +261,7 @@ const foldSettingsNestedCombine = () =>
   ])
 
 const foldSettingsDataFirstCombine = () =>
-  Testing.callOfMember('Update', 'combine', [
+  Testing.callOfMember('Update', 'combineSteps', [
     Testing.id('outerModel'),
     {
       type: 'ArrayExpression',
@@ -278,7 +278,7 @@ const foldSettingsDataFirstCombine = () =>
   ])
 
 const foldSettingsAppliedToOtherModelInsideCombine = () =>
-  Testing.callOfMember('Update', 'combine', [
+  Testing.callOfMember('Update', 'combineSteps', [
     Testing.id('outerModel'),
     {
       type: 'ArrayExpression',
@@ -773,7 +773,7 @@ describe('no-direct-block-state-update', () => {
   it('flags a foldChildStep used directly in a combine Step array', () => {
     const result = runRule([
       foldSettingsStep,
-      Testing.callOfMember('Update', 'combine', [
+      Testing.callOfMember('Update', 'combineSteps', [
         Testing.id('model'),
         { type: 'ArrayExpression', elements: [Testing.id('foldSettingsStep')] },
       ]),
@@ -810,7 +810,7 @@ describe('completed Block bindings', () => {
     callee: {
       type: 'MemberExpression',
       object: Testing.id('Application'),
-      property: Testing.id('bindChild'),
+      property: Testing.id('makeBinding'),
       computed: false,
     },
     arguments: [
@@ -822,12 +822,12 @@ describe('completed Block bindings', () => {
     ],
   })
 
-  const directSettingsBinding = Testing.varDecl('const', 'settings', {
+  const directSettingsBindingCall = {
     type: 'CallExpression',
     callee: {
       type: 'MemberExpression',
       object: Testing.id('Application'),
-      property: Testing.id('bindChild'),
+      property: Testing.id('makeBinding'),
       computed: false,
     },
     arguments: [
@@ -836,7 +836,37 @@ describe('completed Block bindings', () => {
         property('field', { type: 'Literal', value: 'settings' }),
       ]),
     ],
+  }
+  const directSettingsBinding = Testing.varDecl(
+    'const',
+    'settings',
+    directSettingsBindingCall,
+  )
+
+  const fluentSettingsBinding = Testing.varDecl('const', 'settings', {
+    type: 'CallExpression',
+    callee: {
+      type: 'MemberExpression',
+      object: directSettingsBindingCall,
+      property: Testing.id('withOutMessagePolicy'),
+      computed: false,
+    },
+    arguments: [
+      objectExpression([
+        property('fold', Testing.id('foldSettingsOutMessage')),
+      ]),
+    ],
   })
+
+  const selectedSettingsBinding = Testing.varDecl(
+    'const',
+    'settingsWithOutMessagePolicy',
+    Testing.callOfMember('settings', 'withOutMessagePolicy', [
+      objectExpression([
+        property('fold', Testing.id('foldSettingsOutMessage')),
+      ]),
+    ]),
+  )
 
   const directEntriesBinding = (keyPropertyName = 'key') =>
     Testing.varDecl('const', 'entries', {
@@ -844,7 +874,7 @@ describe('completed Block bindings', () => {
       callee: {
         type: 'MemberExpression',
         object: Testing.id('Application'),
-        property: Testing.id('bindChild'),
+        property: Testing.id('makeBinding'),
         computed: false,
       },
       arguments: [
@@ -861,7 +891,7 @@ describe('completed Block bindings', () => {
     callee: {
       type: 'MemberExpression',
       object: Testing.id('Application'),
-      property: Testing.id('bindChild'),
+      property: Testing.id('makeBinding'),
       computed: false,
     },
     arguments: [
@@ -879,7 +909,7 @@ describe('completed Block bindings', () => {
     callee: {
       type: 'MemberExpression',
       object: Testing.id('Application'),
-      property: Testing.id('bindChild'),
+      property: Testing.id('makeBinding'),
       computed: false,
     },
     arguments: [
@@ -1025,7 +1055,7 @@ describe('completed Block bindings', () => {
     ])
 
   const stepFields = (definition: string, updates: unknown) =>
-    Testing.callOfMember(definition, 'stepFields', [
+    Testing.callOfMember(definition, 'makeFieldsStep', [
       Testing.arrowFn(updates, [Testing.id('model')]),
     ])
 
@@ -1042,10 +1072,10 @@ describe('completed Block bindings', () => {
     expect(result).toHaveLength(1)
   })
 
-  it('tracks an exposed operation inside Update.combine', () => {
+  it('tracks an exposed operation inside Update.combineSteps', () => {
     const result = runRule([
       settingsBinding,
-      Testing.callOfMember('Update', 'combine', [
+      Testing.callOfMember('Update', 'combineSteps', [
         Testing.id('model'),
         {
           type: 'ArrayExpression',
@@ -1100,7 +1130,7 @@ describe('completed Block bindings', () => {
   it('tracks direct keyed fields through named Binding operations', () => {
     const result = runRule([
       directEntriesBinding(),
-      Testing.callOfMember('Update', 'combine', [
+      Testing.callOfMember('Update', 'combineSteps', [
         Testing.id('model'),
         {
           type: 'ArrayExpression',
@@ -1146,10 +1176,10 @@ describe('completed Block bindings', () => {
     expect(result).toHaveLength(0)
   })
 
-  it('flags a child-owned transform returned from Definition.stepFields', () => {
+  it('flags a child-owned transform returned from Definition.makeFieldsStep', () => {
     const result = runRule([
       directSettingsBinding,
-      Testing.callOfMember('Update', 'combine', [
+      Testing.callOfMember('Update', 'combineSteps', [
         Testing.id('model'),
         {
           type: 'ArrayExpression',
@@ -1175,7 +1205,7 @@ describe('completed Block bindings', () => {
   it('allows stepFields from another Definition owner', () => {
     const result = runRule([
       directSettingsBinding,
-      Testing.callOfMember('Update', 'combine', [
+      Testing.callOfMember('Update', 'combineSteps', [
         Testing.id('model'),
         {
           type: 'ArrayExpression',
@@ -1198,7 +1228,7 @@ describe('completed Block bindings', () => {
     expect(result).toHaveLength(0)
   })
 
-  it('flags a directly applied Definition.stepFields Step', () => {
+  it('flags a directly applied Definition.makeFieldsStep Step', () => {
     const result = runRule([
       directSettingsBinding,
       Testing.callOfMember('settings', 'fold', [
@@ -1223,15 +1253,15 @@ describe('completed Block bindings', () => {
     expect(result).toHaveLength(1)
   })
 
-  it('allows Definition.stepNoop because it has no field transform record', () => {
+  it('allows Definition.makeNoopStep because it has no field transform record', () => {
     const result = runRule([
       directSettingsBinding,
-      Testing.callOfMember('Update', 'combine', [
+      Testing.callOfMember('Update', 'combineSteps', [
         Testing.id('model'),
         {
           type: 'ArrayExpression',
           elements: [
-            Testing.callOfMember('Application', 'stepNoop', []),
+            Testing.callOfMember('Application', 'makeNoopStep', []),
             Testing.callOfMember('settings', 'clearSelection', []),
           ],
         },
@@ -1258,7 +1288,7 @@ describe('completed Block bindings', () => {
   it('tracks wrapped child Models through named Binding operations', () => {
     const result = runRule([
       wrappedEntriesBinding,
-      Testing.callOfMember('Update', 'combine', [
+      Testing.callOfMember('Update', 'combineSteps', [
         Testing.id('model'),
         {
           type: 'ArrayExpression',
@@ -1344,6 +1374,58 @@ describe('completed Block bindings', () => {
     expect(result).toHaveLength(1)
   })
 
+  it('tracks a fluent Binding policy chain in Composition.makeUpdate', () => {
+    const result = runRule([
+      fluentSettingsBinding,
+      applicationComposition(
+        'ApplicationComposition',
+        Testing.id('Application'),
+        [Testing.id('settings')],
+      ),
+      compositionUpdate('ApplicationComposition'),
+    ])
+
+    expect(result).toHaveLength(1)
+  })
+
+  it('tracks an extracted policy selection as the original Binding', () => {
+    const result = runRule([
+      directSettingsBinding,
+      selectedSettingsBinding,
+      applicationComposition(
+        'ApplicationComposition',
+        Testing.id('Application'),
+        [Testing.id('settingsWithOutMessagePolicy')],
+      ),
+      compositionUpdate('ApplicationComposition'),
+    ])
+
+    expect(result).toHaveLength(1)
+  })
+
+  it('does not treat an unrelated fluent policy method as a Binding', () => {
+    const unrelated = Testing.varDecl(
+      'const',
+      'settingsWithOutMessagePolicy',
+      Testing.callOfMember('unrelated', 'withOutMessagePolicy', [
+        objectExpression([
+          property('fold', Testing.id('foldSettingsOutMessage')),
+        ]),
+      ]),
+    )
+    const result = runRule([
+      unrelated,
+      applicationComposition(
+        'ApplicationComposition',
+        Testing.id('Application'),
+        [Testing.id('settingsWithOutMessagePolicy')],
+      ),
+      compositionUpdate('ApplicationComposition'),
+    ])
+
+    expect(result).toHaveLength(0)
+  })
+
   it('tracks a registered Binding through a namespace Definition receiver', () => {
     const namespacedApplication = Testing.memberExpr('Feature', 'Application')
     const namespacedBinding = Testing.varDecl('const', 'settings', {
@@ -1351,7 +1433,7 @@ describe('completed Block bindings', () => {
       callee: {
         type: 'MemberExpression',
         object: namespacedApplication,
-        property: Testing.id('bindChild'),
+        property: Testing.id('makeBinding'),
         computed: false,
       },
       arguments: [
@@ -1457,7 +1539,7 @@ describe('completed Block bindings', () => {
       callee: {
         type: 'MemberExpression',
         object: Testing.id('OtherApplication'),
-        property: Testing.id('bindChild'),
+        property: Testing.id('makeBinding'),
         computed: false,
       },
       arguments: [

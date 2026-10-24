@@ -1,3 +1,5 @@
+import { Program } from 'foldkit'
+
 import { ApplicationComposition as ImportedApplicationComposition } from './rootApplication'
 
 import { Child } from './child'
@@ -11,17 +13,29 @@ type RootHtmlBuilder = Parameters<
 const childViewHelper = (h: RootHtmlBuilder) =>
   h.button([h.OnClick(Child.Message.ClickedFromRootViewHelper())])
 
-export const page = RootApplicationComposition.assembleApplication({
+const view = RootApplicationComposition.makeView((_model, h) =>
+  h.div(
+    [h.OnClick(RootApplicationComposition.Message.ClickedOwnLink())],
+    [childViewHelper(h)],
+  ),
+)
+
+const elementView = RootApplicationComposition.makeView((_model, h) =>
+  h.div([h.OnClick(Child.Message.ClickedFromElementCompletion())]),
+)
+
+const ApplicationBlock = RootApplicationComposition.prepareBlock({ view })
+const ElementBlock = RootApplicationComposition.prepareBlock({
+  view: elementView,
+})
+
+export const page = Program.make({
+  block: ApplicationBlock,
+  container,
   routing: {
-    onUrlRequest: () => RootApplicationComposition.Message.ClickedOwnLink(),
+    onUrlRequest: ApplicationBlock.Message.ClickedOwnLink,
     onUrlChange: () => Child.Message.ClickedFromRootCompletion(),
   },
 })
 
-export const element = RootApplicationComposition.assembleElement({
-  view: (_model, h) =>
-    h.div(
-      [h.OnClick(Child.Message.ClickedFromElementCompletion())],
-      [childViewHelper(h)],
-    ),
-})
+export const element = Program.makeElement({ block: ElementBlock })

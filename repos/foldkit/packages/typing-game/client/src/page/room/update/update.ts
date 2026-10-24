@@ -25,7 +25,7 @@ import { Model, RoomAsyncData, RoomPlayerSession } from '../model'
 import { validateUserTextInput } from '../userGameText'
 import { handleRoomUpdated } from './handleRoomUpdated'
 
-export const NavigateHome = RoomDefinition.command('NavigateHome', {
+export const NavigateHome = RoomDefinition.makeCommand('NavigateHome', {
   messages: [Message.CompletedNavigateHome],
   handler: function* () {
     return () =>
@@ -200,7 +200,7 @@ export const update = RoomComposition.makeUpdate(
 )
 
 const handleKeyPressed =
-  (model: Model, context: Context) =>
+  (model: typeof Model.Type, context: Context) =>
   ({ key }: { key: string }) =>
     Option.match(AsyncData.getData(model.roomAsyncData), {
       onNone: () => ({ model }),
@@ -213,8 +213,8 @@ const handleKeyPressed =
     })
 
 const recordJoinedPlayer = (
-  model: Model,
-  player: Shared.Player,
+  model: typeof Model.Type,
+  player: typeof Shared.Player.Type,
   context: Context,
 ) => {
   const session = RoomPlayerSession.make({
@@ -231,10 +231,10 @@ const recordJoinedPlayer = (
 }
 
 const whenWaiting = (
-  model: Model,
+  model: typeof Model.Type,
   context: Context,
   key: string,
-  room: Shared.Room,
+  room: typeof Shared.Room.Type,
 ) =>
   Match.value(key).pipe(
     Match.when('Backspace', () => leaveRoom(model, context.roomId)),
@@ -243,10 +243,10 @@ const whenWaiting = (
   )
 
 const whenFinished = (
-  model: Model,
+  model: typeof Model.Type,
   context: Context,
   key: string,
-  room: Shared.Room,
+  room: typeof Shared.Room.Type,
 ) =>
   Match.value(key).pipe(
     Match.when('Backspace', () =>
@@ -258,7 +258,7 @@ const whenFinished = (
     Match.orElse(() => ({ model })),
   )
 
-const leaveRoom = (model: Model, roomId: string) => ({
+const leaveRoom = (model: typeof Model.Type, roomId: string) => ({
   model: modifyFields(model, {
     maybeSession: () => Option.none(),
     roomAsyncData: () => RoomAsyncData.Loading(),
@@ -267,7 +267,8 @@ const leaveRoom = (model: Model, roomId: string) => ({
 })
 
 const handleStartGame =
-  (model: Model, roomId: string, room: Shared.Room) => () =>
+  (model: typeof Model.Type, roomId: string, room: typeof Shared.Room.Type) =>
+  () =>
     Option.match(model.maybeSession, {
       onSome: session => {
         const isHost = session.player.id === room.hostId

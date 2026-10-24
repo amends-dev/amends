@@ -2,7 +2,7 @@
 // block below is an excerpt. Fit them into your own Model, init, Message,
 // update, and view definitions.
 import { Schema, Tuple } from 'effect'
-import { Block, Update } from 'foldkit'
+import { Block } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 
 import { Popover } from '@foldkit/ui'
@@ -14,46 +14,44 @@ const Model = Schema.Struct({
   popover: Popover.PopoverBlock.Model,
   // ...your other fields
 })
-type Model = typeof Model.Type
 
 // This excerpt has no parent-owned facts. The Composition derives delivery.
 const Message = defineMessageUnion({})
-type Message = typeof Message.Type
 
-// At module scope, fold the OutMessage into your own Model. `Opened` and
-// `Closed` mark the visibility transitions. Fire analytics, coordinate with
-// other UI, or clear ephemeral state on close. Each arm returns an
-// Update.Step over the parent Model, which already has the next Popover Model
-// written back:
-const foldPopoverOutMessage = Popover.PopoverBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  // The child has emitted `Opened`. In this arm the parent can update its
-  // own state or dispatch its own Commands, for example lazy-load panel
-  // content, log analytics, or trigger a downstream Command.
-  Opened: () => PopoverExampleDefinition.stepNoop(),
-  // The child has emitted `Closed`. In this arm the parent can update its
-  // own state or dispatch its own Commands, for example persist a draft,
-  // clear ephemeral state, or trigger a downstream Command.
-  Closed: () => PopoverExampleDefinition.stepNoop(),
-})
-
-// The Binding wires the completed child Block into the parent: it runs Popover.PopoverBlock.update,
-// writes the next Popover Model back, routes generated delivery and Command
-// results, and hands any OutMessage to the OutMessage fold.
 const PopoverExampleDefinition = Block.makeDefinition('PopoverExample', {
   Model,
   Message,
 })
 
-const PopoverBinding = PopoverExampleDefinition.bindChild(
+// At module scope, fold the OutMessage into your own Model. `Opened` and
+// `Closed` mark the visibility transitions. Fire analytics, coordinate with
+// other UI, or clear ephemeral state on close. Each arm returns an
+// parent Step over the Model that already has the next Popover Model written
+// back. The parent Definition checks every named variant:
+const foldPopoverOutMessage = PopoverExampleDefinition.makeOutMessageFold(
+  Popover.PopoverBlock,
+  {
+    // The child has emitted `Opened`. In this arm the parent can update its
+    // own state or dispatch its own Commands, for example lazy-load panel
+    // content, log analytics, or trigger a downstream Command.
+    Opened: PopoverExampleDefinition.makeNoopStep,
+    // The child has emitted `Closed`. In this arm the parent can update its
+    // own state or dispatch its own Commands, for example persist a draft,
+    // clear ephemeral state, or trigger a downstream Command.
+    Closed: PopoverExampleDefinition.makeNoopStep,
+  },
+)
+
+// The Binding wires the completed child Block into the parent: it runs Popover.PopoverBlock.update,
+// writes the next Popover Model back, routes generated delivery and Command
+// results, and hands any OutMessage to the OutMessage fold.
+const PopoverBinding = PopoverExampleDefinition.makeBinding(
   Popover.PopoverBlock,
   {
     field: 'popover',
     init: { contextToArgs: () => Tuple.make({ id: 'info' }) },
-    outMessage: { fold: foldPopoverOutMessage },
   },
-)
+).withOutMessagePolicy({ fold: foldPopoverOutMessage })
 
 const PopoverExampleComposition = PopoverExampleDefinition.makeComposition({
   bindings: [PopoverBinding],

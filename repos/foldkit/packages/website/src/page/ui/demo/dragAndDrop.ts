@@ -18,13 +18,10 @@ import type { Model } from '../model'
 
 // HELPERS
 
-type DemoColumnType = typeof DemoColumn.Type
-type DemoCardType = typeof DemoCard.Type
-
 const findDraggedCard = (
-  columns: ReadonlyArray<DemoColumnType>,
+  columns: ReadonlyArray<typeof DemoColumn.Type>,
   maybeItemId: Option.Option<string>,
-): Option.Option<DemoCardType> =>
+): Option.Option<typeof DemoCard.Type> =>
   pipe(
     maybeItemId,
     Option.flatMap(itemId =>
@@ -40,7 +37,7 @@ const cardClassName =
   'rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 cursor-grab active:cursor-grabbing select-none transition-opacity'
 
 const cardView = (
-  card: DemoCardType,
+  card: typeof DemoCard.Type,
   index: number,
   containerId: string,
   dragAndDropModel: typeof DragAndDropBlock.Model.Type,
@@ -71,8 +68,8 @@ const cardView = (
 }
 
 const columnView = (
-  columns: ReadonlyArray<DemoColumnType>,
-  column: DemoColumnType,
+  columns: ReadonlyArray<typeof DemoColumn.Type>,
+  column: typeof DemoColumn.Type,
   dragAndDropModel: typeof DragAndDropBlock.Model.Type,
   draggable: RenderInfo['draggable'],
   h: UiViewBuilder,
@@ -144,7 +141,7 @@ const columnView = (
 }
 
 const renderColumn = (
-  column: DemoColumnType,
+  column: typeof DemoColumn.Type,
   dragAndDropModel: typeof DragAndDropBlock.Model.Type,
   children: ReadonlyArray<Html>,
   h: UiViewBuilder,
@@ -183,7 +180,7 @@ const renderColumn = (
 }
 
 const ghostView = (
-  columns: ReadonlyArray<DemoColumnType>,
+  columns: ReadonlyArray<typeof DemoColumn.Type>,
   dragAndDropModel: typeof DragAndDropBlock.Model.Type,
 ): Html => {
   const maybeItemId = maybeDraggedItemId(dragAndDropModel)
@@ -212,7 +209,10 @@ const ghostView = (
   )
 }
 
-export const demo = (model: Model, h: UiViewBuilder): ReadonlyArray<Html> => {
+export const demo = (
+  model: typeof Model.Type,
+  h: UiViewBuilder,
+): ReadonlyArray<Html> => {
   return [
     h.block(
       DragAndDropDemoBinding.embedView({

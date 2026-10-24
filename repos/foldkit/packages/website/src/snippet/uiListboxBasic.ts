@@ -2,20 +2,18 @@
 // block below is an excerpt. Fit them into your own Model, init, Message,
 // update, and view definitions.
 import { Option, Schema, Tuple } from 'effect'
-import { Block, Update } from 'foldkit'
+import { Block } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
-import { modifyFields } from 'foldkit/struct'
 
 import { Listbox } from '@foldkit/ui'
 import { buttonId as ListboxButtonId } from '@foldkit/ui/listbox'
 
 const Plan = Schema.Literals(['Free', 'Pro', 'Enterprise'])
-type Plan = typeof Plan.Type
 
 // Declare a typed Listbox once at module scope. `view` and `update` are
 // bound to `Plan`: `items` is typed as `ReadonlyArray<Plan>` and the
 // OutMessage carries `value: Plan`.
-const PlanListbox = Listbox.create<Plan>()
+const PlanListbox = Listbox.create<typeof Plan.Type>()
 
 // Add a field to your Model for the Listbox Block, plus a field for
 // the selected value your app actually cares about. Using the `Plan`
@@ -25,40 +23,38 @@ const Model = Schema.Struct({
   listbox: PlanListbox.Model,
   // ...your other fields
 })
-type Model = typeof Model.Type
 
 // This excerpt has no parent-owned facts. The Composition derives delivery.
 const Message = defineMessageUnion({})
-type Message = typeof Message.Type
 
-// At module scope, fold the OutMessage into your own Model. When the user
-// commits a selection it carries `Selected({ value })` where `value: Plan`.
-// The arm returns an Update.Step over the parent Model, which already has the
-// next Listbox Model written back:
-const foldListboxOutMessage = PlanListbox.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Selected:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, { maybePlan: () => Option.some(value) }),
-    }),
-})
-
-// The Binding wires the completed child Block into the parent: it delegates keyboard
-// navigation, typeahead, and open/close to PlanListbox.update, writes the next
-// Listbox Model back, routes generated delivery and Command results, and
-// hands any OutMessage to the OutMessage fold.
 const PlanPickerDefinition = Block.makeDefinition('PlanPicker', {
   Model,
   Message,
 })
 
-const PlanListboxBinding = PlanPickerDefinition.bindChild(PlanListbox, {
+// At module scope, fold the OutMessage into your own Model. When the user
+// commits a selection it carries `Selected({ value })` where `value: Plan`.
+// The arm returns an Update.Step over the parent Model, which already has the
+// next Listbox Model written back. Passing the completed child Block preserves
+// the factory's refined `Plan` payload without a repeated type argument:
+const foldListboxOutMessage = PlanPickerDefinition.makeOutMessageFold(
+  PlanListbox,
+  {
+    Selected: ({ value }) =>
+      PlanPickerDefinition.makeFieldsStep(() => ({
+        maybePlan: () => Option.some(value),
+      })),
+  },
+)
+
+// The Binding wires the completed child Block into the parent: it delegates keyboard
+// navigation, typeahead, and open/close to PlanListbox.update, writes the next
+// Listbox Model back, routes generated delivery and Command results, and
+// hands any OutMessage to the OutMessage fold.
+const PlanListboxBinding = PlanPickerDefinition.makeBinding(PlanListbox, {
   field: 'listbox',
   init: { contextToArgs: () => Tuple.make({ id: 'plan' }) },
-  outMessage: { fold: foldListboxOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldListboxOutMessage })
 
 const PlanPickerComposition = PlanPickerDefinition.makeComposition({
   bindings: [PlanListboxBinding],
@@ -75,7 +71,7 @@ const init = PlanPickerComposition.makeInit(() => ({
 // The Composition routes generated Listbox delivery through the Binding.
 const update = PlanPickerComposition.makeUpdate()
 
-const plans: ReadonlyArray<Plan> = ['Free', 'Pro', 'Enterprise']
+const plans: ReadonlyArray<typeof Plan.Type> = ['Free', 'Pro', 'Enterprise']
 
 // Inside your view function, embed the Listbox via h.block using
 // its canonical view. Associate a visible label with the trigger via a native

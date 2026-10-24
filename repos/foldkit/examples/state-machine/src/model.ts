@@ -44,7 +44,6 @@ export const TransitionLogEntry = Schema.Struct({
   id: Schema.Number,
   summary: Schema.String,
 })
-export type TransitionLogEntry = typeof TransitionLogEntry.Type
 
 export const EDITION_RADIO_GROUP_ID = 'edition'
 
@@ -67,4 +66,3 @@ export const Model = Schema.Struct({
   transitionLog: Schema.Array(TransitionLogEntry),
   nextTransitionLogId: Schema.Number,
 })
-export type Model = typeof Model.Type

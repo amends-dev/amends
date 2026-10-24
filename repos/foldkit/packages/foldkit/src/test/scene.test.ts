@@ -3579,12 +3579,12 @@ describe('Scene.Subscription.emit', () => {
   })
 
   test('a widened Subscriptions record has no statically known declarations', () => {
+    const clock = widenedCounterSubscriptions['clock']!
+    const ticked = CounterMessage.Ticked()
+
     expectTypeOf(() =>
-      Scene.Subscription.emit(
-        // @ts-expect-error The broad record type erases per-entry Message schemas.
-        widenedCounterSubscriptions['clock']!,
-        CounterMessage.Ticked(),
-      ),
+      // @ts-expect-error The broad record type erases per-entry Message schemas.
+      Scene.Subscription.emit(clock, ticked),
     ).toBeFunction()
 
     const unknownSubscriptions: unknown = counterSubscriptions

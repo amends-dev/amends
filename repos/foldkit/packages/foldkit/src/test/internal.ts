@@ -12,6 +12,12 @@ import {
 import { isScopedInvocation } from '../block/scope.js'
 import { CommandDefinitionTypeId } from '../command/index.js'
 import { type MountDefinition, MountDefinitionTypeId } from '../mount/index.js'
+import {
+  bindingMatcherFingerprint,
+  commandMatches,
+  isBindingCommandMatcher,
+  sameOperation,
+} from './bindingMatcher.js'
 
 /** A Command in a test simulation. Carries `name` and optionally the `args`
  *  the runtime captured at construction. Instance matchers (Command values
@@ -94,33 +100,6 @@ const isCommandDefinitionMatcher = (
   matcher: CommandMatcher,
 ): matcher is ResolvableCommandDefinition<string, unknown> =>
   Predicate.hasProperty(matcher, CommandDefinitionTypeId)
-
-/** Compares source identity and an explicitly bound path before args matching. */
-const sameOperation = (
-  matcher: Readonly<{ name: string }>,
-  operation: Readonly<{ name: string }>,
-): boolean => {
-  const expected = identityOf(matcher) ?? invocationIdentity(matcher)
-  const actual = invocationIdentity(operation)
-  if (expected !== undefined && actual !== undefined) {
-    return (
-      expected.token === actual.token &&
-      (invocationName(matcher) ?? matcher.name) ===
-        (invocationName(operation) ?? operation.name) &&
-      (!isScopedInvocation(matcher) || matcher.name === operation.name)
-    )
-  }
-  return matcher.name === operation.name
-}
-
-const commandMatches = (
-  matcher: CommandMatcher,
-  command: AnyCommand,
-): boolean =>
-  sameOperation(matcher, command) &&
-  (isCommandDefinitionMatcher(matcher) ||
-    matcher.args === undefined ||
-    Equal.equals(matcher.args, command.args))
 
 const formatArgs = (args: Record<string, unknown> | undefined): string =>
   args === undefined ? '' : ` ${JSON.stringify(args)}`
@@ -346,7 +325,7 @@ const matcherFingerprint = (matcher: CommandMatcher): string => {
   if (identity !== undefined) {
     const identityId = matcherIdentities.get(identity) ?? nextMatcherIdentity++
     matcherIdentities.set(identity, identityId)
-    source = `${identityId}:${invocationName(matcher) ?? matcher.name}:${isScopedInvocation(matcher) ? matcher.name : ''}`
+    source = `${identityId}:${invocationName(matcher) ?? matcher.name}:${isScopedInvocation(matcher) ? matcher.name : ''}:${bindingMatcherFingerprint(matcher)}`
   }
   return isCommandDefinitionMatcher(matcher)
     ? `def:${source}`
@@ -369,6 +348,17 @@ const findNextMatch = (
     )
 
   return Array.findFirst(commands, toMatchedResolver)
+}
+
+const assertBindingResolversUnambiguous = (
+  commands: ReadonlyArray<AnyCommand>,
+  resolvers: ReadonlyArray<ResolverEntry>,
+): void => {
+  for (const { matcher } of resolvers) {
+    if (isBindingCommandMatcher(matcher)) {
+      assertResolveUnambiguous(commands, matcher)
+    }
+  }
 }
 
 /** Resolves all listed Commands, cascading through any Commands produced by
@@ -400,6 +390,7 @@ export const resolveAllInternal = <Model, Message, OutMessage>(
   } as BaseInternal<Model, Message, unknown>
 
   for (let depth = 0; depth < MAX_CASCADE_DEPTH; depth++) {
+    assertBindingResolversUnambiguous(current.commands, current.resolvers)
     const matched = findNextMatch(current.commands, current.resolvers)
 
     if (Option.isNone(matched)) {
@@ -448,6 +439,7 @@ export const resolveAllExactInternal = <Model, Message, OutMessage>(
   let current = internal
 
   for (let depth = 0; depth < MAX_CASCADE_DEPTH; depth++) {
+    assertBindingResolversUnambiguous(current.commands, remainingResolvers)
     const matched = findNextMatch(current.commands, remainingResolvers)
 
     if (Option.isNone(matched)) {
@@ -523,11 +515,13 @@ export const assertResolveUnambiguous = (
   )
 
   if (matches.length > 1) {
+    const resolutionAdvice = isBindingCommandMatcher(matcher)
+      ? 'Include the missing ancestor Binding and keyed occurrence in the component test fixture.'
+      : 'To disambiguate, pass a Command instance with specific args, or use resolveAll for ordered consumption.'
     throw new Error(
       `I tried to resolve "${formatMatcher(matcher)}" but multiple pending Commands match.\n\n` +
         `Matches:\n${formatCommandList(matches)}\n\n` +
-        'To disambiguate, pass a Command instance with specific args, ' +
-        'or use resolveAll for ordered consumption.',
+        resolutionAdvice,
     )
   }
 }
@@ -623,7 +617,7 @@ const formatChildBlockCommandHint = (
   )
     ? '\n\nSome Commands came from a child Block. If the child is an\n' +
       '@foldkit/ui component, check its test namespace for a helper\n' +
-      '(for example, Toast.test.drainEntry).'
+      '(for example, ToastBlock.test.drainEntry).'
     : ''
 
 /** Throws when trying to send a message with unresolved Commands. Keyed

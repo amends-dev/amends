@@ -1,3 +1,5 @@
+import { Program } from 'foldkit'
+
 import { ApplicationComposition as ImportedApplicationComposition, Message } from './rootApplication'
 
 const RootApplicationComposition = ImportedApplicationComposition
@@ -9,18 +11,22 @@ type RootHtmlBuilder = Parameters<
 const rootViewHelper = (h: RootHtmlBuilder) =>
   h.button([h.OnClick(Message.ClickedContinue())])
 
-export const page = RootApplicationComposition.assembleApplication({
+const view = RootApplicationComposition.makeView((_model, h) =>
+  h.div(
+    [h.OnClick(RootApplicationComposition.Message.ClickedElement())],
+    [rootViewHelper(h)],
+  ),
+)
+
+const ApplicationBlock = RootApplicationComposition.prepareBlock({ view })
+
+export const page = Program.make({
+  block: ApplicationBlock,
+  container,
   routing: {
-    onUrlRequest: request =>
-      RootApplicationComposition.Message.ClickedLink({ request }),
-    onUrlChange: url => Message.ChangedUrl({ url }),
+    onUrlRequest: ApplicationBlock.Message.ClickedLink,
+    onUrlChange: ApplicationBlock.Message.ChangedUrl,
   },
 })
 
-export const element = RootApplicationComposition.assembleElement({
-  view: (_model, h) =>
-    h.div(
-      [h.OnClick(RootApplicationComposition.Message.ClickedElement())],
-      [rootViewHelper(h)],
-    ),
-})
+export const element = Program.makeElement({ block: ApplicationBlock })

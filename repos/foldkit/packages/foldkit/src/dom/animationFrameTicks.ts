@@ -12,7 +12,7 @@ import { Effect, Queue, Stream } from 'effect'
  * @example
  * ```ts
  * const ExampleDefinition = Block.makeDefinition('Example', { Model, Message })
- * const subscriptions = ExampleDefinition.subscriptions(entry => ({
+ * const subscriptions = ExampleDefinition.makeSubscriptions(entry => ({
  *   frame: entry(
  *     'AnimationFrameTicks',
  *     { isActive: Schema.Boolean },

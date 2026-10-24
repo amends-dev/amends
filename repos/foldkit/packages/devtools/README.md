@@ -22,37 +22,29 @@ With `@foldkit/vite-plugin`, installing this package as a development dependency
 
 ```typescript
 // src/entry.ts
-import { Runtime } from 'foldkit'
+import { Program, Runtime } from 'foldkit'
 
-import {
-  ApplicationComposition,
-  init,
-  update,
-  view,
-  Message,
-} from './application'
+import { ApplicationBlock } from './application'
 
-const application = ApplicationComposition.assembleApplication({
-  init,
-  update,
-  view,
+const program = Program.make({
+  block: ApplicationBlock,
   container: document.getElementById('root'),
-  devTools: {
-    Message,
-  },
+  devTools: { dispatch: true },
 })
 
-Runtime.run(application)
+Runtime.run(program)
 ```
 
-`Application` is the typed authoring value created by `makeApplicationDefinition({ Model, Message })`. Export `ApplicationComposition = Application.makeComposition({ bindings })` from `application.ts`, or call `makeComposition()` for a root without child Bindings. Complete that Composition with `ApplicationComposition.assembleApplication` in the entry point.
+The application root is an ordinary Block created with `Block.makeDefinition('Application', { Model, Message })`. Author its implementation through `ApplicationComposition`. Call `prepareBlock` inside a private `prepare` function, then export `ApplicationBlock` with its matching `FromAssembly` annotation and `Block.assemble(prepare)`. Pass that Block to `Program.make` in the entry point.
 
-The `devTools` configuration is optional unless you need settings such as `Message`, `position`, or `excludeFromHistory`. Recording and the WebSocket bridge that the [DevTools MCP server](https://foldkit.dev/ai/mcp) connects to live in Foldkit's core Runtime.
+The `devTools` configuration is optional. Development inspection is enabled by default, while external Message dispatch is disabled. Set `dispatch: true` when the [DevTools MCP server](https://foldkit.dev/ai/mcp) should discover and dispatch the completed root Block's Messages. Foldkit derives that Schema from `ApplicationBlock`, including the generated envelopes for registered child Blocks.
 
 To include the overlay in production, move `@foldkit/devtools` to regular `dependencies` and set `show: 'Always'`. The dependency section is the build-time opt-in, and `show` controls whether the Runtime mounts it:
 
 ```typescript
-const application = ApplicationComposition.assembleApplication({
+const program = Program.make({
+  block: ApplicationBlock,
+  container,
   // ...
   devTools: {
     show: 'Always',

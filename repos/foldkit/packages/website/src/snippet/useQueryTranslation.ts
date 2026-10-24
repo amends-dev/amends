@@ -1,5 +1,5 @@
 import { Effect, Match, Option, Schema, pipe } from 'effect'
-import { AsyncData, makeApplicationDefinition } from 'foldkit'
+import { AsyncData, Block } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
 
@@ -10,7 +10,6 @@ const PostsData = AsyncData.Schema(Schema.Array(Post), Schema.String)
 const Model = Schema.Struct({
   posts: PostsData.schema,
 })
-type Model = typeof Model.Type
 
 const Message = defineMessageUnion({
   EnteredPostsRoute: {},
@@ -18,11 +17,13 @@ const Message = defineMessageUnion({
     result: Schema.Result(Schema.Array(Post), Schema.String),
   },
 })
-type Message = typeof Message.Type
 
-const ApplicationDefinition = makeApplicationDefinition({ Model, Message })
+const ApplicationDefinition = Block.makeDefinition('Application', {
+  Model,
+  Message,
+})
 
-const FetchPosts = ApplicationDefinition.command('FetchPosts', {
+const FetchPosts = ApplicationDefinition.makeCommand('FetchPosts', {
   messages: [Message.CompletedFetchPosts],
   handler: function* () {
     return () =>

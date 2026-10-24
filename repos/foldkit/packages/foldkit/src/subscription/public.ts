@@ -1,10 +1,26 @@
+declare const HandlerTypeId: unique symbol
+
+type Invariant<Value> = (value: Value) => Value
+
+/**
+ * The service required by a Subscription whose implementation is supplied by
+ * a Layer. Its name, decoded dependencies, and declared Message identify the
+ * handler contract.
+ */
+export interface Handler<Name extends string, Dependencies, Message> {
+  readonly [HandlerTypeId]: Readonly<{
+    name: Invariant<Name>
+    dependencies: Invariant<Dependencies>
+    message: Invariant<Message>
+  }>
+}
+
 export { RegistryEntriesTypeId, aggregate, lift, make } from './subscription.js'
 
 export type {
   EntryGates,
   EntryWithoutKeepAlive,
   GatedDependencies,
-  Handler,
   HandlerOf,
   LayeredEntryWithKeepAlive,
   LayeredEntryWithoutKeepAlive,

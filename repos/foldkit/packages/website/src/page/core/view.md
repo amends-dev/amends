@@ -12,7 +12,7 @@ Event attributes complete the loop. They produce Messages for the runtime to dis
 
 In the [restaurant analogy](/core/architecture#the-restaurant-analogy), view is the meal on the table. The Model records the current facts; view presents them.
 
-The Counter's named `ApplicationComposition` supplies the primary view builder, so the view's Model, Message, child, and Mount capabilities come from the same Composition that the entry completes. This excerpt remains in the compact Counter's `application.ts` after the Application and Composition declarations.
+The Counter's named `ApplicationComposition` supplies the primary view builder, so the view's Model, Message, child, and Mount capabilities come from the same Composition that assembles `ApplicationBlock`. This excerpt remains in the compact Counter's `application.ts` after the Application and Composition declarations.
 
 ::Snippet{name="counterView" label="Using view"}
 
@@ -24,7 +24,7 @@ React functional components can hold local state and run effects through hooks, 
 
 ### Document Fields
 
-An `ApplicationComposition.assembleApplication` view returns a `Document`, not bare HTML. The Document contains the body to patch into the application container and the document-level state that should track the Model.
+A root Block passed to `Program.make` has a view that returns a `Document`, not bare HTML. The Document contains the body to patch into the application container and the document-level state that should track the Model.
 
 | Field       | Type                       | Required | What the runtime does with it                                                                                                                  |
 | ----------- | -------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -39,7 +39,7 @@ Every field is a function of the Model, just like `body`. There is no imperative
 
 ### Document Ownership
 
-An `ApplicationComposition.assembleElement` view returns `Html` directly. An embedded app does not own the page, so it cannot declare the title or document metadata. Everything outside this section applies to both kinds of view. See [Runtime](/core/runtime#to-element) for when to use each one.
+A root Block passed to `Program.makeElement` has a view that returns `Html` directly. An embedded app does not own the page, so it cannot declare the title or document metadata. Everything outside this section applies to both kinds of view. See [Runtime](/core/runtime#to-element) for when to use each one.
 
 ### Language and Direction
 
@@ -89,7 +89,7 @@ Every view receives `h`, an `HtmlBuilder` typed to the application's Message uni
 
 The Message type follows the builder. If `h.OnClick` receives a Message outside the application union, TypeScript rejects it. The root Runtime supplies its builder, and each Block Composition's `makeView` supplies one for its child view.
 
-The builder also carries the Mount definitions and child Blocks the view may render. A Composition infers them from its local Mounts and child Bindings, and `ApplicationComposition.assembleApplication` installs the root Composition's complete registry. See [Mount requirements in reusable views](/core/mount#mount-requirements-in-reusable-views) for child views and attribute slots.
+The builder also carries the Mount definitions and child Blocks the view may render. A Composition infers them from its local Mounts and child Bindings. `ApplicationComposition.prepareBlock` packages the root registry into the opaque draft, and `Block.assemble` installs it on the completed root Block. See [Mount requirements in reusable views](/core/mount#mount-requirements-in-reusable-views) for child views and attribute slots.
 
 #### Element Builder Arity
 
@@ -105,7 +105,11 @@ The owner prefix identifies the specific Composition at a plain type import site
 
 ::Snippet{name="featureViewHelpers" label="View helpers within a feature"}
 
-Rendering functions that are genuinely shared across owners should keep taking the caller's general `HtmlBuilder<Message>`. A shared helper that forwards attributes, a view callback, child embeddings, or Mounts can introduce an `AllowedMountRequirements` generic to preserve the caller's capability. Introduce a `ParentMessage` generic when the helper accepts any parent Message universe.
+A rendering helper shared across Compositions takes a generic `ParentMessage` and the caller's `HtmlBuilder<ParentMessage>`. Both a root view and a child view can call this heading helper with their own `h`; TypeScript infers the Message type at each call:
+
+::Snippet{name="viewSharedHelper" label="Sharing a view helper across Compositions"}
+
+The heading uses only ordinary elements and attributes. A helper that forwards Mount attributes, a view callback, or child embeddings may also need an `AllowedMountRequirements` generic to preserve those capabilities. Keep that extra parameter only when the helper needs it. Helpers tied to one feature continue to use that Composition's `FeatureViewBuilder`.
 
 ### Inert HTML
 
@@ -155,6 +159,8 @@ A handler can do more than return a one-line Message. The constraint is purity, 
 ::Snippet{name="eventHandlingComplex" label="Complex handler"}
 
 For `OnKeyDownPreventDefault`, returning `Some` claims the key. Foldkit suppresses the browser's default action and dispatches the Message. Returning `None` leaves the key to the browser.
+
+Every `OnKeyDown` attribute leaves a keydown alone while an input method is still composing. Foldkit does not call the handler and does not suppress the browser default, so Enter can confirm a Japanese, Chinese, or Korean conversion.
 
 ### Self-Targeted Keydowns
 

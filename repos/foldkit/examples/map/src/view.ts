@@ -15,9 +15,9 @@ import { MountMap } from './mount'
 const HOST_ID = 'map-host-1'
 
 const filterLocations = (
-  locations: ReadonlyArray<Location>,
+  locations: ReadonlyArray<typeof Location.Type>,
   query: string,
-): ReadonlyArray<Location> => {
+): ReadonlyArray<typeof Location.Type> => {
   const trimmed = query.trim().toLowerCase()
   if (String.isEmpty(trimmed)) {
     return locations
@@ -43,7 +43,10 @@ export const view = ApplicationComposition.makeView((model, h) => ({
   ),
 }))
 
-const sidebarView = (model: Model, h: ApplicationViewBuilder): Html => {
+const sidebarView = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+): Html => {
   const visible = filterLocations(model.locations, model.searchQuery)
   return h.aside(
     [
@@ -117,7 +120,7 @@ const emptySidebarView = (
 
 const locationListItemView =
   (maybeSelectedId: Option.Option<string>) =>
-  (location: Location, h: ApplicationViewBuilder): Html => {
+  (location: typeof Location.Type, h: ApplicationViewBuilder): Html => {
     const isSelected = Option.exists(maybeSelectedId, Equal.equals(location.id))
     return h.li(
       [],
@@ -154,7 +157,10 @@ const locationListItemView =
     )
   }
 
-const footerView = (model: Model, h: ApplicationViewBuilder): Html => {
+const footerView = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+): Html => {
   const isLocating = model.geolocateState._tag === 'Locating'
   return h.div(
     [h.Class('border-t border-slate-200 px-5 py-3 space-y-2')],
@@ -188,7 +194,10 @@ const footerView = (model: Model, h: ApplicationViewBuilder): Html => {
   )
 }
 
-const mapPaneView = (model: Model, h: ApplicationViewBuilder): Html =>
+const mapPaneView = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+): Html =>
   h.main(
     [h.Class('flex-1 relative')],
     [
@@ -224,7 +233,7 @@ const mapErrorBannerView = (
   })
 
 const boundsBadgeView = (
-  maybeBounds: Option.Option<Bounds>,
+  maybeBounds: Option.Option<typeof Bounds.Type>,
   h: ApplicationViewBuilder,
 ): Html =>
   Option.match(maybeBounds, {
@@ -246,7 +255,7 @@ const boundsBadgeView = (
   })
 
 const geolocateOverlayView = (
-  state: GeolocateState,
+  state: typeof GeolocateState.Type,
   h: ApplicationViewBuilder,
 ): Html =>
   GeolocateState.match(state, {

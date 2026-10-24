@@ -13,7 +13,7 @@ import { DietListboxBlock, type Model, PeriodListboxBlock } from './model'
 import { ApplicationRoute, Sorting, browseRouter } from './route'
 import { update } from './update'
 
-const browseModel: Model = {
+const browseModel: typeof Model.Type = {
   route: ApplicationRoute.Browse({
     search: Option.none(),
     sorting: Sorting.Unsorted(),

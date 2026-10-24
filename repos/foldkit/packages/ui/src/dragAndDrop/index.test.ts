@@ -731,6 +731,52 @@ describe('DragAndDrop', () => {
       ).toThrow('no matching pending Command was found')
     })
 
+    it('resolveKeyboardMove rejects a pending move for another item', () => {
+      expect(() =>
+        Story.story(
+          update,
+          Story.given(defaultInit()),
+          Story.message(activatedKeyboardDrag),
+          Story.message(
+            Message.PressedArrowKey({ direction: 'NextContainer' }),
+          ),
+          DragAndDropTest.resolveKeyboardMove({
+            itemId: 'item-2',
+            targetContainerId: 'list-2',
+            targetIndex: 3,
+          }),
+        ),
+      ).toThrow('could not find a pending keyboard move for item "item-2"')
+    })
+
+    it('resolveKeyboardMove rejects duplicate pending moves for the item', () => {
+      const updateWithDuplicateMoves = (model: Model, message: Message) => {
+        const dragAndDropUpdate = update(model, message)
+        const commands = dragAndDropUpdate.commands ?? []
+
+        return {
+          ...dragAndDropUpdate,
+          commands: Array.appendAll(commands, commands),
+        }
+      }
+
+      expect(() =>
+        Story.story(
+          updateWithDuplicateMoves,
+          Story.given(defaultInit()),
+          Story.message(activatedKeyboardDrag),
+          Story.message(
+            Message.PressedArrowKey({ direction: 'NextContainer' }),
+          ),
+          DragAndDropTest.resolveKeyboardMove({
+            itemId: 'item-1',
+            targetContainerId: 'list-2',
+            targetIndex: 3,
+          }),
+        ),
+      ).toThrow('Isolate one pending move in this Story')
+    })
+
     it('resolveKeyboardMove rejects a missing move Command', () => {
       expect(() =>
         Story.story(
@@ -743,7 +789,7 @@ describe('DragAndDrop', () => {
             targetIndex: 3,
           }),
         ),
-      ).toThrow('no matching pending Command was found')
+      ).toThrow('could not find a pending keyboard move')
     })
 
     it('resolveKeyboardMove rejects a move that omits its focus Command', () => {

@@ -208,7 +208,9 @@ Put the local Message constructor directly under `operations` when its payload i
 
 ::Snippet{name="antiPatternBlockBoundaryGood" label="✅ A public helper preserves the child's update boundary"}
 
-The Binding writes the returned child Model into the parent, maps its Commands, and applies the required `outMessage.fold` or `outMessage.forward` policy. The [Block guide](/core/block) explains child Messages and OutMessages. [Informing Blocks](/patterns/informing-blocks) covers parent-owned facts that a child needs to hear about.
+This excerpt focuses on the operation and its parent call. It omits the completed export's producer/header annotation; use the [matching checked assembly boundary](/patterns/project-organization#keep-model-schema-dependencies-small) in the feature module.
+
+The Binding writes the returned child Model into the parent, maps its Commands, and applies the required `fold` or `forward` selected through `withOutMessagePolicy`. The [Block guide](/core/block) explains child Messages and OutMessages. [Informing Blocks](/patterns/informing-blocks) covers parent-owned facts that a child needs to hear about.
 
 ## Initialize Children Through Their Connections
 
@@ -234,7 +236,7 @@ Store Search and Editor in required direct fields and omit `init`. Return the pa
 
 ::Snippet{name="updateIndependentInits" label="✅ Initialize independent child Bindings together"}
 
-Each Binding declares whether a child OutMessage is handled locally, forwarded upward, or both. If several restoration Steps emit parent OutMessages during one `Update.combine`, the last emitted parent OutMessage wins; split the operations when each fact must be observed independently.
+Each Binding declares whether a child OutMessage is handled locally, forwarded upward, or both. If several restoration Steps emit parent OutMessages during one `Update.combineSteps`, the last emitted parent OutMessage wins; split the operations when each fact must be observed independently.
 
 ## Know What Linting Can Catch {#what-linting-can-catch}
 

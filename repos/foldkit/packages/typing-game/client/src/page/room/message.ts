@@ -36,4 +36,3 @@ export const Message = defineMessageUnion({
   InformedOfJoin: { player: Shared.Player },
   SucceededJoinRoom: { player: Shared.Player },
 })
-export type Message = typeof Message.Type

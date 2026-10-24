@@ -23,5 +23,3 @@ export const Message = defineMessageUnion({
   CompletedLockBodyScroll: {},
   CompletedUnlockBodyScroll: {},
 })
-
-export type Message = typeof Message.Type

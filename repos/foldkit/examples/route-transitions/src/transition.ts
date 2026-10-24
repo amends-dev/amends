@@ -4,23 +4,24 @@ import { Transition } from 'foldkit/route'
 import { modifyFields } from 'foldkit/struct'
 
 import { LoadCatalog, LoadPainting, SaveDraft } from './command'
+import { ApplicationDefinition } from './definition'
 import { type LoggedTransition, type Model, PaintingStatus } from './model'
 import { type ApplicationRoute } from './route'
 
 const MAX_LOGGED_TRANSITIONS = 20
 
-export type AppTransition = Transition.Transition<ApplicationRoute>
+export type AppTransition = Transition.Transition<typeof ApplicationRoute.Type>
 
 const nextSequenceNumber = (
-  transitionLog: ReadonlyArray<LoggedTransition>,
+  transitionLog: ReadonlyArray<typeof LoggedTransition.Type>,
 ): number =>
   Option.match(Array.head(transitionLog), {
     onNone: () => 1,
     onSome: newestEntry => newestEntry.sequenceNumber + 1,
   })
 
-const logTransition = (transition: AppTransition) => (model: Model) => ({
-  model: modifyFields(model, {
+const logTransition = (transition: AppTransition) =>
+  ApplicationDefinition.makeFieldsStep(() => ({
     transitionLog: transitionLog =>
       pipe(
         transitionLog,
@@ -31,62 +32,59 @@ const logTransition = (transition: AppTransition) => (model: Model) => ({
         }),
         Array.take(MAX_LOGGED_TRANSITIONS),
       ),
-  }),
-})
+  }))
 
-const loadCatalogOnGalleryEntry =
-  (transition: AppTransition) => (model: Model) =>
+const loadCatalogOnGalleryEntry = (transition: AppTransition) =>
+  ApplicationDefinition.makeStep(model =>
     Transition.isEntering(transition, 'Gallery') &&
     model.catalogStatus !== 'Loading'
       ? {
           model: modifyFields(model, { catalogStatus: () => 'Loading' }),
           commands: [LoadCatalog()],
         }
-      : { model }
+      : { model },
+  )
 
-const loadPaintingOnEntry = (transition: AppTransition) => (model: Model) =>
-  Option.match(Transition.entered(transition, 'Painting'), {
-    onNone: () => ({ model }),
-    onSome: ({ paintingId }) => ({
-      model: modifyFields(model, {
-        paintingStatus: () => PaintingStatus.Loading({ paintingId }),
-      }),
-      commands: [LoadPainting({ paintingId })],
+const keepModel = ApplicationDefinition.makeNoopStep()
+
+const loadPainting = (paintingId: number) =>
+  ApplicationDefinition.makeStep(model => ({
+    model: modifyFields(model, {
+      paintingStatus: () => PaintingStatus.Loading({ paintingId }),
     }),
-  })
+    commands: [LoadPainting({ paintingId })],
+  }))
 
-const reloadPaintingOnIdChange =
-  (transition: AppTransition) => (model: Model) =>
-    Option.match(Transition.stayed(transition, 'Painting'), {
-      onNone: () => ({ model }),
-      onSome: ({ previousRoute, nextRoute }) =>
+type PaintingRouteStep = typeof keepModel | ReturnType<typeof loadPainting>
+
+const reconcilePaintingRoute = (transition: AppTransition) =>
+  Transition.matchOrElse<PaintingRouteStep>()(
+    transition,
+    'Painting',
+    {
+      Entered: ({ paintingId }) => loadPainting(paintingId),
+      Stayed: ({ previousRoute, nextRoute }) =>
         previousRoute.paintingId === nextRoute.paintingId
-          ? { model }
-          : {
-              model: modifyFields(model, {
-                paintingStatus: () =>
-                  PaintingStatus.Loading({
-                    paintingId: nextRoute.paintingId,
-                  }),
-              }),
-              commands: [LoadPainting({ paintingId: nextRoute.paintingId })],
-            },
-    })
+          ? keepModel
+          : loadPainting(nextRoute.paintingId),
+    },
+    () => keepModel,
+  )
 
-const saveDraftOnStudioExit = (transition: AppTransition) => (model: Model) =>
-  Option.match(Transition.exited(transition, 'Studio'), {
-    onNone: () => ({ model }),
-    onSome: () =>
-      model.studioDraft === ''
-        ? { model }
-        : { model, commands: [SaveDraft({ draft: model.studioDraft })] },
-  })
+const saveDraftOnStudioExit = (transition: AppTransition) =>
+  ApplicationDefinition.makeStep(model =>
+    Transition.isExiting(transition, 'Studio') && model.studioDraft !== ''
+      ? { model, commands: [SaveDraft({ draft: model.studioDraft })] }
+      : { model },
+  )
 
-export const handleTransition = (model: Model, transition: AppTransition) =>
-  Update.combine(model, [
+export const handleTransition = (
+  model: typeof Model.Type,
+  transition: AppTransition,
+) =>
+  Update.combineSteps(model, [
     logTransition(transition),
     loadCatalogOnGalleryEntry(transition),
-    loadPaintingOnEntry(transition),
-    reloadPaintingOnIdChange(transition),
+    reconcilePaintingRoute(transition),
     saveDraftOnStudioExit(transition),
   ])

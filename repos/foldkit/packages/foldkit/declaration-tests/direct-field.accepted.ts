@@ -11,25 +11,30 @@ const ChildDefinition = Block.makeDefinition('DeclaredDirectFieldChild', {
   Model: ChildModel,
   Message: ChildMessage,
 })
-const setCount = ChildDefinition.step((model, count: number) => ({
+const setCount = ChildDefinition.makeStep((model, count: number) => ({
   model: Struct.modifyFields(model, { count: () => count }),
 }))
 const DeclaredDirectFieldChildComposition = ChildDefinition.makeComposition()
 const childUpdate = DeclaredDirectFieldChildComposition.makeUpdate(
   (model, { count }) => setCount(model, count),
 )
-export const childBlock = DeclaredDirectFieldChildComposition.assembleBlock({
-  init: DeclaredDirectFieldChildComposition.makeInit(() => ({
-    model: ChildModel.make({ count: 0 }),
-  })),
-  update: childUpdate,
-  operations: {
-    setCount: (count: number) => [ChildMessage.UpdatedCount({ count })],
-  },
-  EffectsLayer: Layer.empty,
-})
-export const argumentChildBlock =
-  DeclaredDirectFieldChildComposition.assembleBlock({
+const prepareChildBlock = () =>
+  DeclaredDirectFieldChildComposition.prepareBlock({
+    init: DeclaredDirectFieldChildComposition.makeInit(() => ({
+      model: ChildModel.make({ count: 0 }),
+    })),
+    update: childUpdate,
+    operations: {
+      setCount: (count: number) => [ChildMessage.UpdatedCount({ count })],
+    },
+    EffectsLayer: Layer.empty,
+  })
+export const childBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ChildModel,
+  typeof prepareChildBlock
+> = Block.assemble(prepareChildBlock)
+const prepareArgumentChildBlock = () =>
+  DeclaredDirectFieldChildComposition.prepareBlock({
     init: DeclaredDirectFieldChildComposition.makeInit((count: number) => ({
       model: ChildModel.make({ count }),
     })),
@@ -39,6 +44,10 @@ export const argumentChildBlock =
     },
     EffectsLayer: Layer.empty,
   })
+export const argumentChildBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ChildModel,
+  typeof prepareArgumentChildBlock
+> = Block.assemble(prepareArgumentChildBlock)
 export const NestedOptionChildModel = Schema.Option(ChildModel)
 // eslint-disable-next-line foldkit/block-name-matches-variable
 
@@ -49,8 +58,8 @@ const DeclaredNestedOptionChildComposition = Block.makeDefinition(
     Message: ChildMessage,
   },
 ).makeComposition()
-export const nestedOptionChildBlock =
-  DeclaredNestedOptionChildComposition.assembleBlock({
+const prepareNestedOptionChildBlock = () =>
+  DeclaredNestedOptionChildComposition.prepareBlock({
     init: DeclaredNestedOptionChildComposition.makeInit(() => ({
       model: Option.none(),
     })),
@@ -59,6 +68,10 @@ export const nestedOptionChildBlock =
     })),
     EffectsLayer: Layer.empty,
   })
+export const nestedOptionChildBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof NestedOptionChildModel,
+  typeof prepareNestedOptionChildBlock
+> = Block.assemble(prepareNestedOptionChildBlock)
 export const ArrayChildModel = Schema.Array(Schema.String)
 // eslint-disable-next-line foldkit/block-name-matches-variable
 
@@ -69,13 +82,18 @@ const DeclaredArrayChildComposition = Block.makeDefinition(
     Message: ChildMessage,
   },
 ).makeComposition()
-export const arrayChildBlock = DeclaredArrayChildComposition.assembleBlock({
-  init: DeclaredArrayChildComposition.makeInit(() => ({
-    model: ArrayChildModel.make([]),
-  })),
-  update: DeclaredArrayChildComposition.makeUpdate(model => ({ model })),
-  EffectsLayer: Layer.empty,
-})
+const prepareArrayChildBlock = () =>
+  DeclaredArrayChildComposition.prepareBlock({
+    init: DeclaredArrayChildComposition.makeInit(() => ({
+      model: ArrayChildModel.make([]),
+    })),
+    update: DeclaredArrayChildComposition.makeUpdate(model => ({ model })),
+    EffectsLayer: Layer.empty,
+  })
+export const arrayChildBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ArrayChildModel,
+  typeof prepareArrayChildBlock
+> = Block.assemble(prepareArrayChildBlock)
 export const Model = Schema.Struct({
   child: ChildModel,
   argumentChild: ChildModel,
@@ -98,39 +116,42 @@ export const ParentDefinition = Block.makeDefinition(
     Message: ParentMessage,
   },
 )
-export const RequiredBinding = ParentDefinition.bindChild(childBlock, {
+export const RequiredBinding = ParentDefinition.makeBinding(childBlock, {
   field: 'child',
 })
-export const OptionalBinding = ParentDefinition.bindChild(childBlock, {
+export const OptionalBinding = ParentDefinition.makeBinding(childBlock, {
   field: 'maybeChild',
   presentWhen: model => model.route === 'Home',
 })
-export const SuspendedOptionalBinding = ParentDefinition.bindChild(childBlock, {
-  field: 'suspendedMaybeChild',
-})
-export const NestedRequiredBinding = ParentDefinition.bindChild(
+export const SuspendedOptionalBinding = ParentDefinition.makeBinding(
+  childBlock,
+  {
+    field: 'suspendedMaybeChild',
+  },
+)
+export const NestedRequiredBinding = ParentDefinition.makeBinding(
   nestedOptionChildBlock,
   {
     field: 'nestedChild',
   },
 )
-export const NestedOptionalBinding = ParentDefinition.bindChild(
+export const NestedOptionalBinding = ParentDefinition.makeBinding(
   nestedOptionChildBlock,
   {
     field: 'maybeNestedChild',
   },
 )
-export const ArrayChildBinding = ParentDefinition.bindChild(arrayChildBlock, {
+export const ArrayChildBinding = ParentDefinition.makeBinding(arrayChildBlock, {
   field: 'arrayChild',
 })
-export const CustomIgnoredMessageBinding = ParentDefinition.bindChild(
+export const CustomIgnoredMessageBinding = ParentDefinition.makeBinding(
   childBlock,
   {
     placement: 'customIgnoredMessage',
     field: 'suspendedMaybeChild',
   },
 )
-export const InitializedRequiredBinding = ParentDefinition.bindChild(
+export const InitializedRequiredBinding = ParentDefinition.makeBinding(
   childBlock,
   {
     field: 'child',
@@ -138,7 +159,7 @@ export const InitializedRequiredBinding = ParentDefinition.bindChild(
     init: true,
   },
 )
-export const InitializedArgumentBinding = ParentDefinition.bindChild(
+export const InitializedArgumentBinding = ParentDefinition.makeBinding(
   argumentChildBlock,
   {
     field: 'argumentChild',
@@ -147,7 +168,7 @@ export const InitializedArgumentBinding = ParentDefinition.bindChild(
     },
   },
 )
-export const InitializedOptionalBinding = ParentDefinition.bindChild(
+export const InitializedOptionalBinding = ParentDefinition.makeBinding(
   argumentChildBlock,
   {
     field: 'maybeArgumentChild',
@@ -162,7 +183,7 @@ export const InitializedOptionalBinding = ParentDefinition.bindChild(
     },
   },
 )
-export const NativeTupleOptionalBinding = ParentDefinition.bindChild(
+export const NativeTupleOptionalBinding = ParentDefinition.makeBinding(
   argumentChildBlock,
   {
     field: 'maybeArgumentChild',
@@ -173,7 +194,7 @@ export const NativeTupleOptionalBinding = ParentDefinition.bindChild(
     },
   },
 )
-export const InitializedCustomBinding = ParentDefinition.bindChild(
+export const InitializedCustomBinding = ParentDefinition.makeBinding(
   argumentChildBlock,
   {
     placement: 'initializedCustom',
@@ -212,11 +233,16 @@ export const initialize = initialComposition.makeInit(
     },
   }),
 )
-export const initializedBlock = initialComposition.assembleBlock({
-  init: initialize,
-  update: initialComposition.makeUpdate(model => ({ model })),
-  EffectsLayer: Layer.empty,
-})
+const prepareInitializedBlock = () =>
+  initialComposition.prepareBlock({
+    init: initialize,
+    update: initialComposition.makeUpdate(model => ({ model })),
+    EffectsLayer: Layer.empty,
+  })
+export const initializedBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof Model,
+  typeof prepareInitializedBlock
+> = Block.assemble(prepareInitializedBlock)
 // eslint-disable-next-line foldkit/block-name-matches-variable
 export const composition = ParentDefinition.makeComposition({
   bindings: [
@@ -260,7 +286,7 @@ const folded = foldOptional(
 )
 void result
 void folded
-export const CustomBinding = ParentDefinition.bindChild(childBlock, {
+export const CustomBinding = ParentDefinition.makeBinding(childBlock, {
   placement: 'custom',
   read: model =>
     model.route === 'Home' ? Option.some(model.child) : Option.none(),
@@ -279,7 +305,7 @@ const GeneratedParentDefinition = Block.makeDefinition(
     Message: GeneratedParentMessage,
   },
 )
-export const GeneratedChildBinding = GeneratedParentDefinition.bindChild(
+export const GeneratedChildBinding = GeneratedParentDefinition.makeBinding(
   childBlock,
   { field: 'child' },
 )
@@ -309,13 +335,13 @@ const CallableParentDefinition = Block.makeDefinition(
     Message: CallableParentMessage,
   },
 )
-export const CallableRequiredBinding = CallableParentDefinition.bindChild(
+export const CallableRequiredBinding = CallableParentDefinition.makeBinding(
   childBlock,
   {
     field: 'child',
   },
 )
-export const CallableOptionalBinding = CallableParentDefinition.bindChild(
+export const CallableOptionalBinding = CallableParentDefinition.makeBinding(
   childBlock,
   {
     field: 'maybeChild',

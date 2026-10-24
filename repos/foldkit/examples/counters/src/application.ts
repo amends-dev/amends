@@ -1,21 +1,19 @@
 import { Array, Number, Schema, Tuple } from 'effect'
-import { makeApplicationDefinition } from 'foldkit'
-import type { Block } from 'foldkit'
+import { Block } from 'foldkit'
 import { Html } from 'foldkit/html'
 import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
 
 import { Button } from '@foldkit/ui'
 
-import { CounterBlock } from './counter'
+import * as Counter from './counter'
 
 const INITIAL_COUNTER_COUNT = 3
 
 const CounterInstance = Schema.Struct({
   id: Schema.String,
-  counter: CounterBlock.Model,
+  counter: Counter.CounterBlock.Model,
 })
-type CounterInstance = typeof CounterInstance.Type
 
 export const Model = Schema.Struct({
   counters: Schema.Array(CounterInstance),
@@ -27,24 +25,27 @@ export const Message = defineMessageUnion({
   ClickedRemoveCounter: { id: Schema.String },
 })
 
-export const ApplicationDefinition = makeApplicationDefinition({
+export const ApplicationDefinition = Block.makeDefinition('Application', {
   Model,
   Message,
 })
 
-export const CountersBinding = ApplicationDefinition.bindChild(CounterBlock, {
-  field: 'counters',
-  key: 'id',
-  childField: 'counter',
-  init: {
-    instances: () =>
-      Array.makeBy(INITIAL_COUNTER_COUNT, counterId => ({
-        key: `counter-${counterId}`,
-        args: Tuple.make(),
-      })),
-    toItem: ({ key }, counter) => ({ id: key, counter }),
+export const CountersBinding = ApplicationDefinition.makeBinding(
+  Counter.CounterBlock,
+  {
+    field: 'counters',
+    key: 'id',
+    childField: 'counter',
+    init: {
+      instances: () =>
+        Array.makeBy(INITIAL_COUNTER_COUNT, counterId => ({
+          key: `counter-${counterId}`,
+          args: Tuple.make(),
+        })),
+      toItem: ({ key }, counter) => ({ id: key, counter }),
+    },
   },
-})
+)
 
 export const ApplicationComposition = ApplicationDefinition.makeComposition({
   bindings: [CountersBinding],
@@ -80,7 +81,7 @@ export const init = ApplicationComposition.makeInit(() => ({
 }))
 
 const counterInstanceView = (
-  counterInstance: CounterInstance,
+  counterInstance: typeof CounterInstance.Type,
   h: ApplicationViewBuilder,
 ): Html =>
   h.keyed('div')(
@@ -159,3 +160,14 @@ export const view = ApplicationComposition.makeView((model, h) => ({
     ],
   ),
 }))
+
+const prepare = () =>
+  ApplicationComposition.prepareBlock({
+    init,
+    update,
+    view,
+  })
+export const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

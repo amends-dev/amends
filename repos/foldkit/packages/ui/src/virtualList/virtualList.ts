@@ -194,8 +194,6 @@ export const OutMessage = defineMessageUnion({
   ObservedContainerScroll: ContainerScrollObservation.fields,
 })
 
-export type OutMessage = typeof OutMessage.Type
-
 const VirtualListDefinition = Block.makeDefinition('VirtualList', {
   Model,
   Message,
@@ -495,7 +493,7 @@ const scrollTopForRequest = (
 
 const mountedContainers = new Map<string, Set<HTMLElement>>()
 
-export const ApplyScroll = VirtualListDefinition.command('ApplyScroll', {
+export const ApplyScroll = VirtualListDefinition.makeCommand('ApplyScroll', {
   args: {
     id: Schema.String,
     request: ScrollRequest,
@@ -568,7 +566,7 @@ export type ScrollToOptions = Readonly<{
 }>
 
 const buildScrollRequest = (request: typeof ScrollRequest.Type) =>
-  VirtualListDefinition.step(model => {
+  VirtualListDefinition.makeStep(model => {
     const nextVersion = Number.increment(model.pendingScrollVersion)
     return {
       model: modifyFields(model, {
@@ -597,8 +595,9 @@ const currentScrollRequest = (model: Model): typeof ScrollRequest.Type =>
     Pending: ({ request }) => request,
   })
 
-const reconcileLayout = (model: Model) =>
-  buildScrollRequest(currentScrollRequest(model))(model)
+const reconcileLayout = VirtualListDefinition.makeStep(model =>
+  buildScrollRequest(currentScrollRequest(model)),
+)
 
 const anchorFromSnapshot = (
   model: Model,
@@ -658,18 +657,20 @@ const measureContainer = (
     Unmeasured: () => false,
     Measured: measurement => measurement.containerWidth !== containerWidth,
   })
-  const recordContainerMeasurement = VirtualListDefinition.stepFields(() => ({
-    measurement: () =>
-      Measurement.Measured({ containerWidth, containerHeight }),
-    measuredRowHeights: measuredRowHeights =>
-      didWidthChange ? Record.empty() : measuredRowHeights,
-    layoutVersion: layoutVersion =>
-      didWidthChange ? Number.increment(layoutVersion) : layoutVersion,
-  }))
+  const recordContainerMeasurement = VirtualListDefinition.makeFieldsStep(
+    () => ({
+      measurement: () =>
+        Measurement.Measured({ containerWidth, containerHeight }),
+      measuredRowHeights: measuredRowHeights =>
+        didWidthChange ? Record.empty() : measuredRowHeights,
+      layoutVersion: layoutVersion =>
+        didWidthChange ? Number.increment(layoutVersion) : layoutVersion,
+    }),
+  )
 
   const { initialScroll } = model
   if (initialScroll._tag === 'Pending') {
-    return Update.combine(model, [
+    return Update.combineSteps(model, [
       recordContainerMeasurement,
       buildScrollRequest(
         ScrollRequest.Target({
@@ -684,7 +685,10 @@ const measureContainer = (
     return recordContainerMeasurement(model)
   }
 
-  return Update.combine(model, [recordContainerMeasurement, reconcileLayout])
+  return Update.combineSteps(model, [
+    recordContainerMeasurement,
+    reconcileLayout,
+  ])
 }
 
 const hasChangedMeasurement = (
@@ -730,12 +734,10 @@ const applyRowMeasurements = (
     (heights, measurement) =>
       Record.set(heights, measurement.key, measurement.height),
   )
-  return Update.combine(model, [
-    stepModel => ({
-      model: modifyFields(stepModel, {
-        measuredRowHeights: () => measuredRowHeights,
-      }),
-    }),
+  return Update.combineSteps(model, [
+    VirtualListDefinition.makeFieldsStep(() => ({
+      measuredRowHeights: () => measuredRowHeights,
+    })),
     reconcileLayout,
   ])
 }
@@ -821,12 +823,10 @@ const requestScroll = (
   target: ScrollTarget,
   maybeAlignment: Option.Option<ScrollAlignment>,
 ) =>
-  Update.combine(model, [
-    stepModel => ({
-      model: modifyFields(stepModel, {
-        initialScroll: () => InitialScroll.Applied(),
-      }),
-    }),
+  Update.combineSteps(model, [
+    VirtualListDefinition.makeFieldsStep(() => ({
+      initialScroll: () => InitialScroll.Applied(),
+    })),
     buildScrollRequest(
       ScrollRequest.Target({
         target,
@@ -837,15 +837,13 @@ const requestScroll = (
 
 const applyItemsChange = (model: Model, itemKeys: ReadonlyArray<string>) => {
   const currentKeys = HashSet.fromIterable(itemKeys)
-  return Update.combine(model, [
-    stepModel => ({
-      model: modifyFields(stepModel, {
-        measuredRowHeights: Record.filter((_, key) =>
-          HashSet.has(currentKeys, key),
-        ),
-        layoutVersion: Number.increment,
-      }),
-    }),
+  return Update.combineSteps(model, [
+    VirtualListDefinition.makeFieldsStep(() => ({
+      measuredRowHeights: Record.filter((_, key) =>
+        HashSet.has(currentKeys, key),
+      ),
+      layoutVersion: Number.increment,
+    })),
     reconcileLayout,
   ])
 }
@@ -1279,7 +1277,7 @@ const observeVirtualList = (
 
 /** Container-owned Mount that tracks scrolling, container resizing, and
  *  rendered row measurements for dynamic-height lists. */
-export const ObserveVirtualList = VirtualListDefinition.mountStream(
+export const ObserveVirtualList = VirtualListDefinition.makeMountStream(
   'ObserveVirtualList',
   {
     args: { id: Schema.String },
@@ -1542,14 +1540,19 @@ const operations = {
   requestScrollToEnd: Message.RequestedScrollToEnd,
 }
 
+const prepareVirtualListBlock = () =>
+  VirtualListComposition.prepareBlock({
+    init,
+    update,
+    view: viewImpl,
+    operations,
+    EffectsLayer,
+  })
 /** Complete VirtualList Block definition using an unknown item type. */
-export const block = VirtualListComposition.assembleBlock({
-  init,
-  update,
-  view: viewImpl,
-  operations,
-  EffectsLayer,
-})
+export const block: Block.FromAssemblyWithViewAndOutMessage<
+  typeof Model,
+  typeof prepareVirtualListBlock
+> = Block.assemble(prepareVirtualListBlock)
 
 /** Programmatically scrolls to a logical target. */
 export const scrollTo = block.operations.requestScrollTo
@@ -1595,5 +1598,11 @@ export interface Completed<Item> extends Block.CompletedWithViewAndOutMessage<
 export const create = <Item>(): Completed<Item> => {
   const { composition, implementation } = makeBlockParts<Item>()
 
-  return composition.assembleBlock(implementation)
+  const prepare = () => composition.prepareBlock(implementation)
+  const completedBlock: Block.FromAssemblyWithViewAndOutMessage<
+    typeof Model,
+    typeof prepare
+  > = Block.assemble(prepare)
+
+  return completedBlock
 }

@@ -10,7 +10,7 @@ Embed Combobox via the [`Combobox.create(Item)` factory](/ui/selection-blocks) a
 
 What the factory returns is typed [`Completed<Item>` from `@foldkit/ui/combobox`](/ui/selection-blocks#completed-type). The multi-select subpath exports its own `Completed<Item>` type for cases where a created Block has to be named.
 
-Call `ParentDefinition.bindChild` with the completed Block, its parent Model `field` and an exhaustive OutMessage policy. Use explicit accessors for custom storage. Include the resulting Binding in the parent Composition's `bindings` list to collect the Combobox's handlers and Mounts. `binding.embedView` supplies the canonical view and Message wrapper at the render site. See [Connecting a static placement](/core/block#embedding) for the complete authoring flow. Use `Combobox.create(Schema.String)` for plain strings; `Combobox.create(Item)` requires the Item Schema.
+Call `ParentDefinition.makeBinding` with the completed Block, its parent Model `field` and an exhaustive OutMessage policy. Use explicit accessors for custom storage. Include the resulting Binding in the parent Composition's `bindings` list to collect the Combobox's handlers and Mounts. `binding.embedView` supplies the canonical view and Message wrapper at the render site. See [Connecting a static placement](/core/block#embedding) for the complete authoring flow. Use `Combobox.create(Schema.String)` for plain strings; `Combobox.create(Item)` requires the Item Schema.
 
 ### Programmatic API
 
@@ -135,6 +135,8 @@ Focus stays on the input while arrow keys navigate items via `aria-activedescend
 | `Escape`           | Closes the dropdown.                                                                                                 |
 | `Type a character` | Filters the items list. You control filtering in your view by passing filtered items. Frozen when isReadOnly is set. |
 
+While an input method is composing, these keys stay with the composition. Enter confirms the conversion instead of selecting the active item.
+
 Opening, closing, and arrow, `Home`, and `End` navigation are unaffected by `isReadOnly`. See [Read-Only](#read-only).
 
 ### Empty Results
@@ -159,7 +161,7 @@ Two view input fields cover the cases a `<label for>` does not. Pass `ariaLabel`
 
 ### InitConfig {#init-config}
 
-Configuration object passed to `Combobox.init()` or `Combobox.Multi.init()`.
+Configuration passed to the Binding for the completed Block returned by `Combobox.create(Item)` or `Combobox.Multi.create(Item)`.
 
 The Binding’s `init` accepts the same configuration in its child argument tuple: `ComboboxBinding.init({ args: [config], toParentModel })`. It returns a passive initialization recipe with no `.model` or `.commands` fields. Return that recipe from the registered Composition’s `makeInit` or `makeUpdate` callback, or preserve it through a Definition-owned Step; checked execution constructs the parent Model and retains the child Commands.
 
@@ -209,9 +211,9 @@ Pass the child Model as `model` and these fields as `viewInputs` to the composed
 
 ### OutMessage {#out-message}
 
-The child update and programmatic API return these facts through their optional `outMessage` field. Handle the complete union with the completed Block’s `OutMessage.match` in the Binding’s `outMessage.fold`, or provide an exhaustive `outMessage.forward` policy when facts continue to the current Block’s parent. The same union is exposed by `Combobox.Multi.create(Item)`.
+The child update and programmatic API return these facts through their optional `outMessage` field. Pass the completed Combobox Block to `ParentDefinition.makeOutMessageFold(ComboboxBlock, handlers)` whether the fold is inline or named. The forwarding API remains contextual when inline: use `ParentDefinition.makeOutMessageForward(handlers)` when facts continue to the current Block's parent, and pass the completed Block when extracting the forward. The explicit fold child preserves the exact item type returned by `Combobox.create(Item)` or `Combobox.Multi.create(Item)`.
 
-| Name               | Type              | Default | Description                                                                                                                                                                                                                                                                                                                                                               |
-| ------------------ | ----------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Selected`         | `{ value: Item }` | —       | Emitted when an item is activated. Carries the neutral fact that the item was activated; the parent owns the selection and decides what it means. Single-select stores the value; multi-select toggles the value in and out of its array. Handle it in the Binding's `outMessage.fold` to lift the value into the selection you own. A read-only Combobox never emits it. |
-| `ClearedSelection` | `{}`              | —       | Emitted when a nullable single-select Combobox closes with an empty input, meaning the user cleared it. The parent clears the selection it owns. Multi-select never emits it, since its input rests empty by design. A read-only Combobox never emits it either, so opening and closing one cannot clear the selection.                                                   |
+| Name               | Type              | Default | Description                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------ | ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Selected`         | `{ value: Item }` | —       | Emitted when an item is activated. Carries the neutral fact that the item was activated; the parent owns the selection and decides what it means. Single-select stores the value; multi-select toggles the value in and out of its array. Handle it in the Binding's selected `fold` to lift the value into the selection you own. A read-only Combobox never emits it. |
+| `ClearedSelection` | `{}`              | —       | Emitted when a nullable single-select Combobox closes with an empty input, meaning the user cleared it. The parent clears the selection it owns. Multi-select never emits it, since its input rests empty by design. A read-only Combobox never emits it either, so opening and closing one cannot clear the selection.                                                 |

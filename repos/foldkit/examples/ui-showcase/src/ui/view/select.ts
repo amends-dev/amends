@@ -4,7 +4,6 @@ import { Select } from '@foldkit/ui'
 
 import * as Icon from '../../icon'
 import { UiComposition } from '../composition'
-import type { UiMessage } from '../composition'
 import { Message } from '../message'
 
 const selectClassName =
@@ -28,7 +27,7 @@ export const view = UiComposition.makeView((model, h) => {
   ]
 
   const basicSelectView = (
-    attributes: Select.SelectAttributes<UiMessage>,
+    attributes: Select.SelectAttributes<typeof UiComposition.Message.Type>,
   ): Html =>
     h.div(
       [h.Class('flex flex-col gap-1.5 w-full')],
@@ -52,7 +51,7 @@ export const view = UiComposition.makeView((model, h) => {
     )
 
   const disabledSelectView = (
-    attributes: Select.SelectAttributes<UiMessage>,
+    attributes: Select.SelectAttributes<typeof UiComposition.Message.Type>,
   ): Html =>
     h.div(
       [h.Class('flex flex-col gap-1.5 max-w-sm')],

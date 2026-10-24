@@ -10,8 +10,6 @@ export const ApplicationRoute = defineRouteUnion({
   NotFound: { path: Schema.String },
 })
 
-export type ApplicationRoute = typeof ApplicationRoute.Type
-
 export const LoggedOutRoute = ApplicationRoute.subset([
   'Home',
   'Login',
@@ -22,9 +20,6 @@ export const LoggedInRoute = ApplicationRoute.subset([
   'Settings',
   'NotFound',
 ])
-
-export type LoggedOutRoute = typeof LoggedOutRoute.Type
-export type LoggedInRoute = typeof LoggedInRoute.Type
 
 export const homeRouter = pipe(Route.root, Route.mapTo(ApplicationRoute.Home))
 export const loginRouter = pipe(

@@ -6,17 +6,19 @@ import {
   addSearchToHistory,
   routeSearchText,
 } from './informingBlocksModel'
-import { type PeopleRoute } from './informingBlocksRoute'
+import type { ApplicationRoute } from './informingBlocksRoute'
 
-export const init = PeopleComposition.makeInit((route: PeopleRoute) => {
-  const searchText = routeSearchText(route.searchText)
+export const init = PeopleComposition.makeInit(
+  (route: typeof ApplicationRoute.People.Type) => {
+    const searchText = routeSearchText(route.searchText)
 
-  return {
-    model: Model.make({
-      searchInput: searchText,
-      searchHistory: addSearchToHistory([], searchText),
-      results: SearchResults.Loading(),
-    }),
-    commands: [FetchPeople({ searchText })],
-  }
-})
+    return {
+      model: Model.make({
+        searchInput: searchText,
+        searchHistory: addSearchToHistory([], searchText),
+        results: SearchResults.Loading(),
+      }),
+      commands: [FetchPeople({ searchText })],
+    }
+  },
+)

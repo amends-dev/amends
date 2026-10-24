@@ -53,11 +53,11 @@ The Counter starter begins with these files:
 - `AGENTS.md`: your instructions for AI coding assistants working on the project
 - `FOLDKIT.md`: Foldkit's own conventions for those assistants, [replaced from the current template when you upgrade Foldkit](/ai/overview)
 
-In a small starter, `src/application.ts` calls `makeApplicationDefinition({ Model, Message })` and creates a named `ApplicationComposition`. The Definition authors Commands, Steps, lifecycle behavior, and Bindings; the Composition owns init, update, and the primary view after its child and Mount graph is fixed. Commands, Subscriptions, Mounts, ManagedResources, and their handler recipes stay at that Application boundary. Larger examples move substantial pieces into focused files as the application grows.
+In a small starter, `src/application.ts` calls `Block.makeDefinition('Application', { Model, Message })`, creates a named `ApplicationComposition`, and assembles `ApplicationBlock`. The Definition authors Commands, Steps, lifecycle behavior, and Bindings; the Composition owns init, update, and the primary view after its child and Mount graph is fixed. Commands, Subscriptions, Mounts, ManagedResources, and their handler recipes stay on the root Block. Larger examples move substantial pieces into focused files as the application grows.
 
 ### Runtime Entry
 
-For the Counter starter, `src/entry.ts` imports `ApplicationComposition`, init, update, and view, then completes that same Composition with `assembleApplication`. The returned lowercase `application` is a passive runtime input. A starter whose handlers need application Services defines `ApplicationLayer` in `services.ts`, then the entry calls `application.provide(ApplicationLayer)`. Importing the authoring Definition, completing the runtime input, and providing a Layer remain passive; startup happens only when the Runtime starts the program.
+For the Counter starter, `src/entry.ts` imports `ApplicationBlock` and passes it with the page container to `Program.make`. The returned lowercase `program` is a passive runtime input. A starter whose handlers need application Services defines `ApplicationLayer` in `services.ts`, then the entry calls `program.provide(ApplicationLayer)`. Importing the Block, creating the Program, and providing a Layer remain passive; startup happens only when the Runtime starts the Program.
 
 ### Project Scripts
 

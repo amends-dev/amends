@@ -21,7 +21,7 @@ import * as SnippetDisclosureRenderer from '../snippetDisclosureRenderer'
 import * as Blog from './blog'
 
 type HomeViewInput = Readonly<{
-  model: Model
+  model: typeof Model.Type
   homeModel: typeof HomeBlock.Model.Type
 }>
 
@@ -64,7 +64,7 @@ const homeView = (
   )
 }
 
-const newsletterView = (model: Model, h: ApplicationViewBuilder) =>
+const newsletterView = (model: typeof Model.Type, h: ApplicationViewBuilder) =>
   Marketing.view(
     model,
     {

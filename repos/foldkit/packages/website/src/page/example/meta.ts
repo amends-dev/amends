@@ -39,7 +39,6 @@ export const ExampleSlug = Schema.Literals([
   'personal-blog',
   'livestore',
 ])
-export type ExampleSlug = typeof ExampleSlug.Type
 
 export type LivePreview =
   | 'Spa'
@@ -48,7 +47,7 @@ export type LivePreview =
   | 'Unavailable'
 
 export type ExampleMeta = Readonly<{
-  slug: ExampleSlug
+  slug: typeof ExampleSlug.Type
   title: string
   description: string
   difficulty: Difficulty
@@ -360,7 +359,7 @@ export const examples: ReadonlyArray<ExampleMeta> = [
     description:
       'A Foldkit widget embedded in a plain TypeScript host page through Runtime.embed. The host seeds initial state with Flags, pushes a step value in through an inbound Port, mirrors the count the widget emits through an outbound Port, and mounts and unmounts the widget with dispose. All communication crosses one Schema-typed handle; the host never touches the Model.',
     difficulty: 'Advanced',
-    tags: ['Embedding', 'Ports', 'assembleElement', 'Host Interop'],
+    tags: ['Embedding', 'Ports', 'Program.makeElement', 'Host Interop'],
     hasRouting: false,
     livePreview: 'Spa',
   },
@@ -416,16 +415,17 @@ export const examples: ReadonlyArray<ExampleMeta> = [
   },
 ]
 
-export const exampleSlugs: ReadonlyArray<ExampleSlug> = Array.map(
+export const exampleSlugs: ReadonlyArray<typeof ExampleSlug.Type> = Array.map(
   examples,
   ({ slug }) => slug,
 )
 
-export const runnableExampleSlugs: ReadonlyArray<ExampleSlug> = pipe(
-  examples,
-  Array.filter(example => example.livePreview !== 'Unavailable'),
-  Array.map(({ slug }) => slug),
-)
+export const runnableExampleSlugs: ReadonlyArray<typeof ExampleSlug.Type> =
+  pipe(
+    examples,
+    Array.filter(example => example.livePreview !== 'Unavailable'),
+    Array.map(({ slug }) => slug),
+  )
 
 export const findBySlug = (slug: string): Option.Option<ExampleMeta> =>
   Array.findFirst(examples, example => example.slug === slug)

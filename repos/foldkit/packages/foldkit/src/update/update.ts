@@ -3,6 +3,7 @@ import { Array, type Effect, Function, Option, pipe } from 'effect'
 import { type AsyncData } from '../asyncData/index.js'
 import { type Command, mapMessage, mapMessages } from '../command/index.js'
 import {
+  assertResolvedStep,
   isResultRecipe,
   makeResultRecipe,
   resolveOperationOutput,
@@ -97,6 +98,9 @@ type ConcreteGraphRequirement<Requirement> = 0 extends 1 & Requirement
 /**
  * Carries the exact registered Binding graph available to a Composition callback.
  * Connected Steps require this capability on their Model input.
+ * Apply them inside the Composition's `makeUpdate` or `makeInit` callback.
+ * To define a reusable Step before composition, return the connected Step from
+ * `Definition.makeStep`, or return `Update.combineSteps(steps)` for several Steps.
  */
 export interface GraphCapability<Model, Requirement> {
   readonly [GraphCapabilityTypeId]: readonly [
@@ -664,6 +668,8 @@ type WithOutMessageOutput<Input, OutMessage> =
 /** Adds a known or optional OutMessage to a plain update return while
  *  preserving its Model and Commands. Use this helper when attaching to an
  *  existing return or when the value has the type `OutMessage | undefined`.
+ *  For a reusable Model-preserving Step that only emits a known OutMessage,
+ *  use the owning Definition's `makeOutMessageStep` helper.
  *  `undefined` means that the operation emitted no OutMessage, so the returned
  *  record omits the property.
  *
@@ -671,7 +677,7 @@ type WithOutMessageOutput<Input, OutMessage> =
  *  OutMessage that an update already emitted.
  *
  *  ```ts
- *  const editorSave = Update.combine(model, [writeDraft, clearErrors])
+ *  const editorSave = Update.combineSteps(model, [writeDraft, clearErrors])
  *
  *  return pipe(editorSave, Update.withOutMessage(outMessage))
  *  ```
@@ -720,7 +726,7 @@ export const withOutMessage: {
 )
 
 /** One self-contained edit to the Model paired with the Commands to run:
- *  the unit {@link combine} composes. A step that needs arguments is a
+ *  the unit {@link combineSteps} composes. A step that needs arguments is a
  *  function returning a Step
  *  (`(noteId: NoteId) => Update.Step<Model, Message>`). */
 export type Step<Model, Message, R = never> = (
@@ -763,6 +769,14 @@ type StepsFromReturns<
 
 type CombinedGraphRequirement<Steps extends ReadonlyArray<AnyStep>> =
   GraphRequirementOf<Steps[number]>
+
+type RegisteredCompositionDiagnostic<Input, Model> = [Input] extends [Model]
+  ? unknown
+  : [GraphCapabilityRequirement<Model>] extends [never]
+    ? unknown
+    : Readonly<{
+        'Connected Steps require a Composition registering their Bindings: return Update.combineSteps(steps) from Definition.makeStep instead of applying it to a plain Model': never
+      }>
 
 type ResolvedStepReturn<StepValue> = StepValue extends AnyStep
   ? ResolvedOperationOutput<ReturnOf<StepValue>>
@@ -849,54 +863,60 @@ type CombinedStepRecipe<
   CombinedStepRegistrationEvidence<Steps>
 >
 
-/** Composes a list of update steps into one. Each step runs against the
- *  Model the previous step produced, and every step's Commands are
- *  concatenated into a single batch, in step order.
+/**
+ * Composes a list of update Steps into one. Each Step runs against the Model
+ * the previous Step produced. Their Commands form one batch for the Runtime,
+ * which runs them independently. Array order does not sequence their effects
+ * or completion.
  *
- *  Dual: call it data-first with the Model to run the steps now
- *  (`combine(model, steps)` returns a {@link Return}), or data-last with
- *  only the steps to build a composable {@link Step} that runs later
- *  (`combine(steps)`, for a `pipe` or a nested step list).
+ * Dual: pass the Model and Steps (`combineSteps(model, steps)`), or pass only
+ * the Steps to build a composable {@link Step} that runs later
+ * (`combineSteps(steps)`, for a `pipe` or a nested Step list). Ordinary Steps
+ * produce a readable {@link Return}. Connected Steps preserve an opaque
+ * {@link ResultRecipe} for execution by a matching registered Composition.
  *
- *  Steps only ever accumulate Commands; a step cannot cancel or replace
- *  another step's Commands, and no Command runs during the fold. The
- *  runtime runs the batch after update returns. `combine([])` returns
- *  `{ model }`.
+ * Steps only ever accumulate Commands; a Step cannot cancel or replace
+ * another Step's Commands, and no Command runs during the fold. The
+ * Runtime runs the batch after update returns. `combineSteps([])` returns
+ * `{ model }`.
  *
- *  ```ts
- *  SucceededUpdateNote: ({ note }) =>
- *    combine(model, [
- *      replaceNoteInCaches(note),
- *      refreshNote(note.id),
- *      refreshAllNotes,
- *      refreshNotebookNotes(note.maybeNotebookId),
- *      ...Array.filter([refreshNotebookNotes(previousNotebookId)], () => hasMoved),
- *      showToast('Success', `Updated ${note.title}`),
- *    ])
- *  ``` */
-export const combine: {
+ * ```ts
+ * SucceededUpdateNote: ({ note }) =>
+ *   combineSteps(model, [
+ *     replaceNoteInCaches(note),
+ *     refreshNote(note.id),
+ *     refreshAllNotes,
+ *     refreshNotebookNotes(note.maybeNotebookId),
+ *     ...Array.filter([refreshNotebookNotes(previousNotebookId)], () => hasMoved),
+ *     showToast('Success', `Updated ${note.title}`),
+ *   ])
+ * ```
+ */
+export const combineSteps: {
   <const Steps extends NonEmptySteps>(
     steps: Steps &
       StepsForModel<Steps, OperationStepModel<Steps>> &
       RequireOperationStep<Steps> &
       StepsWithoutOutMessage<NoInfer<Steps>>,
-  ): (
-    model: GraphInput<
-      OperationStepModel<Steps>,
-      CombinedGraphRequirement<Steps>
-    >,
-  ) => CombinedStepRecipe<OperationStepModel<Steps>, Steps>
+  ): NoInfer<
+    (
+      model: GraphInput<
+        OperationStepModel<Steps>,
+        CombinedGraphRequirement<Steps>
+      >,
+    ) => CombinedStepRecipe<OperationStepModel<Steps>, Steps>
+  >
   <ModelInput, const Steps extends NonEmptySteps>(
     model: ModelInput &
       GraphInput<
         GraphModelOfValue<ModelInput>,
-        CombinedGraphRequirement<Steps>
+        NoInfer<CombinedGraphRequirement<Steps>>
       >,
     steps: Steps &
       StepsForModel<Steps, GraphModelOfValue<ModelInput>> &
       RequireOperationStep<Steps> &
       StepsWithoutOutMessage<NoInfer<Steps>>,
-  ): CombinedStepRecipe<GraphModelOfValue<ModelInput>, Steps>
+  ): NoInfer<CombinedStepRecipe<GraphModelOfValue<ModelInput>, Steps>>
   <StepValue>(
     steps: ReadonlyArray<StepValue> &
       StepsForModel<
@@ -905,25 +925,27 @@ export const combine: {
       > &
       RequireOperationStep<CommonOperationSteps<StepValue>> &
       StepsWithoutOutMessage<ReadonlyArray<StepValue>>,
-  ): (
-    model: GraphInput<
-      OperationStepModel<CommonOperationSteps<StepValue>>,
-      CombinedGraphRequirement<CommonOperationSteps<StepValue>>
-    >,
-  ) =>
-    | CombinedStepOutputFor<
+  ): NoInfer<
+    (
+      model: GraphInput<
         OperationStepModel<CommonOperationSteps<StepValue>>,
-        CommonOperationSteps<StepValue>
-      >
-    | CombinedStepRecipe<
-        OperationStepModel<CommonOperationSteps<StepValue>>,
-        CommonOperationSteps<StepValue>
-      >
+        CombinedGraphRequirement<CommonOperationSteps<StepValue>>
+      >,
+    ) =>
+      | CombinedStepOutputFor<
+          OperationStepModel<CommonOperationSteps<StepValue>>,
+          CommonOperationSteps<StepValue>
+        >
+      | CombinedStepRecipe<
+          OperationStepModel<CommonOperationSteps<StepValue>>,
+          CommonOperationSteps<StepValue>
+        >
+  >
   <ModelInput, StepValue>(
     model: ModelInput &
       GraphInput<
         GraphModelOfValue<ModelInput>,
-        CombinedGraphRequirement<CommonOperationSteps<StepValue>>
+        NoInfer<CombinedGraphRequirement<CommonOperationSteps<StepValue>>>
       >,
     steps: ReadonlyArray<StepValue> &
       StepsForModel<
@@ -932,7 +954,7 @@ export const combine: {
       > &
       RequireOperationStep<CommonOperationSteps<StepValue>> &
       StepsWithoutOutMessage<ReadonlyArray<StepValue>>,
-  ):
+  ): NoInfer<
     | CombinedStepOutputFor<
         GraphModelOfValue<ModelInput>,
         CommonOperationSteps<StepValue>
@@ -941,6 +963,7 @@ export const combine: {
         GraphModelOfValue<ModelInput>,
         CommonOperationSteps<StepValue>
       >
+  >
   <const Steps extends NonEmptySteps>(
     steps: Steps &
       StepsForModel<Steps, FirstStepModel<Steps>> &
@@ -968,13 +991,15 @@ export const combine: {
   >
   <ModelInput, const Steps extends ReadonlyArray<AnyStep>>(
     model: ModelInput,
-    steps: number extends Steps['length']
-      ? [CombinedGraphRequirement<Steps>] extends [never]
-        ? Steps &
-            StepsForModel<Steps, GraphModelOfValue<ModelInput>> &
-            StepsWithoutOutMessage<NoInfer<Steps>>
-        : never
-      : never,
+    steps: Steps extends readonly []
+      ? Steps
+      : number extends Steps['length']
+        ? [CombinedGraphRequirement<Steps>] extends [never]
+          ? Steps &
+              StepsForModel<Steps, GraphModelOfValue<ModelInput>> &
+              StepsWithoutOutMessage<NoInfer<Steps>>
+          : never
+        : never,
   ): WithRegistrationEvidence<
     Return<
       GraphModelOfValue<ModelInput>,
@@ -1020,27 +1045,12 @@ export const combine: {
     >,
     CombinedStepRegistrationEvidence<Steps>
   >
-  <const Steps extends NonEmptySteps>(
-    model: GraphInput<
-      CombinedStepModel<Steps>,
-      CombinedGraphRequirement<Steps>
-    >,
-    steps: Steps &
-      StepsForModel<Steps, CombinedStepModel<Steps>> &
-      StepsWithoutOutMessage<NoInfer<Steps>>,
-  ): WithRegistrationEvidence<
-    Return<
-      CombinedStepModel<Steps>,
-      CombinedStepMessage<Steps>,
-      CombinedStepRequirements<Steps>
-    >,
-    CombinedStepRegistrationEvidence<Steps>
-  >
   <Model, Message, R = never>(
     steps: ReadonlyArray<Step<Model, Message, R>>,
   ): Step<Model, Message, R>
-  <Model, Message, R = never>(
-    model: Model,
+  <Model, Message, R = never, Input = Model>(
+    model: Input &
+      NoInfer<RegisteredCompositionDiagnostic<Input, Model> & Model>,
     steps: ReadonlyArray<Step<Model, Message, R>>,
   ): Return<Model, Message, R>
   /* eslint-disable-next-line @typescript-eslint/consistent-type-assertions */
@@ -1076,6 +1086,9 @@ export const combine: {
       const next = resolvePending
         ? resolveOperationOutput(output, current.model)
         : output
+      if (!resolvePending) {
+        assertResolvedStep(next)
+      }
       current = {
         model: next.model,
         commands: [...(current.commands ?? []), ...(next.commands ?? [])],
@@ -1246,7 +1259,7 @@ export type FoldContext<
  *    {@link Step}. The Step receives the parent Model with the child
  *    already written back, and its Commands follow the child's in the
  *    returned batch. Match on the OutMessage tag through its union matcher,
- *    and build a multi-step fold with {@link combine}. Takes an optional
+ *    and build a multi-step fold with {@link combineSteps}. Takes an optional
  *    second parameter, a
  *    {@link FoldContext} of lifters bound to `toParentMessage`, for a
  *    Command the Step returns whose result is the child's Message. Parent Model
@@ -1410,7 +1423,7 @@ type AnyChildFold = Readonly<{
 /** The dual function {@link foldChild} returns. Data-first runs the
  *  fold now (`fold(model, input)` returns a {@link Return}); data-last
  *  builds a composable {@link Step} (`fold(input)`, for
- *  {@link combine}). */
+ *  {@link combineSteps}). */
 export type Fold<ParentModel, ParentMessage, Input, R = never> = {
   (model: ParentModel, input: Input): Return<ParentModel, ParentMessage, R>
   (input: Input): Step<ParentModel, ParentMessage, R>
@@ -1481,12 +1494,12 @@ export type FoldWithOutMessage<
  *  {@link foldChildStep}, which returns the {@link Step} directly.
  *
  *  `update` closes over per-dispatch context, and the data-last form
- *  composes with {@link combine}, here to put a navigation Command ahead
+ *  composes with {@link combineSteps}, here to put a navigation Command ahead
  *  of the child's:
  *
  *  ```ts
  *  const enterJoinedRoom = (roomId: string, player: Player): UpdateStep =>
- *    Update.combine([
+ *    Update.combineSteps([
  *      model => ({ model, commands: [NavigateToRoom({ roomId })] }),
  *      Update.foldChild({
  *        update: (room: Room.Model, joinedPlayer: Player) =>
@@ -1610,7 +1623,7 @@ export const foldChild: {
 
 /** {@link Fold} for one child addressed by key. Data-first runs the fold
  * now (`fold(model, key, input)`). Data-last builds a composable
- * {@link Step} (`fold(key, input)`, for {@link combine}). */
+ * {@link Step} (`fold(key, input)`, for {@link combineSteps}). */
 export type FoldAt<ParentModel, ParentMessage, Key, Input, R = never> = {
   (
     model: ParentModel,
@@ -1821,7 +1834,7 @@ type AnyKeyedChildFold = Readonly<{
  * `writeAt` use the key to find and replace the child Model.
  * `toParentMessage` receives the key when wrapping child Messages. The returned
  * {@link FoldAt} runs data-first as `fold(model, key, input)` and data-last
- * as `fold(key, input)` for {@link combine}.
+ * as `fold(key, input)` for {@link combineSteps}.
  *
  * When `readAt` returns `None` for the key, the fold returns `{ model }`.
  *
@@ -2256,7 +2269,7 @@ type AnyChildStepFold = Readonly<{
  *  child already written back.
  *
  *  Reach for it wherever a Block exposes a no-argument entry point, so the
- *  call site composes with {@link combine} as a plain Step and never invents
+ *  call site composes with {@link combineSteps} as a plain Step and never invents
  *  an input the child does not take:
  *
  *  ```ts
@@ -2269,7 +2282,7 @@ type AnyChildStepFold = Readonly<{
  *  })
  *
  *  // in the parent update
- *  Update.combine(model, [writeRouteFields, foldMobileMenuDialogClose])
+ *  Update.combineSteps(model, [writeRouteFields, foldMobileMenuDialogClose])
  *  ```
  *
  *  `foldOutMessage` takes the same optional second parameter as

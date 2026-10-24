@@ -9,7 +9,7 @@ import { Message } from '../message'
 import { cartRouter, productsRouter } from '../route'
 
 export const view = (
-  cart: Cart.Cart,
+  cart: typeof Cart.Cart.Type,
   deliveryInstructions: string,
   orderPlaced: boolean,
   h: ApplicationViewBuilder,

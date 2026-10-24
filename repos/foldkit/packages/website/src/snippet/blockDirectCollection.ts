@@ -6,7 +6,7 @@ import { Row } from './row'
 
 const TableDefinition = Block.makeDefinition('Table', { Model, Message })
 
-export const RowsBinding = TableDefinition.bindChild(Row.RowBlock, {
+export const RowsBinding = TableDefinition.makeBinding(Row.RowBlock, {
   field: 'rows',
   key: 'id',
 })

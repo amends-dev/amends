@@ -12,4 +12,3 @@ export const Flags = Schema.Struct({
   maybeApiData: Schema.Option(ApiReference.ApiData),
   maybeExampleSources: Schema.Option(ExampleDetail.ExampleSources),
 })
-export type Flags = typeof Flags.Type

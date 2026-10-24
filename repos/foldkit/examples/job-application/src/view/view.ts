@@ -39,8 +39,8 @@ import { review } from './review'
 import { stepMenu, stepTabButton } from './stepNav'
 
 const stepHasErrors =
-  (model: Model) =>
-  (step: Step.Step): boolean =>
+  (model: typeof Model.Type) =>
+  (step: typeof Step.Step.Type): boolean =>
     Match.value(step).pipe(
       Match.when('PersonalInfo', () =>
         personalInfoHasErrors(model.personalInfo),
@@ -52,8 +52,8 @@ const stepHasErrors =
     )
 
 const stepIsComplete =
-  (model: Model) =>
-  (step: Step.Step): boolean =>
+  (model: typeof Model.Type) =>
+  (step: typeof Step.Step.Type): boolean =>
     Match.value(step).pipe(
       Match.when('PersonalInfo', () =>
         isPersonalInfoComplete(model.personalInfo),
@@ -65,17 +65,19 @@ const stepIsComplete =
     )
 
 const stepNeedsAttention =
-  (model: Model) =>
-  (step: Step.Step): boolean =>
+  (model: typeof Model.Type) =>
+  (step: typeof Step.Step.Type): boolean =>
     stepHasErrors(model)(step) ||
     (model.isSubmitAttempted && !stepIsComplete(model)(step))
 
-const stepsNeedingAttention = (model: Model): ReadonlyArray<Step.Step> =>
+const stepsNeedingAttention = (
+  model: typeof Model.Type,
+): ReadonlyArray<typeof Step.Step.Type> =>
   Array.filter(Step.all, stepNeedsAttention(model))
 
 const stepContent = (
-  model: Model,
-  attentionSteps: ReadonlyArray<Step.Step>,
+  model: typeof Model.Type,
+  attentionSteps: ReadonlyArray<typeof Step.Step.Type>,
   h: ApplicationViewBuilder,
 ): Html =>
   Match.value(model.currentStep).pipe(
@@ -131,13 +133,16 @@ const stepContent = (
     Match.exhaustive,
   )
 
-const isFirstStep = (model: Model): boolean =>
+const isFirstStep = (model: typeof Model.Type): boolean =>
   pipe(Step.all, Array.head, Option.exists(Equal.equals(model.currentStep)))
 
-const isLastStep = (model: Model): boolean =>
+const isLastStep = (model: typeof Model.Type): boolean =>
   pipe(Step.all, Array.last, Option.exists(Equal.equals(model.currentStep)))
 
-const navigationButtons = (model: Model, h: ApplicationViewBuilder) =>
+const navigationButtons = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+) =>
   h.div(
     [h.Class('flex justify-between pt-6 mt-8 border-t border-gray-200')],
     [
@@ -200,8 +205,8 @@ const pageHeader = (h: ApplicationViewBuilder) =>
   )
 
 const stepContentPanel = (
-  model: Model,
-  attentionSteps: ReadonlyArray<Step.Step>,
+  model: typeof Model.Type,
+  attentionSteps: ReadonlyArray<typeof Step.Step.Type>,
   panelAttributes: ReadonlyArray<ChildAttribute>,
   h: ApplicationViewBuilder,
 ): Html =>
@@ -221,9 +226,9 @@ const stepContentPanel = (
   )
 
 const stepTabsLayout = (
-  model: Model,
-  attentionSteps: ReadonlyArray<Step.Step>,
-  attentionStepSet: HashSet.HashSet<Step.Step>,
+  model: typeof Model.Type,
+  attentionSteps: ReadonlyArray<typeof Step.Step.Type>,
+  attentionStepSet: HashSet.HashSet<typeof Step.Step.Type>,
   h: ApplicationViewBuilder,
 ): Html =>
   h.block(
@@ -278,7 +283,10 @@ const stepTabsLayout = (
     }),
   )
 
-const desktopPreviewSidebar = (model: Model, h: ApplicationViewBuilder) =>
+const desktopPreviewSidebar = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+) =>
   h.div(
     [h.Class('hidden w-80 shrink-0 xl:block')],
     [
@@ -307,7 +315,10 @@ const desktopPreviewSidebar = (model: Model, h: ApplicationViewBuilder) =>
     ],
   )
 
-const mobilePreviewToggle = (model: Model, h: ApplicationViewBuilder) =>
+const mobilePreviewToggle = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+) =>
   h.div(
     [h.Class('fixed top-4 right-4 xl:hidden')],
     [
@@ -335,7 +346,10 @@ const mobilePreviewToggle = (model: Model, h: ApplicationViewBuilder) =>
     ],
   )
 
-const mobilePreviewOverlay = (model: Model, h: ApplicationViewBuilder) =>
+const mobilePreviewOverlay = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+) =>
   h.div(
     [
       h.Class(

@@ -6,7 +6,7 @@ import { RoomBinding } from '../composition'
 import { type Model, RoomInstance } from '../model'
 import { ApplicationRoute, urlToApplicationRoute } from '../route'
 
-export const initRoom = (model: Model, roomId: string) => {
+export const initRoom = (model: typeof Model.Type, roomId: string) => {
   return RoomBinding.init({
     key: roomId,
     args: [Option.some(roomId)],
@@ -18,7 +18,7 @@ export const initRoom = (model: Model, roomId: string) => {
   })
 }
 
-export const changeRoute = (model: Model, url: Url.Url) => {
+export const changeRoute = (model: typeof Model.Type, url: Url.Url) => {
   const route = urlToApplicationRoute(url)
   const routeChanged = modifyFields(model, { route: () => route })
 

@@ -47,7 +47,7 @@ const isCommandDefineCall = (
   node: ESTree.CallExpression,
   references: WeakMap<ESTree.Node, Reference> | undefined,
 ): boolean => {
-  if (isOwnedDefinitionCall(node, 'command', references)) {
+  if (isOwnedDefinitionCall(node, 'makeCommand', references)) {
     return true
   }
 

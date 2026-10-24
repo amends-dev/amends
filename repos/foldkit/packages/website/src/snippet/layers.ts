@@ -1,11 +1,10 @@
 import { Context, Effect, Layer, Schema } from 'effect'
 import { HttpClient, HttpClientRequest } from 'effect/http'
-import { Http, makeApplicationDefinition } from 'foldkit'
+import { Block, Http } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 import { defineTaggedUnion } from 'foldkit/schema'
 
 const User = Schema.Struct({ id: Schema.String, name: Schema.String })
-type User = typeof User.Type
 
 export const Message = defineMessageUnion({
   SucceededLoadUser: { user: User },
@@ -19,20 +18,20 @@ export const UserState = defineTaggedUnion({
 })
 
 export const Model = Schema.Struct({ user: UserState })
-export const ApplicationDefinition = makeApplicationDefinition({
+export const ApplicationDefinition = Block.makeDefinition('Application', {
   Model,
   Message,
 })
 
 type ApiClient = Readonly<{
-  getUser: (userId: string) => Effect.Effect<User, unknown>
+  getUser: (userId: string) => Effect.Effect<typeof User.Type, unknown>
 }>
 
 class ApiClientService extends Context.Service<ApiClientService, ApiClient>()(
   'ApiClientService',
 ) {}
 
-export const LoadUser = ApplicationDefinition.command('LoadUser', {
+export const LoadUser = ApplicationDefinition.makeCommand('LoadUser', {
   args: { userId: Schema.String },
   messages: [Message.SucceededLoadUser, Message.FailedLoadUser],
   handler: function* () {

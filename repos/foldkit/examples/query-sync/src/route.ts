@@ -21,14 +21,12 @@ export const SortColumn = Schema.Literals([
   'Length',
   'Weight',
 ])
-export type SortColumn = typeof SortColumn.Type
 
 export const Sorting = defineTaggedUnion({
   Unsorted: {},
   Ascending: { column: SortColumn },
   Descending: { column: SortColumn },
 })
-export type Sorting = typeof Sorting.Type
 const SORT_PARAM_SEPARATOR = ':'
 
 const optionFromValidParam = <A extends string>(schema: Schema.Codec<A, A>) => {
@@ -112,8 +110,6 @@ export const ApplicationRoute = defineRouteUnion({
   NotFound: { path: Schema.String },
 })
 
-export type ApplicationRoute = typeof ApplicationRoute.Type
-
 export const browseRouter = pipe(
   Route.root,
   Route.query(
@@ -141,15 +137,17 @@ export const emptyBrowseFields: BrowseFields = {
   period: Option.none(),
 }
 
-export const routeToBrowseFields = (route: ApplicationRoute): BrowseFields =>
+export const routeToBrowseFields = (
+  route: typeof ApplicationRoute.Type,
+): BrowseFields =>
   Match.value(route).pipe(
     Match.tag('Browse', route => route),
     Match.orElse(() => emptyBrowseFields),
   )
 export const columnSortDirection = (
-  sorting: Sorting,
-  column: SortColumn,
-): Types.Tags<Sorting> => {
+  sorting: typeof Sorting.Type,
+  column: typeof SortColumn.Type,
+): Types.Tags<typeof Sorting.Type> => {
   const isColumnSorted =
     sorting._tag !== 'Unsorted' && sorting.column === column
 
@@ -160,7 +158,10 @@ export const columnSortDirection = (
   }
 }
 
-export const nextSorting = (sorting: Sorting, column: SortColumn): Sorting =>
+export const nextSorting = (
+  sorting: typeof Sorting.Type,
+  column: typeof SortColumn.Type,
+): typeof Sorting.Type =>
   pipe(
     columnSortDirection(sorting, column),
     Match.value,

@@ -40,31 +40,7 @@ const isBlockFactoryCall = (
   })
 }
 
-const isApplicationDefinitionCall = (
-  node: ESTree.CallExpression,
-  references: WeakMap<ESTree.Node, Reference> | undefined,
-): boolean => {
-  if (references === undefined) {
-    return (
-      AST.isCallOf(node, 'Application', 'makeDefinition') ||
-      isIdentifier(node.callee, 'makeApplicationDefinition')
-    )
-  }
-
-  return Option.exists(resolveFoldkitApiPath(references, node.callee), path => {
-    const [namespace, methodName, extraMember] = path
-
-    return (
-      (namespace === 'makeApplicationDefinition' && methodName === undefined) ||
-      (namespace === 'Application' &&
-        methodName === 'makeDefinition' &&
-        extraMember === undefined)
-    )
-  })
-}
-
 type AuthoringStage = Readonly<{
-  isApplication: boolean
   stage: 'Namespace' | 'Definition' | 'Composition'
   identity: string | undefined
 }>
@@ -84,10 +60,8 @@ const authoringStage = (
     'makeDefinition',
     references,
   )
-  const isApplication = isApplicationDefinitionCall(node, references)
-  if (isBlockNamespace || isBlockDefinition || isApplication) {
+  if (isBlockNamespace || isBlockDefinition) {
     return {
-      isApplication,
       stage: isBlockNamespace ? 'Namespace' : 'Definition',
       identity: firstStringArgument(node)?.value,
     }
@@ -145,8 +119,7 @@ const authoringStage = (
   }
 
   if (
-    (methodName === 'makeDefinition' &&
-      (precedingStage.isApplication || precedingStage.stage !== 'Namespace')) ||
+    (methodName === 'makeDefinition' && precedingStage.stage !== 'Namespace') ||
     (methodName === 'makeComposition' && precedingStage.stage !== 'Definition')
   ) {
     return undefined
@@ -158,13 +131,12 @@ const authoringStage = (
   }
 }
 
-/** Requires Block and Application bindings to use their authoring stage suffix. */
+/** Requires Block bindings to use their authoring stage suffix. */
 export const blockNameMatchesVariable = Rule.define({
   name: 'block-name-matches-variable',
   meta: Rule.meta({
     type: 'suggestion',
-    description:
-      'Name Block and Application bindings for their authoring stage.',
+    description: 'Name Block bindings for their authoring stage.',
   }),
   create: function* () {
     const ctx = yield* RuleContext
@@ -186,23 +158,6 @@ export const blockNameMatchesVariable = Rule.define({
         const stage = authoringStage(init, references)
         if (stage === undefined) {
           return Effect.void
-        }
-
-        if (stage.isApplication) {
-          const expectedName =
-            stage.stage === 'Composition'
-              ? 'ApplicationComposition'
-              : 'ApplicationDefinition'
-          if (node.id.name === expectedName) {
-            return Effect.void
-          }
-
-          return ctx.report(
-            Diagnostic.make({
-              node: node.id,
-              message: `Application identifier "${node.id.name}" must be "${expectedName}" at this authoring stage.`,
-            }),
-          )
         }
 
         const identity = stage.identity

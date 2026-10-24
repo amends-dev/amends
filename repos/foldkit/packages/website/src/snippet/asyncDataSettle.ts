@@ -1,4 +1,4 @@
-const LoadAllNotes = ApplicationDefinition.command('LoadAllNotes', {
+const LoadAllNotes = ApplicationDefinition.makeCommand('LoadAllNotes', {
   messages: [SettledLoadAllNotes],
   handler: function* () {
     return () =>

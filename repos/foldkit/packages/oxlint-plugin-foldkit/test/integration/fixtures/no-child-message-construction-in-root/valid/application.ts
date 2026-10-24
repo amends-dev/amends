@@ -69,7 +69,7 @@ export const typedChildView = TypedChildViewComposition.makeView((_model, h) =>
   h.button([h.OnClick(Child.Message.ClickedTypedChildViewSave())]),
 )
 
-export const childStep = childView.step(model => ({
+export const childStep = childView.makeStep(model => ({
   model,
   message: Child.Message.ClickedStepSave(),
 }))

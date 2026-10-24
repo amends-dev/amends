@@ -15,7 +15,7 @@ describe('view identity branding', () => {
         view: (currentModel, h) => {
           renderedVNode = Animation.view(
             currentModel,
-            { content: h.div([]) },
+            { toView: () => h.div([]) },
             h,
           )
           return renderedVNode

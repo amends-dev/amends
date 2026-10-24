@@ -1,5 +1,5 @@
 import { Layer, Schema } from 'effect'
-import { CustomElement, makeApplicationDefinition } from 'foldkit'
+import { CustomElement, Block } from 'foldkit'
 import { type Document } from 'foldkit/html'
 import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
@@ -11,25 +11,24 @@ export const Model = Schema.Struct({
   count: Schema.Number,
   formState: Schema.Literals(['Controlled', 'Released']),
 })
-export type Model = typeof Model.Type
 
 export const Flags = Schema.Struct({ start: Schema.Number })
-export type Flags = typeof Flags.Type
 
 export const Message = defineMessageUnion({
   ClickedIncrement: {},
   ClickedRelease: {},
 })
-export type Message = typeof Message.Type
 
-export const ApplicationComposition = makeApplicationDefinition({
+export const ApplicationComposition = Block.makeDefinition('Application', {
   Model,
   Message,
 }).makeComposition()
 
-export const init = ApplicationComposition.makeInit((flags: Flags) => ({
-  model: Model.make({ count: flags.start, formState: 'Controlled' }),
-}))
+export const init = ApplicationComposition.makeInit(
+  (flags: typeof Flags.Type) => ({
+    model: Model.make({ count: flags.start, formState: 'Controlled' }),
+  }),
+)
 
 export const update = ApplicationComposition.makeUpdate((model, message) =>
   Message.match(message, {
@@ -248,3 +247,15 @@ export const view = ApplicationComposition.makeView((model, h): Document => {
 })
 
 export const EffectsLayer = Layer.empty
+
+const prepare = () =>
+  ApplicationComposition.prepareBlock({
+    init,
+    update,
+    view,
+    EffectsLayer,
+  })
+export const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

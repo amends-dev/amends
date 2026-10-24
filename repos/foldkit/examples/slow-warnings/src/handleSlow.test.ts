@@ -5,7 +5,7 @@ import { Message } from './message'
 import type { Model } from './model'
 import { handleSlow } from './subscription'
 
-const initialModel: Model = {
+const initialModel: typeof Model.Type = {
   activeWorkload: 'Idle',
   nextWarningId: 1,
   warnings: [],

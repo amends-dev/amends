@@ -171,6 +171,18 @@ it('extracts a handler whose declared result Message is never', () => {
   >()
 })
 
+it('preserves additional evidence on an extracted handler requirement', () => {
+  type ExtendedHandler = SendMessageHandler &
+    Readonly<{ handlerEvidence: 'extended' }>
+  type ExtendedDefinition = () => Readonly<{
+    effect: Effect.Effect<Message, never, ExtendedHandler | Prefix>
+  }>
+
+  expectTypeOf<
+    Command.HandlerOf<ExtendedDefinition>
+  >().toEqualTypeOf<ExtendedHandler>()
+})
+
 it('uses invocation context over the context captured by the handler Layer', async () => {
   const handlerLayer = SendMessageLayer.pipe(
     Layer.provideMerge(Layer.succeed(Prefix, { value: 'construction:' })),

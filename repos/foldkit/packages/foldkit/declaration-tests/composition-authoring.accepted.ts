@@ -1,12 +1,12 @@
 import { Context, Effect, Layer, Option, Schema, Tuple } from 'effect'
-import { makeApplicationDefinition } from 'foldkit'
-import type {
-  Element as ElementProgram,
-  PendingApplication,
-} from 'foldkit/application'
+import { Program } from 'foldkit'
 import * as Block from 'foldkit/block'
 import * as Command from 'foldkit/command'
 import { defineMessageUnion } from 'foldkit/message'
+import type {
+  Element as ElementProgram,
+  Pending as PendingProgram,
+} from 'foldkit/program'
 import { defineRouteUnion } from 'foldkit/route'
 import * as Struct from 'foldkit/struct'
 import * as Update from 'foldkit/update'
@@ -154,7 +154,7 @@ const SettingsDefinition = Block.makeDefinition('Settings', {
 const handlerConstruction: Effect.Effect<void, 'SettingsHandlerUnavailable'> =
   Effect.void
 
-export const SyncSettings = SettingsDefinition.command('SyncSettings', {
+export const SyncSettings = SettingsDefinition.makeCommand('SyncSettings', {
   args: { accountId: Schema.String, theme: Schema.String },
   messages: [SettingsMessage.CompletedSync],
   handler: function* () {
@@ -181,7 +181,7 @@ export const settingsUpdate = SettingsComposition.makeUpdate(
       CompletedSync: () => ({ model }),
     }),
 )
-export const refreshSettings = SettingsDefinition.step(
+export const refreshSettings = SettingsDefinition.makeStep(
   (model, currentUser: CurrentUser) => ({
     model,
     commands: [
@@ -194,15 +194,20 @@ export const refreshSettings = SettingsDefinition.step(
 )
 
 export const SettingsEffectsLayer = SyncSettings.layer
-export const SettingsBlock = SettingsComposition.assembleBlock({
-  init: settingsInit,
-  update: settingsUpdate,
-  operations: {
-    refresh: (currentUser: CurrentUser) =>
-      Tuple.make(SettingsMessage.RequestedSync(), currentUser),
-  },
-  EffectsLayer: SettingsEffectsLayer,
-})
+const prepareSettingsBlock = () =>
+  SettingsComposition.prepareBlock({
+    init: settingsInit,
+    update: settingsUpdate,
+    operations: {
+      refresh: (currentUser: CurrentUser) =>
+        Tuple.make(SettingsMessage.RequestedSync(), currentUser),
+    },
+    EffectsLayer: SettingsEffectsLayer,
+  })
+export const SettingsBlock: Block.FromAssemblyWithOutMessage<
+  typeof SettingsModel,
+  typeof prepareSettingsBlock
+> = Block.assemble(prepareSettingsBlock)
 
 type SettingsServicesAreExact = Expect<
   Equal<Layer.Services<typeof SettingsEffectsLayer>, SettingsClient>
@@ -237,57 +242,64 @@ export type SettingsAssertions = [
 export const StatusModel = Schema.Struct({ count: Schema.Number })
 export type StatusModel = typeof StatusModel.Type
 export const StatusMessage = defineMessageUnion({ Incremented: {} })
-export type StatusMessage = typeof StatusMessage.Type
 
 const StatusComposition = Block.makeDefinition('Status', {
   Model: StatusModel,
   Message: StatusMessage,
 }).makeComposition()
-export const StatusBlock = StatusComposition.assembleBlock({
-  init: StatusComposition.makeInit(() => ({
-    model: StatusModel.make({ count: 0 }),
-  })),
-  update: StatusComposition.makeUpdate(model => ({
-    model: Struct.modifyFields(model, { count: count => count + 1 }),
-  })),
-  operations: { increment: () => [StatusMessage.Incremented()] },
-  EffectsLayer: Layer.empty,
-})
+const prepareStatusBlock = () =>
+  StatusComposition.prepareBlock({
+    init: StatusComposition.makeInit(() => ({
+      model: StatusModel.make({ count: 0 }),
+    })),
+    update: StatusComposition.makeUpdate(model => ({
+      model: Struct.modifyFields(model, { count: count => count + 1 }),
+    })),
+    operations: { increment: () => [StatusMessage.Incremented()] },
+    EffectsLayer: Layer.empty,
+  })
+export const StatusBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof StatusModel,
+  typeof prepareStatusBlock
+> = Block.assemble(prepareStatusBlock)
 
 export const RoomModel = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
 })
-export type RoomModel = typeof RoomModel.Type
 export const RoomDispatchContext = Schema.Struct({ roomId: Schema.String })
 export type RoomDispatchContext = typeof RoomDispatchContext.Type
 export const RoomMessage = defineMessageUnion({
   RenamedRoom: { name: Schema.String },
 })
-export type RoomMessage = typeof RoomMessage.Type
 
 const RoomComposition = Block.makeDefinition('Room', {
   Model: RoomModel,
   Message: RoomMessage,
 }).makeComposition()
-export const RoomBlock = RoomComposition.assembleBlock({
-  init: RoomComposition.makeInit((id: string, name: string) => ({
-    model: RoomModel.make({ id, name }),
-  })),
-  update: RoomComposition.makeUpdate(
-    (model, message, context: RoomDispatchContext) => {
-      const roomId: string = context.roomId
-      void roomId
+const prepareRoomBlock = () =>
+  RoomComposition.prepareBlock({
+    init: RoomComposition.makeInit((id: string, name: string) => ({
+      model: RoomModel.make({ id, name }),
+    })),
+    update: RoomComposition.makeUpdate(
+      (model, message, context: RoomDispatchContext) => {
+        const roomId: string = context.roomId
+        void roomId
 
-      return RoomMessage.match(message, {
-        RenamedRoom: ({ name }) => ({
-          model: Struct.modifyFields(model, { name: () => name }),
-        }),
-      })
-    },
-  ),
-  EffectsLayer: Layer.empty,
-})
+        return RoomMessage.match(message, {
+          RenamedRoom: ({ name }) => ({
+            model: Struct.modifyFields(model, { name: () => name }),
+          }),
+        })
+      },
+    ),
+    EffectsLayer: Layer.empty,
+  })
+export const RoomBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof RoomModel,
+  typeof prepareRoomBlock
+> = Block.assemble(prepareRoomBlock)
 
 export const ParentModel = Schema.Struct({
   settings: SettingsModel,
@@ -336,7 +348,15 @@ export const ParentDefinition = Block.makeDefinition('Parent', {
   OutMessage: ParentOutMessage,
 })
 
-export const SettingsBinding = ParentDefinition.bindChild(SettingsBlock, {
+const forwardSettingsOutMessage = ParentDefinition.makeOutMessageForward(
+  SettingsBlock,
+  {
+    SelectedTheme: ({ theme }) =>
+      ParentOutMessage.SelectedSettingsTheme({ theme }),
+  },
+)
+
+export const SettingsBinding = ParentDefinition.makeBinding(SettingsBlock, {
   field: 'settings',
   delivery: {
     toUpdateContext: model => {
@@ -351,36 +371,34 @@ export const SettingsBinding = ParentDefinition.bindChild(SettingsBlock, {
       return [childInitContext.theme]
     },
   },
-  outMessage: {
-    forward: outMessage =>
-      SettingsOutMessage.match(outMessage, {
-        SelectedTheme: ({ theme }) =>
-          ParentOutMessage.SelectedSettingsTheme({ theme }),
-      }),
-  },
+}).withOutMessagePolicy({
+  forward: forwardSettingsOutMessage,
 })
 
-export const StatusBinding = ParentDefinition.bindChild(StatusBlock, {
+export const StatusBinding = ParentDefinition.makeBinding(StatusBlock, {
   field: 'status',
   init: true,
 })
 
-export const ProjectedStatusBinding = ParentDefinition.bindChild(StatusBlock, {
-  placement: 'secondaryStatus',
-  read: model => Option.some(model.secondaryStatus),
-  write: (model, nextStatus) =>
-    Struct.modifyFields(model, { secondaryStatus: () => nextStatus }),
-  init: {
-    contextToArgs: () => [],
-    toParentFields: status => {
-      expectExactStatusModel(status)
+export const ProjectedStatusBinding = ParentDefinition.makeBinding(
+  StatusBlock,
+  {
+    placement: 'secondaryStatus',
+    read: model => Option.some(model.secondaryStatus),
+    write: (model, nextStatus) =>
+      Struct.modifyFields(model, { secondaryStatus: () => nextStatus }),
+    init: {
+      contextToArgs: () => [],
+      toParentFields: status => {
+        expectExactStatusModel(status)
 
-      return { secondaryStatus: status }
+        return { secondaryStatus: status }
+      },
     },
   },
-})
+)
 
-export const RoomBinding = ParentDefinition.bindChild(RoomBlock, {
+export const RoomBinding = ParentDefinition.makeBinding(RoomBlock, {
   placement: 'room',
   readAll: model => Option.toArray(model.maybeRoom),
   key: room => room.id,
@@ -403,13 +421,13 @@ export const RoomBinding = ParentDefinition.bindChild(RoomBlock, {
   },
 })
 
-export const FirstStatusBinding = ParentDefinition.bindChild(StatusBlock, {
+export const FirstStatusBinding = ParentDefinition.makeBinding(StatusBlock, {
   field: 'status',
   placement: 'firstStatus',
   init: false,
 })
 
-export const SecondStatusBinding = ParentDefinition.bindChild(StatusBlock, {
+export const SecondStatusBinding = ParentDefinition.makeBinding(StatusBlock, {
   field: 'status',
   placement: 'secondStatus',
   init: false,
@@ -477,20 +495,30 @@ export const foldRoom = ParentComposition.makeUpdate(
   ) => RoomBinding.fold(model, roomId, childMessage, context),
 )
 
-export const ParentBlock = ParentComposition.assembleBlock({
-  init: parentInit,
-  update: parentUpdate,
-  EffectsLayer: Layer.empty,
-})
+const prepareParentBlock = () =>
+  ParentComposition.prepareBlock({
+    init: parentInit,
+    update: parentUpdate,
+    EffectsLayer: Layer.empty,
+  })
+export const ParentBlock: Block.FromAssemblyWithOutMessage<
+  typeof ParentModel,
+  typeof prepareParentBlock
+> = Block.assemble(prepareParentBlock)
 
-export const ParentRefreshBlock = ParentComposition.assembleBlock({
-  init: parentInit,
-  update: parentRefreshUpdate,
-  operations: {
-    refreshSettings: () => Tuple.make(ParentMessage.OpenedDashboard()),
-  },
-  EffectsLayer: Layer.empty,
-})
+const prepareParentRefreshBlock = () =>
+  ParentComposition.prepareBlock({
+    init: parentInit,
+    update: parentRefreshUpdate,
+    operations: {
+      refreshSettings: () => Tuple.make(ParentMessage.OpenedDashboard()),
+    },
+    EffectsLayer: Layer.empty,
+  })
+export const ParentRefreshBlock: Block.FromAssemblyWithOutMessage<
+  typeof ParentModel,
+  typeof prepareParentRefreshBlock
+> = Block.assemble(prepareParentRefreshBlock)
 
 type ParentInitParametersAreExact = Expect<
   Equal<
@@ -776,7 +804,7 @@ export type ApplicationModel = typeof ApplicationModel.Type
 export const ApplicationMessage = defineMessageUnion({ Incremented: {} })
 export type ApplicationMessage = typeof ApplicationMessage.Type
 
-export const ApplicationComposition = makeApplicationDefinition({
+export const ApplicationComposition = Block.makeDefinition('Application', {
   Model: ApplicationModel,
   Message: ApplicationMessage,
 }).makeComposition()
@@ -798,11 +826,20 @@ export const applicationUpdate = ApplicationComposition.makeUpdate(model => ({
 export const applicationView = ApplicationComposition.makeView((model, h) =>
   h.main([], [globalThis.String(model.count)]),
 )
-export const ApplicationElement = ApplicationComposition.assembleElement({
+
+const prepare = () =>
+  ApplicationComposition.prepareBlock({
+    init: applicationInit,
+    update: applicationUpdate,
+    view: applicationView,
+  })
+const completedBlock: Block.FromAssemblyWithView<
+  typeof ApplicationModel,
+  typeof prepare
+> = Block.assemble(prepare)
+export const ApplicationElement = Program.makeElement({
+  block: completedBlock,
   container: null,
-  init: applicationInit,
-  update: applicationUpdate,
-  view: applicationView,
 })
 
 type ApplicationInitModelIsExact = Expect<
@@ -847,12 +884,12 @@ export const ServiceApplicationMessage = defineMessageUnion({
 })
 
 // oxlint-disable-next-line foldkit/block-name-matches-variable
-const ServiceApplicationDefinition = makeApplicationDefinition({
+const ServiceApplicationDefinition = Block.makeDefinition('Application', {
   Model: ServiceApplicationModel,
   Message: ServiceApplicationMessage,
 })
 
-export const RunApplicationTask = ServiceApplicationDefinition.command(
+export const RunApplicationTask = ServiceApplicationDefinition.makeCommand(
   'RunApplicationTask',
   {
     messages: [ServiceApplicationMessage.CompletedRunApplicationTask],
@@ -887,14 +924,21 @@ export const serviceApplicationView = ServiceApplicationComposition.makeView(
   (model, h) => h.main([], [globalThis.String(model.count)]),
 )
 
-export const PendingServiceApplicationElement =
-  ServiceApplicationComposition.assembleElement({
-    container: null,
+const prepare2 = () =>
+  ServiceApplicationComposition.prepareBlock({
     init: serviceApplicationInit,
     update: serviceApplicationUpdate,
     view: serviceApplicationView,
     EffectsLayer: RunApplicationTask.layer,
   })
+const completedBlock2: Block.FromAssemblyWithView<
+  typeof ServiceApplicationModel,
+  typeof prepare2
+> = Block.assemble(prepare2)
+export const PendingServiceApplicationElement = Program.makeElement({
+  block: completedBlock2,
+  container: null,
+})
 
 export const ApplicationClientLayer = Layer.succeed(ApplicationClient, {
   run: Effect.void,
@@ -905,7 +949,7 @@ export const ProvidedServiceApplicationElement =
 type PendingServiceApplicationElementIsExact = Expect<
   Equal<
     typeof PendingServiceApplicationElement,
-    PendingApplication<
+    PendingProgram<
       undefined,
       void,
       ApplicationClient,
@@ -937,7 +981,7 @@ const NoStartupDefinition = Block.makeDefinition('NoStartup', {
   Model: NoStartupModel,
   Message: Schema.Never,
 })
-const NoStartupStatusBinding = NoStartupDefinition.bindChild(StatusBlock, {
+const NoStartupStatusBinding = NoStartupDefinition.makeBinding(StatusBlock, {
   field: 'status',
   init: true,
 })
@@ -954,10 +998,15 @@ export const symbolMetadataInit = NoStartupComposition.makeInit(() => ({
   childInitContext: { source: 'declaration-test' },
   [InitializationMetadata]: true,
 }))
-export const NoStartupBlock = NoStartupComposition.assembleBlock({
-  init: noStartupInit,
-  update: NoStartupComposition.makeUpdate(),
-})
+const prepareNoStartupBlock = () =>
+  NoStartupComposition.prepareBlock({
+    init: noStartupInit,
+    update: NoStartupComposition.makeUpdate(),
+  })
+export const NoStartupBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof NoStartupModel,
+  typeof prepareNoStartupBlock
+> = Block.assemble(prepareNoStartupBlock)
 export type NoStartupArgumentsAreExact = Expect<
   Equal<Parameters<typeof noStartupInit>, []>
 >

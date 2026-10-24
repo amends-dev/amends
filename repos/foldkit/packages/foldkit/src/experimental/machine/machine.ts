@@ -797,7 +797,7 @@ const transitionFoldedMachine = (
  * foldUpload(model, message)
  *
  * // Data-last in a composed update
- * Update.combine(model, [foldUpload(message), recordUploadAttempt])
+ * Update.combineSteps(model, [foldUpload(message), recordUploadAttempt])
  * ```
  *
  * @experimental Ships from `foldkit/experimental/machine`; expect breaking changes while the API settles.

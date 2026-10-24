@@ -9,8 +9,7 @@ import {
   flow,
   pipe,
 } from 'effect'
-import { makeApplicationDefinition } from 'foldkit'
-import type { Block } from 'foldkit'
+import { Block } from 'foldkit'
 import { Html } from 'foldkit/html'
 import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
@@ -24,7 +23,6 @@ export const Model = Schema.Struct({
   isRunning: Schema.Boolean,
   startTime: Schema.Number,
 })
-export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
   ClickedStart: {},
@@ -35,9 +33,7 @@ export const Message = defineMessageUnion({
   CompletedDetermineTickTime: { elapsedMs: Schema.Number },
 })
 
-export type Message = typeof Message.Type
-
-export const ApplicationDefinition = makeApplicationDefinition({
+export const ApplicationDefinition = Block.makeDefinition('Application', {
   Model,
   Message,
 })
@@ -47,7 +43,7 @@ type ApplicationViewBuilder = Block.ViewBuilderFor<
   typeof ApplicationComposition
 >
 
-export const DetermineStartTime = ApplicationDefinition.command(
+export const DetermineStartTime = ApplicationDefinition.makeCommand(
   'DetermineStartTime',
   {
     args: { elapsedMs: Schema.Number },
@@ -67,7 +63,7 @@ export const DetermineStartTime = ApplicationDefinition.command(
   },
 )
 
-export const DetermineTickTime = ApplicationDefinition.command(
+export const DetermineTickTime = ApplicationDefinition.makeCommand(
   'DetermineTickTime',
   {
     args: { startTime: Schema.Number },
@@ -136,7 +132,7 @@ export const init = ApplicationComposition.makeInit(() => ({
   },
 }))
 
-export const subscriptions = ApplicationDefinition.subscriptions(entry => ({
+export const subscriptions = ApplicationDefinition.makeSubscriptions(entry => ({
   stopwatchTicks: entry(
     'StopwatchTicks',
     { isRunning: Schema.Boolean },
@@ -260,3 +256,16 @@ const startStopButton = (
 
 const buttonStyle =
   'px-6 py-4 flex-1 font-semibold text-white transition-colors'
+
+const prepare = () =>
+  ApplicationComposition.prepareBlock({
+    init,
+    update,
+    view,
+    subscriptions,
+    EffectsLayer,
+  })
+export const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

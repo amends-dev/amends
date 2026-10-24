@@ -71,9 +71,9 @@ const splitBoundary = (boundaryId: BoundaryId): ReadonlyArray<string> =>
 /** Per-runtime registry of Block wrapping blocks. The runtime
  *  creates one of these in `start` and reuses it across renders.
  *  `h.block` writes into `wraps` each render and attaches a snabbdom
- *  `destroy` hook that calls `deregisterBoundaryWrap` when the
- *  corresponding vnode is removed from the DOM tree. The dispatch path
- *  reads from `wraps` at event-fire time.
+ *  `postdestroy` hook that calls `deregisterBoundaryWrap` when snabbdom
+ *  destroys the corresponding vnode. The dispatch path reads from `wraps` at
+ *  event-fire time.
  *
  *  `boundaryDispatches` caches per-(outerDispatch, boundaryId) dispatcher
  *  closures so `requireDispatch` returns a stable reference across
@@ -94,8 +94,9 @@ const splitBoundary = (boundaryId: BoundaryId): ReadonlyArray<string> =>
  *  replay render's wraps occupy `wraps`. Its dispatcher therefore reads only
  *  the wraps registered by renders with the same root Mount dispatcher, while
  *  still seeing replacements from later live renders. `mountWrapOwners`
- *  records every owner that has occupied a boundary so its final destroy hook
- *  can clear entries whose earlier hooks were replaced by in-place patches.
+ *  records every owner that has occupied a boundary so its final
+ *  `postdestroy` hook can clear entries whose earlier hooks were replaced by
+ *  in-place patches.
  *
  *  `seenThisRender` tracks boundaries marked alive during the current
  *  render for duplicate-slotId detection: two `h.block` calls
@@ -107,8 +108,8 @@ const splitBoundary = (boundaryId: BoundaryId): ReadonlyArray<string> =>
  *  cache hit are replayed into this map via
  *  {@link restoreBoundaryWrapsForLazyHit} so the duplicate-slotId guard
  *  catches collisions against memoized siblings, not just against siblings
- *  that re-ran this frame. It does not drive pruning; VNode destroy hooks
- *  remove a block only when it is still the current entry, so an old
+ *  that re-ran this frame. It does not drive pruning; VNode `postdestroy`
+ *  hooks remove a block only when it is still the current entry, so an old
  *  root cannot delete a same-cycle remount.
  *
  *  `lazyTrackingStack` is a stack of maps used by `createLazy` and
@@ -126,7 +127,7 @@ const splitBoundary = (boundaryId: BoundaryId): ReadonlyArray<string> =>
  *  Block view's registration and lazy-cache writes transactional. If that
  *  view throws or returns `null`, every nested registration and cache entry it
  *  produced is restored because none of those VNodes will reach snabbdom and
- *  run its destroy hook. */
+ *  run its `postdestroy` hook. */
 export type BoundaryRegistry = {
   readonly wraps: Map<BoundaryId, WrapBlock>
   readonly boundaryDispatches: WeakMap<
@@ -506,8 +507,9 @@ const clearBoundaryDispatches = (
 
 /** Removes a boundary's wrap when it still matches the block owned by the
  *  VNode being destroyed. A replacement registered earlier in the same patch
- *  is left intact. Called by `h.block`'s destroy hook when the corresponding
- *  VNode leaves the DOM.
+ *  is left intact. Called by `h.block`'s `postdestroy` hook when snabbdom
+ *  destroys the corresponding VNode, after every `destroy` hook in that VNode's
+ *  subtree has run.
  *
  *  Removes cached dispatchers only when this block still owns the
  *  current wrap, so a stale destroy hook cannot evict a replacement's cache. */
@@ -542,7 +544,7 @@ export const deregisterBoundaryWrap = (
 
 /** Restores the registry entries replaced by one boundary registration that
  *  did not produce a VNode. Used when a Block view throws or returns
- *  `null`, where no destroy hook will run and cleanup must undo only that
+ *  `null`, where no `postdestroy` hook will run and cleanup must undo only that
  *  render owner's write without evicting blocks retained by the
  *  currently rendered tree. */
 const rollbackBoundaryWrapRegistration = (
@@ -834,11 +836,10 @@ const dispatchAcrossBoundary = (
  *  which defers the chain lookup to fire time, this snapshots the chain at call
  *  time so the resulting thunk survives the boundary being deregistered.
  *
- *  Used by `OnUnmount`: its destroy hook fires during the patch that tears the
- *  boundary down, after the Block's own destroy hook has already removed the
- *  wrap, so a fire-time lookup would throw. Resolving eagerly while the chain is
- *  still live and dispatching the precomputed root message at destroy time
- *  avoids that race. Throws here (at resolve time, boundary alive) if a wrap is
+ *  Used by `OnUnmount`, whose dispatch runs during teardown or, after a failed
+ *  replay patch, later still. Resolving eagerly while the chain is live means
+ *  that dispatch does not depend on what the registry holds at teardown time.
+ *  Throws here (at resolve time, boundary alive) if a wrap is
  *  somehow already missing, surfacing a real corruption rather than misrouting. */
 export const resolveBoundaryDispatchThunk = (
   registry: BoundaryRegistry,
@@ -955,7 +956,7 @@ export const resolveMountBoundaryDispatch = (
  *  per-render duplicate-slotId tracking map so siblings inside the
  *  same parent boundary can be re-validated. Does not touch the wrap
  *  or dispatcher tables. Those persist across renders and are evicted
- *  by VNode destroy hooks instead. */
+ *  by VNode `postdestroy` hooks instead. */
 export const beginRender = (registry: BoundaryRegistry): void => {
   registry.seenThisRender.clear()
   registry.dedupeSeen.clear()

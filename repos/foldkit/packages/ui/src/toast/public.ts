@@ -14,6 +14,3 @@ export {
   type EntryHandlers,
   type Completed,
 } from './index.js'
-
-export * as test from './test.js'
-export type { DrainEntryInput } from './test.js'

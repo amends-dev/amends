@@ -2,9 +2,9 @@ import { Effect, Layer, Schema, Stream } from 'effect'
 import { expect, it, vi } from 'vitest'
 
 import { makeDefinition } from '../block/define.js'
+import * as Block from '../block/public.js'
 import { renderToString } from '../experimental/server/server.js'
 import { defineMessageUnion } from '../message/index.js'
-import { makeDefinition as makeApplicationDefinition } from '../runtime/applicationPublic.js'
 import { modifyFields } from '../struct/index.js'
 import * as Scene from './scene.js'
 import * as Story from './story.js'
@@ -21,7 +21,7 @@ const ChildDefinition = makeDefinition('GeneratedSimulationChild', {
   Model: ChildModel,
   Message: ChildMessage,
 })
-const ReadCount = ChildDefinition.command('ReadCount', {
+const ReadCount = ChildDefinition.makeCommand('ReadCount', {
   messages: [ChildMessage.CompletedReadCount],
   handler: function* () {
     yield* Effect.sync(constructHandler)
@@ -33,7 +33,7 @@ const ReadCount = ChildDefinition.command('ReadCount', {
       })
   },
 })
-const subscriptions = ChildDefinition.subscriptions(entry => ({
+const subscriptions = ChildDefinition.makeSubscriptions(entry => ({
   observations: entry('Observations', {
     messages: [ChildMessage.ObservedCount],
     handler: function* () {
@@ -44,35 +44,43 @@ const subscriptions = ChildDefinition.subscriptions(entry => ({
   }),
 }))
 const ChildComposition = ChildDefinition.makeComposition()
-const ChildBlock = ChildComposition.assembleBlock({
-  init: ChildComposition.makeInit(() => ({ model: { count: 0 } })),
-  update: ChildComposition.makeUpdate((model, message) =>
-    ChildMessage.match(message, {
-      RequestedReadCount: () => ({ model, commands: [ReadCount()] }),
-      CompletedReadCount: ({ count }) => ({
-        model: modifyFields(model, { count: () => count }),
+const prepareChildBlock = () =>
+  ChildComposition.prepareBlock({
+    init: ChildComposition.makeInit(() => ({ model: { count: 0 } })),
+    update: ChildComposition.makeUpdate((model, message) =>
+      ChildMessage.match(message, {
+        RequestedReadCount: () => ({ model, commands: [ReadCount()] }),
+        CompletedReadCount: ({ count }) => ({
+          model: modifyFields(model, { count: () => count }),
+        }),
+        ObservedCount: ({ count }) => ({
+          model: modifyFields(model, { count: () => count }),
+        }),
       }),
-      ObservedCount: ({ count }) => ({
-        model: modifyFields(model, { count: () => count }),
-      }),
-    }),
-  ),
-  view: ChildComposition.makeView((model, h) =>
-    h.section(
-      [],
-      [
-        h.button(
-          [h.OnClick(ChildMessage.RequestedReadCount())],
-          ['Read count'],
-        ),
-        h.output([], [globalThis.String(model.count)]),
-      ],
     ),
-  ),
-  subscriptions,
-  operations: { requestReadCount: ChildMessage.RequestedReadCount },
-  EffectsLayer: Layer.merge(ReadCount.layer, subscriptions.observations.layer),
-})
+    view: ChildComposition.makeView((model, h) =>
+      h.section(
+        [],
+        [
+          h.button(
+            [h.OnClick(ChildMessage.RequestedReadCount())],
+            ['Read count'],
+          ),
+          h.output([], [globalThis.String(model.count)]),
+        ],
+      ),
+    ),
+    subscriptions,
+    operations: { requestReadCount: ChildMessage.RequestedReadCount },
+    EffectsLayer: Layer.merge(
+      ReadCount.layer,
+      subscriptions.observations.layer,
+    ),
+  })
+const ChildBlock: Block.FromAssemblyWithView<
+  typeof ChildModel,
+  typeof prepareChildBlock
+> = Block.assemble(prepareChildBlock)
 
 const ParentModel = Schema.Struct({ child: ChildBlock.Model })
 const ParentMessage = defineMessageUnion({ RequestedRefresh: {} })
@@ -80,27 +88,37 @@ const ParentDefinition = makeDefinition('GeneratedSimulationParent', {
   Model: ParentModel,
   Message: ParentMessage,
 })
-const ChildBinding = ParentDefinition.bindChild(ChildBlock, { field: 'child' })
+const ChildBinding = ParentDefinition.makeBinding(ChildBlock, {
+  field: 'child',
+})
 const ParentComposition = ParentDefinition.makeComposition({
   bindings: [ChildBinding],
 })
-const ParentBlock = ParentComposition.assembleBlock({
-  init: ParentComposition.makeInit(() => ({ model: {} })),
-  update: ParentComposition.makeUpdate((model, message) =>
-    ParentMessage.match(message, {
-      RequestedRefresh: () => ChildBinding.requestReadCount()(model),
-    }),
-  ),
-  view: ParentComposition.makeView((model, h) =>
-    h.block(ChildBinding.embedView({ slotId: 'child', model: model.child })),
-  ),
-  operations: { requestRefresh: ParentMessage.RequestedRefresh },
-})
+const prepareParentBlock = () =>
+  ParentComposition.prepareBlock({
+    init: ParentComposition.makeInit(() => ({ model: {} })),
+    update: ParentComposition.makeUpdate((model, message) =>
+      ParentMessage.match(message, {
+        RequestedRefresh: () => ChildBinding.requestReadCount()(model),
+      }),
+    ),
+    view: ParentComposition.makeView((model, h) =>
+      h.block(ChildBinding.embedView({ slotId: 'child', model: model.child })),
+    ),
+    operations: { requestRefresh: ParentMessage.RequestedRefresh },
+  })
+const ParentBlock: Block.FromAssemblyWithView<
+  typeof ParentModel,
+  typeof prepareParentBlock
+> = Block.assemble(prepareParentBlock)
 
 const Model = Schema.Struct({ parent: ParentBlock.Model })
 const Message = defineMessageUnion({ RequestedRefresh: {} })
-const ApplicationDefinition = makeApplicationDefinition({ Model, Message })
-const ParentBinding = ApplicationDefinition.bindChild(ParentBlock, {
+const ApplicationDefinition = Block.makeDefinition('Application', {
+  Model,
+  Message,
+})
+const ParentBinding = ApplicationDefinition.makeBinding(ParentBlock, {
   field: 'parent',
 })
 const ApplicationComposition = ApplicationDefinition.makeComposition({
@@ -124,7 +142,7 @@ const view = ApplicationComposition.makeView((model, h) => ({
   ),
 }))
 const sceneSubscriptions = Scene.subscriptions(ApplicationComposition)
-const localSubscriptions = ApplicationDefinition.subscriptions(entry => ({
+const localSubscriptions = ApplicationDefinition.makeSubscriptions(entry => ({
   refresh: entry('Refresh', { messages: [Message.RequestedRefresh] }),
 }))
 
@@ -132,7 +150,7 @@ const ForeignDefinition = makeDefinition('GeneratedSimulationForeign', {
   Model: ChildModel,
   Message: ChildMessage,
 })
-const foreignSubscriptions = ForeignDefinition.subscriptions(entry => ({
+const foreignSubscriptions = ForeignDefinition.makeSubscriptions(entry => ({
   observations: entry('Observations', {
     messages: [ChildMessage.ObservedCount],
   }),
@@ -229,11 +247,11 @@ it('rejects a root declaration that collides with a child registration', () => {
   ).toThrow('duplicate key "parent/child/observations"')
 })
 
-it('requires a framework-created Application Composition for registry assembly', () => {
+it('requires a framework-created root Composition for registry assembly', () => {
   expect(() =>
     // @ts-expect-error Erased JavaScript input must receive an actionable configuration error.
     Scene.subscriptions({}),
-  ).toThrow('Application composition must come from')
+  ).toThrow('Scene.subscriptions Composition must come from')
 })
 
 it('decodes a complete dispatch contract and replays it through pure update', () => {
@@ -260,12 +278,14 @@ it('decodes a complete dispatch contract and replays it through pure update', ()
 })
 
 it('renders nested generated Blocks on the server without constructing handlers', async () => {
+  const prepare = () =>
+    ApplicationComposition.prepareBlock({ init, update, view })
+  const completedBlock: Block.FromAssemblyWithView<
+    typeof Model,
+    typeof prepare
+  > = Block.assemble(prepare)
   const rendered = await Effect.runPromise(
-    renderToString(
-      ApplicationComposition,
-      { init, update, view },
-      { isHydratable: false },
-    ),
+    renderToString(completedBlock, {}, { isHydratable: false }),
   )
 
   expect(rendered.html).toContain('<output>0</output>')

@@ -36,8 +36,8 @@ const isMountDefinitionCall = (
   references: WeakMap<ESTree.Node, Reference> | undefined,
 ): boolean => {
   if (
-    isOwnedDefinitionCall(node, 'mount', references) ||
-    isOwnedDefinitionCall(node, 'mountStream', references)
+    isOwnedDefinitionCall(node, 'makeMount', references) ||
+    isOwnedDefinitionCall(node, 'makeMountStream', references)
   ) {
     return true
   }

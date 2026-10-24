@@ -21,9 +21,11 @@ Use named imports when the file contains only Story tests. If a file contains bo
 
 ### Match Commands by Definition or Instance
 
-A Command matcher accepts either a Definition or an instance. A Definition matches by name. An instance also checks structurally equal arguments.
+A Command matcher accepts either a Definition or an instance. A Definition matches the originating declaration, even after a Binding qualifies its displayed name. An instance also checks structurally equal arguments, and a bound instance selects its composition path.
 
-Use `FetchWeather` when the test only cares that the Command was dispatched. Use `FetchWeather({ zipCode: '90210' })` when the zip code is part of the contract.
+Use `FetchWeather` when the test only cares that this Command was dispatched. Use `FetchWeather({ zipCode: '90210' })` when the placement and zip code are part of the contract. Do not compare `command.name` with a string or with `Definition.name`: different owners may declare the same local name, while a bound Command's displayed name includes its placement.
+
+For before-and-after examples covering generated child delivery and completed UI Blocks, see [Migrate an existing test suite](/testing#migrate-an-existing-test-suite).
 
 :::Info{label="Mount lifecycle is a Scene concern"}
 Story does not render the view, so the OnMount lifecycle is not observable from a Story test. Tests that need to acknowledge mounts use Scene's `Mount.resolve` and the related steps; see the [Scene](/testing/scene) page.
@@ -67,7 +69,7 @@ When resolving a Command from a [child Block](/core/block), pass the child's res
 
 ### UI Component Test Helpers
 
-Before writing resolvers for an `@foldkit/ui` component, check its `test` namespace for helpers. For example, [`Toast.test.drainEntry`](/ui/toast#testing) handles the animation and timer Commands for a newly shown toast that auto-dismisses.
+Before writing resolvers for an `@foldkit/ui` component, check the completed component's `test` namespace for lifecycle helpers. These helpers preserve the component instance's Command identity while resolving its internal transitions. For example, the [Toast test helper](/ui/toast#testing) handles the animation and timer Commands for a newly shown toast that auto-dismisses.
 
 ## Reusable Step Groups
 

@@ -15,8 +15,8 @@ const BindingMessagePolicyContextChildComposition = Block.makeDefinition(
     Message: ChildMessage,
   },
 ).makeComposition()
-export const ContextChildBlock =
-  BindingMessagePolicyContextChildComposition.assembleBlock({
+const prepareContextChildBlock = () =>
+  BindingMessagePolicyContextChildComposition.prepareBlock({
     init: BindingMessagePolicyContextChildComposition.makeInit(() => ({
       model: ChildModel.make({ value: '' }),
     })),
@@ -24,6 +24,10 @@ export const ContextChildBlock =
       (model, _message, _context: DispatchContext) => ({ model }),
     ),
   })
+export const ContextChildBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ChildModel,
+  typeof prepareContextChildBlock
+> = Block.assemble(prepareContextChildBlock)
 
 const BindingMessagePolicySilentChildComposition = Block.makeDefinition(
   'BindingMessagePolicySilentChild',
@@ -32,13 +36,17 @@ const BindingMessagePolicySilentChildComposition = Block.makeDefinition(
     Message: Schema.Never,
   },
 ).makeComposition()
-export const SilentChildBlock =
-  BindingMessagePolicySilentChildComposition.assembleBlock({
+const prepareSilentChildBlock = () =>
+  BindingMessagePolicySilentChildComposition.prepareBlock({
     init: BindingMessagePolicySilentChildComposition.makeInit(() => ({
       model: ChildModel.make({ value: '' }),
     })),
     update: BindingMessagePolicySilentChildComposition.makeUpdate(),
   })
+export const SilentChildBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ChildModel,
+  typeof prepareSilentChildBlock
+> = Block.assemble(prepareSilentChildBlock)
 
 export const Entry = Schema.Struct({
   id: Schema.String,
@@ -59,7 +67,7 @@ export const BindingMessagePolicyParentDefinition = Block.makeDefinition(
   },
 )
 
-export const ContextBinding = BindingMessagePolicyParentDefinition.bindChild(
+export const ContextBinding = BindingMessagePolicyParentDefinition.makeBinding(
   ContextChildBlock,
   {
     placement: 'child',
@@ -71,7 +79,7 @@ export const ContextBinding = BindingMessagePolicyParentDefinition.bindChild(
   },
 )
 
-export const KeyedBinding = BindingMessagePolicyParentDefinition.bindChild(
+export const KeyedBinding = BindingMessagePolicyParentDefinition.makeBinding(
   ContextChildBlock,
   {
     placement: 'entries',
@@ -86,7 +94,7 @@ export const KeyedBinding = BindingMessagePolicyParentDefinition.bindChild(
   },
 )
 
-export const SilentBinding = BindingMessagePolicyParentDefinition.bindChild(
+export const SilentBinding = BindingMessagePolicyParentDefinition.makeBinding(
   SilentChildBlock,
   {
     placement: 'silent',
@@ -96,7 +104,7 @@ export const SilentBinding = BindingMessagePolicyParentDefinition.bindChild(
 )
 
 export const SilentKeyedBinding =
-  BindingMessagePolicyParentDefinition.bindChild(SilentChildBlock, {
+  BindingMessagePolicyParentDefinition.makeBinding(SilentChildBlock, {
     placement: 'silentEntries',
     readAll: model => model.silentEntries,
     key: entry => entry.id,

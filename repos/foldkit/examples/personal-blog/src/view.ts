@@ -16,7 +16,7 @@ import { proseView } from './prose'
 import * as Route from './route'
 
 const islandViews = (
-  model: Model,
+  model: typeof Model.Type,
   h: ApplicationViewBuilder,
 ): Markdown.Islands =>
   Markdown.islandsFor(islandAttributes, {
@@ -56,7 +56,7 @@ const navLinkClassName = ({ isActive }: { isActive: boolean }): string =>
   })
 
 const headerView = (
-  currentRoute: Route.ApplicationRoute,
+  currentRoute: typeof Route.ApplicationRoute.Type,
   h: ApplicationViewBuilder,
 ): Html =>
   h.header(
@@ -123,10 +123,13 @@ const headerView = (
     ],
   )
 
-const homeView = (model: Model, h: ApplicationViewBuilder): Html =>
+const homeView = (model: typeof Model.Type, h: ApplicationViewBuilder): Html =>
   proseView(about, islandViews(model, h))
 
-const postCardView = (post: Post, h: ApplicationViewBuilder): Html =>
+const postCardView = (
+  post: typeof Post.Type,
+  h: ApplicationViewBuilder,
+): Html =>
   h.keyed('li')(
     post.slug,
     [],
@@ -175,7 +178,7 @@ const missingPostView = (slug: string, h: ApplicationViewBuilder): Html =>
 
 const postView = (
   slug: string,
-  model: Model,
+  model: typeof Model.Type,
   h: ApplicationViewBuilder,
 ): Html => {
   const maybePost = findPost(slug)
@@ -239,7 +242,7 @@ const notFoundView = (path: string, h: ApplicationViewBuilder): Html =>
     ],
   )
 
-const routeTitle = (route: Route.ApplicationRoute): string =>
+const routeTitle = (route: typeof Route.ApplicationRoute.Type): string =>
   Route.ApplicationRoute.match(route, {
     Home: () => 'Devin Jameson',
     Posts: () => 'Posts | Devin Jameson',

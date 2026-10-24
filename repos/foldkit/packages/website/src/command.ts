@@ -26,8 +26,8 @@ const detectPlaygroundSupport = (): boolean =>
   !navigator.userAgent.includes('Firefox/')
 
 const loadBrowserEnvironment = Effect.gen(function* () {
-  const themePreference: Option.Option<ThemePreference> = yield* Effect.gen(
-    function* () {
+  const themePreference: Option.Option<typeof ThemePreference.Type> =
+    yield* Effect.gen(function* () {
       const store = yield* LocalStorage
       const json = yield* Effect.fromOption(
         Option.fromNullishOr(yield* store.get(THEME_STORAGE_KEY)),
@@ -36,11 +36,14 @@ const loadBrowserEnvironment = Effect.gen(function* () {
         Schema.fromJsonString(ThemePreference),
       )(json)
       return Option.some(theme)
-    },
-  ).pipe(Effect.catch(() => Effect.succeed(Option.none<ThemePreference>())))
+    }).pipe(
+      Effect.catch(() =>
+        Effect.succeed(Option.none<typeof ThemePreference.Type>()),
+      ),
+    )
 
-  const maybeSidebarState: Option.Option<SidebarState> = yield* Effect.gen(
-    function* () {
+  const maybeSidebarState: Option.Option<typeof SidebarState.Type> =
+    yield* Effect.gen(function* () {
       const store = yield* SessionStorage
       const json = yield* Effect.fromOption(
         Option.fromNullishOr(yield* store.get(SIDEBAR_STORAGE_KEY)),
@@ -48,10 +51,13 @@ const loadBrowserEnvironment = Effect.gen(function* () {
       const state = yield* Schema.decodeEffect(SidebarStateJsonString)(json)
 
       return Option.some(state)
-    },
-  ).pipe(Effect.catch(() => Effect.succeed(Option.none<SidebarState>())))
+    }).pipe(
+      Effect.catch(() =>
+        Effect.succeed(Option.none<typeof SidebarState.Type>()),
+      ),
+    )
 
-  const systemTheme: ResolvedTheme = yield* Effect.sync(() =>
+  const systemTheme: typeof ResolvedTheme.Type = yield* Effect.sync(() =>
     window.matchMedia(DARK_COLOR_SCHEME_QUERY).matches ? 'Dark' : 'Light',
   )
 
@@ -73,7 +79,7 @@ const loadBrowserEnvironment = Effect.gen(function* () {
   })
 })
 
-export const InjectAnalytics = ApplicationDefinition.command(
+export const InjectAnalytics = ApplicationDefinition.makeCommand(
   'InjectAnalytics',
   {
     messages: [Message.CompletedInjectAnalytics],
@@ -86,7 +92,7 @@ export const InjectAnalytics = ApplicationDefinition.command(
   },
 )
 
-export const LoadBrowserEnvironment = ApplicationDefinition.command(
+export const LoadBrowserEnvironment = ApplicationDefinition.makeCommand(
   'LoadBrowserEnvironment',
   {
     messages: [Message.CompletedLoadBrowserEnvironment],
@@ -96,7 +102,7 @@ export const LoadBrowserEnvironment = ApplicationDefinition.command(
   },
 )
 
-export const InjectSpeedInsights = ApplicationDefinition.command(
+export const InjectSpeedInsights = ApplicationDefinition.makeCommand(
   'InjectSpeedInsights',
   {
     messages: [Message.CompletedInjectSpeedInsights],
@@ -109,7 +115,7 @@ export const InjectSpeedInsights = ApplicationDefinition.command(
   },
 )
 
-export const CopyLink = ApplicationDefinition.command('CopyLink', {
+export const CopyLink = ApplicationDefinition.makeCommand('CopyLink', {
   args: { url: Schema.String },
   messages: [Message.SucceededCopyLink, Message.FailedCopyLink],
   handler: function* () {
@@ -124,7 +130,7 @@ export const CopyLink = ApplicationDefinition.command('CopyLink', {
   },
 })
 
-export const ScrollToTop = ApplicationDefinition.command('ScrollToTop', {
+export const ScrollToTop = ApplicationDefinition.makeCommand('ScrollToTop', {
   messages: [Message.CompletedScrollToTop],
   handler: function* () {
     return () =>
@@ -135,22 +141,24 @@ export const ScrollToTop = ApplicationDefinition.command('ScrollToTop', {
   },
 })
 
-export const ScrollToAnchor = ApplicationDefinition.command('ScrollToAnchor', {
-  args: { hash: Schema.String },
-  messages: [Message.CompletedScrollToAnchor],
-  handler: function* () {
-    return ({ hash }) =>
-      Effect.gen(function* () {
-        const target = `#${CSS.escape(hash)}`
-        yield* Dom.scrollIntoViewAfterPaint(target, { block: 'start' })
-        yield* Dom.focus(target, { preventScroll: true, makeFocusable: true })
-      }).pipe(Effect.ignore, Effect.as(Message.CompletedScrollToAnchor()))
-  },
-})
-
-export const ScrollSidebarActiveLinkIntoView = ApplicationDefinition.command(
-  'ScrollSidebarActiveLinkIntoView',
+export const ScrollToAnchor = ApplicationDefinition.makeCommand(
+  'ScrollToAnchor',
   {
+    args: { hash: Schema.String },
+    messages: [Message.CompletedScrollToAnchor],
+    handler: function* () {
+      return ({ hash }) =>
+        Effect.gen(function* () {
+          const target = `#${CSS.escape(hash)}`
+          yield* Dom.scrollIntoViewAfterPaint(target, { block: 'start' })
+          yield* Dom.focus(target, { preventScroll: true, makeFocusable: true })
+        }).pipe(Effect.ignore, Effect.as(Message.CompletedScrollToAnchor()))
+    },
+  },
+)
+
+export const ScrollSidebarActiveLinkIntoView =
+  ApplicationDefinition.makeCommand('ScrollSidebarActiveLinkIntoView', {
     messages: [Message.CompletedScrollSidebarActiveLinkIntoView],
     handler: function* () {
       return () =>
@@ -161,14 +169,12 @@ export const ScrollSidebarActiveLinkIntoView = ApplicationDefinition.command(
           Effect.as(Message.CompletedScrollSidebarActiveLinkIntoView()),
         )
     },
-  },
-)
+  })
 
 const MOBILE_MENU_ACTIVE_LINK = `#${MOBILE_MENU_NAV_ID} [aria-current="page"]`
 
-export const ScrollMobileMenuActiveLinkIntoView = ApplicationDefinition.command(
-  'ScrollMobileMenuActiveLinkIntoView',
-  {
+export const ScrollMobileMenuActiveLinkIntoView =
+  ApplicationDefinition.makeCommand('ScrollMobileMenuActiveLinkIntoView', {
     messages: [Message.CompletedScrollMobileMenuActiveLinkIntoView],
     handler: function* () {
       return () =>
@@ -179,10 +185,9 @@ export const ScrollMobileMenuActiveLinkIntoView = ApplicationDefinition.command(
           Effect.as(Message.CompletedScrollMobileMenuActiveLinkIntoView()),
         )
     },
-  },
-)
+  })
 
-export const SaveSidebarState = ApplicationDefinition.command(
+export const SaveSidebarState = ApplicationDefinition.makeCommand(
   'SaveSidebarState',
   {
     args: { state: SidebarState },
@@ -204,7 +209,7 @@ export const SaveSidebarState = ApplicationDefinition.command(
   },
 )
 
-export const NavigateInternal = ApplicationDefinition.command(
+export const NavigateInternal = ApplicationDefinition.makeCommand(
   'NavigateInternal',
   {
     args: { url: Schema.String },
@@ -216,7 +221,7 @@ export const NavigateInternal = ApplicationDefinition.command(
   },
 )
 
-export const LoadExternal = ApplicationDefinition.command('LoadExternal', {
+export const LoadExternal = ApplicationDefinition.makeCommand('LoadExternal', {
   args: { href: Schema.String },
   messages: [Message.CompletedLoadExternal],
   handler: function* () {

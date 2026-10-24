@@ -1,5 +1,11 @@
 import { Struct } from 'effect'
 
+type ModelOnlyReturn<Model> = Readonly<{
+  model: Model
+  commands?: never
+  outMessage?: never
+}>
+
 type FieldTransforms<Model> = Partial<{
   [Field in keyof Model]: (value: Model[Field]) => Model[Field]
 }>
@@ -32,9 +38,7 @@ interface ObjectStepFields<Model extends object> {
     evolve: Evolve,
     ...validation: Validation
   ): NoInfer<
-    (
-      model: Model,
-    ) => Readonly<{ model: FieldStepModel<Model, ReturnType<Evolve>> }>
+    (model: Model) => ModelOnlyReturn<FieldStepModel<Model, ReturnType<Evolve>>>
   >
 }
 
@@ -73,9 +77,7 @@ export const makeStepFields = <
     evolve: Evolve,
     ...validation: Validation
   ): NoInfer<
-    (
-      model: Model,
-    ) => Readonly<{ model: FieldStepModel<Model, ReturnType<Evolve>> }>
+    (model: Model) => ModelOnlyReturn<FieldStepModel<Model, ReturnType<Evolve>>>
   >
   function stepFields(
     evolve: (model: Model) => FieldTransforms<Model>,
@@ -92,7 +94,7 @@ export const makeStepFields = <
  * without undoing the child transition or suppressing its Message.
  */
 export interface DefineStepNoop<Model> {
-  (): <Current extends Model>(model: Current) => Readonly<{ model: Current }>
+  (): <Current extends Model>(model: Current) => ModelOnlyReturn<Current>
 }
 
 /** @internal Creates the Model-preserving Step without an execution mechanism. */

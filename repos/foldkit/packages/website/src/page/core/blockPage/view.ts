@@ -1,5 +1,5 @@
 import { clsx } from 'clsx'
-import { type Html, type HtmlBuilder } from 'foldkit/html'
+import { type Html } from 'foldkit/html'
 
 import { Disclosure } from '@foldkit/ui'
 
@@ -7,7 +7,7 @@ import { CodeBlock } from '../../../component'
 import { Icon } from '../../../icon'
 import { type RenderHeadingLink, inlineCode } from '../../../prose'
 import * as Snippet from '../../../snippet'
-import { BlockPageComposition } from './composition'
+import { BlockPageComposition, type BlockPageViewBuilder } from './composition'
 import { BlockPageContent } from './content'
 import { Message } from './message'
 import { type Model } from './model'
@@ -21,9 +21,9 @@ export type ViewInputs = Readonly<{
 }>
 
 const mapMessagesUnderHoodDemo = (
-  model: Model,
+  model: typeof Model.Type,
   renderSnippet: CodeBlock.RenderSnippet,
-  h: HtmlBuilder<Message>,
+  h: BlockPageViewBuilder,
 ): Html =>
   Disclosure.view(
     {

@@ -12,8 +12,10 @@ import {
   isCallExpression,
   blockBindingMethod,
   isIdentifierReference,
+  isBindingPolicyCall,
   isObjectExpression,
   isObjectProperty,
+  isOwnedDefinitionCall,
   isUnshadowedReference,
   staticPropertyName,
 } from '../guards.ts'
@@ -119,6 +121,15 @@ const isBindingForwardProperty = (
   const configuration = policyProperty?.parent
   const binding = configuration?.parent
 
+  if (
+    isObjectExpression(policy) &&
+    isCallExpression(policyProperty) &&
+    Array.contains(policyProperty.arguments, policy) &&
+    isBindingPolicyCall(policyProperty, references)
+  ) {
+    return true
+  }
+
   return (
     isObjectExpression(policy) &&
     isObjectProperty(policyProperty) &&
@@ -126,6 +137,31 @@ const isBindingForwardProperty = (
     isObjectExpression(configuration) &&
     isCallExpression(binding) &&
     Option.isSome(blockBindingMethod(binding, references))
+  )
+}
+
+const isEmptyOutMessageForwardCases = (
+  node: ESTree.ObjectExpression,
+  references: WeakMap<ESTree.Node, Reference> | undefined,
+): boolean => {
+  const call = node.parent
+  if (
+    !isCallExpression(call) ||
+    !Option.contains(Array.get(call.arguments, 1), node) ||
+    !isOwnedDefinitionCall(call, 'makeOutMessageForward', references) ||
+    Array.isArrayEmpty(node.properties)
+  ) {
+    return false
+  }
+
+  return Array.every(
+    node.properties,
+    property =>
+      isObjectProperty(property) &&
+      !property.computed &&
+      property.kind === 'init' &&
+      isMapperFunction(property.value) &&
+      forwardsNothing(references, property.value),
   )
 }
 
@@ -198,6 +234,16 @@ export const noEmptyToParentOutMessage = Rule.define({
       ObjectExpression: (node: ESTree.Node) => {
         if (!isObjectExpression(node)) {
           return Effect.void
+        }
+
+        if (isEmptyOutMessageForwardCases(node, references)) {
+          return ctx.report(
+            Diagnostic.make({
+              node,
+              message:
+                'Omit forwarding. Every makeOutMessageForward handler returns undefined.',
+            }),
+          )
         }
 
         const hasSpread = Array.some(

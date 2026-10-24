@@ -5,7 +5,6 @@ const Model = Schema.Struct({
   order: OrderData.schema,
   route: ApplicationRoute,
 })
-type Model = typeof Model.Type
 
 const update = ApplicationComposition.makeUpdate((model, message) =>
   Message.match(message, {

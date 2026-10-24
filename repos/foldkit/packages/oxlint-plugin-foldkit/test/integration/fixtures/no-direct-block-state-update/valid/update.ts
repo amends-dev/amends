@@ -88,7 +88,7 @@ export const updateParentWithOtherFold = (
   model: OuterModel,
   message: unknown,
 ) => {
-  const update = Update.combine(model, [
+  const update = Update.combineSteps(model, [
     stepModel => {
       const otherUpdate = foldOtherSettings(message)(stepModel.other)
 

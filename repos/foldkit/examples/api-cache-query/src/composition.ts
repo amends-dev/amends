@@ -5,39 +5,41 @@ import { ApplicationDefinition } from './definition'
 import { AppTabsBlock, TABS_ID, type Tab } from './model'
 import { postQuery, postsQuery, statsQuery } from './query'
 
-export const PostsBinding = ApplicationDefinition.bindChild(postsQuery, {
+export const PostsBinding = ApplicationDefinition.makeBinding(postsQuery, {
   field: 'posts',
 })
 
-export const StatsBinding = ApplicationDefinition.bindChild(statsQuery, {
+export const StatsBinding = ApplicationDefinition.makeBinding(statsQuery, {
   field: 'stats',
 })
 
-export const PostDetailsBinding = ApplicationDefinition.bindChild(postQuery, {
+export const PostDetailsBinding = ApplicationDefinition.makeBinding(postQuery, {
   field: 'postDetails',
 })
 
-const activateTab = (tab: Tab) => {
-  const selectTab = ApplicationDefinition.stepFields(() => ({
+const activateTab = (tab: typeof Tab.Type) => {
+  const selectTab = ApplicationDefinition.makeFieldsStep(() => ({
     activeTab: () => tab,
   }))
+
   const loadTab = Match.value(tab).pipe(
     Match.when('Posts', () => PostsBinding.requestLoadIfMissing()),
     Match.when('Stats', () => StatsBinding.requestLoadIfMissing()),
     Match.exhaustive,
   )
 
-  return Update.combine([selectTab, loadTab])
+  return ApplicationDefinition.makeStep(() =>
+    Update.combineSteps([selectTab, loadTab]),
+  )
 }
 
-const foldTabsOutMessage = AppTabsBlock.OutMessage.match({
-  Selected: ({ value }) => activateTab(value),
-})
-
-export const TabsBinding = ApplicationDefinition.bindChild(AppTabsBlock, {
+export const TabsBinding = ApplicationDefinition.makeBinding(AppTabsBlock, {
   field: 'tabs',
   init: { contextToArgs: () => [{ id: TABS_ID }] },
-  outMessage: { fold: foldTabsOutMessage },
+}).withOutMessagePolicy({
+  fold: ApplicationDefinition.makeOutMessageFold(AppTabsBlock, {
+    Selected: ({ value }) => activateTab(value),
+  }),
 })
 
 export const ApplicationComposition = ApplicationDefinition.makeComposition({

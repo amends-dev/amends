@@ -1,26 +1,20 @@
 import { Tuple } from 'effect'
 import type { Block } from 'foldkit'
-import { Update } from 'foldkit'
 
 import { DialogBlock } from '@foldkit/ui'
 
 import { clearSearchQuery } from './clear'
 import { SearchDefinition } from './definition'
-import { Message } from './message'
-import { Model } from './model'
 
-const foldDialogOutMessage = DialogBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Opened: () => SearchDefinition.stepNoop(),
-  Closed: () => SearchDefinition.stepNoop(),
-  CompletedClose: () => clearSearchQuery,
-})
-
-export const DialogBinding = SearchDefinition.bindChild(DialogBlock, {
+export const DialogBinding = SearchDefinition.makeBinding(DialogBlock, {
   field: 'dialog',
-  outMessage: { fold: foldDialogOutMessage },
   init: { contextToArgs: () => Tuple.make({ id: 'search-dialog' }) },
+}).withOutMessagePolicy({
+  fold: SearchDefinition.makeOutMessageFold(DialogBlock, {
+    Opened: SearchDefinition.makeNoopStep,
+    Closed: SearchDefinition.makeNoopStep,
+    CompletedClose: () => clearSearchQuery,
+  }),
 })
 
 export const SearchComposition = SearchDefinition.makeComposition({

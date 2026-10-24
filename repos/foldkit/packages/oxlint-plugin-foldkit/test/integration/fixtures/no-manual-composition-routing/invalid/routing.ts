@@ -1,5 +1,5 @@
 import { Match } from 'effect'
-import { makeApplicationDefinition } from 'foldkit'
+import { Block } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 
 const Message = defineMessageUnion({
@@ -9,15 +9,18 @@ const Message = defineMessageUnion({
   GotPickerEvent: { event: Picker.Message },
   ClickedSave: {},
 })
-const ApplicationDefinition = makeApplicationDefinition({ Model, Message })
+const ApplicationDefinition = Block.makeDefinition('Application', {
+  Model,
+  Message,
+})
 
-ApplicationDefinition.bindChild(DialogBlock, {
+ApplicationDefinition.makeBinding(DialogBlock, {
   field: 'dialog',
   parentMessage: Message.GotDialogMessage,
   fromParentMessage: false,
 })
 
-ApplicationDefinition.bindChild(PickerBlock, {
+ApplicationDefinition.makeBinding(PickerBlock, {
   field: 'picker',
   toParentMessage: message => Message.GotPickerEvent({ event: message }),
 })

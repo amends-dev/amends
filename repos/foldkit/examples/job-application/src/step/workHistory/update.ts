@@ -34,7 +34,7 @@ export const update = WorkHistoryComposition.makeUpdate((model, message) =>
     }),
 
     RequestedRevealErrors: () =>
-      Update.combine(
+      Update.combineSteps(
         model,
         Array.map(model.entries, entry =>
           EntriesBinding.requestRevealErrors(entry.id),
@@ -43,9 +43,9 @@ export const update = WorkHistoryComposition.makeUpdate((model, message) =>
   }),
 )
 
-export const hasErrors = (model: Model): boolean =>
+export const hasErrors = (model: typeof Model.Type): boolean =>
   Array.some(model.entries, entryHasErrors)
 
-export const isComplete = (model: Model): boolean =>
+export const isComplete = (model: typeof Model.Type): boolean =>
   Array.isReadonlyArrayNonEmpty(model.entries) &&
   Array.every(model.entries, isEntryComplete)

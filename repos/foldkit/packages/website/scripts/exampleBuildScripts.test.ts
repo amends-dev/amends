@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, extname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { canaryVersion } from '../../../scripts/lib/package-version.mjs'
 import { previewUploadTag } from '../../../scripts/lib/preview-release.mjs'
@@ -40,6 +40,14 @@ const previewManifest = async () => {
   }
 }
 
+type PlaygroundFiles = Awaited<ReturnType<typeof loadPlaygroundFiles>>
+type WorkspacePackageVersions = Awaited<
+  ReturnType<typeof loadPlaygroundWorkspacePackageVersions>
+>
+
+let stablePlaygroundFiles: PlaygroundFiles
+let stableWorkspacePackageVersions: WorkspacePackageVersions
+
 const buildScriptOf = (slug: string): string => {
   const manifest: Readonly<{ scripts: Readonly<Record<string, string>> }> =
     JSON.parse(
@@ -55,6 +63,35 @@ const buildScriptOf = (slug: string): string => {
 // made of. `vite build` reads the config rather than a script, so the config is
 // the file that has to reach both.
 describe('server-rendered example build scripts', () => {
+  beforeAll(async () => {
+    const previousCanaryCommit = process.env['VITE_FOLDKIT_CANARY_COMMIT']
+    const previousPreviewRelease = process.env['VITE_FOLDKIT_PREVIEW_RELEASE']
+    delete process.env['VITE_FOLDKIT_CANARY_COMMIT']
+    delete process.env['VITE_FOLDKIT_PREVIEW_RELEASE']
+
+    try {
+      const [playgroundFiles, workspacePackageVersions] = await Promise.all([
+        loadPlaygroundFiles(),
+        loadPlaygroundWorkspacePackageVersions(),
+      ])
+
+      stablePlaygroundFiles = playgroundFiles
+      stableWorkspacePackageVersions = workspacePackageVersions
+    } finally {
+      if (previousCanaryCommit === undefined) {
+        delete process.env['VITE_FOLDKIT_CANARY_COMMIT']
+      } else {
+        process.env['VITE_FOLDKIT_CANARY_COMMIT'] = previousCanaryCommit
+      }
+
+      if (previousPreviewRelease === undefined) {
+        delete process.env['VITE_FOLDKIT_PREVIEW_RELEASE']
+      } else {
+        process.env['VITE_FOLDKIT_PREVIEW_RELEASE'] = previousPreviewRelease
+      }
+    }
+  })
+
   for (const slug of SERVER_RENDERED_EXAMPLES) {
     it(`ships the config the ${slug} build command reads`, () => {
       expect(buildScriptOf(slug)).toBe('vite build')
@@ -69,9 +106,10 @@ describe('server-rendered example build scripts', () => {
     })
   }
 
-  it('retains the executable the transformed SSG build invokes', async () => {
-    const bySlug = await loadPlaygroundFiles()
-    const ssgEntry = Object.entries(bySlug).find(([slug]) => slug === 'ssg')
+  it('retains the executable the transformed SSG build invokes', () => {
+    const ssgEntry = Object.entries(stablePlaygroundFiles).find(
+      ([slug]) => slug === 'ssg',
+    )
     if (ssgEntry === undefined) {
       throw new Error('the transformed playground files omit ssg')
     }
@@ -91,23 +129,16 @@ describe('server-rendered example build scripts', () => {
     expect(manifest.devDependencies).toHaveProperty('vite')
   })
 
-  it('disables the MCP relay in every runnable playground', async () => {
-    const bySlug = await loadPlaygroundFiles()
+  it('disables the MCP relay in every runnable playground', () => {
+    expect(Object.keys(stablePlaygroundFiles)).not.toHaveLength(0)
 
-    expect(Object.keys(bySlug)).not.toHaveLength(0)
-
-    for (const [slug, { files }] of Object.entries(bySlug)) {
+    for (const [slug, { files }] of Object.entries(stablePlaygroundFiles)) {
       expect(files['vite.config.ts'], slug).toContain('devToolsMcpPort: false')
     }
   })
 
-  it('pins every transformed workspace dependency to its exact version', async () => {
-    const [bySlug, versions] = await Promise.all([
-      loadPlaygroundFiles(),
-      loadPlaygroundWorkspacePackageVersions(),
-    ])
-
-    for (const [slug, { files }] of Object.entries(bySlug)) {
+  it('pins every transformed workspace dependency to its exact version', () => {
+    for (const [slug, { files }] of Object.entries(stablePlaygroundFiles)) {
       const source = files['package.json']
       if (source === undefined) {
         throw new Error(`the ${slug} playground omits package.json`)
@@ -127,7 +158,9 @@ describe('server-rendered example build scripts', () => {
       for (const [name, specifier] of Object.entries(dependencies)) {
         expect(specifier, `${slug}: ${name}`).not.toMatch(/^workspace:/)
       }
-      for (const [name, version] of Object.entries(versions)) {
+      for (const [name, version] of Object.entries(
+        stableWorkspacePackageVersions,
+      )) {
         if (dependencies[name] !== undefined) {
           expect(dependencies[name], `${slug}: ${name}`).toBe(version)
         }
@@ -135,10 +168,8 @@ describe('server-rendered example build scripts', () => {
     }
   })
 
-  it('pins WebContainer dependency overrides', async () => {
-    const bySlug = await loadPlaygroundFiles()
-
-    for (const [slug, { files }] of Object.entries(bySlug)) {
+  it('pins WebContainer dependency overrides', () => {
+    for (const [slug, { files }] of Object.entries(stablePlaygroundFiles)) {
       const source = files['package.json']
       if (source === undefined) {
         throw new Error(`the ${slug} playground omits package.json`)

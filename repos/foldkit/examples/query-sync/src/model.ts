@@ -14,4 +14,3 @@ export const Model = Schema.Struct({
   dietListbox: DietListboxBlock.Model,
   periodListbox: PeriodListboxBlock.Model,
 })
-export type Model = typeof Model.Type

@@ -7,7 +7,6 @@ import { SavedCanvas, SavedCanvasJsonString } from './model'
 export const Flags = Schema.Struct({
   maybeSavedCanvas: Schema.Option(SavedCanvas),
 })
-export type Flags = typeof Flags.Type
 
 export const flags = Effect.gen(function* () {
   const store = yield* KeyValueStore.KeyValueStore

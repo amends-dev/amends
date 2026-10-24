@@ -1,38 +1,32 @@
 import { ApplicationDefinition } from './definition'
 
-const foldSearchOutMessage = Search.SearchBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  RestoredQuery:
-    ({ query }) =>
-    model => ({
-      model: modifyFields(model, {
+const foldSearchOutMessage = ApplicationDefinition.makeOutMessageFold(
+  Search.SearchBlock,
+  {
+    RestoredQuery: ({ query }) =>
+      ApplicationDefinition.makeFieldsStep(() => ({
         maybeRestoredQuery: () => Option.some(query),
-      }),
-    }),
-})
+      })),
+  },
+)
 
-const foldEditorOutMessage = Editor.EditorBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  RestoredDraft:
-    ({ documentId }) =>
-    model => ({
-      model: modifyFields(model, {
+const foldEditorOutMessage = ApplicationDefinition.makeOutMessageFold(
+  Editor.EditorBlock,
+  {
+    RestoredDraft: ({ documentId }) =>
+      ApplicationDefinition.makeFieldsStep(() => ({
         maybeRestoredDocumentId: () => Option.some(documentId),
-      }),
-    }),
-})
+      })),
+  },
+)
 
-const SearchBinding = ApplicationDefinition.bindChild(Search.SearchBlock, {
+const SearchBinding = ApplicationDefinition.makeBinding(Search.SearchBlock, {
   field: 'search',
-  outMessage: { fold: foldSearchOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldSearchOutMessage })
 
-const EditorBinding = ApplicationDefinition.bindChild(Editor.EditorBlock, {
+const EditorBinding = ApplicationDefinition.makeBinding(Editor.EditorBlock, {
   field: 'editor',
-  outMessage: { fold: foldEditorOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldEditorOutMessage })
 
 const ApplicationComposition = ApplicationDefinition.makeComposition({
   bindings: [SearchBinding, EditorBinding],

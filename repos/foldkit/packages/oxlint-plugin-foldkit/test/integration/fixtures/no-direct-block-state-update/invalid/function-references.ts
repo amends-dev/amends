@@ -1,5 +1,5 @@
 import { Array, Option, Schema } from 'effect'
-import { Update, makeApplicationDefinition } from 'foldkit'
+import { Block, Update } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
 
@@ -20,19 +20,22 @@ const Message = defineMessageUnion({
   GotChildMessage: { message: Child.Message },
   GotEntryMessage: { id: Schema.String, message: Child.Message },
 })
-const ApplicationDefinition = makeApplicationDefinition({ Model, Message })
-const ChildBinding = ApplicationDefinition.bindChild(Child.block, {
+const ApplicationDefinition = Block.makeDefinition('Application', {
+  Model,
+  Message,
+})
+const ChildBinding = ApplicationDefinition.makeBinding(Child.block, {
   field: 'child',
   parentMessage: Message.GotChildMessage,
 })
-const AliasedChildBinding = ApplicationDefinition.bindChild(
+const AliasedChildBinding = ApplicationDefinition.makeBinding(
   ImportedChildBlock,
   {
     field: 'aliasedChild',
     parentMessage: Message.GotAliasedChildMessage,
   },
 )
-const EntriesBinding = ApplicationDefinition.bindChild(Child.block, {
+const EntriesBinding = ApplicationDefinition.makeBinding(Child.block, {
   field: 'entries',
   key: 'id',
   toParentMessage: (id, message) => Message.GotEntryMessage({ id, message }),
@@ -51,7 +54,7 @@ const revealLocalErrors = (child: Child.Model): Child.Model =>
 const revealErrorsThroughParentHelper = (model: Model): Model =>
   modifyFields(model, { child: revealLocalErrors })
 
-const revealChildFields = ApplicationDefinition.stepFields(() => ({
+const revealChildFields = ApplicationDefinition.makeFieldsStep(() => ({
   child: Child.revealErrors,
 }))
 
@@ -63,7 +66,7 @@ export const update = ApplicationComposition.makeUpdate(model => {
   void modifyFields(model, {
     entries: Array.map(Child.revealErrors),
   })
-  void Update.combine(model, [
+  void Update.combineSteps(model, [
     revealChildFields,
     ChildBinding.informThemeChanged({ theme: 'Light' }),
   ])

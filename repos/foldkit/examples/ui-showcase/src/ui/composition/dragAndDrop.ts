@@ -1,21 +1,18 @@
 import { Array, Option, pipe } from 'effect'
-import { Update } from 'foldkit'
 import { modifyFields } from 'foldkit/struct'
 
 import { DragAndDropBlock } from '@foldkit/ui'
 
 import { UiDefinition } from '../definition'
 import type { DemoColumn } from '../domain'
-import { Message } from '../message'
-import { Model } from '../model'
 
 const reorderColumns = (
-  columns: ReadonlyArray<DemoColumn>,
+  columns: ReadonlyArray<typeof DemoColumn.Type>,
   itemId: string,
   fromContainerId: string,
   toContainerId: string,
   toIndex: number,
-): ReadonlyArray<DemoColumn> => {
+): ReadonlyArray<typeof DemoColumn.Type> => {
   const maybeCard = pipe(
     columns,
     Array.findFirst(({ id }) => id === fromContainerId),
@@ -48,13 +45,16 @@ const reorderColumns = (
   })
 }
 
-const foldDragAndDropDemoOutMessage = DragAndDropBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Reordered:
-    ({ itemId, fromContainerId, toContainerId, toIndex }) =>
-    model => ({
-      model: modifyFields(model, {
+export const DragAndDropDemoBinding = UiDefinition.makeBinding(
+  DragAndDropBlock,
+  {
+    field: 'dragAndDropDemo',
+    init: { contextToArgs: () => [{ id: 'drag-and-drop-demo' }] },
+  },
+).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(DragAndDropBlock, {
+    Reordered: ({ itemId, fromContainerId, toContainerId, toIndex }) =>
+      UiDefinition.makeFieldsStep(() => ({
         dragAndDropDemoColumns: dragAndDropDemoColumns =>
           reorderColumns(
             dragAndDropDemoColumns,
@@ -63,13 +63,7 @@ const foldDragAndDropDemoOutMessage = DragAndDropBlock.OutMessage.match<
             toContainerId,
             toIndex,
           ),
-      }),
-    }),
-  Cancelled: () => UiDefinition.stepNoop(),
-})
-
-export const DragAndDropDemoBinding = UiDefinition.bindChild(DragAndDropBlock, {
-  field: 'dragAndDropDemo',
-  init: { contextToArgs: () => [{ id: 'drag-and-drop-demo' }] },
-  outMessage: { fold: foldDragAndDropDemoOutMessage },
+      })),
+    Cancelled: UiDefinition.makeNoopStep,
+  }),
 })

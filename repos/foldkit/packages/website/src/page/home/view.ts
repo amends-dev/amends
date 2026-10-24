@@ -115,7 +115,7 @@ const playgroundItemContent = (meta: ExampleMeta): Html =>
 
 type PlaygroundMenuViewInput = Readonly<{
   model: typeof PlaygroundMenuBlock.Model.Type
-  slugs: ReadonlyArray<ExampleSlug>
+  slugs: ReadonlyArray<typeof ExampleSlug.Type>
 }>
 
 const playgroundMenuView = (
@@ -172,7 +172,7 @@ type ViewInputs = Readonly<{
   renderSnippet: CodeBlock.RenderSnippet
   isNarrowViewport: boolean
   maybeGitHubStarCount: Option.Option<number>
-  resolvedTheme: ResolvedTheme
+  resolvedTheme: typeof ResolvedTheme.Type
   isBrowserEnvironmentLoaded: boolean
   newsletterEmail: string
 }>
@@ -197,14 +197,14 @@ export const view = HomeComposition.makeView.withInputs<ViewInputs>(
       h,
     )
 
-    const buttonLabelFor = (tab: DemoTab.Tab): string =>
+    const buttonLabelFor = (tab: typeof DemoTab.Tab.Type): string =>
       Match.value(tab).pipe(
         Match.when('AsyncCounter', () => 'Async Counter'),
         Match.when('Note Player', () => 'Note Player'),
         Match.exhaustive,
       )
 
-    const panelFor = (tab: DemoTab.Tab) =>
+    const panelFor = (tab: typeof DemoTab.Tab.Type) =>
       Match.value(tab).pipe(
         Match.when('AsyncCounter', () => asyncCounterDemoView),
         Match.when('Note Player', () => notePlayerDemoView),

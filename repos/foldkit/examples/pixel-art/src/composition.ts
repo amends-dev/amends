@@ -17,7 +17,6 @@ import {
 import { DEFAULT_COLOR_INDEX } from './constant'
 import { ApplicationDefinition } from './definition'
 import { createEmptyGrid, isGridEmpty } from './grid'
-import { Message } from './message'
 import {
   Model,
   type PaletteIndex,
@@ -26,67 +25,74 @@ import {
 } from './model'
 import { PALETTE_THEMES } from './palette'
 
-const foldErrorDialogOutMessage = DialogBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Opened: () => ApplicationDefinition.stepNoop(),
-  Closed: () => model => ({
-    model: modifyFields(model, { maybeExportError: () => Option.none() }),
+export const ErrorDialogBinding = ApplicationDefinition.makeBinding(
+  DialogBlock,
+  {
+    field: 'errorDialog',
+    init: { contextToArgs: () => [{ id: 'export-error-dialog' }] },
+  },
+).withOutMessagePolicy({
+  fold: ApplicationDefinition.makeOutMessageFold(DialogBlock, {
+    Opened: ApplicationDefinition.makeNoopStep,
+    Closed: () =>
+      ApplicationDefinition.makeFieldsStep(() => ({
+        maybeExportError: () => Option.none(),
+      })),
+    CompletedClose: ApplicationDefinition.makeNoopStep,
   }),
-  CompletedClose: () => ApplicationDefinition.stepNoop(),
 })
 
-export const ErrorDialogBinding = ApplicationDefinition.bindChild(DialogBlock, {
-  field: 'errorDialog',
-  init: { contextToArgs: () => [{ id: 'export-error-dialog' }] },
-  outMessage: { fold: foldErrorDialogOutMessage },
-})
-
-const foldGridSizeConfirmDialogOutMessage = DialogBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Opened: () => ApplicationDefinition.stepNoop(),
-  Closed: () => model => ({
-    model: modifyFields(model, { maybePendingGridSize: () => Option.none() }),
-  }),
-  CompletedClose: () => ApplicationDefinition.stepNoop(),
-})
-
-export const GridSizeConfirmDialogBinding = ApplicationDefinition.bindChild(
+export const GridSizeConfirmDialogBinding = ApplicationDefinition.makeBinding(
   DialogBlock,
   {
     field: 'gridSizeConfirmDialog',
     init: { contextToArgs: () => [{ id: 'grid-size-confirm-dialog' }] },
-    outMessage: { fold: foldGridSizeConfirmDialogOutMessage },
   },
-)
+).withOutMessagePolicy({
+  fold: ApplicationDefinition.makeOutMessageFold(DialogBlock, {
+    Opened: ApplicationDefinition.makeNoopStep,
+    Closed: () =>
+      ApplicationDefinition.makeFieldsStep(() => ({
+        maybePendingGridSize: () => Option.none(),
+      })),
+    CompletedClose: ApplicationDefinition.makeNoopStep,
+  }),
+})
 
-export const selectTool = (model: Model, tool: Tool) => ({
+export const selectTool = (
+  model: typeof Model.Type,
+  tool: typeof Tool.Type,
+) => ({
   model: modifyFields(model, { tool: () => tool }),
 })
 
-export const selectColor = (model: Model, colorIndex: PaletteIndex) => {
+export const selectColor = (
+  model: typeof Model.Type,
+  colorIndex: typeof PaletteIndex.Type,
+) => {
   const nextModel = modifyFields(model, {
     selectedColorIndex: () => colorIndex,
   })
   return { model: nextModel, commands: [saveCanvas(nextModel)] }
 }
 
-const foldToolRadioGroupOutMessage = ToolRadioGroupBlock.OutMessage.match({
-  Selected: ({ value }) =>
-    ApplicationDefinition.step(model => selectTool(model, value)),
-})
-
-export const ToolRadioGroupBinding = ApplicationDefinition.bindChild(
+export const ToolRadioGroupBinding = ApplicationDefinition.makeBinding(
   ToolRadioGroupBlock,
   {
     field: 'toolRadioGroup',
     init: { contextToArgs: () => [{ id: TOOL_RADIO_GROUP_ID }] },
-    outMessage: { fold: foldToolRadioGroupOutMessage },
   },
-)
+).withOutMessagePolicy({
+  fold: ApplicationDefinition.makeOutMessageFold(ToolRadioGroupBlock, {
+    Selected: ({ value }) =>
+      ApplicationDefinition.makeStep(model => selectTool(model, value)),
+  }),
+})
 
-export const applyGridSizeChange = (model: Model, size: number) => ({
+export const applyGridSizeChange = (
+  model: typeof Model.Type,
+  size: number,
+) => ({
   model: modifyFields(model, {
     grid: () => createEmptyGrid(size),
     gridSize: () => size,
@@ -98,7 +104,7 @@ export const applyGridSizeChange = (model: Model, size: number) => ({
 })
 
 export const requestGridSizeChange = (size: number) =>
-  ApplicationDefinition.step(model => {
+  ApplicationDefinition.makeStep(model => {
     if (size === model.gridSize) {
       return { model }
     }
@@ -107,75 +113,72 @@ export const requestGridSizeChange = (size: number) =>
       return applyGridSizeChange(model, size)
     }
 
-    const rememberGridSize = ApplicationDefinition.stepFields(() => ({
+    const rememberGridSize = ApplicationDefinition.makeFieldsStep(() => ({
       maybePendingGridSize: () => Option.some(size),
     }))
 
-    return Update.combine([
+    return Update.combineSteps([
       rememberGridSize,
       GridSizeConfirmDialogBinding.requestOpen(),
     ])
   })
 
-const foldGridSizeRadioGroupOutMessage =
-  GridSizeRadioGroupBlock.OutMessage.match({
-    Selected: ({ value }) => requestGridSizeChange(Number(value)),
-  })
-
-export const GridSizeRadioGroupBinding = ApplicationDefinition.bindChild(
+export const GridSizeRadioGroupBinding = ApplicationDefinition.makeBinding(
   GridSizeRadioGroupBlock,
   {
     field: 'gridSizeRadioGroup',
     init: { contextToArgs: () => [{ id: GRID_SIZE_RADIO_GROUP_ID }] },
-    outMessage: { fold: foldGridSizeRadioGroupOutMessage },
   },
-)
+).withOutMessagePolicy({
+  fold: ApplicationDefinition.makeOutMessageFold(GridSizeRadioGroupBlock, {
+    Selected: ({ value }) => requestGridSizeChange(Number(value)),
+  }),
+})
 
-const foldPaletteRadioGroupOutMessage = PaletteRadioGroupBlock.OutMessage.match(
+export const PaletteRadioGroupBinding = ApplicationDefinition.makeBinding(
+  PaletteRadioGroupBlock,
   {
+    field: 'paletteRadioGroup',
+    init: { contextToArgs: () => [{ id: PALETTE_RADIO_GROUP_ID }] },
+  },
+).withOutMessagePolicy({
+  fold: ApplicationDefinition.makeOutMessageFold(PaletteRadioGroupBlock, {
     Selected: ({ value }) =>
-      ApplicationDefinition.step(model =>
+      ApplicationDefinition.makeStep(model =>
         selectColor(
           model,
           paletteIndexFromValue(value, model.selectedColorIndex),
         ),
       ),
-  },
-)
-
-export const PaletteRadioGroupBinding = ApplicationDefinition.bindChild(
-  PaletteRadioGroupBlock,
-  {
-    field: 'paletteRadioGroup',
-    init: { contextToArgs: () => [{ id: PALETTE_RADIO_GROUP_ID }] },
-    outMessage: { fold: foldPaletteRadioGroupOutMessage },
-  },
-)
-
-const foldThemeListboxOutMessage = ThemeListboxBlock.OutMessage.match({
-  Selected: ({ value }) =>
-    ApplicationDefinition.step(model => {
-      const themeIndex = Number(value)
-      const maybeNextTheme = Array.get(PALETTE_THEMES, themeIndex)
-      if (Option.isNone(maybeNextTheme)) {
-        return { model }
-      }
-      const nextModel = modifyFields(model, {
-        paletteThemeIndex: () => themeIndex,
-        selectedColorIndex: () => DEFAULT_COLOR_INDEX,
-      })
-      return { model: nextModel, commands: [saveCanvas(nextModel)] }
-    }),
+  }),
 })
 
-export const ThemeListboxBinding = ApplicationDefinition.bindChild(
+const foldThemeListboxOutMessage = ApplicationDefinition.makeOutMessageFold(
+  ThemeListboxBlock,
+  {
+    Selected: ({ value }) =>
+      ApplicationDefinition.makeStep(model => {
+        const themeIndex = Number(value)
+        const maybeNextTheme = Array.get(PALETTE_THEMES, themeIndex)
+        if (Option.isNone(maybeNextTheme)) {
+          return { model }
+        }
+        const nextModel = modifyFields(model, {
+          paletteThemeIndex: () => themeIndex,
+          selectedColorIndex: () => DEFAULT_COLOR_INDEX,
+        })
+        return { model: nextModel, commands: [saveCanvas(nextModel)] }
+      }),
+  },
+)
+
+export const ThemeListboxBinding = ApplicationDefinition.makeBinding(
   ThemeListboxBlock,
   {
     field: 'themeListbox',
     init: { contextToArgs: () => [{ id: 'theme-picker' }] },
-    outMessage: { fold: foldThemeListboxOutMessage },
   },
-)
+).withOutMessagePolicy({ fold: foldThemeListboxOutMessage })
 
 export const ApplicationComposition = ApplicationDefinition.makeComposition({
   bindings: [

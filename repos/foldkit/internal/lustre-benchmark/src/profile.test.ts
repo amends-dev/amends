@@ -1,5 +1,4 @@
-import { Runtime } from 'foldkit'
-import { makeDefinition } from 'foldkit/application'
+import { Block, Program, Runtime } from 'foldkit'
 import { Document, type HtmlBuilder } from 'foldkit/html'
 import { describe, it } from 'vitest'
 
@@ -117,20 +116,28 @@ const runProfile = async (
     return wrappedView.fn(model, h)
   }
 
-  const ApplicationComposition = makeDefinition({
+  const ApplicationComposition = Block.makeDefinition('Application', {
     Model,
     Message,
   }).makeComposition()
-  const application = ApplicationComposition.assembleApplication({
-    init: ApplicationComposition.makeInit(init_),
-    update: ApplicationComposition.makeUpdate(wrappedUpdate.fn),
-    view: ApplicationComposition.makeView(captureView),
+  const prepare = () =>
+    ApplicationComposition.prepareBlock({
+      init: ApplicationComposition.makeInit(init_),
+      update: ApplicationComposition.makeUpdate(wrappedUpdate.fn),
+      view: ApplicationComposition.makeView(captureView),
+    })
+  const ApplicationBlock: Block.FromAssemblyWithView<
+    typeof Model,
+    typeof prepare
+  > = Block.assemble(prepare)
+  const program = Program.make({
+    block: ApplicationBlock,
     container,
     devTools: false,
     freezeModel: false,
   })
 
-  Runtime.run(application)
+  Runtime.run(program)
 
   await waitForCondition(() => capturedDispatch !== null)
 

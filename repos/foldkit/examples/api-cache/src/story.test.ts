@@ -25,7 +25,7 @@ import {
 } from './model.fixture'
 import { update } from './update'
 
-const postDetailTag = (model: Model, postId: string): string =>
+const postDetailTag = (model: typeof Model.Type, postId: string): string =>
   HashMap.get(model.postDetailById, postId).pipe(
     Option.map(postDetail => postDetail._tag),
     Option.getOrElse(() => 'Missing'),

@@ -94,6 +94,54 @@ Actions. The command prompts once for an OTP or accepts `NPM_CONFIG_OTP`, keeps
 the OTP out of command arguments, and removes it from non-npm subprocesses.
 After local promotion, use the manual finalization recovery run above.
 
+## Preparing a replacement integration preview
+
+Prepare a replacement locally before updating the integration branch. A request
+to prepare release material does not authorize pushing, merging, publishing, or
+changing the public preview status. Keep the previous verified snapshot available
+while the candidate is under review.
+
+1. Review the candidate code and finish the agreed security review of changes
+   since the last reviewed snapshot. Resolve required CI checks on the actual
+   integration candidate. Do not merge the preview into `main` as part of this
+   process.
+2. Prepare both migration entry points from the candidate source:
+   - `/preview-migration`: a direct stable-to-candidate migration to the final API.
+   - `/preview-upgrade`: the required changes from earlier preview snapshots,
+     with optional improvements listed separately.
+3. State each guide's tested starting package versions and source commits. Use
+   the installed package and lockfile to identify the consumer's starting point;
+   a branch name or a remembered preview date is insufficient. Check all active
+   After examples against the target APIs and organization conventions.
+4. Rehearse both paths in independent real consumer checkouts. Give each agent
+   only the relevant guide, exact target manifest, and existing project
+   instructions. Verify the installed package declarations rather than workspace
+   source aliases. Record typecheck coverage of test files, lint, tests, build,
+   and the consumer's browser, SSR/SSG, or embedding behavior. Packed candidate
+   artifacts can support local rehearsal; the final acceptance must use the
+   published exact packages.
+5. After review approval, merge into `codex/layers-and-submodels`. Its existing
+   workflow publishes and verifies the complete package snapshot and deploys
+   matching documentation. Use the resulting full source commit and immutable
+   website URL, not the pre-merge candidate's hash, in installation instructions.
+6. Use the generated ready summary's migration links and two agent prompts for
+   the public handoff. They derive the package map, documentation URLs, and
+   target source commit from the verified release. Confirm the live `.md` guides
+   include their rendered source examples and `/preview-release.json` matches
+   the registry-verified input.
+7. Update the public latest-ready pointer only after workflow verification and
+   published-package migration acceptance. Preserve prior immutable URLs and
+   manifests so users can read guidance matching an older installed preview.
+
+For an existing project, update every installed Foldkit package to its entry in
+the target manifest, preserving dependency and devDependency placement. Do not
+install the whole package set merely because it appears in the workflow report.
+Numeric package prefixes can differ; the shared commit identifies the snapshot.
+For projects that already maintain vendored source or copied skills, repin them
+to the full target commit. Refresh an existing managed `FOLDKIT.md` snapshot
+and preserve the consumer's own `AGENTS.md` instructions. Other projects can
+use the immutable deployment's documentation and source links directly.
+
 ## Package canaries
 
 The Release workflow builds a canary for every package-affecting push to `main`

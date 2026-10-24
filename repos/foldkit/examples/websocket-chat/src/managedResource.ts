@@ -8,7 +8,7 @@ import { Message } from './message'
 const WS_URL = 'wss://ws.postman-echo.com/raw'
 const CONNECTION_TIMEOUT_MS = 5000
 
-export const managedResources = ApplicationDefinition.managedResources(
+export const managedResources = ApplicationDefinition.makeManagedResources(
   entry => ({
     chatSocket: entry('ManageChatSocket', Schema.Option(Schema.Null), {
       resource: ChatSocket,

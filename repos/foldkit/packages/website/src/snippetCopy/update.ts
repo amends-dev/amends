@@ -32,7 +32,7 @@ export const update = SnippetCopyComposition.makeUpdate((model, message) =>
   }),
 )
 
-export const CopySnippet = SnippetCopyDefinition.command('CopySnippet', {
+export const CopySnippet = SnippetCopyDefinition.makeCommand('CopySnippet', {
   args: { snippetId: Schema.String, text: Schema.String },
   messages: [Message.SucceededCopySnippet, Message.FailedCopySnippet],
   handler: function* () {
@@ -49,9 +49,8 @@ export const CopySnippet = SnippetCopyDefinition.command('CopySnippet', {
 
 const COPY_INDICATOR_DURATION = '2 seconds'
 
-export const WaitBeforeHidingCopiedIndicator = SnippetCopyDefinition.command(
-  'WaitBeforeHidingCopiedIndicator',
-  {
+export const WaitBeforeHidingCopiedIndicator =
+  SnippetCopyDefinition.makeCommand('WaitBeforeHidingCopiedIndicator', {
     args: { snippetId: Schema.String },
     messages: [Message.CompletedWaitBeforeHidingCopiedIndicator],
     handler: function* () {
@@ -62,8 +61,7 @@ export const WaitBeforeHidingCopiedIndicator = SnippetCopyDefinition.command(
           ),
         )
     },
-  },
-)
+  })
 
 export const EffectsLayer = Layer.mergeAll(
   CopySnippet.layer,

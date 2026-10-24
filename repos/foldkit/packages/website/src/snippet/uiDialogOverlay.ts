@@ -2,17 +2,15 @@ import { Option, Schema, Tuple } from 'effect'
 // Pseudocode walkthrough of the Foldkit integration points. Each labeled
 // block below is an excerpt. Fit them into your own Model, init, Message,
 // update, and view definitions.
-import { Block, Update } from 'foldkit'
+import { Block } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
-import { modifyFields } from 'foldkit/struct'
 
 import { Combobox, Dialog } from '@foldkit/ui'
 import type { RenderInfo as DialogRenderInfo } from '@foldkit/ui/dialog'
 
 const City = Schema.Literals(['Johannesburg', 'Kyiv', 'Oxford', 'Wellington'])
-type City = typeof City.Type
 const CityCombobox = Combobox.create(City)
-const cities: ReadonlyArray<City> = [
+const cities: ReadonlyArray<typeof City.Type> = [
   'Johannesburg',
   'Kyiv',
   'Oxford',
@@ -28,48 +26,45 @@ const Model = Schema.Struct({
   maybeCity: Schema.Option(City),
   // ...your other fields
 })
-type Model = typeof Model.Type
 
 // This excerpt has no parent-owned facts. The two Bindings derive distinct
 // generated delivery for Dialog and Combobox.
 const Message = defineMessageUnion({})
-type Message = typeof Message.Type
-
-const foldDialogOutMessage = Dialog.DialogBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Opened: () => FilterDialogDefinition.stepNoop(),
-  Closed: () => FilterDialogDefinition.stepNoop(),
-  CompletedClose: () => FilterDialogDefinition.stepNoop(),
-})
-
-const foldComboboxOutMessage = CityCombobox.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Selected:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, { maybeCity: () => Option.some(value) }),
-    }),
-  ClearedSelection: () => FilterDialogDefinition.stepNoop(),
-})
 
 const FilterDialogDefinition = Block.makeDefinition('FilterDialog', {
   Model,
   Message,
 })
 
-const DialogBinding = FilterDialogDefinition.bindChild(Dialog.DialogBlock, {
+const foldDialogOutMessage = FilterDialogDefinition.makeOutMessageFold(
+  Dialog.DialogBlock,
+  {
+    Opened: FilterDialogDefinition.makeNoopStep,
+    Closed: FilterDialogDefinition.makeNoopStep,
+    CompletedClose: FilterDialogDefinition.makeNoopStep,
+  },
+)
+
+const foldComboboxOutMessage = FilterDialogDefinition.makeOutMessageFold(
+  CityCombobox,
+  {
+    Selected: ({ value }) =>
+      FilterDialogDefinition.makeFieldsStep(() => ({
+        maybeCity: () => Option.some(value),
+      })),
+    ClearedSelection: FilterDialogDefinition.makeNoopStep,
+  },
+)
+
+const DialogBinding = FilterDialogDefinition.makeBinding(Dialog.DialogBlock, {
   field: 'dialog',
   init: { contextToArgs: () => Tuple.make({ id: 'edit-filters' }) },
-  outMessage: { fold: foldDialogOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
-const ComboboxBinding = FilterDialogDefinition.bindChild(CityCombobox, {
+const ComboboxBinding = FilterDialogDefinition.makeBinding(CityCombobox, {
   field: 'combobox',
   init: { contextToArgs: () => Tuple.make({ id: 'city' }) },
-  outMessage: { fold: foldComboboxOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldComboboxOutMessage })
 
 const FilterDialogComposition = FilterDialogDefinition.makeComposition({
   bindings: [DialogBinding, ComboboxBinding],

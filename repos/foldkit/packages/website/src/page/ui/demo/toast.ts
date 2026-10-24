@@ -9,8 +9,7 @@ import { ToastDemoBinding } from '../composition'
 import { Message } from '../message'
 import { ToastBlock } from './toastModule'
 
-type Model = typeof ToastBlock.Model.Type
-type Entry = Model['entries'][number]
+type Entry = (typeof ToastBlock.Model.Type)['entries'][number]
 
 // DEMO CONTENT
 

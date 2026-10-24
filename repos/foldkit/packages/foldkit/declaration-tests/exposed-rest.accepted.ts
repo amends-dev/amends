@@ -19,7 +19,6 @@ const ChildMessage = Message.defineMessageUnion({
   },
   RequestedReset: {},
 })
-type ChildMessage = typeof ChildMessage.Type
 // oxlint-disable-next-line foldkit/block-name-matches-variable -- This fixture deliberately uses a distinct literal Block identity for type coverage.
 
 // oxlint-disable-next-line foldkit/block-name-matches-variable -- This fixture deliberately uses a distinct literal Block identity for type coverage.
@@ -56,41 +55,51 @@ const childUpdate = ChildComposition.makeUpdate((model, message) =>
     RequestedReset: () => ({ model: ChildModel.make({ count: 0 }) }),
   }),
 )
-export const ChildBlock = ChildComposition.assembleBlock({
-  init: () => ({ model: ChildModel.make({ count: 0 }) }),
-  update: childUpdate,
-  operations: {
-    defaultIncrement: (amount?: number) =>
-      Tuple.make(
-        ChildMessage.RequestedDefaultIncrement(
-          amount === undefined ? {} : { amount },
+const prepareChildBlock = () =>
+  ChildComposition.prepareBlock({
+    init: () => ({ model: ChildModel.make({ count: 0 }) }),
+    update: childUpdate,
+    operations: {
+      defaultIncrement: (amount?: number) =>
+        Tuple.make(
+          ChildMessage.RequestedDefaultIncrement(
+            amount === undefined ? {} : { amount },
+          ),
         ),
-      ),
-    addMany: (...amounts: ReadonlyArray<number>) =>
-      Tuple.make(ChildMessage.RequestedAddMany({ amounts })),
-    addRequiredPrefix: (
-      ...[first, ...labels]: readonly [first: number, ...labels: Array<string>]
-    ) => Tuple.make(ChildMessage.RequestedRequiredPrefix({ first, labels })),
-    addOptionalPrefix: (
-      ...[first, ...labels]: readonly [first?: number, ...labels: Array<string>]
-    ) =>
-      Tuple.make(
-        ChildMessage.RequestedOptionalPrefix(
-          first === undefined ? { labels } : { first, labels },
+      addMany: (...amounts: ReadonlyArray<number>) =>
+        Tuple.make(ChildMessage.RequestedAddMany({ amounts })),
+      addRequiredPrefix: (
+        ...[first, ...labels]: readonly [
+          first: number,
+          ...labels: Array<string>,
+        ]
+      ) => Tuple.make(ChildMessage.RequestedRequiredPrefix({ first, labels })),
+      addOptionalPrefix: (
+        ...[first, ...labels]: readonly [
+          first?: number,
+          ...labels: Array<string>,
+        ]
+      ) =>
+        Tuple.make(
+          ChildMessage.RequestedOptionalPrefix(
+            first === undefined ? { labels } : { first, labels },
+          ),
         ),
-      ),
-    addMixed: (...values: ReadonlyArray<number | string>) =>
-      Tuple.make(ChildMessage.RequestedMixed({ values })),
-    addRefined: (...amounts: ReadonlyArray<1 | 2>) =>
-      Tuple.make(ChildMessage.RequestedAddMany({ amounts })),
-    reset: () => Tuple.make(ChildMessage.RequestedReset()),
-  },
-  EffectsLayer: Layer.empty,
-})
+      addMixed: (...values: ReadonlyArray<number | string>) =>
+        Tuple.make(ChildMessage.RequestedMixed({ values })),
+      addRefined: (...amounts: ReadonlyArray<1 | 2>) =>
+        Tuple.make(ChildMessage.RequestedAddMany({ amounts })),
+      reset: () => Tuple.make(ChildMessage.RequestedReset()),
+    },
+    EffectsLayer: Layer.empty,
+  })
+export const ChildBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ChildModel,
+  typeof prepareChildBlock
+> = Block.assemble(prepareChildBlock)
 
 const ParentModel = Schema.Struct({ child: ChildModel })
 const ParentMessage = Message.defineMessageUnion({
-  // oxlint-disable-next-line foldkit/got-prefix-requires-block-payload -- This fixture deliberately probes reserved Got* routing with a nonstandard payload.
   GotChildMessage: { message: ChildMessage },
 })
 // oxlint-disable-next-line foldkit/block-name-matches-variable -- This fixture deliberately uses a distinct literal Block identity for type coverage.
@@ -98,7 +107,7 @@ const ParentDefinition = Block.makeDefinition('EmittedRestParent', {
   Model: ParentModel,
   Message: ParentMessage,
 })
-export const ChildBinding = ParentDefinition.bindChild(ChildBlock, {
+export const ChildBinding = ParentDefinition.makeBinding(ChildBlock, {
   read: model => Option.some(model.child),
   write: (model, child) => Struct.modifyFields(model, { child: () => child }),
 })

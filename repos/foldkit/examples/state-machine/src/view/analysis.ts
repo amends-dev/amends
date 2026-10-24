@@ -13,7 +13,7 @@ export const formatTags = (tags: ReadonlyArray<string>): string =>
   })
 
 export const transitionLogView = (
-  model: Model,
+  model: typeof Model.Type,
   h: ApplicationViewBuilder,
 ): Html => {
   const transitionLogClassName =
@@ -42,7 +42,10 @@ export const DEAD_TRANSITIONS = checkoutMachine.deadTransitions()
 export const UNREACHABLE_STATE_TAGS = checkoutMachine.unreachableStates()
 export const MERMAID_DEFINITION = checkoutMachine.toMermaid()
 
-export const analysisView = (model: Model, h: ApplicationViewBuilder): Html =>
+export const analysisView = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+): Html =>
   h.section(
     [
       h.AriaLabel('State machine inspector'),

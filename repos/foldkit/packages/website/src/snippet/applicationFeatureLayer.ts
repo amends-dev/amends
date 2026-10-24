@@ -9,7 +9,7 @@ import { subscriptions } from './subscription'
 export const EffectsLayer = Layer.provide(
   Layer.mergeAll(
     LoadProducts.layer,
-    subscriptions.productUpdates.layer,
+    subscriptions.layer,
     MeasureProductGrid.layer,
     managedResources.productPreview.layer,
   ),

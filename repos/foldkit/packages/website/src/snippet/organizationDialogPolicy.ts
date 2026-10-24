@@ -3,17 +3,19 @@ import { Dialog } from '@foldkit/ui'
 import { SaveDraft } from '../command'
 import { EditorDefinition } from '../definition'
 
-const foldDialogOutMessage = Dialog.DialogBlock.OutMessage.match({
-  Opened: () => EditorDefinition.stepNoop(),
-  CompletedClose: () => EditorDefinition.stepNoop(),
-  Closed: () =>
-    EditorDefinition.step(model => ({
-      model,
-      commands: [SaveDraft({ contents: model.contents })],
-    })),
-})
+const foldDialogOutMessage = EditorDefinition.makeOutMessageFold(
+  Dialog.DialogBlock,
+  {
+    Opened: EditorDefinition.makeNoopStep,
+    CompletedClose: EditorDefinition.makeNoopStep,
+    Closed: () =>
+      EditorDefinition.makeStep(model => ({
+        model,
+        commands: [SaveDraft({ contents: model.contents })],
+      })),
+  },
+)
 
-export const DialogBinding = EditorDefinition.bindChild(Dialog.DialogBlock, {
+export const DialogBinding = EditorDefinition.makeBinding(Dialog.DialogBlock, {
   field: 'dialog',
-  outMessage: { fold: foldDialogOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })

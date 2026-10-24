@@ -6,11 +6,13 @@ import {
   given,
   role,
   scene,
+  subscriptions as sceneSubscriptions,
   text,
 } from 'foldkit/scene'
 import { describe, test } from 'vitest'
 
 import {
+  ApplicationComposition,
   DetermineStartTime,
   DetermineTickTime,
   Message,
@@ -96,7 +98,14 @@ describe('view', () => {
     })
 
     scene(
-      { update, view, subscriptions },
+      {
+        update,
+        view,
+        subscriptions: sceneSubscriptions(
+          ApplicationComposition,
+          subscriptions,
+        ),
+      },
       given(runningModel),
       expect(text('00:00.00')).toExist(),
       Subscription.emit(subscriptions.stopwatchTicks, Message.Ticked()),

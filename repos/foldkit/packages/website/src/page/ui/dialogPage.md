@@ -89,7 +89,7 @@ The ids are framework-managed (the `-dialog-title`, `-dialog-description`, and `
 
 ### InitConfig {#init-config}
 
-Configuration object passed to `Dialog.init()`.
+Configuration passed to the Dialog Binding's child initializer. Direct completed Block calls use `Dialog.DialogBlock.init()`.
 
 | Name            | Type      | Default | Description                                                                                                                                                                                                                                                                                          |
 | --------------- | --------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -123,9 +123,16 @@ Payload delivered to the `toView` callback each render.
 
 ### OutMessage {#out-message}
 
-Messages emitted to the parent through the optional `outMessage` field. Match on the OutMessage in the Binding’s `outMessage.fold` policy.
+Messages emitted to the parent through the optional `outMessage` field. Match on the OutMessage in the Binding’s selected `fold` policy.
 
-| Name     | Type | Default | Description                                                                                                                                                                                                                              |
-| -------- | ---- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Opened` | `{}` | —       | Emitted once the dialog has transitioned to open. Fires after `update` has processed `RequestedOpen` and `isOpen` reflects the new state.                                                                                                |
-| `Closed` | `{}` | —       | Emitted once the dialog has transitioned to closed. Calling the bound `dialog.requestClose()` operation on an already-closed Model is a no-op that does not re-emit, as is calling close while a leave animation is already in progress. |
+| Name             | Type | Default | Description                                                                                                                                                                                                                                                                                |
+| ---------------- | ---- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Opened`         | `{}` | —       | Emitted once `RequestedOpen` changes the Model to open.                                                                                                                                                                                                                                    |
+| `Closed`         | `{}` | —       | Emitted once `RequestedClose` changes an open Model to closed, whether the request came from the view or the bound `requestClose()` operation. Calling close on an already-closed Model is a no-op that does not re-emit, as is calling it while a leave animation is already in progress. |
+| `CompletedClose` | `{}` | —       | Emitted after the leave animation, native dialog close, scroll unlock, focus restoration, and other close cleanup have completed.                                                                                                                                                          |
+
+Treat `Closed` as the parent's single close policy. If closing should navigate, clear a selection, or update another child, return that Step from the `Closed` fold. A parent Message that calls `DialogBinding.requestClose()` should not repeat the same transition; the operation runs the same OutMessage policy as a close button or Escape.
+
+::Snippet{name="uiDialogClosePolicy" label="One parent-owned Dialog close policy"}
+
+Use `CompletedClose` only for work that must wait for cleanup. It does not replace `Closed` as the fact that the Dialog Model accepted a close request.

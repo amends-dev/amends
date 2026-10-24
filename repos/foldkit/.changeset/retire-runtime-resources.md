@@ -2,11 +2,11 @@
 'foldkit': minor
 ---
 
-Remove `Runtime.makeApplication` and `Runtime.makeElement`, including their `resources` configuration field. Create the Application Definition with `makeApplicationDefinition` from `foldkit`, then create `ApplicationComposition` with `makeComposition(...)`. Retain `ApplicationDefinition` as a named value when its authoring methods are used; when its only use is `makeComposition`, chain both top-level calls directly. Complete it through `ApplicationComposition.assembleApplication` or `ApplicationComposition.assembleElement`, then supply application-lifetime Services through `application.provide(layer)` or `element.provide(layer)` before calling `Runtime.run`, `Runtime.hydrate`, or `Runtime.embed`.
+Remove `Runtime.makeApplication` and `Runtime.makeElement`, including their `resources` configuration field. Create the root through `Block.makeDefinition('Application', { Model, Message })`, then create `ApplicationComposition` with `makeComposition(...)`, prepare its implementation with `prepareBlock(...)`, and assemble `ApplicationBlock` with `Block.assemble(prepare)`. Retain `ApplicationDefinition` as a named value when its authoring methods are used; when its only use is `makeComposition`, chain both top-level calls directly. Create the host through `Program.make` or `Program.makeElement`, then supply application-lifetime Services through `program.provide(layer)` before calling `Runtime.run`, `Runtime.hydrate`, or `Runtime.embed`.
 
-The Composition methods are factories: they return passive runtime inputs and do not execute application behavior. Only the Runtime starts the application or Element.
+The Block and Program methods are factories: they return passive values and do not execute application behavior. Only the Runtime starts the Program.
 
-The Composition captures Model, Message, child Bindings, and Mount capabilities. Pass local init, update, view, lifecycle declarations, and handler recipes to completion. Remaining Service requirements must be satisfied before the program can start.
+The completed Block captures Model, Message, child Bindings, Mount capabilities, init, update, view, lifecycle declarations, and handler recipes. Program configuration adds only host behavior. Remaining Service requirements must be satisfied before the Program can start.
 
 Application Layers build eagerly once for each runtime start and release when that runtime stops. They are available to Flags, Commands, Subscriptions, Mounts, and ManagedResources. This differs from the removed `resources` field, which deferred construction until Flags, a Command, or a Subscription first requested its services. An application Layer build failure stops startup before the first render, where no Model exists for a crash view.
 

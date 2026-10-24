@@ -11,8 +11,6 @@ export const ApplicationRoute = defineRouteUnion({
   NotFound: { path: Schema.String },
 })
 
-export type ApplicationRoute = typeof ApplicationRoute.Type
-
 // ROUTERS
 
 export const productsRouter = pipe(

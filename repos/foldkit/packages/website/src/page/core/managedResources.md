@@ -10,9 +10,9 @@ Application-scoped Layers are the kitchen equipment available all night. A Manag
 
 ### Defining the Lifecycle
 
-Create the handle accessor from the named feature with `FeatureDefinition.resource<Value>()('ResourceName')`, then define its lifecycle through `FeatureDefinition.managedResources`. The feature name qualifies the accessor's local identity. The `modelToMaybeRequirements` function returns `Option.some(params)` while the handle should be active and `Option.none()` while it should be absent.
+Create the handle accessor from the named feature with `FeatureDefinition.makeResource<Value>()('ResourceName')`, then define its lifecycle through `FeatureDefinition.makeManagedResources`. The feature name qualifies the accessor's local identity. The `modelToMaybeRequirements` function returns `Option.some(params)` while the handle should be active and `Option.none()` while it should be absent.
 
-Give each entry a stable local handler name and set `config.handler` to a generator constructor that returns both `acquire` and `release`. Both functions are required whenever the handler is supplied. The entry exposes that attached recipe as `.layer`. Pass the `managedResources` record and its attached recipes to `FeatureComposition.assembleBlock`; the completed Block carries the lifecycle registrations and handler graph through parent Bindings. `ApplicationComposition.assembleApplication` installs that graph, while `application.provide(layer)` supplies any ordinary services the handler recipes still require. The constructed handler lasts for the application lifetime; each handle it acquires still starts and stops according to the Model.
+Give each entry a stable local handler name and set `config.handler` to a generator constructor that returns both `acquire` and `release`. Both functions are required whenever the handler is supplied. The entry exposes that attached recipe as `.layer`. Pass the `managedResources` record and its attached recipes to `FeatureComposition.prepareBlock`; `Block.assemble` then creates the Block that carries the lifecycle registrations and handler graph through parent Bindings. The root follows the same producer and finisher sequence, while `program.provide(layer)` supplies any ordinary Services the handler recipes still require. The constructed handler lasts for the application lifetime; each handle it acquires still starts and stops according to the Model.
 
 Put the named authoring value and resource accessor in a shared module. The lifecycle registry and Commands must import the same accessor definition.
 
@@ -49,7 +49,7 @@ Omit `handler` when an external host owns the lifecycle implementation. That ent
 
 ManagedResource names are local to their named Block. Two features can both declare `ManageSession`; their owners keep the definitions distinct. Names must be unique within one owner, and composition derives readable paths for each Binding placement. Reusing one completed child at two placements shares its handler recipe while giving each occurrence a separate handle lifecycle.
 
-A ManagedResource handler requirement contains its owned name, decoded acquire params, and resource value type. `FeatureComposition.assembleBlock` checks that each local requirement is supplied by `EffectsLayer` or declared in `hostHandlers`; `block.provideHandlers` checks an external provider against those declared contracts. Use `ManagedResource.HandlerOf<typeof managedResources.camera>` for an explicit requirement; the expanded form is `ManagedResource.Handler<Name, Params, Value>`, with all three arguments required.
+A ManagedResource handler requirement contains its owned name, decoded acquire params, and resource value type. `FeatureComposition.prepareBlock` checks that each local requirement is supplied by `EffectsLayer` or declared in `hostHandlers`; `block.provideHandlers` checks an external provider against those declared contracts. Use `ManagedResource.HandlerOf<typeof managedResources.camera>` for an explicit requirement; the expanded form is `ManagedResource.Handler<Name, Params, Value>`, with all three arguments required.
 
 Definitions created by different named Blocks receive different owned names even when their local names and protocols match. Each definition also retains a private runtime identity. An external implementation should use the declared entry's `toLayer` so it keeps that identity.
 
@@ -83,9 +83,9 @@ The resource accessor holds that bare value, so Commands read it through `.get` 
 
 ## Composing Child Blocks
 
-A child Block defines its ManagedResources in its own Model and Message terms, with no knowledge of its parent. Create the registry through `FeatureDefinition.managedResources` and include it in `FeatureComposition.assembleBlock`.
+A child Block defines its ManagedResources in its own Model and Message terms, with no knowledge of its parent. Create the registry through `FeatureDefinition.makeManagedResources` and include it in `FeatureComposition.prepareBlock`.
 
-A Binding lifts the child's entries through its Model access and generated delivery. Include that Binding in the parent's `bindings` list, and the parent collects its entries under placement-qualified keys. `ApplicationComposition.assembleApplication({ init, update, view, ... })` installs the root's complete graph. Completion rejects one local resource accessor used by two lifecycle owners; changing record keys does not create another local handle. Repeating the completed child through separate Bindings is different: each placement receives its own scoped accessor and lifecycle.
+A Binding lifts the child's entries through its Model access and generated delivery. Include that Binding in the parent's `bindings` list, and the parent collects its entries under placement-qualified keys. `ApplicationComposition.prepareBlock({ init, update, view, ... })` packages the root's complete graph, and `Block.assemble(prepare)` finishes the root Block. Completion rejects one local resource accessor used by two lifecycle owners; changing record keys does not create another local handle. Repeating the completed child through separate Bindings is different: each placement receives its own scoped accessor and lifecycle.
 
 ### Optional Child Models
 
@@ -95,7 +95,7 @@ Use an exact `Option<ChildModel>` field for direct optional storage. `None` rele
 
 ### Multiple Block Levels
 
-`bindChild` automates composition for static, optional, and keyed placements. Every active collection key receives an independent ManagedResource lifetime. [Subscription Organization](/patterns/subscription-organization) traces the equivalent leaf-to-root shape with Subscriptions.
+`makeBinding` automates composition for static, optional, and keyed placements. Every active collection key receives an independent ManagedResource lifetime. [Subscription Organization](/patterns/subscription-organization) traces the equivalent leaf-to-root shape with Subscriptions.
 
 :::Info{label="Layers vs Managed Resources"}
 Use the root `ApplicationLayer` and the completed program's `provide` method for services that live with the runtime, such as an `RpcClient` or analytics client. The completed Block already carries its handler recipes. Use `managedResources` for handles whose lifetime follows the Model, such as camera streams, an `AudioContext`, or `WebSocket` connections. These are separate scopes: restarting or releasing a ManagedResource handle does not rebuild the app service or handler Layer that implements its lifecycle.

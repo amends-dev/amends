@@ -21,7 +21,7 @@ export const DeclarationSubscriptionRegistryDefinition = Block.makeDefinition(
   },
 )
 export const subscriptions =
-  DeclarationSubscriptionRegistryDefinition.subscriptions(entry => ({
+  DeclarationSubscriptionRegistryDefinition.makeSubscriptions(entry => ({
     clock: entry('Clock', {
       messages: [Message.Ticked],
       handler: function* () {
@@ -42,8 +42,8 @@ export const subscriptions =
 
 export const DeclarationSubscriptionRegistryComposition =
   DeclarationSubscriptionRegistryDefinition.makeComposition()
-export const registryBlock =
-  DeclarationSubscriptionRegistryComposition.assembleBlock({
+const prepareRegistryBlock = () =>
+  DeclarationSubscriptionRegistryComposition.prepareBlock({
     init: DeclarationSubscriptionRegistryComposition.makeInit(() => ({
       model: Model.make({ count: 0 }),
     })),
@@ -53,6 +53,10 @@ export const registryBlock =
     subscriptions,
     EffectsLayer: subscriptions.layer,
   })
+export const registryBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof Model,
+  typeof prepareRegistryBlock
+> = Block.assemble(prepareRegistryBlock)
 
 export const aggregated = Subscription.aggregate(subscriptions)
 export const lifted = Subscription.lift(subscriptions)<
@@ -64,9 +68,9 @@ export const lifted = Subscription.lift(subscriptions)<
 })
 
 export const emptySubscriptions =
-  DeclarationSubscriptionRegistryDefinition.subscriptions(() => ({}))
+  DeclarationSubscriptionRegistryDefinition.makeSubscriptions(() => ({}))
 export const mixedSubscriptions =
-  DeclarationSubscriptionRegistryDefinition.subscriptions(entry => ({
+  DeclarationSubscriptionRegistryDefinition.makeSubscriptions(entry => ({
     attached: entry('Attached', {
       messages: [Message.Ticked],
       handler: function* () {

@@ -1,11 +1,15 @@
 import { Duration } from 'effect'
 import type * as Block from 'foldkit/block'
 
+import * as DragAndDrop from '@foldkit/ui/dragAndDrop'
 import * as Slider from '@foldkit/ui/slider'
 import * as Tooltip from '@foldkit/ui/tooltip'
 
 import {
   DialogBinding,
+  DragAndDropBinding,
+  KeyedDragAndDropBinding,
+  KeyedToastBinding,
   Picker,
   PickerBinding,
   RootSlider,
@@ -26,6 +30,8 @@ type Equal<Left, Right> =
 type Expect<Value extends true> = Value
 
 export type RelocatedAssertions = [
+  Expect<Equal<Parameters<typeof KeyedDragAndDropBinding.fold>[1], 'Primary'>>,
+  Expect<Equal<Parameters<typeof KeyedToastBinding.fold>[1], 'Primary'>>,
   Expect<Equal<Parameters<typeof DialogBinding.requestOpen>, []>>,
   Expect<
     Equal<
@@ -44,6 +50,26 @@ export type RelocatedAssertions = [
 ]
 
 DialogBinding.requestOpen()
+
+DragAndDrop.test.settleFocus({
+  binding: DragAndDropBinding,
+  itemId: 'card-1',
+})
+DragAndDrop.test.resolveKeyboardMove({
+  binding: KeyedDragAndDropBinding,
+  key: 'Primary',
+  itemId: 'card-1',
+  targetContainerId: 'done',
+  targetIndex: 0,
+})
+DragAndDrop.test.resolveKeyboardMove({
+  binding: KeyedDragAndDropBinding,
+  // @ts-expect-error The relocated keyed helper retains its literal key.
+  key: 'Secondary',
+  itemId: 'card-1',
+  targetContainerId: 'done',
+  targetIndex: 0,
+})
 
 // @ts-expect-error The relocated Dialog operation takes no arguments.
 DialogBinding.requestOpen('unexpected')

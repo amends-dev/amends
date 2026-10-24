@@ -49,12 +49,10 @@ const observeExampleUrlMessages = (element: Element) => {
   )
 }
 
-export const ObserveExampleUrlMessages = ExampleDetailDefinition.mountStream(
-  'ObserveExampleUrlMessages',
-  {
+export const ObserveExampleUrlMessages =
+  ExampleDetailDefinition.makeMountStream('ObserveExampleUrlMessages', {
     messages: [Message.ChangedExampleUrl],
     handler: function* () {
       return ({ element }) => observeExampleUrlMessages(element)
     },
-  },
-)
+  })

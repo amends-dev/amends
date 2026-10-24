@@ -370,13 +370,33 @@ type ChildRuntimeServices<Block> =
     ? BindingRuntimeServices<Binding>
     : never
 
+type RuntimeServicesOfBlockMember<Block> = Block extends unknown
+  ?
+      | ManagedResourceRuntimeServices<BlockManagedResources<Block>>
+      | ChildRuntimeServices<Block>
+  : never
+
+type BlocksMissingRuntimeService<Block, Service> = Block extends unknown
+  ? [Service] extends [RuntimeServicesOfBlockMember<Block>]
+    ? never
+    : Block
+  : never
+
+type RuntimeServiceProvidedByEveryBlock<Block, Service> =
+  Service extends unknown
+    ? [BlocksMissingRuntimeService<Block, Service>] extends [never]
+      ? Service
+      : never
+    : never
+
 /**
- * @internal Extracts every ManagedResource service installed by a block
- * graph, including keyed child placements whose channels are not flattened.
+ * @internal Extracts ManagedResource services installed by every alternative
+ * of a Block graph, retaining complete keyed child placement capabilities.
  */
-export type RuntimeServicesOfBlock<Block> =
-  | ManagedResourceRuntimeServices<BlockManagedResources<Block>>
-  | ChildRuntimeServices<Block>
+export type RuntimeServicesOfBlock<Block> = RuntimeServiceProvidedByEveryBlock<
+  Block,
+  RuntimeServicesOfBlockMember<Block>
+>
 
 type BlockLocalMounts<Block> =
   Block extends Readonly<{ [LocalMountsTypeId]: infer Mounts }>
@@ -482,7 +502,9 @@ type ResidualRequirements<Block> =
  * requirements after startup. The selected Layer graph satisfies matching
  * operation services; unrelated Layer construction inputs remain requirements.
  */
-export type RequirementsOfBlock<Block> = ResidualRequirements<Block>
+export type RequirementsOfBlock<Block> = Block extends unknown
+  ? ResidualRequirements<Block>
+  : never
 
 type ResidualHandlers<Block> = HandlerRequirements<ResidualRequirements<Block>>
 
@@ -623,72 +645,210 @@ type SatisfyLocalRequirements<Requirements, Provided> =
     ? Exclude<Requirements, Provided>
     : SatisfyRequirements<Requirements, Provided>
 
-type LocalResidualRequirements<Composition> =
-  | SatisfyLocalRequirements<
-      Exclude<
-        LocalOperationRequirements<Composition>,
-        ManagedResourceRuntimeServices<BlockManagedResources<Composition>>
-      >,
-      LayerOutputs<BlockLayer<Composition>>
-    >
-  | Exclude<
-      LayerInputs<BlockLayer<Composition>>,
-      ManagedResourceRuntimeServices<BlockManagedResources<Composition>>
-    >
-
 type CompositionChildHandlerEvidence<Composition> =
   Composition extends Readonly<{ bindings: infer Children }>
     ? ChildHandlerEvidence<Children>
     : never
-
-type MissingLocalHostHandlers<Composition> = Exclude<
-  HandlerRequirements<LocalResidualRequirements<Composition>>,
-  | DeclaredHostHandlers<Composition>
-  | CompositionChildHandlerEvidence<Composition>
->
-
-type UnexpectedLocalHostHandlers<Composition> = Exclude<
-  DeclaredHostHandlers<Composition>,
-  HandlerRequirements<LocalResidualRequirements<Composition>>
->
-
-type ValidateMissingLocalHostHandlers<Composition> = [
-  MissingLocalHostHandlers<Composition>,
-] extends [never]
-  ? unknown
-  : Readonly<{
-      'Block handler requirements must be provided locally or listed in hostHandlers': MissingLocalHostHandlers<Composition>
-    }>
-
-type ValidateUnexpectedLocalHostHandlers<Composition> = [
-  UnexpectedLocalHostHandlers<Composition>,
-] extends [never]
-  ? unknown
-  : Readonly<{
-      'Block hostHandlers must match residual handler requirements': UnexpectedLocalHostHandlers<Composition>
-    }>
 
 type UnscopedHandlerRequirements<Requirements> =
   Requirements extends Scoped<any, any>
     ? never
     : HandlerRequirements<Requirements>
 
-type LocalHandlerContracts<Composition> =
-  | UnscopedHandlerRequirements<LocalOperationRequirements<Composition>>
-  | HandlerRequirements<
-      | LayerOutputs<BlockLayer<Composition>>
-      | LayerInputs<BlockLayer<Composition>>
-      | DeclaredHostHandlers<Composition>
-    >
+interface LocalCompositionChannelsShape {
+  readonly initRequirements: unknown
+  readonly updateRequirements: unknown
+  readonly subscriptionRequirements: unknown
+  readonly managedResourceRequirements: unknown
+  readonly managedResourceServices: unknown
+  readonly mountRequirements: unknown
+  readonly layerOutputs: unknown
+  readonly layerInputs: unknown
+  readonly hostDefinitions: unknown
+  readonly childHandlerEvidence: unknown
+  readonly registrationEvidence: unknown
+  readonly registeredChildEvidence: unknown
+}
 
-type ValidateLocalComposition<Composition> =
-  ValidateBlockOperationNames<Composition> &
-    ValidateOperationRegistrations<Composition> &
-    ValidatePreciseRequirements<Composition> &
-    ValidateHostDefinitions<Composition> &
-    ValidateMissingLocalHostHandlers<Composition> &
-    ValidateUnexpectedLocalHostHandlers<Composition> &
-    ValidHandlerContracts<LocalHandlerContracts<Composition>>
+type CompleteLocalComposition = Readonly<{
+  [LocalMountsTypeId]: unknown
+  bindings: ReadonlyArray<unknown>
+  init: unknown
+  update: unknown
+  subscriptions: unknown
+  managedResources: unknown
+  EffectsLayer: unknown
+  hostHandlers: ReadonlyArray<unknown>
+}>
+
+type HasCompleteLocalCompositionShape<Composition> =
+  IsAny<Composition> extends true
+    ? false
+    : [Composition] extends [never]
+      ? false
+      : IsUnknown<Composition> extends true
+        ? false
+        : [Composition] extends [CompleteLocalComposition]
+          ? true
+          : false
+
+type FastLocalCompositionChannels<Composition> = [Composition] extends [
+  Readonly<{
+    [LocalMountsTypeId]: infer Mounts
+    bindings: infer Children extends ReadonlyArray<unknown>
+    init: infer Init
+    update: infer UpdateFunction
+    subscriptions: infer Subscriptions
+    managedResources: infer ManagedResources
+    EffectsLayer: infer EffectsLayer
+    hostHandlers: infer HostHandlers extends ReadonlyArray<unknown>
+  }>,
+]
+  ? Readonly<{
+      initRequirements: ProducerRequirements<Init>
+      updateRequirements: ProducerRequirements<UpdateFunction>
+      subscriptionRequirements: SubscriptionRequirements<Subscriptions>
+      managedResourceRequirements: ManagedResourceLifecycleRequirements<ManagedResources>
+      managedResourceServices: ManagedResourceRuntimeServices<ManagedResources>
+      mountRequirements: MountRequirements<Mounts>
+      layerOutputs: LayerOutputs<EffectsLayer>
+      layerInputs: LayerInputs<EffectsLayer>
+      hostDefinitions: HostHandlers[number]
+      childHandlerEvidence: ChildHandlerEvidence<Children>
+      registrationEvidence:
+        | ProducerRegistrationEvidence<Init>
+        | ProducerRegistrationEvidence<UpdateFunction>
+      registeredChildEvidence: RequirementsOfBindings<Children>
+    }>
+  : never
+
+type FallbackLocalCompositionChannels<Composition> = Readonly<{
+  initRequirements: Composition extends Readonly<{ init: infer Init }>
+    ? ProducerRequirements<Init>
+    : never
+  updateRequirements: Composition extends Readonly<{
+    update: infer UpdateFunction
+  }>
+    ? ProducerRequirements<UpdateFunction>
+    : never
+  subscriptionRequirements: Composition extends Readonly<{
+    subscriptions: infer Subscriptions
+  }>
+    ? SubscriptionRequirements<Subscriptions>
+    : never
+  managedResourceRequirements: ManagedResourceLifecycleRequirements<
+    BlockManagedResources<Composition>
+  >
+  managedResourceServices: ManagedResourceRuntimeServices<
+    BlockManagedResources<Composition>
+  >
+  mountRequirements: MountRequirements<BlockLocalMounts<Composition>>
+  layerOutputs: LayerOutputs<BlockLayer<Composition>>
+  layerInputs: LayerInputs<BlockLayer<Composition>>
+  hostDefinitions: HostDefinitions<Composition>
+  childHandlerEvidence: CompositionChildHandlerEvidence<Composition>
+  registrationEvidence: LocalOperationRegistrationEvidence<Composition>
+  registeredChildEvidence: RegisteredChildEvidence<Composition>
+}>
+
+type LocalCompositionChannels<Composition> =
+  HasCompleteLocalCompositionShape<Composition> extends true
+    ? FastLocalCompositionChannels<Composition>
+    : FallbackLocalCompositionChannels<Composition>
+
+type ValidateLocalCompositionChannels<
+  Composition,
+  Channels extends LocalCompositionChannelsShape,
+  LocalRequirements =
+    | Channels['initRequirements']
+    | Channels['updateRequirements']
+    | Channels['subscriptionRequirements']
+    | Channels['managedResourceRequirements']
+    | Channels['mountRequirements'],
+  DeclaredHostHandlersValue = HandlerOfHostDefinition<
+    Channels['hostDefinitions']
+  >,
+  LocalResidual =
+    | SatisfyLocalRequirements<
+        Exclude<LocalRequirements, Channels['managedResourceServices']>,
+        Channels['layerOutputs']
+      >
+    | Exclude<Channels['layerInputs'], Channels['managedResourceServices']>,
+  ResidualHandlers = HandlerRequirements<LocalResidual>,
+  PrecisionFailure =
+    | ErasedRequirement<
+        'init, update, or exposed operations',
+        Channels['initRequirements']
+      >
+    | ErasedRequirement<
+        'init, update, or exposed operations',
+        Channels['updateRequirements']
+      >
+    | ErasedRequirement<'subscriptions', Channels['subscriptionRequirements']>
+    | ErasedRequirement<
+        'managed resources',
+        | Channels['managedResourceRequirements']
+        | Channels['managedResourceServices']
+      >
+    | ErasedRequirement<'mounts', Channels['mountRequirements']>
+    | ErasedRequirement<'EffectsLayer outputs', Channels['layerOutputs']>
+    | ErasedRequirement<'EffectsLayer inputs', Channels['layerInputs']>
+    | ErasedRequirement<'hostHandlers', DeclaredHostHandlersValue>,
+  InvalidHostDefinition = Channels['hostDefinitions'] extends infer Definition
+    ? Definition extends unknown
+      ? [HandlerOfHostDefinition<Definition>] extends [never]
+        ? Definition
+        : never
+      : never
+    : never,
+  MissingRegistration = Exclude<
+    Channels['registrationEvidence'],
+    Channels['registeredChildEvidence']
+  >,
+  MissingHostHandler = Exclude<
+    ResidualHandlers,
+    DeclaredHostHandlersValue | Channels['childHandlerEvidence']
+  >,
+  UnexpectedHostHandler = Exclude<DeclaredHostHandlersValue, ResidualHandlers>,
+  HandlerContract =
+    | UnscopedHandlerRequirements<LocalRequirements>
+    | HandlerRequirements<
+        | Channels['layerOutputs']
+        | Channels['layerInputs']
+        | DeclaredHostHandlersValue
+      >,
+> = ValidateBlockOperationNames<Composition> &
+  ([MissingRegistration] extends [never]
+    ? unknown
+    : Readonly<{
+        'Block operations may use only registered child bindings': MissingRegistration
+      }>) &
+  ([PrecisionFailure] extends [never]
+    ? unknown
+    : Readonly<{
+        'Block requirement sources must preserve exact service types': PrecisionFailure
+      }>) &
+  ([InvalidHostDefinition] extends [never]
+    ? unknown
+    : Readonly<{
+        'Block hostHandlers must contain layered Foldkit definitions': InvalidHostDefinition
+      }>) &
+  ([MissingHostHandler] extends [never]
+    ? unknown
+    : Readonly<{
+        'Block handler requirements must be provided locally or listed in hostHandlers': MissingHostHandler
+      }>) &
+  ([UnexpectedHostHandler] extends [never]
+    ? unknown
+    : Readonly<{
+        'Block hostHandlers must match residual handler requirements': UnexpectedHostHandler
+      }>) &
+  ValidHandlerContracts<HandlerContract>
+
+type ValidateLocalComposition<Composition> = ValidateLocalCompositionChannels<
+  Composition,
+  LocalCompositionChannels<Composition>
+>
 
 type HandlerContracts<Block> = HandlerRequirements<
   | OperationRequirementsOfBlock<Block>

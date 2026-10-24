@@ -6,7 +6,7 @@ import {
   PubSub,
   Result,
   Schema,
-  type Scope,
+  Scope,
   Stream,
   SubscriptionRef,
 } from 'effect'
@@ -29,7 +29,7 @@ import {
   liveViewStateChanges,
 } from '../mount/index.js'
 import {
-  type DevToolsConfig,
+  type RuntimeDevToolsConfig,
   resolveDevToolsConfig,
   resolveDevToolsKeyframeInterval,
   resolveDevToolsMaxEntries,
@@ -106,18 +106,24 @@ const toCommandRecord = ({ id, command }: RecordableCommand): CommandRecord =>
  * Builds the DevTools integration for one runtime from the `devTools`
  * config. `update` and `maybeFreezeModel` drive time-travel replay.
  * `prepareDispatch` admits decoded WebSocket input and captures the queue
- * guard that belongs to that exact admission.
+ * guard that belongs to that exact admission. `provideDispatchServices`
+ * supplies application Services used by Message decoding while installation
+ * retains its active Scope for bridge finalizers.
  */
-export const makeDevToolsIntegration = <Model, Message>({
+export const makeDevToolsIntegration = <Model, Message, DispatchServices>({
   devTools,
   update,
   maybeFreezeModel,
   prepareDispatch,
+  provideDispatchServices,
 }: Readonly<{
-  devTools: DevToolsConfig | undefined
+  devTools: RuntimeDevToolsConfig<DispatchServices> | undefined
   update: (model: Model, message: Message) => Readonly<{ model: Model }>
   maybeFreezeModel: (model: Model) => Model
   prepareDispatch: PrepareDispatch
+  provideDispatchServices: <A>(
+    effect: Effect.Effect<A, never, DispatchServices>,
+  ) => Effect.Effect<A>
 }>): Effect.Effect<DevToolsIntegration<Model, Message>> =>
   Effect.gen(function* () {
     const resolvedDevTools = resolveDevToolsConfig(devTools)
@@ -272,14 +278,18 @@ export const makeDevToolsIntegration = <Model, Message>({
             if (import.meta.hot) {
               const maybeMessageSchema =
                 devTools !== undefined && devTools !== false
-                  ? Option.fromNullishOr(devTools.Message)
-                  : Option.none<Schema.Codec<any, any, unknown, unknown>>()
-              yield* startWebSocketBridge(
-                store,
-                import.meta.hot,
-                /* eslint-disable-next-line @typescript-eslint/consistent-type-assertions */
-                maybeMessageSchema as Option.Option<Schema.Codec<any, any>>,
-                prepareExternalDispatch,
+                  ? Option.fromNullishOr(devTools.dispatchSchema)
+                  : Option.none<
+                      Schema.Codec<any, any, DispatchServices, unknown>
+                    >()
+              const runtimeScope = yield* Effect.scope
+              yield* provideDispatchServices(
+                startWebSocketBridge(
+                  store,
+                  import.meta.hot,
+                  maybeMessageSchema,
+                  prepareExternalDispatch,
+                ).pipe(Effect.provideService(Scope.Scope, runtimeScope)),
               )
             }
           }),

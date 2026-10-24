@@ -1,5 +1,5 @@
-import { Array, Effect, Fiber, Layer, Schema } from 'effect'
-import { makeApplicationDefinition } from 'foldkit'
+import { Array, Effect, Fiber, Schema } from 'effect'
+import { Block, Program } from 'foldkit'
 import { modifyFields } from 'foldkit/struct'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -10,38 +10,37 @@ const dialogId = 'preserved-dialog'
 const DialogEvent = Schema.Literals(['Opened', 'Closed'])
 
 const Model = Schema.Struct({
-  dialog: Dialog.DialogBlock.Model,
+  dialog: Dialog.Model,
   dialogEvents: Schema.Array(DialogEvent),
 })
 type Model = typeof Model.Type
 
-const ApplicationDefinition = makeApplicationDefinition({
+const ApplicationDefinition = Block.makeDefinition('Application', {
   Model,
   Message: Schema.Never,
 })
 
-const foldDialogOutMessage = (outMessage: typeof Dialog.OutMessage.Type) =>
-  ApplicationDefinition.step(model =>
-    Dialog.OutMessage.match(outMessage, {
-      Opened: () => ({
-        model: modifyFields(model, {
-          dialogEvents: Array.append(DialogEvent.make('Opened')),
-        }),
+const foldDialogOutMessage = ApplicationDefinition.makeOutMessageFold(
+  Dialog.DialogBlock,
+  {
+    Opened: () => model => ({
+      model: modifyFields(model, {
+        dialogEvents: Array.append(DialogEvent.make('Opened')),
       }),
-      Closed: () => ({
-        model: modifyFields(model, {
-          dialogEvents: Array.append(DialogEvent.make('Closed')),
-        }),
-      }),
-      CompletedClose: () => ({ model }),
     }),
-  )
+    Closed: () => model => ({
+      model: modifyFields(model, {
+        dialogEvents: Array.append(DialogEvent.make('Closed')),
+      }),
+    }),
+    CompletedClose: () => model => ({ model }),
+  },
+)
 
-const DialogBinding = ApplicationDefinition.bindChild(Dialog.DialogBlock, {
+const DialogBinding = ApplicationDefinition.makeBinding(Dialog.DialogBlock, {
   field: 'dialog',
-  outMessage: { fold: foldDialogOutMessage },
   init: { contextToArgs: () => [{ id: dialogId }] },
-})
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
 const ApplicationComposition = ApplicationDefinition.makeComposition({
   bindings: [DialogBinding],
@@ -92,14 +91,21 @@ const preservedModel = (dialogModel: Dialog.Model): Model => ({
 const preservedOpenModel = (config: Dialog.InitConfig): Dialog.Model =>
   Dialog.update(Dialog.init(config).model, Dialog.Message.RequestedOpen()).model
 
-const makeDialogProgram = (container: HTMLElement) =>
-  ApplicationComposition.assembleElement({
+const makeDialogProgram = (container: HTMLElement) => {
+  const prepare = () =>
+    ApplicationComposition.prepareBlock({
+      init,
+      update,
+      view,
+    })
+  const block: Block.FromAssemblyWithView<typeof Model, typeof prepare> =
+    Block.assemble(prepare)
+
+  return Program.makeElement({
+    block,
     container,
-    init,
-    update,
-    view,
-    EffectsLayer: Layer.empty,
   })
+}
 
 describe('Dialog runtime lifecycle', () => {
   beforeEach(() => {

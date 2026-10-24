@@ -1,5 +1,5 @@
 import { Array, Option, Schema } from 'effect'
-import { Block, type Update } from 'foldkit'
+import { Block } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
 
@@ -32,7 +32,7 @@ export const make = <Value extends string>(Value: ValueSchema<Value>) => {
   })
   const RefinedPickerComposition = RefinedPicker.makeComposition()
 
-  const selectValue = RefinedPicker.step((model, value: Value) => ({
+  const selectValue = RefinedPicker.makeStep((model, value: Value) => ({
     model: modifyFields(model, { selected: () => Option.some(value) }),
     outMessage: OutMessage.Selected({ value }),
   }))
@@ -65,16 +65,19 @@ export const make = <Value extends string>(Value: ValueSchema<Value>) => {
     model: Model.make({ selected: Option.none() }),
   }))
 
-  return RefinedPickerComposition.assembleBlock({
-    init,
-    update,
-    view,
-    operations: {
-      requestSelectValue: (value: Value) => [
-        Message.RequestedSelectValue({ value }),
-      ],
-    },
-  })
+  const prepare = () =>
+    RefinedPickerComposition.prepareBlock({
+      init,
+      update,
+      view,
+      operations: {
+        requestSelectValue: (value: Value) => [
+          Message.RequestedSelectValue({ value }),
+        ],
+      },
+    })
+
+  return Block.assemble(prepare)
 }
 
 const Fruit = Schema.Literals(['Apple', 'Pear'])
@@ -84,8 +87,6 @@ const ParentModel = Schema.Struct({
   picker: FruitPicker.Model,
   selectionHistory: Schema.Array(Fruit),
 })
-type ParentModel = typeof ParentModel.Type
-
 const ParentMessage = defineMessageUnion({})
 
 const FruitSelectionDefinition = Block.makeDefinition('FruitSelection', {
@@ -93,21 +94,15 @@ const FruitSelectionDefinition = Block.makeDefinition('FruitSelection', {
   Message: ParentMessage,
 })
 
-const PickerBinding = FruitSelectionDefinition.bindChild(FruitPicker, {
+const PickerBinding = FruitSelectionDefinition.makeBinding(FruitPicker, {
   field: 'picker',
-  outMessage: {
-    fold: FruitPicker.OutMessage.match<
-      Update.Step<ParentModel, typeof ParentMessage.Type>
-    >({
-      Selected:
-        ({ value }) =>
-        model => ({
-          model: modifyFields(model, {
-            selectionHistory: Array.append(value),
-          }),
-        }),
-    }),
-  },
+}).withOutMessagePolicy({
+  fold: FruitSelectionDefinition.makeOutMessageFold(FruitPicker, {
+    Selected: ({ value }) =>
+      FruitSelectionDefinition.makeFieldsStep(() => ({
+        selectionHistory: Array.append(value),
+      })),
+  }),
 })
 
 export const selectApple = PickerBinding.requestSelectValue('Apple')

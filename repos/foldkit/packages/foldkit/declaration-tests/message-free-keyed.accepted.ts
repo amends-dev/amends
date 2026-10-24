@@ -32,7 +32,7 @@ const SilentDefinition = Block.makeDefinition(
     Message: Schema.Never,
   },
 )
-const WaitForever = SilentDefinition.command('WaitForever', {
+const WaitForever = SilentDefinition.makeCommand('WaitForever', {
   messages: [],
   handler: function* () {
     const client = yield* SilentClient
@@ -41,14 +41,19 @@ const WaitForever = SilentDefinition.command('WaitForever', {
 })
 // oxlint-disable-next-line foldkit/block-name-matches-variable -- This fixture deliberately uses a distinct literal Block identity for type coverage.
 const SilentComposition = SilentDefinition.makeComposition()
-export const SilentBlock = SilentComposition.assembleBlock({
-  init: SilentComposition.makeInit((id: string) => ({
-    model: SilentModel.make({ id, ready: false }),
-    commands: [WaitForever()],
-  })),
-  update: SilentComposition.makeUpdate(),
-  EffectsLayer: WaitForever.layer,
-})
+const prepareSilentBlock = () =>
+  SilentComposition.prepareBlock({
+    init: SilentComposition.makeInit((id: string) => ({
+      model: SilentModel.make({ id, ready: false }),
+      commands: [WaitForever()],
+    })),
+    update: SilentComposition.makeUpdate(),
+    EffectsLayer: WaitForever.layer,
+  })
+export const SilentBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof SilentModel,
+  typeof prepareSilentBlock
+> = Block.assemble(prepareSilentBlock)
 
 export const Entry = Schema.Struct({
   key: Schema.String,
@@ -65,7 +70,7 @@ export const ParentDefinition = Block.makeDefinition(
   },
 )
 
-export const GeneralKeyedBinding = ParentDefinition.bindChild(SilentBlock, {
+export const GeneralKeyedBinding = ParentDefinition.makeBinding(SilentBlock, {
   placement: 'general-silent',
   readAll: model => {
     const proof: Expect<Equal<typeof model, typeof ParentModel.Type>> = true
@@ -107,20 +112,26 @@ export const GeneralKeyedBinding = ParentDefinition.bindChild(SilentBlock, {
 export const ParentComposition = ParentDefinition.makeComposition({
   bindings: [GeneralKeyedBinding],
 })
-export const initializeGeneral = ParentDefinition.step((model, key: string) =>
-  GeneralKeyedBinding.init({
-    key,
-    args: [key],
-    toParentModel: silent =>
-      modifyFields(model, {
-        entries: Array.append(Entry.make({ key, silent })),
-      }),
-  }),
+export const initializeGeneral = ParentDefinition.makeStep(
+  (model, key: string) =>
+    GeneralKeyedBinding.init({
+      key,
+      args: [key],
+      toParentModel: silent =>
+        modifyFields(model, {
+          entries: Array.append(Entry.make({ key, silent })),
+        }),
+    }),
 )
-export const ParentBlock = ParentComposition.assembleBlock({
-  init: ParentComposition.makeInit(() => ({ model: { entries: [] } })),
-  update: ParentComposition.makeUpdate(model => ({ model })),
-})
+const prepareParentBlock = () =>
+  ParentComposition.prepareBlock({
+    init: ParentComposition.makeInit(() => ({ model: { entries: [] } })),
+    update: ParentComposition.makeUpdate(model => ({ model })),
+  })
+export const ParentBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ParentModel,
+  typeof prepareParentBlock
+> = Block.assemble(prepareParentBlock)
 
 type InitializationRequirements = Expect<
   Equal<

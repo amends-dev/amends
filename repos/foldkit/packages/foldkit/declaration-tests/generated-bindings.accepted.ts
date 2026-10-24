@@ -17,17 +17,22 @@ export const GeneratedBindingCounterDefinition = Block.makeDefinition(
 )
 export const GeneratedBindingCounterComposition =
   GeneratedBindingCounterDefinition.makeComposition()
-export const CounterBlock = GeneratedBindingCounterComposition.assembleBlock({
-  init: GeneratedBindingCounterComposition.makeInit((id: string) => ({
-    model: { id, count: 0 },
-  })),
-  update: GeneratedBindingCounterComposition.makeUpdate(
-    (model, _message, amount: number) => ({
-      model: modifyFields(model, { count: count => count + amount }),
-    }),
-  ),
-  view: GeneratedBindingCounterComposition.makeView((_model, h) => h.empty),
-})
+const prepareCounterBlock = () =>
+  GeneratedBindingCounterComposition.prepareBlock({
+    init: GeneratedBindingCounterComposition.makeInit((id: string) => ({
+      model: { id, count: 0 },
+    })),
+    update: GeneratedBindingCounterComposition.makeUpdate(
+      (model, _message, amount: number) => ({
+        model: modifyFields(model, { count: count => count + amount }),
+      }),
+    ),
+    view: GeneratedBindingCounterComposition.makeView((_model, h) => h.empty),
+  })
+export const CounterBlock: Block.FromAssemblyWithView<
+  typeof CounterModel,
+  typeof prepareCounterBlock
+> = Block.assemble(prepareCounterBlock)
 
 export const StatusModel = Schema.Struct({ isReady: Schema.Boolean })
 export const StatusMessage = defineMessageUnion({ ToggledReady: {} })
@@ -40,14 +45,19 @@ export const GeneratedBindingStatusDefinition = Block.makeDefinition(
 )
 export const GeneratedBindingStatusComposition =
   GeneratedBindingStatusDefinition.makeComposition()
-export const StatusBlock = GeneratedBindingStatusComposition.assembleBlock({
-  init: GeneratedBindingStatusComposition.makeInit(() => ({
-    model: { isReady: false },
-  })),
-  update: GeneratedBindingStatusComposition.makeUpdate(model => ({ model })),
-  view: GeneratedBindingStatusComposition.makeView((_model, h) => h.empty),
-  operations: { requestToggle: StatusMessage.ToggledReady },
-})
+const prepareStatusBlock = () =>
+  GeneratedBindingStatusComposition.prepareBlock({
+    init: GeneratedBindingStatusComposition.makeInit(() => ({
+      model: { isReady: false },
+    })),
+    update: GeneratedBindingStatusComposition.makeUpdate(model => ({ model })),
+    view: GeneratedBindingStatusComposition.makeView((_model, h) => h.empty),
+    operations: { requestToggle: StatusMessage.ToggledReady },
+  })
+export const StatusBlock: Block.FromAssemblyWithView<
+  typeof StatusModel,
+  typeof prepareStatusBlock
+> = Block.assemble(prepareStatusBlock)
 
 export const Room = Schema.Struct({
   roomId: Schema.String,
@@ -71,7 +81,7 @@ export const GeneratedBindingParentDefinition = Block.makeDefinition(
   },
 )
 
-export const AccessorBinding = GeneratedBindingParentDefinition.bindChild(
+export const AccessorBinding = GeneratedBindingParentDefinition.makeBinding(
   CounterBlock,
   {
     placement: 'selected-child',
@@ -85,7 +95,7 @@ export const AccessorBinding = GeneratedBindingParentDefinition.bindChild(
   },
 )
 
-export const OptionalBinding = GeneratedBindingParentDefinition.bindChild(
+export const OptionalBinding = GeneratedBindingParentDefinition.makeBinding(
   CounterBlock,
   {
     field: 'maybeCounter',
@@ -97,7 +107,7 @@ export const OptionalBinding = GeneratedBindingParentDefinition.bindChild(
   },
 )
 
-export const KeyedFieldBinding = GeneratedBindingParentDefinition.bindChild(
+export const KeyedFieldBinding = GeneratedBindingParentDefinition.makeBinding(
   CounterBlock,
   {
     field: 'counters',
@@ -122,7 +132,7 @@ export const readRoomId = (room: typeof Room.Type): string => room.roomId
 export const readRoomCounter = (
   room: typeof Room.Type,
 ): typeof CounterModel.Type => room.counter
-export const RoomBinding = GeneratedBindingParentDefinition.bindChild(
+export const RoomBinding = GeneratedBindingParentDefinition.makeBinding(
   CounterBlock,
   {
     placement: 'room-counters',
@@ -144,7 +154,7 @@ export const RoomBinding = GeneratedBindingParentDefinition.bindChild(
   },
 )
 
-export const WrappedBinding = GeneratedBindingParentDefinition.bindChild(
+export const WrappedBinding = GeneratedBindingParentDefinition.makeBinding(
   CounterBlock,
   {
     placement: 'wrapped-counters',
@@ -157,7 +167,7 @@ export const WrappedBinding = GeneratedBindingParentDefinition.bindChild(
   },
 )
 
-export const StatusBinding = GeneratedBindingParentDefinition.bindChild(
+export const StatusBinding = GeneratedBindingParentDefinition.makeBinding(
   StatusBlock,
   {
     field: 'status',
@@ -175,13 +185,13 @@ export const GeneratedBindingParentComposition =
       StatusBinding,
     ],
   })
-export const applyGeneratedOperation = GeneratedBindingParentDefinition.step(
-  () =>
-    Update.combine([
-      GeneratedBindingParentDefinition.stepNoop(),
+export const applyGeneratedOperation =
+  GeneratedBindingParentDefinition.makeStep(() =>
+    Update.combineSteps([
+      GeneratedBindingParentDefinition.makeNoopStep(),
       StatusBinding.requestToggle(),
     ]),
-)
+  )
 export const update = GeneratedBindingParentComposition.makeUpdate(
   (model, message) =>
     ParentMessage.match(message, {

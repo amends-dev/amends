@@ -5,7 +5,7 @@ import { Message } from './message'
 
 const PLACE_ORDER_DELAY = Duration.seconds(1)
 
-export const PlaceOrder = ApplicationDefinition.command('PlaceOrder', {
+export const PlaceOrder = ApplicationDefinition.makeCommand('PlaceOrder', {
   args: { isShippingRequired: Schema.Boolean },
   messages: [Message.CompletedPlaceOrder],
   handler: function* () {

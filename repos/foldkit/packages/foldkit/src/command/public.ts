@@ -1,9 +1,25 @@
+declare const HandlerTypeId: unique symbol
+
+type Invariant<Value> = (value: Value) => Value
+
+/**
+ * The service required by a Command whose implementation is supplied by a
+ * Layer. Its name, decoded arguments, and declared result Message identify the
+ * handler contract.
+ */
+export interface Handler<Name extends string, Args, Message> {
+  readonly [HandlerTypeId]: Readonly<{
+    name: Invariant<Name>
+    args: Invariant<Args>
+    message: Invariant<Message>
+  }>
+}
+
 export type {
   Command,
   CommandDefinition,
   CommandDefinitionNoArgs,
   CommandDefinitionWithArgs,
-  Handler,
   HandlerOf,
   InterruptOption,
   LayeredCommandDefinitionNoArgs,

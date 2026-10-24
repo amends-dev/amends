@@ -7,7 +7,7 @@ import * as SignedIn from './signedIn'
 const readSignedIn = (model: Model) =>
   Option.liftPredicate(model, model => model._tag === 'SignedIn')
 
-export const SignedInBinding = ApplicationDefinition.bindChild(
+export const SignedInBinding = ApplicationDefinition.makeBinding(
   SignedIn.SignedInBlock,
   {
     read: readSignedIn,

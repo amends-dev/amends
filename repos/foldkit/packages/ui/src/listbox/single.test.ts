@@ -921,6 +921,61 @@ describe('Listbox', () => {
         )
       })
 
+      it('keeps the listbox open after ClickedButton follows a mouse press', () => {
+        Story.story(
+          update,
+          givenClosed,
+          Story.message(
+            Message.PressedPointerOnButton({
+              pointerType: 'mouse',
+              button: 0,
+            }),
+          ),
+          Story.Command.resolve(
+            FocusListboxItems,
+            Message.CompletedFocusListboxItems(),
+          ),
+          Story.message(Message.ClickedButton()),
+          Story.model(model => {
+            expect(model.isOpen).toBe(true)
+            expect(model.maybeLastButtonPointerType).toStrictEqual(
+              Option.none(),
+            )
+          }),
+        )
+      })
+
+      it('opens on ClickedButton when the click did not follow a mouse press', () => {
+        Story.story(
+          update,
+          givenClosed,
+          Story.message(Message.ClickedButton()),
+          Story.Command.resolve(
+            FocusListboxItems,
+            Message.CompletedFocusListboxItems(),
+          ),
+          Story.model(model => {
+            expect(model.isOpen).toBe(true)
+            expect(model.activationTrigger).toBe('Pointer')
+          }),
+        )
+      })
+
+      it('closes an open listbox on ClickedButton when the click did not follow a mouse press', () => {
+        Story.story(
+          update,
+          givenOpen,
+          Story.message(Message.ClickedButton()),
+          Story.Command.resolve(
+            FocusListboxButton,
+            Message.CompletedFocusListboxButton(),
+          ),
+          Story.model(model => {
+            expect(model.isOpen).toBe(false)
+          }),
+        )
+      })
+
       it('returns model unchanged for SuppressedSpaceScroll', () => {
         Story.story(
           update,
@@ -1369,6 +1424,35 @@ describe('Listbox', () => {
           expect(model.isOpen).toBe(false)
         }),
       )
+    })
+
+    it('emits no Commands when requestOpen receives an open modal Model', () => {
+      const openModal = modifyFields(
+        init({ id: 'test', isModal: true }).model,
+        {
+          isOpen: () => true,
+          maybeActiveItemIndex: () => Option.some(1),
+          searchQuery: () => 'ap',
+          searchVersion: () => 2,
+        },
+      )
+
+      for (const reopened of [
+        TestListbox.operations.requestOpen(openModal),
+        update(
+          openModal,
+          Message.Opened({ maybeActiveItemIndex: Option.none() }),
+        ),
+      ]) {
+        expect(reopened.commands ?? []).toEqual([])
+        expect(reopened.outMessage).toBeUndefined()
+        expect(reopened.model.isOpen).toBe(true)
+        expect(reopened.model.maybeActiveItemIndex).toStrictEqual(
+          Option.some(1),
+        )
+        expect(reopened.model.searchQuery).toBe('ap')
+        expect(reopened.model.searchVersion).toBe(2)
+      }
     })
 
     it('emits unlockScroll and restoreInert commands when the items container blurs in modal mode', () => {

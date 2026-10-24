@@ -45,7 +45,7 @@ const phaseAccentClass = (phase: SlowPhase): string =>
     Match.exhaustive,
   )
 
-const burnCpuDuringView = (workload: Workload): void => {
+const burnCpuDuringView = (workload: typeof Workload.Type): void => {
   if (workload === 'View') {
     burnCpu(VIEW_WORK_MS)
   }
@@ -65,7 +65,7 @@ const scenarioCard = (
     title: string
     body: string
     buttonText: string
-    message: Message
+    message: typeof Message.Type
   }>,
   h: ApplicationViewBuilder,
 ): Html =>
@@ -95,7 +95,10 @@ const scenarioCard = (
     ],
   )
 
-const warningView = (warning: SlowWarning, h: ApplicationViewBuilder): Html =>
+const warningView = (
+  warning: typeof SlowWarning.Type,
+  h: ApplicationViewBuilder,
+): Html =>
   h.keyed('li')(
     warning.id.toString(),
     [
@@ -125,7 +128,7 @@ const warningView = (warning: SlowWarning, h: ApplicationViewBuilder): Html =>
   )
 
 const warningsView = (
-  warnings: ReadonlyArray<SlowWarning>,
+  warnings: ReadonlyArray<typeof SlowWarning.Type>,
   h: ApplicationViewBuilder,
 ): Html =>
   h.section(
@@ -212,7 +215,10 @@ const patchRowsView = (
   }
 }
 
-const patchSurfaceView = (model: Model, h: ApplicationViewBuilder): Html =>
+const patchSurfaceView = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+): Html =>
   h.section(
     [h.Class('rounded-lg border border-zinc-200 bg-white p-4 shadow-sm')],
     [

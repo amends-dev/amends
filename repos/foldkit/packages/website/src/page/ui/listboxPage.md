@@ -117,7 +117,7 @@ Two ViewInputs fields cover the cases a `<label for>` does not. Pass `ariaLabel`
 
 ### InitConfig {#init-config}
 
-Configuration object passed to `Listbox.init()` or `Listbox.Multi.init()`.
+Configuration passed to the Binding for the completed Block returned by `Listbox.create(Item)` or `Listbox.Multi.create(Item)`.
 
 | Name          | Type                         | Default      | Description                                                                                                                                          |
 | ------------- | ---------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -160,8 +160,8 @@ Pass the child Model as `model` and these fields as `viewInputs` to the composed
 
 ### OutMessage {#out-message}
 
-Messages emitted to the parent through the optional `outMessage` field. Handle the OutMessage in the Binding’s `outMessage.fold` policy. The same shape applies to the completed Block returned by `Listbox.Multi.create()`.
+Messages emitted to the parent through the optional `outMessage` field. Handle the OutMessage in the Binding’s selected `fold` policy. The same shape applies to the completed Block returned by `Listbox.Multi.create()`.
 
-| Name       | Type               | Default | Description                                                                                                                                                                                                                                                                                                                                                                     |
-| ---------- | ------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Selected` | `{ value: Value }` | —       | Emitted when an item is activated. Carries the neutral fact that the item was activated; the parent owns the selection and decides what it means. Single-select stores the value; multi-select toggles the value in and out of its array. Handle it in the Binding's `outMessage.fold` policy to lift the value into the selection you own. A read-only Listbox never emits it. |
+| Name       | Type               | Default | Description                                                                                                                                                                                                                                                                                                                                                                   |
+| ---------- | ------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Selected` | `{ value: Value }` | —       | Emitted when an item is activated. Carries the neutral fact that the item was activated; the parent owns the selection and decides what it means. Single-select stores the value; multi-select toggles the value in and out of its array. Handle it in the Binding's selected `fold` policy to lift the value into the selection you own. A read-only Listbox never emits it. |

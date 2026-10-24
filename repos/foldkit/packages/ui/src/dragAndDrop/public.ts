@@ -13,6 +13,6 @@ export {
   type ViewInputs,
 } from './index.js'
 
-/** Original DragAndDrop Command Definitions and test resolvers for Story and Scene tests. */
+/** Original DragAndDrop Command Definitions plus Story convenience helpers. */
 export * as test from './test.js'
 export type { SettleFocusInput, ResolveKeyboardMoveInput } from './test.js'

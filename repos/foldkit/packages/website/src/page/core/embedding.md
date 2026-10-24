@@ -8,13 +8,13 @@ The [embedding example](/example-apps/embedding) runs everything on this page: a
 
 ## Choosing an Entry Point
 
-Embedded apps are usually built with `ApplicationComposition.assembleElement`: the view returns `Html` and the runtime stays scoped to its container, never touching the document `<head>`, the URL bar, or anything else the host owns. Use `ApplicationComposition.assembleApplication` when the embedded app should own page-level concerns like the document title. `embed` accepts programs from both. Both forms carry their Effect requirements until the completed program's `provide` method supplies the needed Layers.
+Embedded apps are usually built with `Program.makeElement`: the root Block view returns `Html` and the Runtime stays scoped to its container, never touching the document `<head>`, the URL bar, or anything else the host owns. Use `Program.make` when the embedded app should own page-level concerns like the document title. `embed` accepts Programs from both. Both forms carry their Effect requirements until the Program's `provide` method supplies the needed Layers.
 
 ## Providing Host Implementations
 
 An embedded feature can declare a Command whose implementation belongs to its host. For example, an editor can request `SaveDocument` while the host supplies the persistence handler through `SaveDocument.toLayer`. The handler returns the editor's declared result Messages, which its update handles through the usual data flow.
 
-Declare the handler contract in the feature’s `hostHandlers` and supply it through `block.provideHandlers` before composition. Supply its ordinary service dependencies through `element.provide(layer)` before calling `Runtime.embed`. [Host implementations for reusable features](/core/layers#host-implementations-for-reusable-features) shows the feature contract and a browser-storage host. When the feature owns the handler's workflow, include its attached `.layer` in its local `EffectsLayer` and choose the underlying services at the host boundary.
+Declare the handler contract in the feature’s `hostHandlers` and supply it through `block.provideHandlers` before composition. Supply its ordinary service dependencies through `program.provide(layer)` before calling `Runtime.embed`. [Host implementations for reusable features](/core/layers#host-implementations-for-reusable-features) shows the feature contract and a browser-storage host. When the feature owns the handler's workflow, include its attached `.layer` in its local `EffectsLayer` and choose the underlying services at the host boundary.
 
 ## Declaring Ports
 
@@ -44,7 +44,7 @@ Values the app announces to the host leave through an outbound Port, written fro
 
 ::Snippet{name="embeddingOutboundCommand" label="Outbound Command"}
 
-The feature Definition’s `step` infers the helper's Command handler requirement. Include `ReportCount.layer` in the local `EffectsLayer` passed to `FeatureComposition.assembleBlock`; the completed Block carries that bundle into the Element.
+The feature Definition’s `makeStep` infers the helper's Command handler requirement. Include `ReportCount.layer` in the local `EffectsLayer` passed to `FeatureComposition.prepareBlock`; `Block.assemble` carries that bundle from the opaque draft onto the completed Block and into the Element.
 
 When the program runs without an embed handle (started with `Runtime.run`), emitting is a no-op, so the same app works embedded and standalone.
 

@@ -383,7 +383,10 @@ const chatMessageDetailClassName =
 const COLLAPSED_CHAT_MESSAGE_ESTIMATED_HEIGHT_PX = 48
 const EXPANDED_CHAT_MESSAGE_ESTIMATED_HEIGHT_PX = 80
 
-const chatMessageView = (message: VirtualListChatMessage, h: UiViewBuilder) => {
+const chatMessageView = (
+  message: typeof VirtualListChatMessage.Type,
+  h: UiViewBuilder,
+) => {
   const isSentMessage = message.id % 2 !== 0
 
   return h.div(
@@ -428,7 +431,7 @@ const chatMessageView = (message: VirtualListChatMessage, h: UiViewBuilder) => {
 
 export const virtualListChatDemo = (
   model: typeof ActivityVirtualListBlock.Model.Type,
-  messages: ReadonlyArray<VirtualListChatMessage>,
+  messages: ReadonlyArray<typeof VirtualListChatMessage.Type>,
   h: UiViewBuilder,
 ) => [
   h.div(

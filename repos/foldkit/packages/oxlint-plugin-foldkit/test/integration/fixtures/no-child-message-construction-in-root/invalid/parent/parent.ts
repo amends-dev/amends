@@ -7,14 +7,14 @@ import { ParentDefinition } from './definition'
 
 const AliasedEntryMessage = EntryMessage
 
-export const RunParentWork = ParentDefinition.command('RunParentWork', {
+export const RunParentWork = ParentDefinition.makeCommand('RunParentWork', {
   messages: [ChildMessage.CompletedChildWork],
   handler: function* () {
     return () => Effect.succeed(ChildMessage.CompletedChildWork())
   },
 })
 
-export const ChildBinding = ParentDefinition.bindChild(Child.block, {
+export const ChildBinding = ParentDefinition.makeBinding(Child.block, {
   field: 'child',
   toParentMessage: message => ChildMessage.GotChildMessage({ message }),
 })

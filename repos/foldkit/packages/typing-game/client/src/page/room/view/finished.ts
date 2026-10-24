@@ -9,12 +9,12 @@ import { RoomPlayerSession } from '../model'
 
 const byHighestWpm = pipe(
   Number.Order,
-  Order.mapInput(({ wpm }: Shared.PlayerScore) => wpm),
+  Order.mapInput(({ wpm }: typeof Shared.PlayerScore.Type) => wpm),
   Order.flip,
 )
 
 const scoreboardView = (
-  scoreboard: Shared.Scoreboard,
+  scoreboard: typeof Shared.Scoreboard.Type,
   hostId: string,
   h: RoomViewBuilder,
 ): Html => {
@@ -133,9 +133,9 @@ const scoreboardView = (
 }
 
 export const finished = (
-  maybeScoreboard: Option.Option<Shared.Scoreboard>,
+  maybeScoreboard: Option.Option<typeof Shared.Scoreboard.Type>,
   hostId: string,
-  maybeSession: Option.Option<RoomPlayerSession>,
+  maybeSession: Option.Option<typeof RoomPlayerSession.Type>,
   h: RoomViewBuilder,
 ): Html => {
   const isLocalPlayerHost = Option.exists(

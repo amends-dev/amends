@@ -5,7 +5,6 @@ import { defineRouteUnion, literal, schemaSegment, slash } from 'foldkit/route'
 // A branded id: structurally a number, but its own type. The brand stops it
 // from being mixed up with another number, like an OrderId or a count.
 const PersonId = Schema.FiniteFromString.pipe(Schema.brand('PersonId'))
-type PersonId = typeof PersonId.Type
 
 const ApplicationRoute = defineRouteUnion({
   Person: { personId: PersonId },

@@ -4,11 +4,9 @@ import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
 
 export const Model = Schema.Struct({ id: Schema.String, theme: Schema.String })
-export type Model = typeof Model.Type
 export const Message = defineMessageUnion({
   InformedOfThemeChange: { theme: Schema.String },
 })
-export type Message = typeof Message.Type
 const NoDirectStateInvalidKeyedEntryDefinition = Block.makeDefinition(
   'NoDirectStateInvalidKeyedEntry',
   {
@@ -28,7 +26,7 @@ const update = KeyedEntryComposition.makeUpdate((model, message) =>
     }),
   }),
 )
-export const Entry = KeyedEntryComposition.assembleBlock({
+export const Entry = KeyedEntryComposition.prepareBlock({
   init,
   update,
   operations: {

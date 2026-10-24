@@ -1,26 +1,18 @@
 import { Array } from 'effect'
-import { type Block, type Update } from 'foldkit'
-import { modifyFields } from 'foldkit/struct'
+import type { Block } from 'foldkit'
 
-import { EducationDefinition, Message, type Model } from './definition'
+import { EducationDefinition } from './definition'
 import { EducationEntryBlock } from './entry'
 
-const foldEntryOutMessage = (
-  entryId: string,
-  outMessage: typeof EducationEntryBlock.OutMessage.Type,
-) =>
-  EducationEntryBlock.OutMessage.match<Update.Step<Model, Message>>(
-    outMessage,
-    {
-      Removed: () => model => ({
-        model: modifyFields(model, {
-          entries: Array.filter(entry => entry.id !== entryId),
-        }),
-      }),
-    },
-  )
+const foldEntryOutMessage = (entryId: string) =>
+  EducationDefinition.makeOutMessageFold(EducationEntryBlock, {
+    Removed: () =>
+      EducationDefinition.makeFieldsStep(() => ({
+        entries: Array.filter(entry => entry.id !== entryId),
+      })),
+  })
 
-export const EntriesBinding = EducationDefinition.bindChild(
+export const EntriesBinding = EducationDefinition.makeBinding(
   EducationEntryBlock,
   {
     field: 'entries',
@@ -31,9 +23,10 @@ export const EntriesBinding = EducationDefinition.bindChild(
       ],
       toItem: (_occurrence, entry) => entry,
     },
-    outMessage: { fold: foldEntryOutMessage },
   },
-)
+).withOutMessagePolicy({
+  fold: (entryId, outMessage) => foldEntryOutMessage(entryId)(outMessage),
+})
 
 export const EducationComposition = EducationDefinition.makeComposition({
   bindings: [EntriesBinding],

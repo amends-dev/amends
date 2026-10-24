@@ -30,8 +30,6 @@ import {
   view,
 } from './generated-dispatch.accepted.js'
 
-// @ts-expect-error This adapter takes an Application Composition, not a feature Composition.
-Scene.subscriptions(GeneratedDispatchChildComposition)
 Scene.subscriptions(
   ApplicationDefinition.makeComposition({ bindings: [] }),
   // @ts-expect-error Root-local Subscriptions must read the Application Model.
@@ -54,7 +52,7 @@ const ForeignSubscriptionDefinition = Block.makeDefinition(
     Message: ChildMessage,
   },
 )
-const foreignSubscriptions = ForeignSubscriptionDefinition.subscriptions(
+const foreignSubscriptions = ForeignSubscriptionDefinition.makeSubscriptions(
   entry => ({
     observations: entry('Observations', {
       messages: [ChildMessage.ObservedCount],
@@ -76,7 +74,7 @@ Scene.scene(
 )
 
 // @ts-expect-error Child handler recipes remain required at local assembly.
-GeneratedDispatchChildComposition.assembleBlock({
+GeneratedDispatchChildComposition.prepareBlock({
   init: childInit,
   update: childUpdate,
   view: childView,
@@ -111,17 +109,17 @@ EmptyParentComposition.makeUpdate(model =>
   // @ts-expect-error Generated operations require the exact registered child graph.
   ChildBinding.requestSetCount({ count: 1 })(model),
 )
-EmptyParentComposition.assembleBlock({
+EmptyParentComposition.prepareBlock({
   // @ts-expect-error The child initializer cannot be installed without its registered Binding.
   init: parentInit,
   update: EmptyParentComposition.makeUpdate(model => ({ model })),
 })
-EmptyParentComposition.assembleBlock({
+EmptyParentComposition.prepareBlock({
   init: () => ({ model: ParentModel.make({ child: { count: 0 }, title: '' }) }),
   // @ts-expect-error Child update routing retains its Binding registration evidence.
   update: parentUpdate,
 })
-EmptyParentComposition.assembleBlock({
+EmptyParentComposition.prepareBlock({
   init: () => ({ model: ParentModel.make({ child: { count: 0 }, title: '' }) }),
   update: EmptyParentComposition.makeUpdate(model => ({ model })),
   // @ts-expect-error A view's child capability cannot disappear at completion.
@@ -129,12 +127,11 @@ EmptyParentComposition.assembleBlock({
 })
 
 const EmptyApplicationComposition = ApplicationDefinition.makeComposition()
-// @ts-expect-error Nested init keeps root Binding registration evidence.
-EmptyApplicationComposition.assembleElement({
+EmptyApplicationComposition.prepareBlock({
+  // @ts-expect-error Nested init keeps root Binding registration evidence.
   init,
-  update,
-  view,
-  container: null,
+  update: EmptyApplicationComposition.makeUpdate(model => ({ model })),
+  view: EmptyApplicationComposition.makeView((_model, h) => h.empty),
 })
 
 const RepeatedModel = Schema.Struct({
@@ -148,16 +145,19 @@ const RepeatedDefinition = Block.makeDefinition('Repeated', {
   Model: RepeatedModel,
   Message: RepeatedMessage,
 })
-const HeaderBinding = RepeatedDefinition.bindChild(
+const HeaderBinding = RepeatedDefinition.makeBinding(
   GeneratedDispatchChildBlock,
   {
     field: 'first',
     placement: 'header-search',
   },
 )
-const AliasBinding = RepeatedDefinition.bindChild(GeneratedDispatchChildBlock, {
-  field: 'second',
-  placement: 'headerSearch',
-})
+const AliasBinding = RepeatedDefinition.makeBinding(
+  GeneratedDispatchChildBlock,
+  {
+    field: 'second',
+    placement: 'headerSearch',
+  },
+)
 // @ts-expect-error Different placements cannot format into the same child delivery tag.
 RepeatedDefinition.makeComposition({ bindings: [HeaderBinding, AliasBinding] })

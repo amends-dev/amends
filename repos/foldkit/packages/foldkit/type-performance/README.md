@@ -3,9 +3,8 @@
 This harness measures deterministic TypeScript diagnostics for completed Block
 composition through Foldkit's published declarations. Each checked-in fixture
 imports public `foldkit` package entry points, completes its Block graph, and
-finishes with `Application.update`,
-`ApplicationComposition.assembleElement`, and the completed program’s
-`.provide(...)` method.
+finishes with an Application update, `ApplicationComposition.prepareBlock`,
+`Program.makeElement`, and the completed Program's `.provide(...)` method.
 
 The shared baseline contains the imports and warmup expressions repeated by
 every fixture. Fixture cost is the fixture total minus that baseline for these
@@ -38,6 +37,110 @@ pnpm update:block-type-performance command-requirements-200
 Only update budgets after reviewing an intentional type-level change. The
 ordinary check never changes them and fails when either gated metric exceeds
 its stored maximum.
+
+## Language service latency
+
+Compiler instantiation and type counts provide regression signals,
+but they do not predict the delay of an editor request after a file changes.
+Use the opt-in native LSP benchmark after building `packages/foldkit` when a
+type-level change is intended to improve authoring latency:
+
+```sh
+node packages/foldkit/scripts/profile-block-language-service.ts --runs 5 > /tmp/foldkit-block-language-service.json
+```
+
+The benchmark starts a fresh pinned native TypeScript language server for each
+Website hover, go-to-definition, Route completion, Binding member completion,
+and changed URL workflow scenario. Route completion retains the narrowed
+`previousRoute.` query. Binding completion uses valid
+`packages/website/src/update/handleChangedUrl.ts`, placing the cursor after
+`SearchBinding.` in `SearchBinding.informRouteChanged()` and requiring
+`informRouteChanged` and `embedView`. It records first and warm requests before
+and after a ranged newline edit.
+
+The changed URL workflow hovers `SearchBinding` at that call, repeats the hover
+after a ranged newline edit, and pulls a full clean diagnostic report. It then
+replaces only `nextRoute` in `route: () => nextRoute` with `1709`, requires an
+error with code 2322 whose range is exactly the `route` property, restores
+`nextRoute`, and requires a full report with no errors. Hover requests after restored diagnostics
+measure the first and warm query costs separately; the final completion is
+explicitly warm. All edits stay in server memory, and the workflow verifies that
+the source returns to its original text plus the deliberate newline.
+
+The client advertises snippet support and pull diagnostics, requires incremental
+synchronization and UTF-16 positions, and returns null workspace configuration
+sections to select server defaults. This protocol profile and the moved Binding
+completion site were introduced in format version 2; compare measurements only when
+these workload settings match. Existing hover and definition scenarios also
+record post-whitespace and post-semantic-edit requests where applicable.
+
+JSON output includes raw samples, medians, full response hashes, document versions
+and content hashes, diagnostic validation evidence, the source commit and dirty state, and a hash of
+the Website and mapped workspace TypeScript sources, workspace declarations and
+declaration maps, package manifests, TypeScript configuration, and lockfile. It
+also records separate lockfile and benchmark-script hashes and the compiler,
+server, Node, and platform versions. Set `--timeout-ms` when profiling a graph
+that legitimately takes longer than the default 60 seconds. Missing or empty
+hover contents, definitions, server identity, or expected completion labels fail
+the run. The actual-file Binding hover requires `InitializedBinding` and rejects
+a direct `any`, `unknown`, or `never` type. When the Owner is visible, it must be
+`Search`. Checked assembly headers can hide the Owner through hover truncation;
+in that case, the guard requires the recorded Schema header and field fragments.
+This validates the visible Binding shape, not full ownership. Framework source
+and emitted-declaration tests enforce ownership. Missing route errors or errors
+remaining after restoration fail instead of recording an artificially fast
+response.
+
+### Message constructor access
+
+A completed Block forwards its local Message constructors through its composed
+Message Schema. Reading a constructor through that Schema can demand the child
+graph even when reading the original local constructor is inexpensive. Profile
+these two access paths separately:
+
+```sh
+node packages/foldkit/scripts/profile-block-language-service.ts --scenario message-constructors --runs 3 > /tmp/foldkit-message-constructors.json
+```
+
+Each case opens a minimal document at the Website's `src/entry.ts` URI. Both
+import `ApplicationBlock` and the local `Message`, keep both imports in use, and
+export `onUrlChange`. Only the accessed expression differs:
+`Message.ChangedUrl` or `ApplicationBlock.Message.ChangedUrl`. Each case starts a
+fresh native server and requires a full diagnostic response with no errors.
+These are cold type-checking measurements, not post-edit or application runtime
+measurements. The output records both document texts, their hashes, the selected
+scenario, and compiler and workspace identities. Format version 3 adds this pair
+of cases. The default `all` selection also retains the existing workloads.
+
+The benchmark has no CI latency threshold. Run baseline and candidate samples
+on the same idle host and compare their metadata before comparing medians.
+Inspect post-edit samples and slow requests alongside medians. Repeat small
+compiler-count differences with identical source and emitted declarations.
+Wall-clock results vary with CPU contention, filesystem cache state, profiling,
+and language-server scheduling. Keep captured JSON outside the source tree.
+
+The initial investigation at commit
+`3edb273870b898ef963f1ed3a308424554bfd370` reproduced a 3.3–4.4 second Website
+hover after invalidation and a 3.8–4.2 second first go-to-definition request.
+Warm hovers were normally below one millisecond, while the focused Route
+completion remained around 20 milliseconds after a whitespace edit. Hover
+responses were about one kilobyte. Native profiles attributed the delay to
+conditional type instantiation and relation work, with allocation and garbage
+collection pressure, rather than response formatting or transport.
+Whole-program compiler traces highlighted several large Block validation
+graphs. Request-scoped traces found the post-edit work distributed across
+local Block validation, deferred Message policy resolution, selected Binding
+resolution, and delivery indexes, so they do not establish one validator as
+the interactive stall. A local assembly channel projection was adopted because
+it reduced Website compiler instantiations by 8.09% and focused fixture counts
+by 8–13% on the integrated factory surface. Its paired native timings were
+modest and noisy, so it is a compiler-cost optimization rather than a claimed
+interactive latency fix.
+Other safe encodings reduced compiler counts without a repeatable
+post-edit LSP improvement and were not adopted as latency fixes.
+
+This benchmark drives the native server directly. Editor extensions, editor UI
+rendering, and editor-side request scheduling remain outside its scope.
 
 Baseline history for private Binding evidence: the TypeScript 7.0.2 ceilings
 include the evidence used by `Block.inspectBinding`. Compared with the
@@ -135,3 +238,37 @@ result.
 Only the wide fixture's Types ceiling changes, to the exact observed 216,662.
 All instantiation ceilings and the deep and Command Types ceilings stay in
 place. No fixture was narrowed and no rejection test was removed.
+
+## Source Model Schema boundaries
+
+The Website's parent Model composes canonical child Schemas exported from
+feature barrels. It uses `Ui.Model` when declaring state and the completed
+`UiBlock` for Bindings. This prevents a Schema query from demanding the inferred
+child implementation, including unrelated views and child policies. It does not
+change assembly validation or runtime behavior.
+
+The external `schema-boundary` declaration fixture checks exact Schema and
+Codec channels, Service requirements, operation arguments, and registration
+checks through the public barrel, then emits and relocates the consumer. The actual-file editor benchmark above
+measures the source dependency. A full-program count does not establish that an
+editor demand boundary is cheap: the compiler must still validate the producer.
+
+## Assembly checks
+
+Block assembly keeps its existing consumer call shape. Its first overload infers
+the exact implementation object before checking that object against the shared
+validators. Additional overloads preserve contextual typing for specialized and
+generic implementations. Six of them defer Composition checks until inference
+resolves their type parameters. Those checks must still run when an explicit
+implementation type contains optional view or Layer fields.
+
+Handler checks index contracts by identity and compare contracts within each
+group. They may skip a group proven identical to the current entry. They must
+not skip validation merely because TypeScript cannot prove that generic
+contracts form a union: a handler for `string` cannot implement every narrower
+generic item contract. The generic handler declaration fixtures cover accepted
+implementations, rejected mismatches, exact payloads, and relocated consumption.
+
+These encodings change type-checking work. They do not construct Layers or
+change Runtime behavior. Keep the numerical budgets unchanged when evaluating
+editor improvements, and measure real post-edit requests as well as counts.

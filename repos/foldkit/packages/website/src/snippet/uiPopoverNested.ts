@@ -2,7 +2,7 @@
 // block below is an excerpt. Fit them into your own Model, init, Message,
 // update, and view definitions.
 import { Schema, Tuple } from 'effect'
-import { Block, Update } from 'foldkit'
+import { Block } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 
 import { Popover } from '@foldkit/ui'
@@ -14,26 +14,25 @@ const Model = Schema.Struct({
   accountDetailsPopover: Popover.PopoverBlock.Model,
   // ...your other fields
 })
-type Model = typeof Model.Type
 
 // This excerpt has no parent-owned facts. Each Binding derives distinct
 // generated Popover delivery.
 const Message = defineMessageUnion({})
-type Message = typeof Message.Type
-
-const foldPopoverOutMessage = Popover.PopoverBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Opened: () => AccountMenuDefinition.stepNoop(),
-  Closed: () => AccountMenuDefinition.stepNoop(),
-})
 
 const AccountMenuDefinition = Block.makeDefinition('AccountMenu', {
   Model,
   Message,
 })
 
-const AccountPopoverBinding = AccountMenuDefinition.bindChild(
+const foldPopoverOutMessage = AccountMenuDefinition.makeOutMessageFold(
+  Popover.PopoverBlock,
+  {
+    Opened: AccountMenuDefinition.makeNoopStep,
+    Closed: AccountMenuDefinition.makeNoopStep,
+  },
+)
+
+const AccountPopoverBinding = AccountMenuDefinition.makeBinding(
   Popover.PopoverBlock,
   {
     field: 'accountPopover',
@@ -41,20 +40,18 @@ const AccountPopoverBinding = AccountMenuDefinition.bindChild(
       contextToArgs: () =>
         Tuple.make({ id: 'account-popover', contentFocus: true }),
     },
-    outMessage: { fold: foldPopoverOutMessage },
   },
-)
+).withOutMessagePolicy({ fold: foldPopoverOutMessage })
 
-const AccountDetailsPopoverBinding = AccountMenuDefinition.bindChild(
+const AccountDetailsPopoverBinding = AccountMenuDefinition.makeBinding(
   Popover.PopoverBlock,
   {
     field: 'accountDetailsPopover',
     init: {
       contextToArgs: () => Tuple.make({ id: 'account-details-popover' }),
     },
-    outMessage: { fold: foldPopoverOutMessage },
   },
-)
+).withOutMessagePolicy({ fold: foldPopoverOutMessage })
 
 const AccountMenuComposition = AccountMenuDefinition.makeComposition({
   bindings: [AccountPopoverBinding, AccountDetailsPopoverBinding],

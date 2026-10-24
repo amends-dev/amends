@@ -11,12 +11,11 @@ export const Message = defineMessageUnion({
     outcome: Command.Interruptible.Outcome,
   },
 })
-export type Message = typeof Message.Type
 
 const Model = Schema.Struct({})
 const UploadsDefinition = Block.makeDefinition('Uploads', { Model, Message })
 
-export const UploadFile = UploadsDefinition.command('UploadFile', {
+export const UploadFile = UploadsDefinition.makeCommand('UploadFile', {
   args: {
     uploadId: Schema.Int,
     file: Schema.instanceOf(File),

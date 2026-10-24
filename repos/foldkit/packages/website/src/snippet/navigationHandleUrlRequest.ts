@@ -1,5 +1,5 @@
 import { Effect, Schema, pipe } from 'effect'
-import { Navigation, Route, Url, makeApplicationDefinition } from 'foldkit'
+import { Block, Navigation, Route, Url } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 import { defineRouteUnion, int, literal, slash } from 'foldkit/route'
 import { modifyFields } from 'foldkit/struct'
@@ -11,7 +11,6 @@ const ApplicationRoute = defineRouteUnion({
   Person: { personId: Schema.Number },
   NotFound: { path: Schema.String },
 })
-type ApplicationRoute = typeof ApplicationRoute.Type
 
 const homeRouter = pipe(Route.root, Route.mapTo(ApplicationRoute.Home))
 const personRouter = pipe(
@@ -26,7 +25,6 @@ const urlToApplicationRoute = Route.parseUrlWithFallback(
 )
 
 const Model = Schema.Struct({ route: ApplicationRoute })
-type Model = typeof Model.Type
 
 const Message = defineMessageUnion({
   CompletedNavigateInternal: {},
@@ -34,12 +32,14 @@ const Message = defineMessageUnion({
   ClickedLink: { request: Navigation.UrlRequest },
   ChangedUrl: { url: Url.Url },
 })
-type Message = typeof Message.Type
 
-const ApplicationDefinition = makeApplicationDefinition({ Model, Message })
+const ApplicationDefinition = Block.makeDefinition('Application', {
+  Model,
+  Message,
+})
 const ApplicationComposition = ApplicationDefinition.makeComposition()
 
-const NavigateInternal = ApplicationDefinition.command('NavigateInternal', {
+const NavigateInternal = ApplicationDefinition.makeCommand('NavigateInternal', {
   args: { url: Schema.String },
   messages: [Message.CompletedNavigateInternal],
   handler: function* () {
@@ -50,7 +50,7 @@ const NavigateInternal = ApplicationDefinition.command('NavigateInternal', {
   },
 })
 
-const LoadExternal = ApplicationDefinition.command('LoadExternal', {
+const LoadExternal = ApplicationDefinition.makeCommand('LoadExternal', {
   args: { href: Schema.String },
   messages: [Message.CompletedLoadExternal],
   handler: function* () {

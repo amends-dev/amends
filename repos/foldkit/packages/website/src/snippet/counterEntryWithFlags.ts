@@ -1,15 +1,13 @@
-import { Runtime } from 'foldkit'
+import { Program, Runtime } from 'foldkit'
 
-import { ApplicationComposition, init, update, view } from './counterFlagsRoot'
+import { ApplicationBlock } from './counterApplicationWithFlags'
 import { Flags, flags } from './flagsDefinition'
 import { ApplicationLayer } from './services'
 
-const application = ApplicationComposition.assembleApplication({
-  init,
-  update,
-  view,
+const program = Program.make({
+  block: ApplicationBlock,
   Flags,
   container: document.getElementById('root'),
 })
 
-Runtime.run(application.provide(ApplicationLayer), { flags })
+Runtime.run(program.provide(ApplicationLayer), { flags })

@@ -34,12 +34,13 @@ export const view = UiComposition.makeView((model, h) => {
               viewInputs: {
                 className: contentClassName,
                 animateSize: true,
-                content: h.p(
-                  [h.Class('text-indigo-800')],
-                  [
-                    'This content smoothly animates in and out. The Animation component coordinates CSS enter/leave lifecycles via data attributes, while animateSize uses a CSS grid wrapper for smooth height animation.',
-                  ],
-                ),
+                toView: () =>
+                  h.p(
+                    [h.Class('text-indigo-800')],
+                    [
+                      'This content smoothly animates in and out. The Animation component coordinates CSS enter/leave lifecycles via data attributes, while animateSize uses a CSS grid wrapper for smooth height animation.',
+                    ],
+                  ),
               },
             }),
           ),

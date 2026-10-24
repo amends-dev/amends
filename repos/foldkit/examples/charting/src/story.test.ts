@@ -28,7 +28,7 @@ const emptyPackageRadioGroupView = PackageRadioGroupBlock.makeView(
   (_model, h) => h.empty,
 )
 
-const selectedChartMode = (chartMode: ChartMode) =>
+const selectedChartMode = (chartMode: typeof ChartMode.Type) =>
   ChartModeRadioGroupBinding.embedView({
     slotId: 'chartModeRadioGroup',
     model: readyModel.chartModeRadioGroup,
@@ -40,7 +40,7 @@ const selectedChartMode = (chartMode: ChartMode) =>
     }),
   )
 
-const selectedPackage = (packageId: PackageId) =>
+const selectedPackage = (packageId: typeof PackageId.Type) =>
   PackageRadioGroupBinding.embedView({
     slotId: 'packageRadioGroup',
     model: readyModel.packageRadioGroup,

@@ -40,7 +40,6 @@ export const GitHubContributorResponse = Schema.Struct({
   contributions: Schema.Number,
   avatar_url: Schema.OptionFromOptional(Schema.String),
 })
-export type GitHubContributorResponse = typeof GitHubContributorResponse.Type
 
 export const GitHubIssueResponse = Schema.Struct({
   pull_request: Schema.OptionFromOptional(Schema.Unknown),

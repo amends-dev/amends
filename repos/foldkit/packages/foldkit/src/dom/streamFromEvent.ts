@@ -329,7 +329,7 @@ export type StreamFromEventFilterMapPreventDefaultConfig<
  * @example
  * ```typescript
  * const ExampleDefinition = Block.makeDefinition('Example', { Model, Message })
- * const subscriptions = ExampleDefinition.subscriptions(entry => ({
+ * const subscriptions = ExampleDefinition.makeSubscriptions(entry => ({
  *   escapeKey: entry(
  *     'EscapeKey',
  *     { isListening: Schema.Boolean },
@@ -396,7 +396,7 @@ export const streamFromEventFilterMap = <
  * @example
  * ```typescript
  * const ExampleDefinition = Block.makeDefinition('Example', { Model, Message })
- * const subscriptions = ExampleDefinition.subscriptions(entry => ({
+ * const subscriptions = ExampleDefinition.makeSubscriptions(entry => ({
  *   shortcut: entry(
  *     'KeyboardShortcut',
  *     { isListening: Schema.Boolean },
@@ -472,7 +472,7 @@ export const streamFromEvent = <
  * @example
  * ```typescript
  * const ExampleDefinition = Block.makeDefinition('Example', { Model, Message })
- * const subscriptions = ExampleDefinition.subscriptions(entry => ({
+ * const subscriptions = ExampleDefinition.makeSubscriptions(entry => ({
  *   wheelLock: entry(
  *     'WheelLock',
  *     { isModalOpen: Schema.Boolean },

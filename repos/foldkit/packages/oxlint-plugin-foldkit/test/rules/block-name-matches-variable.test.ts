@@ -179,13 +179,15 @@ describe('block-name-matches-variable', () => {
     expect(result).toHaveLength(0)
   })
 
-  it('requires ApplicationDefinition at the authoring stage', () => {
+  it('requires ApplicationDefinition for the Application Block', () => {
     const result = Testing.runRule(
       blockNameMatchesVariable,
       'VariableDeclarator',
       variableDeclarator(
         'Application',
-        Testing.callOfMember('Application', 'makeDefinition', []),
+        Testing.callOfMember('Block', 'makeDefinition', [
+          Testing.strLiteral('Application'),
+        ]),
       ),
     )
 
@@ -202,7 +204,9 @@ describe('block-name-matches-variable', () => {
       variableDeclarator(
         'Application',
         callMethod(
-          Testing.callOfMember('Application', 'makeDefinition', []),
+          Testing.callOfMember('Block', 'makeDefinition', [
+            Testing.strLiteral('Application'),
+          ]),
           'makeComposition',
         ),
       ),
@@ -214,19 +218,36 @@ describe('block-name-matches-variable', () => {
     )
   })
 
-  it('requires ApplicationDefinition for the root factory', () => {
+  it('allows ApplicationDefinition for the Application Block', () => {
     const result = Testing.runRule(
       blockNameMatchesVariable,
       'VariableDeclarator',
       variableDeclarator(
-        'Application',
-        Testing.callExpr('makeApplicationDefinition', []),
+        'ApplicationDefinition',
+        Testing.callOfMember('Block', 'makeDefinition', [
+          Testing.strLiteral('Application'),
+        ]),
+      ),
+    )
+
+    expect(result).toHaveLength(0)
+  })
+
+  it('does not give ApplicationDefinition special treatment for another Block', () => {
+    const result = Testing.runRule(
+      blockNameMatchesVariable,
+      'VariableDeclarator',
+      variableDeclarator(
+        'ApplicationDefinition',
+        Testing.callOfMember('Block', 'makeDefinition', [
+          Testing.strLiteral('Root'),
+        ]),
       ),
     )
 
     expect(result).toHaveLength(1)
     expect(result[0]?.diagnostic.message).toContain(
-      '"Application" must be "ApplicationDefinition"',
+      '"ApplicationDefinition" must be "RootDefinition"',
     )
   })
 

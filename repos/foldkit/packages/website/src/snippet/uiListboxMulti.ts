@@ -2,9 +2,8 @@
 // block below is an excerpt. Fit them into your own Model, init, Message,
 // update, and view definitions.
 import { Array, Schema, Tuple } from 'effect'
-import { Block, Update } from 'foldkit'
+import { Block } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
-import { modifyFields } from 'foldkit/struct'
 
 import { Listbox } from '@foldkit/ui'
 
@@ -13,10 +12,9 @@ const Person = Schema.Literals([
   'Lindsay Funke',
   'Tobias Funke',
 ])
-type Person = typeof Person.Type
 
 // Declare a typed multi-select Listbox once at module scope:
-const PeopleListbox = Listbox.Multi.create<Person>()
+const PeopleListbox = Listbox.Multi.create<typeof Person.Type>()
 
 // Add a field to your Model for the multi-select Listbox Block, plus a field
 // for the selected values your app actually cares about. Using the
@@ -26,46 +24,42 @@ const Model = Schema.Struct({
   listboxMulti: PeopleListbox.Model,
   // ...your other fields
 })
-type Model = typeof Model.Type
 
 // This excerpt has no parent-owned facts. The Composition derives delivery.
 const Message = defineMessageUnion({})
-type Message = typeof Message.Type
 
-// At module scope, fold the OutMessage into your own Model. `Selected` carries
-// the activated value. The parent owns the selection and decides what it
-// means: for multi-select, toggle the value in and out of its array. The arm
-// returns an Update.Step over the parent Model, which already has the next
-// Listbox Model written back:
-const foldListboxMultiOutMessage = PeopleListbox.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Selected:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, {
-        selectedPeople: selectedPeople =>
-          Array.contains(selectedPeople, value)
-            ? Array.filter(selectedPeople, person => person !== value)
-            : Array.append(selectedPeople, value),
-      }),
-    }),
-})
-
-// The Binding wires the completed child Block into the parent: it delegates keyboard
-// navigation, typeahead, and open/close to PeopleListbox.update, writes the
-// next Listbox Model back, routes generated delivery and Command results, and
-// hands any OutMessage to the OutMessage fold.
 const PeoplePickerDefinition = Block.makeDefinition('PeoplePicker', {
   Model,
   Message,
 })
 
-const PeopleListboxBinding = PeoplePickerDefinition.bindChild(PeopleListbox, {
+// At module scope, fold the OutMessage into your own Model. `Selected` carries
+// the activated value. The parent owns the selection and decides what it
+// means: for multi-select, toggle the value in and out of its array. The arm
+// returns an Update.Step over the parent Model, which already has the next
+// Listbox Model written back. The parent Definition infers the refined child
+// payload and checks every named variant:
+const foldListboxMultiOutMessage = PeoplePickerDefinition.makeOutMessageFold(
+  PeopleListbox,
+  {
+    Selected: ({ value }) =>
+      PeoplePickerDefinition.makeFieldsStep(() => ({
+        selectedPeople: selectedPeople =>
+          Array.contains(selectedPeople, value)
+            ? Array.filter(selectedPeople, person => person !== value)
+            : Array.append(selectedPeople, value),
+      })),
+  },
+)
+
+// The Binding wires the completed child Block into the parent: it delegates keyboard
+// navigation, typeahead, and open/close to PeopleListbox.update, writes the
+// next Listbox Model back, routes generated delivery and Command results, and
+// hands any OutMessage to the OutMessage fold.
+const PeopleListboxBinding = PeoplePickerDefinition.makeBinding(PeopleListbox, {
   field: 'listboxMulti',
   init: { contextToArgs: () => Tuple.make({ id: 'people' }) },
-  outMessage: { fold: foldListboxMultiOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldListboxMultiOutMessage })
 
 const PeoplePickerComposition = PeoplePickerDefinition.makeComposition({
   bindings: [PeopleListboxBinding],
@@ -82,7 +76,7 @@ const init = PeoplePickerComposition.makeInit(() => ({
 
 const update = PeoplePickerComposition.makeUpdate()
 
-const people: ReadonlyArray<Person> = [
+const people: ReadonlyArray<typeof Person.Type> = [
   'Michael Bluth',
   'Lindsay Funke',
   'Tobias Funke',

@@ -12,7 +12,7 @@ import {
 } from 'effect'
 
 import type { BindableBlock } from '../block/binding.js'
-import { runtimeBindingOf } from '../block/composition.js'
+import { runtimeBindingOf, runtimeBindingsOf } from '../block/composition.js'
 import { localChannelsOf } from '../block/definition.js'
 import {
   type ActiveInstance,
@@ -423,7 +423,7 @@ export const makeCompositionRuntime = <Model, Message>({
       model: any,
     ): ReconciliationPlan => ({
       model,
-      bindings: block.bindings.map(binding => {
+      bindings: runtimeBindingsOf(block).map(binding => {
         const policy = runtimeBindingOf(binding)
         const keys = new Set<InstanceKey | undefined>()
         const occurrences = policy.select(model).map(child => {

@@ -25,14 +25,18 @@ import type { Model } from './model'
 import { update } from './update'
 import { view } from './view'
 
-const card = (id: string, title: string, sortKey: string): Card => ({
+const card = (
+  id: string,
+  title: string,
+  sortKey: string,
+): typeof Card.Type => ({
   id,
   title,
   description: '',
   sortKey,
 })
 
-const testColumns: ReadonlyArray<Column> = [
+const testColumns: ReadonlyArray<typeof Column.Type> = [
   {
     id: 'todo',
     name: 'To Do',
@@ -46,7 +50,7 @@ const testColumns: ReadonlyArray<Column> = [
   { id: 'done', name: 'Done', cards: [] },
 ]
 
-const testModel: Model = {
+const testModel: typeof Model.Type = {
   columns: testColumns,
   dragAndDrop: DragAndDropBlock.init({ id: 'kanban' }).model,
   maybeNewCardColumnId: Option.none(),

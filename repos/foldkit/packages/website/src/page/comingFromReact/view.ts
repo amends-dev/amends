@@ -1,12 +1,15 @@
 import { Option, Record } from 'effect'
-import { Html, type HtmlBuilder, inertHtml as ih } from 'foldkit/html'
+import { Html, inertHtml as ih } from 'foldkit/html'
 
 import { Disclosure } from '@foldkit/ui'
 
 import { type CodeBlock } from '../../component'
 import { Icon } from '../../icon'
 import { type RenderHeadingLink } from '../../prose'
-import { ComingFromReactComposition } from './composition'
+import {
+  ComingFromReactComposition,
+  type ComingFromReactViewBuilder,
+} from './composition'
 import { ComingFromReactContent } from './content'
 import { Message } from './message'
 import type { Model } from './model'
@@ -37,8 +40,8 @@ const faqItem = (
   id: string,
   question: string,
   answerContent: ReadonlyArray<Html>,
-  model: Model,
-  h: HtmlBuilder<Message>,
+  model: typeof Model.Type,
+  h: ComingFromReactViewBuilder,
 ): Html =>
   Option.match(Record.get(model, id), {
     onSome: isFaqOpen =>

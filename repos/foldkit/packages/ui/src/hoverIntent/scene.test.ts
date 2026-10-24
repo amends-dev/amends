@@ -1,31 +1,32 @@
 import { Option, Schema } from 'effect'
 import { Block } from 'foldkit'
 import * as Scene from 'foldkit/scene'
-import * as Update from 'foldkit/update'
 
 import { describe, it } from '@effect/vitest'
 
 import { HoverIntentBlock, Model } from './block.js'
-import { Message, OutMessage } from './message.js'
+import { Message } from './message.js'
 
 const HoverIntentSceneDefinition = Block.makeDefinition('HoverIntentScene', {
   Model,
   Message: Schema.Never,
 })
 
-const foldHoverIntentOutMessage = OutMessage.match<Update.Step<Model, never>>({
-  Opened: () => HoverIntentSceneDefinition.step(model => ({ model })),
-  Closed: () => HoverIntentSceneDefinition.step(model => ({ model })),
-})
+const foldHoverIntentOutMessage = HoverIntentSceneDefinition.makeOutMessageFold(
+  HoverIntentBlock,
+  {
+    Opened: () => model => ({ model }),
+    Closed: () => model => ({ model }),
+  },
+)
 
-const HoverIntentBinding = HoverIntentSceneDefinition.bindChild(
+const HoverIntentBinding = HoverIntentSceneDefinition.makeBinding(
   HoverIntentBlock,
   {
     read: model => Option.some(model),
     write: (_model, nextHoverIntent) => nextHoverIntent,
-    outMessage: { fold: foldHoverIntentOutMessage },
   },
-)
+).withOutMessagePolicy({ fold: foldHoverIntentOutMessage })
 
 const HoverIntentSceneComposition = HoverIntentSceneDefinition.makeComposition({
   bindings: [HoverIntentBinding],

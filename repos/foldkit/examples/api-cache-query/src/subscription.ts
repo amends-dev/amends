@@ -7,7 +7,7 @@ import { statsQuery } from './query'
 
 const STATS_REFETCH_INTERVAL = Duration.seconds(5)
 
-export const subscriptions = ApplicationDefinition.subscriptions(entry => ({
+export const subscriptions = ApplicationDefinition.makeSubscriptions(entry => ({
   statsRefreshTicks: entry(
     'StatsRefreshTicks',
     { isStatsRefreshActive: Schema.Boolean },

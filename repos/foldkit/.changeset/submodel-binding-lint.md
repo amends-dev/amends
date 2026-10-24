@@ -2,11 +2,11 @@
 '@foldkit/oxlint-plugin': minor
 ---
 
-Recognize completed Block Bindings in the architecture rules. `no-direct-block-state-update` tracks a parent Model passed to a Binding’s `fold` or a Step composed through `Update.combine`, including copied child operation and update Models that would discard Commands or an OutMessage. The Command naming and Mount element checks recognize named Block definition methods. Development guard checks recognize `ApplicationComposition.assembleApplication` and `ApplicationComposition.assembleElement`. OutMessage forwarding and Message wrapper checks recognize Binding configuration. Diagnostics point to registered Binding operations.
+Recognize completed Block Bindings in the architecture rules. `no-direct-block-state-update` tracks a parent Model passed to a Binding’s `fold` or a Step composed through `Update.combineSteps`, including copied child operation and update Models that would discard Commands or an OutMessage. The Command naming and Mount element checks recognize named Block definition methods. Development guard checks recognize `Program.make` and `Program.makeElement`. OutMessage forwarding and Message wrapper checks recognize Binding configuration. Diagnostics point to registered Binding operations.
 
 For wrapped keyed Bindings, `no-direct-block-state-update` rejects parent replacement of the nested child Model while allowing the parent to update wrapper metadata and collection membership.
 
-Recognize provenance-backed child transform references in direct field evolution, keyed `Array.map` calls, and Definition-owned `stepFields` records. Imported aliases remain tied to their registered child module, and local helpers require child Model annotations, so ordinary domain transforms, parent collection reconciliation, Binding writers, and initialization stay valid.
+Recognize provenance-backed child transform references in direct field evolution, keyed `Array.map` calls, and Definition-owned `makeFieldsStep` records. Imported aliases remain tied to their registered child module, and local helpers require child Model annotations, so ordinary domain transforms, parent collection reconciliation, Binding writers, and initialization stay valid.
 
 Recognize root-owned Messages in Application completion callbacks and view helpers whose builder type comes from the owning Composition without permitting parents to manufacture foreign child Messages. Report authored `Got*` wrappers around Block, Query, and UI component Messages; registered Bindings generate and route those delivery envelopes.
 

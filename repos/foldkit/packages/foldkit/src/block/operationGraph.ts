@@ -1,4 +1,25 @@
+import { outMessagePoliciesOf } from './outMessagePolicyRuntime.js'
+
 let currentChildBindings: ReadonlyArray<object> | undefined
+
+/** @internal Reads a Binding's policy from the active exact Composition graph. */
+export const activeBindingOutMessagePolicy = (
+  binding: object,
+  placement: string,
+) => {
+  const policy =
+    currentChildBindings === undefined
+      ? undefined
+      : outMessagePoliciesOf(currentChildBindings)?.get(binding)
+
+  if (policy === undefined) {
+    throw new Error(
+      `[foldkit] Binding "${placement}" has no OutMessage policy in the active Composition graph.`,
+    )
+  }
+
+  return policy
+}
 
 /** @internal Runs a synchronous Block operation with its direct child graph active. */
 export const withOperationGraph = <Value>(

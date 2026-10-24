@@ -10,4 +10,4 @@ export const CameraDefinition = Block.makeDefinition('Camera', {
 })
 export const CameraComposition = CameraDefinition.makeComposition()
 export const CameraStream =
-  CameraDefinition.resource<MediaStream>()('CameraStream')
+  CameraDefinition.makeResource<MediaStream>()('CameraStream')

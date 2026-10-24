@@ -231,10 +231,14 @@ type OutgoingBindingIndexes<Bindings extends ReadonlyArray<unknown>> = {
   ]: Index
 }
 
-type ConflictingDeliveryTags<IncomingIndexes, OutgoingIndexes> = {
+type ConflictingDeliveryTags<
+  IncomingIndexes,
+  OutgoingIndexes,
+  OutgoingTags extends keyof OutgoingIndexes = keyof OutgoingIndexes,
+> = {
   [Tag in keyof IncomingIndexes]: true extends IsUnion<
     | IncomingIndexes[Tag]
-    | (Tag extends keyof OutgoingIndexes ? OutgoingIndexes[Tag] : never)
+    | (Tag extends OutgoingTags ? OutgoingIndexes[Tag] : never)
   >
     ? Tag
     : never
@@ -375,13 +379,9 @@ type AuthoredRecipeOutput<Output> = Output extends AnyBindingInitRecipe
   ? BindingInitRecipeReturn<Output>
   : Output
 
-type ValidateAuthoredEvidence<Output> = [
-  Update.ValidateConcreteResultEvidence<AuthoredRecipeOutput<Output>>,
-] extends [never]
-  ? Readonly<{
-      'Composition results must preserve concrete Binding graph evidence': Output
-    }>
-  : unknown
+type ValidateAuthoredEvidence<Output> = Update.ValidateConcreteResultEvidence<
+  AuthoredRecipeOutput<Output>
+>
 
 type AuthoredOutputModel<Output> =
   AuthoredRecipeOutput<Output> extends infer Value
@@ -413,6 +413,19 @@ type AuthoredOutputMessage<Output> =
       : never
     : never
 
+type AuthoredOutputCommands<Output> =
+  AuthoredRecipeOutput<Output> extends infer Value
+    ? Update.ResolvedOperationOutput<Value> extends infer Resolved
+      ? Resolved extends unknown
+        ? 'commands' extends keyof Resolved
+          ? Resolved extends Readonly<{ commands?: infer Commands }>
+            ? Exclude<Commands, undefined>
+            : never
+          : never
+        : never
+      : never
+    : never
+
 type AuthoredOutputOutMessage<Output> =
   AuthoredRecipeOutput<Output> extends infer Value
     ? Update.ResolvedOperationOutput<Value> extends infer Resolved
@@ -426,69 +439,103 @@ type AuthoredOutputOutMessage<Output> =
       : never
     : never
 
-type ValidateAuthoredRecipeChannels<Model, Message, OutMessage, Output> =
-  Output extends Update.AnyResultRecipe | AnyBindingInitRecipe
-    ? true extends
-        | IsAny<AuthoredOutputModel<Output>>
-        | IsUnknown<AuthoredOutputModel<Output>>
-        | IsAny<AuthoredOutputMessage<Output>>
-        | IsUnknown<AuthoredOutputMessage<Output>>
-        | IsAny<AuthoredOutputOutMessage<Output>>
-        | IsUnknown<AuthoredOutputOutMessage<Output>>
-      ? Readonly<{
-          'Composition result channels must remain concrete': Output
+type AuthoredChannelErrors<Model, Message, OutMessage, Output> = true extends
+  | IsAny<AuthoredOutputModel<Output>>
+  | IsUnknown<AuthoredOutputModel<Output>>
+  | IsAny<AuthoredOutputCommands<Output>>
+  | IsUnknown<AuthoredOutputCommands<Output>>
+  | IsAny<AuthoredOutputMessage<Output>>
+  | IsUnknown<AuthoredOutputMessage<Output>>
+  | IsAny<AuthoredOutputOutMessage<Output>>
+  | IsUnknown<AuthoredOutputOutMessage<Output>>
+  ? Readonly<{
+      'Composition result channels must remain concrete': Output
+    }>
+  : Output extends Update.AnyResultRecipe | AnyBindingInitRecipe
+    ? Output extends AnyBindingInitRecipe
+      ? [AuthoredOutputModel<Output>] extends [Model]
+        ? [AuthoredOutputMessage<Output>] extends [
+            | Message
+            | GeneratedMessageOfRequirement<
+                Update.RegistrationEvidenceOf<AuthoredRecipeOutput<Output>>
+              >,
+          ]
+          ? [AuthoredOutputOutMessage<Output>] extends [OutMessage]
+            ? never
+            : Readonly<{
+                'Composition result OutMessages must belong to the Definition': AuthoredOutputOutMessage<Output>
+              }>
+          : Readonly<{
+              'Composition result Messages require local ownership or registered generated delivery': AuthoredOutputMessage<Output>
+            }>
+        : Readonly<{
+            'Composition result Model must match the Definition': AuthoredOutputModel<Output>
+          }>
+      : [AuthoredOutputModel<Output>, Model] extends [
+            Model,
+            AuthoredOutputModel<Output>,
+          ]
+        ? [AuthoredOutputMessage<Output>] extends [
+            | Message
+            | GeneratedMessageOfRequirement<
+                Update.RegistrationEvidenceOf<AuthoredRecipeOutput<Output>>
+              >,
+          ]
+          ? [AuthoredOutputOutMessage<Output>] extends [OutMessage]
+            ? never
+            : Readonly<{
+                'Composition result OutMessages must belong to the Definition': AuthoredOutputOutMessage<Output>
+              }>
+          : Readonly<{
+              'Composition result Messages require local ownership or registered generated delivery': AuthoredOutputMessage<Output>
+            }>
+        : Readonly<{
+            'Composition result Model must match the Definition': AuthoredOutputModel<Output>
+          }>
+    : [AuthoredOutputModel<Output>] extends [Model]
+      ? [AuthoredOutputMessage<Output>] extends [Message]
+        ? [AuthoredOutputOutMessage<Output>] extends [OutMessage]
+          ? never
+          : Readonly<{
+              'Composition result OutMessages must belong to the Definition': AuthoredOutputOutMessage<Output>
+            }>
+        : Readonly<{
+            'Composition result Messages require local ownership or registered generated delivery': AuthoredOutputMessage<Output>
+          }>
+      : Readonly<{
+          'Composition result Model must match the Definition': AuthoredOutputModel<Output>
         }>
-      : Output extends AnyBindingInitRecipe
-        ? [AuthoredOutputModel<Output>] extends [Model]
-          ? [AuthoredOutputMessage<Output>] extends [
-              | Message
-              | GeneratedMessageOfRequirement<
-                  Update.RegistrationEvidenceOf<AuthoredRecipeOutput<Output>>
-                >,
-            ]
-            ? [AuthoredOutputOutMessage<Output>] extends [OutMessage]
-              ? unknown
-              : Readonly<{
-                  'Composition result OutMessages must belong to the Definition': AuthoredOutputOutMessage<Output>
-                }>
-            : Readonly<{
-                'Composition result Messages require local ownership or registered generated delivery': AuthoredOutputMessage<Output>
-              }>
-          : Readonly<{
-              'Composition result Model must match the Definition': AuthoredOutputModel<Output>
-            }>
-        : [AuthoredOutputModel<Output>, Model] extends [
-              Model,
-              AuthoredOutputModel<Output>,
-            ]
-          ? [AuthoredOutputMessage<Output>] extends [
-              | Message
-              | GeneratedMessageOfRequirement<
-                  Update.RegistrationEvidenceOf<AuthoredRecipeOutput<Output>>
-                >,
-            ]
-            ? [AuthoredOutputOutMessage<Output>] extends [OutMessage]
-              ? unknown
-              : Readonly<{
-                  'Composition result OutMessages must belong to the Definition': AuthoredOutputOutMessage<Output>
-                }>
-            : Readonly<{
-                'Composition result Messages require local ownership or registered generated delivery': AuthoredOutputMessage<Output>
-              }>
-          : Readonly<{
-              'Composition result Model must match the Definition': AuthoredOutputModel<Output>
-            }>
-    : unknown
 
-type ValidateAuthoredOutputKind<Model, Message, OutMessage, Output> =
-  Output extends
-    | OwnedReturn<Model, Message, OutMessage>
-    | AnyBindingInitRecipe
-    | Update.AnyResultRecipe
-    ? unknown
-    : Readonly<{
-        'Composition updates must return an update result or Binding recipe': Output
-      }>
+type ValidateAuthoredChannels<Model, Message, OutMessage, Output> = [
+  AuthoredChannelErrors<Model, Message, OutMessage, Output>,
+] extends [never]
+  ? unknown
+  : AuthoredChannelErrors<Model, Message, OutMessage, Output>
+
+type InvalidAuthoredOutputKind<Model, Message, OutMessage, Output> =
+  IsAny<Output> extends true
+    ? true
+    : IsUnknown<Output> extends true
+      ? true
+      : Output extends
+            | OwnedReturn<Model, Message, OutMessage>
+            | AnyBindingInitRecipe
+            | Update.AnyResultRecipe
+        ? never
+        : Output
+
+type ValidateAuthoredOutputKind<Model, Message, OutMessage, Output> = [
+  InvalidAuthoredOutputKind<Model, Message, OutMessage, Output>,
+] extends [never]
+  ? unknown
+  : Readonly<{
+      'Composition updates must return an update result or Binding recipe': InvalidAuthoredOutputKind<
+        Model,
+        Message,
+        OutMessage,
+        Output
+      >
+    }>
 
 type RouteRequirements<Bindings extends ReadonlyArray<AnyBinding>> =
   RouteFold<Bindings> extends infer Fold extends AnyFunction
@@ -590,6 +637,91 @@ type RoutedOnlyUpdate<
   PreserveSource
 >
 
+type ValidateAuthoredUpdate<
+  Model,
+  Message,
+  OutMessage,
+  Context extends ReadonlyArray<unknown>,
+  Output,
+> = ValidateAnnotatedContext<Context> &
+  ValidateAuthoredOutputKind<Model, Message, OutMessage, Output> &
+  ValidateAuthoredEvidence<Output> &
+  ValidateAuthoredChannels<Model, Message, OutMessage, Output>
+
+type AuthoredUpdateContext<AuthoredUpdate extends AnyFunction> =
+  Parameters<AuthoredUpdate> extends readonly [
+    unknown,
+    unknown,
+    ...infer Context,
+  ]
+    ? Context
+    : readonly []
+
+type AuthoredUpdateFunction<
+  Model,
+  Message,
+  Context extends ReadonlyArray<unknown>,
+  Bindings extends ReadonlyArray<AnyBinding>,
+  Output,
+> = (
+  model: Update.CompositionInput<Model, RequirementsOfBindings<Bindings>>,
+  message: AuthoredMessage<Message, Bindings>,
+  ...context: Context
+) => Output
+
+type ContextualAuthoredOutput<Model> =
+  | Readonly<{
+      model: Model
+      commands?: unknown
+      outMessage?: unknown
+    }>
+  | AnyBindingInitRecipe
+  | Update.AnyResultRecipe
+
+declare const InvalidAuthoredUpdateTypeId: unique symbol
+
+type ValidateAuthoredUpdateFunction<
+  Model,
+  Message,
+  DispatchMessage,
+  OutMessage,
+  Context extends ReadonlyArray<unknown>,
+  Bindings extends ReadonlyArray<AnyBinding>,
+  AuthoredUpdate extends AuthoredUpdateFunction<
+    Model,
+    Message,
+    Context,
+    Bindings,
+    unknown
+  >,
+> =
+  IsAny<ReturnType<AuthoredUpdate>> extends true
+    ? never
+    : unknown extends ValidateAuthoredUpdate<
+          Model,
+          DispatchMessage,
+          OutMessage,
+          AuthoredUpdateContext<AuthoredUpdate>,
+          ReturnType<AuthoredUpdate>
+        >
+      ? unknown
+      : (
+          model: Update.CompositionInput<
+            Model,
+            RequirementsOfBindings<Bindings>
+          >,
+          message: AuthoredMessage<Message, Bindings>,
+          ...context: Context
+        ) => ReturnType<AuthoredUpdate> &
+          ValidateAuthoredUpdate<
+            Model,
+            DispatchMessage,
+            OutMessage,
+            AuthoredUpdateContext<AuthoredUpdate>,
+            ReturnType<AuthoredUpdate>
+          > &
+          Readonly<{ [InvalidAuthoredUpdateTypeId]: never }>
+
 type ValidDefineCompositionUpdate<
   Model,
   Message,
@@ -599,23 +731,36 @@ type ValidDefineCompositionUpdate<
   DispatchMessage,
 > = [AuthoredMessage<Message, Bindings>] extends [never]
   ? () => RoutedOnlyUpdate<Model, DispatchMessage, Bindings, PreserveSource>
-  : <const Context extends ReadonlyArray<unknown>, const Output>(
-      update: (
-        model: Update.CompositionInput<Model, RequirementsOfBindings<Bindings>>,
-        message: AuthoredMessage<Message, Bindings>,
-        ...context: Context
-      ) => Output &
-        ValidateAnnotatedContext<Context> &
-        ValidateAuthoredOutputKind<Model, Message, OutMessage, Output> &
-        ValidateAuthoredEvidence<Output> &
-        ValidateAuthoredRecipeChannels<Model, Message, OutMessage, Output>,
-    ) => CompositionDefinedUpdate<
-      Model,
-      DispatchMessage,
-      Context,
-      Output,
-      Bindings,
-      PreserveSource
+  : <
+      const Context extends ReadonlyArray<unknown>,
+      const Output extends ContextualAuthoredOutput<Model>,
+      const AuthoredUpdate extends AuthoredUpdateFunction<
+        Model,
+        Message,
+        Context,
+        Bindings,
+        Output
+      >,
+    >(
+      update: AuthoredUpdate &
+        ValidateAuthoredUpdateFunction<
+          Model,
+          Message,
+          DispatchMessage,
+          OutMessage,
+          Context,
+          Bindings,
+          NoInfer<AuthoredUpdate>
+        >,
+    ) => NoInfer<
+      CompositionDefinedUpdate<
+        Model,
+        DispatchMessage,
+        Context,
+        ReturnType<AuthoredUpdate>,
+        Bindings,
+        PreserveSource
+      >
     >
 
 /**
@@ -821,7 +966,7 @@ export const makeCompositionUpdate = (
     const delivery = bindingDeliveries.get(childBinding)
     if (delivery === undefined) {
       throw new Error(
-        `[foldkit] Delivery metadata is unavailable for child Binding "${childBinding.placement}". Create Bindings through the parent Definition.bindChild method.`,
+        `[foldkit] Delivery metadata is unavailable for child Binding "${childBinding.placement}". Create Bindings through the parent Definition.makeBinding method.`,
       )
     }
 

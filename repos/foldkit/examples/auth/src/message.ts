@@ -17,5 +17,3 @@ export const Message = defineMessageUnion({
   SucceededClearSession: {},
   FailedClearSession: { error: Schema.String },
 })
-
-export type Message = typeof Message.Type

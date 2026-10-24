@@ -85,7 +85,7 @@ const generateConnectionId = (): string =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 
 const tryDeriveJsonSchemaDocument = (
-  schema: Schema.Codec<any, any>,
+  schema: Schema.Codec<any, any, any, any>,
 ): Option.Option<unknown> => {
   try {
     return Option.some(Schema.toJsonSchemaDocument(schema))
@@ -133,15 +133,17 @@ const tryDeriveJsonSchemaDocument = (
  * Production-safe: callers must check `import.meta.hot` is defined before
  * invoking this. The function assumes a live HMR connection.
  */
-export const startWebSocketBridge = (
+export const startWebSocketBridge = <DispatchServices>(
   store: DevToolsStore,
   hot: Hot,
-  maybeMessageSchema: Option.Option<Schema.Codec<any, any>>,
+  maybeMessageSchema: Option.Option<
+    Schema.Codec<any, any, DispatchServices, any>
+  >,
   prepareDispatch: PrepareDispatch,
-): Effect.Effect<void, never, Scope.Scope> =>
+): Effect.Effect<void, never, Scope.Scope | DispatchServices> =>
   Effect.gen(function* () {
     const connectionId = generateConnectionId()
-    const capturedContext = yield* Effect.context<never>()
+    const capturedContext = yield* Effect.context<DispatchServices>()
 
     const maybeDispatchSchema = Option.map(
       maybeMessageSchema,
@@ -390,7 +392,7 @@ const formatUnknownVariantError = (
 
 const missingMessageSchemaResponse = Response.ResponseError({
   reason:
-    'Cannot dispatch: DevToolsConfig.Message not configured. Pass your Message Schema to enable dispatch.',
+    'Cannot dispatch: external dispatch is disabled. Pass devTools: { dispatch: true } to Program.make or Program.makeElement.',
 })
 
 const formatInvalidMessageReason = (error: unknown, message: unknown): string =>
@@ -401,14 +403,16 @@ const formatInvalidMessageReason = (error: unknown, message: unknown): string =>
  * wires this to the HMR request channel; exported so tests can drive request
  * handling without a live HMR connection.
  */
-export const dispatchRequest = (
+export const dispatchRequest = <DispatchServices>(
   store: DevToolsStore,
-  maybeDispatchSchema: Option.Option<Schema.Codec<any, any>>,
+  maybeDispatchSchema: Option.Option<
+    Schema.Codec<any, any, DispatchServices, any>
+  >,
   maybeJsonSchemaDocument: Option.Option<unknown>,
   request: Request,
   prepareDispatch: PrepareDispatch,
-): Effect.Effect<Response> =>
-  Request.match<Effect.Effect<Response>>(request, {
+): Effect.Effect<Response, never, DispatchServices> =>
+  Request.match<Effect.Effect<Response, never, DispatchServices>>(request, {
     RequestGetModel: ({ maybePath, expand }) =>
       Effect.gen(function* () {
         const state = yield* SubscriptionRef.get(store.stateRef)

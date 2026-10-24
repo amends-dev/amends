@@ -15,7 +15,7 @@ import { type Model } from '../model'
 import { Blog, NotFound, UiBlock } from '../page'
 import * as Release0167 from '../page/blog/post/foldkit-0-167-0'
 import * as Prose from '../prose'
-import { type BlogPostRoute, type BlogRoute, homeRouter } from '../route'
+import { type ApplicationRoute, homeRouter } from '../route'
 import { SnippetCopyBlock } from '../snippetCopy'
 import * as SnippetCopyRenderer from '../snippetCopyRenderer'
 import { SnippetDisclosureBlock } from '../snippetDisclosure'
@@ -69,8 +69,10 @@ const postView = (
 const lazyPostView = createKeyedLazy()
 
 export const view = (
-  model: Model,
-  blogRoute: BlogRoute | BlogPostRoute,
+  model: typeof Model.Type,
+  blogRoute:
+    | typeof ApplicationRoute.Blog.Type
+    | typeof ApplicationRoute.BlogPost.Type,
   h: ApplicationViewBuilder,
 ): Html => {
   const content = Match.value(blogRoute).pipe(

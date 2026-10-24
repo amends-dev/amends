@@ -1,6 +1,7 @@
 import { Predicate } from 'effect'
 
 import { generatedDeliveryOf } from '../block/childEnvelope.js'
+import { runtimeBindingsOf } from '../block/composition.js'
 import type { ActiveInstance, InstanceKey } from '../block/instanceContext.js'
 
 type GeneratedDelivery = NonNullable<ReturnType<typeof generatedDeliveryOf>>
@@ -170,7 +171,7 @@ const captureAuthorizedChildMessage = (
   const candidates: Array<
     Readonly<{ binding: object; delivery: GeneratedDelivery }>
   > = []
-  for (const binding of node.block.bindings) {
+  for (const binding of runtimeBindingsOf(node.block)) {
     const delivery = generatedDeliveryOf(binding)
     if (delivery !== undefined && delivery.tag === tag) {
       candidates.push({ binding, delivery })

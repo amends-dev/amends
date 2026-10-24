@@ -10,7 +10,7 @@ import {
 import { Model } from '../model'
 import { ApplicationRoute } from '../route'
 
-const routeTitle = (route: Model['route']): string =>
+const routeTitle = (route: (typeof Model.Type)['route']): string =>
   ApplicationRoute.match(route, {
     Home: () => 'Typing Game',
     Room: ({ roomId }) => `Room ${roomId} | Typing Game`,

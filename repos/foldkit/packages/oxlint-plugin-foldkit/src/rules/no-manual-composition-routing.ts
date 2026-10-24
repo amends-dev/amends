@@ -264,7 +264,7 @@ export const noManualCompositionRouting = Rule.define({
         walk(program, node => {
           if (
             isCallExpression(node) &&
-            isOwnedDefinitionCall(node, 'bindChild', references)
+            isOwnedDefinitionCall(node, 'makeBinding', references)
           ) {
             const config = resolvedObject(node.arguments[1], references)
             for (const property of config?.properties ?? []) {

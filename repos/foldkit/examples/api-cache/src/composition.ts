@@ -14,8 +14,8 @@ import {
 } from './model'
 
 export const applyPostsTransition = (
-  model: Model,
-  maybeNextPosts: Option.Option<PostsData>,
+  model: typeof Model.Type,
+  maybeNextPosts: Option.Option<typeof PostsData.schema.Type>,
 ) =>
   Option.match(maybeNextPosts, {
     onNone: () => ({ model }),
@@ -26,8 +26,8 @@ export const applyPostsTransition = (
   })
 
 export const applyStatsTransition = (
-  model: Model,
-  maybeNextStats: Option.Option<StatsData>,
+  model: typeof Model.Type,
+  maybeNextStats: Option.Option<typeof StatsData.schema.Type>,
 ) =>
   Option.match(maybeNextStats, {
     onNone: () => ({ model }),
@@ -37,7 +37,7 @@ export const applyStatsTransition = (
     }),
   })
 
-const activateTab = (tab: Tab) => (model: Model) => {
+const activateTab = (tab: typeof Tab.Type) => (model: typeof Model.Type) => {
   const modelWithActiveTab = modifyFields(model, { activeTab: () => tab })
 
   return Match.value(tab).pipe(
@@ -57,18 +57,17 @@ const activateTab = (tab: Tab) => (model: Model) => {
   )
 }
 
-const foldTabsOutMessage = ApplicationTabsBlock.OutMessage.match({
-  Selected: ({ value }) => ApplicationDefinition.step(activateTab(value)),
-})
-
-export const TabsBinding = ApplicationDefinition.bindChild(
+export const TabsBinding = ApplicationDefinition.makeBinding(
   ApplicationTabsBlock,
   {
     field: 'tabs',
     init: { contextToArgs: () => [{ id: TABS_ID }] },
-    outMessage: { fold: foldTabsOutMessage },
   },
-)
+).withOutMessagePolicy({
+  fold: ApplicationDefinition.makeOutMessageFold(ApplicationTabsBlock, {
+    Selected: ({ value }) => ApplicationDefinition.makeStep(activateTab(value)),
+  }),
+})
 
 export const ApplicationComposition = ApplicationDefinition.makeComposition({
   bindings: [TabsBinding],

@@ -22,7 +22,7 @@ Calendar owns navigation state, including the visible month, active grid, and ke
 
 Bind `CalendarBlock` in the parent. Declare its startup arguments with the Binding's `init` policy and let the parent Composition assemble its Model. Generated Calendar envelopes route through the Binding automatically. Render it through `h.block(CalendarBinding.embedView(...))`.
 
-Pass the parent-owned selection into `viewInputs.maybeSelectedDate` on every render. When Calendar emits `SelectedDate`, fold that OutMessage into the parent's selected-date field. `Calendar.update` returns `Update.ReturnWithOutMessage<Model, Message, OutMessage>`, so the same fold can handle `ChangedViewMonth` when your application needs month-scoped data.
+Pass the parent-owned selection into `viewInputs.maybeSelectedDate` on every render. When Calendar emits `SelectedDate`, fold that OutMessage into the parent's selected-date field. `Calendar.CalendarBlock.update` retains the Calendar OutMessage contract, so the same Binding fold can handle `ChangedViewMonth` when your application needs month-scoped data.
 
 :::Info{label="See it in an app"}
 See the complete Calendar integration in the [UI Showcase](https://github.com/foldkit/foldkit/blob/main/examples/ui-showcase/src/ui/view/calendar.ts).
@@ -101,7 +101,7 @@ Foldkit ships `defaultEnglishLocale` and nothing else. Supply the locale data yo
 
 ### InitConfig {#init-config}
 
-Pass this configuration to `Calendar.init()`:
+Pass this configuration through the Calendar Binding's child initializer. Direct completed Block calls use `Calendar.CalendarBlock.init()`:
 
 | Name                 | Type                          | Default                | Description                                                                                                                              |
 | -------------------- | ----------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -197,7 +197,7 @@ Month cells expose `isSelected`, `isFocused`, `isCurrentMonth`, and `isDisabled`
 
 ### OutMessage {#out-message}
 
-Calendar returns an optional OutMessage in the `outMessage` field. Match on its tag in the Binding’s `outMessage.fold` policy.
+Calendar returns an optional OutMessage in the `outMessage` field. Match on its tag in the Binding’s selected `fold` policy.
 
 | Name               | Payload                           | Emitted when                                                                                                                                                                       |
 | ------------------ | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -208,7 +208,7 @@ Use `SelectedDate` to update the parent-owned selection. Use `ChangedViewMonth` 
 
 ### Programmatic Helpers
 
-Call these operations through the registered Calendar Binding. Each Binding call returns a connected parent Step that dispatches the operation's Message through Calendar update. Return that Step from the parent handler or compose it with `Update.combine`.
+Call these operations through the registered Calendar Binding. Each Binding call returns a connected parent Step that dispatches the operation's Message through Calendar update. Return that Step from the parent handler or compose it with `Update.combineSteps`.
 
 | Binding call                              | Arguments            | Behavior                                                                                                                                                              |
 | ----------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

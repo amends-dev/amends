@@ -19,9 +19,9 @@ const cardClassName =
   'rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 cursor-grab active:cursor-grabbing select-none transition-opacity'
 
 const findDraggedCard = (
-  columns: ReadonlyArray<DemoColumn>,
+  columns: ReadonlyArray<typeof DemoColumn.Type>,
   maybeItemId: Option.Option<string>,
-): Option.Option<DemoCard> =>
+): Option.Option<typeof DemoCard.Type> =>
   pipe(
     maybeItemId,
     Option.flatMap(itemId =>
@@ -34,7 +34,7 @@ const findDraggedCard = (
   )
 
 const cardView = (
-  card: DemoCard,
+  card: typeof DemoCard.Type,
   index: number,
   containerId: string,
   dragAndDropModel: typeof DragAndDropBlock.Model.Type,
@@ -72,7 +72,7 @@ const dropPlaceholder = (h: UiViewBuilder) => {
 }
 
 const renderColumn = (
-  column: DemoColumn,
+  column: typeof DemoColumn.Type,
   dragAndDropModel: typeof DragAndDropBlock.Model.Type,
   children: ReadonlyArray<Html>,
   render: RenderInfo,
@@ -114,8 +114,8 @@ const renderColumn = (
 }
 
 const columnView = (
-  columns: ReadonlyArray<DemoColumn>,
-  column: DemoColumn,
+  columns: ReadonlyArray<typeof DemoColumn.Type>,
+  column: typeof DemoColumn.Type,
   dragAndDropModel: typeof DragAndDropBlock.Model.Type,
   render: RenderInfo,
   h: UiViewBuilder,
@@ -168,7 +168,7 @@ const columnView = (
 }
 
 const ghostView = (
-  columns: ReadonlyArray<DemoColumn>,
+  columns: ReadonlyArray<typeof DemoColumn.Type>,
   dragAndDropModel: typeof DragAndDropBlock.Model.Type,
   h: UiViewBuilder,
 ): Html => {

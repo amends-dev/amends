@@ -21,7 +21,6 @@ export const Model = Schema.Struct({
   availableDate: DatePickerBlock.Model,
   maybeAvailableDate: Schema.Option(CalendarDate),
 })
-export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
   UpdatedFirstName: { value: Schema.String },
@@ -36,8 +35,6 @@ export const Message = defineMessageUnion({
   UpdatedCustomPronouns: { value: Schema.String },
   UpdatedPortfolioUrl: { value: Schema.String },
 })
-
-export type Message = typeof Message.Type
 
 export const PersonalInfoDefinition = Block.makeDefinition('PersonalInfo', {
   Model,

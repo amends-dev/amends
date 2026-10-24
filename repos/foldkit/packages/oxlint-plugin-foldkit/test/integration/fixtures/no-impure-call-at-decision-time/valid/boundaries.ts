@@ -108,7 +108,7 @@ export const mappedStream = Stream.mapBoth(Stream.make(1), {
   onElement: () => Date.now(),
 })
 
-export const subscriptions = Subscription.make<Model, Message>()(entry => ({
+export const subscriptions = Subscription.make<typeof Model.Type, Message>()(entry => ({
   clock: entry(
     'Clock',
     {},
@@ -123,7 +123,7 @@ export const ClockLayer = subscriptions.clock.toLayer(
   Effect.succeed(() => Stream.make(Date.now())),
 )
 
-export const managedResources = ManagedResource.make<Model, Message>()(
+export const managedResources = ManagedResource.make<typeof Model.Type, Message>()(
   entry => ({
     connection: entry(
       'Connection',
@@ -153,12 +153,12 @@ export const ReadAttachedClock = Command.define('ReadAttachedClock', {
 handler: function* () { return () => Effect.succeed(CompletedReadClock({ timestamp: Date.now() })) },
 })
 
-export const attachedSubscriptions = Subscription.make<Model, Message>()(entry => ({
+export const attachedSubscriptions = Subscription.make<typeof Model.Type, Message>()(entry => ({
   clock: entry('AttachedClock', { messages: [Schema.Number], handler: function* () { return () => Stream.make(Date.now()) }},
   ),
 }))
 
-export const attachedResources = ManagedResource.make<Model, Message>()(entry => ({
+export const attachedResources = ManagedResource.make<typeof Model.Type, Message>()(entry => ({
   connection: entry('AttachedConnection', Schema.Struct({}), {
     resource: Resource,
     modelToMaybeRequirements: () => SomeRequirements,

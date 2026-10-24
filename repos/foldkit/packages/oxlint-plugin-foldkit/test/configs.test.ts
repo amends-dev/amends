@@ -39,12 +39,6 @@ const entryFilePatterns = [
 
 const serverRuleId = 'foldkit/no-nonportable-server-globals'
 const decisionTimeRuleId = 'foldkit/no-impure-call-at-decision-time'
-const legacyAuthoredDeliveryRuleIds = [
-  'foldkit/got-block-message-name',
-  'foldkit/got-prefix-requires-block-payload',
-  'foldkit/got-wrapper-carries-only-routing',
-  'foldkit/wrap-child-output-in-got-message',
-]
 const rulesApplicableToTests = new Set([
   'foldkit/acquire-release-constructs-in-acquire-body',
   'foldkit/no-switch-on-message-tag',
@@ -60,6 +54,9 @@ describe('configs', () => {
   for (const { name, config } of presets) {
     describe(name, () => {
       it('enables foldkit rules at error severity', () => {
+        expect(config.rules['require-yield']).toBe(
+          name === 'recommended' ? 'off' : undefined,
+        )
         expect(config.rules['foldkit/block-name-matches-variable']).toBe(
           'error',
         )
@@ -72,14 +69,14 @@ describe('configs', () => {
         expect(config.rules['foldkit/no-direct-block-state-update']).toBe(
           'error',
         )
+        expect(config.rules['foldkit/no-completed-block-model-in-schema']).toBe(
+          'error',
+        )
         expect(config.rules['foldkit/no-noop-message']).toBe('error')
         expect(config.rules['foldkit/no-empty-commands-array']).toBe('error')
         expect(config.rules['foldkit/no-empty-to-parent-out-message']).toBe(
           'error',
         )
-        for (const ruleId of legacyAuthoredDeliveryRuleIds) {
-          expect(config.rules[ruleId]).toBe('off')
-        }
         expect(config.rules[decisionTimeRuleId]).toBe('error')
         expect(config.rules['foldkit/prefer-effect-module-names']).toBe('error')
       })

@@ -1,5 +1,6 @@
 import { Option, Schema } from 'effect'
 import * as Story from 'foldkit/story'
+import { modifyFields } from 'foldkit/struct'
 import { expect } from 'vitest'
 
 import { describe, it } from '@effect/vitest'
@@ -338,6 +339,55 @@ describe('Popover', () => {
             expect(model.maybeLastButtonPointerType).toStrictEqual(
               Option.none(),
             )
+          }),
+        )
+      })
+    })
+
+    describe('ClickedButton', () => {
+      it('keeps the popover open after the click that follows a mouse press', () => {
+        Story.story(
+          update,
+          givenClosed,
+          Story.message(
+            Message.PressedPointerOnButton({
+              pointerType: 'mouse',
+              button: 0,
+            }),
+          ),
+          Story.message(Message.ClickedButton()),
+          Story.model(model => {
+            expect(model.isOpen).toBe(true)
+            expect(model.maybeLastButtonPointerType).toStrictEqual(
+              Option.none(),
+            )
+          }),
+        )
+      })
+
+      it('opens when the click did not follow a mouse press', () => {
+        Story.story(
+          update,
+          givenClosed,
+          Story.message(Message.ClickedButton()),
+          Story.model(model => {
+            expect(model.isOpen).toBe(true)
+          }),
+        )
+      })
+
+      it('closes an open Popover when the click did not follow a mouse press', () => {
+        Story.story(
+          update,
+          givenOpen,
+          Story.message(Message.ClickedButton()),
+          Story.expectOutMessage(OutMessage.Closed()),
+          Story.Command.resolve(
+            FocusPopoverButton,
+            Message.CompletedFocusPopoverButton(),
+          ),
+          Story.model(model => {
+            expect(model.isOpen).toBe(false)
           }),
         )
       })
@@ -712,6 +762,19 @@ describe('Popover', () => {
           expect(model.isOpen).toBe(false)
         }),
       )
+    })
+
+    it('emits no Commands when requestOpen receives an open modal Model', () => {
+      const openModal = modifyFields(
+        init({ id: 'test', isModal: true }).model,
+        { isOpen: () => true },
+      )
+
+      const reopened = PopoverBlock.operations.requestOpen(openModal)
+
+      expect(reopened.commands).toBeUndefined()
+      expect(reopened.outMessage).toBeUndefined()
+      expect(reopened.model.isOpen).toBe(true)
     })
 
     it('emits unlockScroll and restoreInert commands when the panel blurs in modal mode', () => {

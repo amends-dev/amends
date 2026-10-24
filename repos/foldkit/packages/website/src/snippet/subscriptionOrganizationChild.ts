@@ -4,7 +4,7 @@ import { Effect, Schema, Stream } from 'effect'
 import { themeMenu } from './definition'
 import { Message } from './message'
 
-export const subscriptions = themeMenu.subscriptions(entry => ({
+export const subscriptions = themeMenu.makeSubscriptions(entry => ({
   themeMenuEscapePresses: entry(
     'ThemeMenuEscapePresses',
     { isOpen: Schema.Boolean },

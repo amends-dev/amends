@@ -39,6 +39,7 @@ import {
   SITE_URL,
   blogPostRouter,
   blogRouter,
+  previewDocumentationEnabled,
   routeToUrlPath,
 } from '../src/route'
 import { type BlogPostEntry, blogPostSlugs, blogPosts } from './blogPosts'
@@ -61,7 +62,7 @@ import { generateOgImages, injectMetaTags } from './og-image'
 
 // ROUTES
 
-export const STATIC_ROUTES: ReadonlyArray<ApplicationRoute> = [
+export const STATIC_ROUTES: ReadonlyArray<typeof ApplicationRoute.Type> = [
   ApplicationRoute.Home(),
   ApplicationRoute.Newsletter(),
   ApplicationRoute.WhyFoldkit(),
@@ -87,6 +88,9 @@ export const STATIC_ROUTES: ReadonlyArray<ApplicationRoute> = [
   ApplicationRoute.BestPracticesMessages(),
   ApplicationRoute.BestPracticesKeying(),
   ApplicationRoute.BestPracticesImmutability(),
+  ...(previewDocumentationEnabled
+    ? [ApplicationRoute.PreviewMigration(), ApplicationRoute.PreviewUpgrade()]
+    : []),
   ApplicationRoute.ProjectOrganization(),
   ApplicationRoute.ToolingLinting(),
   ApplicationRoute.CoreArchitecture(),
@@ -168,13 +172,15 @@ export const STATIC_ROUTES: ReadonlyArray<ApplicationRoute> = [
   ),
 ]
 
-const PLAYGROUND_ROUTES: ReadonlyArray<ApplicationRoute> = Array.map(
-  runnableExampleSlugs,
-  exampleSlug => ApplicationRoute.Playground({ exampleSlug }),
-)
+const PLAYGROUND_ROUTES: ReadonlyArray<typeof ApplicationRoute.Type> =
+  Array.map(runnableExampleSlugs, exampleSlug =>
+    ApplicationRoute.Playground({ exampleSlug }),
+  )
 export const INDEX_OUTPUT_PATH = 'index.html'
 
-export const routeToOutputPath = (route: ApplicationRoute): string => {
+export const routeToOutputPath = (
+  route: typeof ApplicationRoute.Type,
+): string => {
   const urlPath = routeToUrlPath(route)
   return urlPath === '/'
     ? INDEX_OUTPUT_PATH
@@ -183,7 +189,7 @@ export const routeToOutputPath = (route: ApplicationRoute): string => {
 
 export const enumerateRoutes = (
   apiModuleSlugs: ReadonlyArray<string>,
-): ReadonlyArray<ApplicationRoute> =>
+): ReadonlyArray<typeof ApplicationRoute.Type> =>
   pipe(
     STATIC_ROUTES,
     Array.appendAll(
@@ -236,14 +242,16 @@ const extractMarkdownFromHtml = (html: string): Effect.Effect<string> =>
         window.document.body.innerHTML = html
         /* eslint-disable-next-line @typescript-eslint/consistent-type-assertions */
         const renderedDocument = window.document as unknown as Document
-        return extractMarkdownFromRenderedDocument(renderedDocument)
+        return extractMarkdownFromRenderedDocument(renderedDocument, SITE_URL, {
+          isPreservingRootRelativeLinks: previewDocumentationEnabled,
+        })
       }),
     window => Effect.promise(() => window.happyDOM.close()),
   )
 
 const renderRoutePage = (
   serverEntry: typeof ServerEntry,
-  route: ApplicationRoute,
+  route: typeof ApplicationRoute.Type,
 ) =>
   Effect.gen(function* () {
     const urlPath = routeToUrlPath(route)
@@ -319,14 +327,14 @@ const readApiModules = Effect.gen(function* () {
 })
 
 type PrerenderResult = Readonly<{
-  route: ApplicationRoute
+  route: typeof ApplicationRoute.Type
   urlPath: string
   markdown: string
   html: string
 }>
 
 const buildApiModuleNameResolver = (
-  modules: ReadonlyArray<ApiModule>,
+  modules: ReadonlyArray<typeof ApiModule.Type>,
 ): ApiModuleNameResolver => {
   const nameBySlug = Record.fromIterableWith(modules, ({ name }) => [
     moduleNameToSlug(name),
@@ -346,7 +354,7 @@ const prerenderRoute =
     baseHtml: string,
     resolveApiModuleName: ApiModuleNameResolver,
   ) =>
-  (route: ApplicationRoute) =>
+  (route: typeof ApplicationRoute.Type) =>
     Effect.gen(function* () {
       const urlPath = routeToUrlPath(route)
       const outputPath = routeToOutputPath(route)
@@ -432,7 +440,10 @@ const prerenderPlaygroundShells = (
     )
 
     const fs = yield* FileSystem.FileSystem
-    const writeShell = (route: ApplicationRoute, outputPath: string) => {
+    const writeShell = (
+      route: typeof ApplicationRoute.Type,
+      outputPath: string,
+    ) => {
       const urlPath = routeToUrlPath(route)
       const outputHtml = injectMetaTags(
         shellHtml,
@@ -508,7 +519,7 @@ const formatDateIso = (dateTime: DateTime.DateTime): string => {
 }
 
 const routeToSitemapEntry =
-  (lastModification: string) => (route: ApplicationRoute) => {
+  (lastModification: string) => (route: typeof ApplicationRoute.Type) => {
     const urlPath = routeToUrlPath(route)
     return `<url>
   <loc>${SITE_URL}${urlPath}</loc>
@@ -517,7 +528,7 @@ const routeToSitemapEntry =
   }
 
 const buildSitemap = (
-  routes: ReadonlyArray<ApplicationRoute>,
+  routes: ReadonlyArray<typeof ApplicationRoute.Type>,
   lastModification: string,
 ): string => {
   const entries = pipe(

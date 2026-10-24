@@ -9,8 +9,8 @@ import {
 // @ts-expect-error Mixed attached and host-owned subscriptions have no aggregate layer.
 mixedSubscriptions.layer
 
-DeclarationSubscriptionRegistryDefinition.subscriptions(entry => ({
-  // @ts-expect-error Definition.subscriptions reserves layer for its aggregate Layer.
+DeclarationSubscriptionRegistryDefinition.makeSubscriptions(entry => ({
+  // @ts-expect-error Definition.makeSubscriptions reserves layer for its aggregate Layer.
   layer: entry('Conflicting', {
     messages: [Message.Ticked],
     handler: function* () {

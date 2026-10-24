@@ -2,7 +2,6 @@ import { Option, Schema } from 'effect'
 import * as Block from 'foldkit/block'
 import type { ChildAttribute } from 'foldkit/html'
 import type * as Mount from 'foldkit/mount'
-import type * as Update from 'foldkit/update'
 import { expectTypeOf, it } from 'vitest'
 
 import * as CalendarInternal from './calendar/block.js'
@@ -48,15 +47,6 @@ type MountRequirementsOfBindingRequirement<Requirement> =
 
 const TestCombobox = Combobox.create()
 
-const foldComboboxOutMessage = TestCombobox.OutMessage.match<
-  Update.Step<typeof TestCombobox.Model.Type, never>
->({
-  Selected: () =>
-    ComboboxMountRequirementsDefinition.step(model => ({ model })),
-  ClearedSelection: () =>
-    ComboboxMountRequirementsDefinition.step(model => ({ model })),
-})
-
 const ComboboxMountRequirementsDefinition = Block.makeDefinition(
   'ComboboxMountRequirements',
   {
@@ -65,14 +55,19 @@ const ComboboxMountRequirementsDefinition = Block.makeDefinition(
   },
 )
 
-const ComboboxBinding = ComboboxMountRequirementsDefinition.bindChild(
+const foldComboboxOutMessage =
+  ComboboxMountRequirementsDefinition.makeOutMessageFold(TestCombobox, {
+    Selected: () => model => ({ model }),
+    ClearedSelection: () => model => ({ model }),
+  })
+
+const ComboboxBinding = ComboboxMountRequirementsDefinition.makeBinding(
   TestCombobox,
   {
     read: model => Option.some(model),
     write: (_model, nextCombobox) => nextCombobox,
-    outMessage: { fold: foldComboboxOutMessage },
   },
-)
+).withOutMessagePolicy({ fold: foldComboboxOutMessage })
 
 const embeddedCombobox = ComboboxBinding.embedView({
   slotId: 'combobox',
@@ -89,12 +84,6 @@ const embeddedCombobox = ComboboxBinding.embedView({
 
 const TestListbox = Listbox.create()
 
-const foldListboxOutMessage = TestListbox.OutMessage.match<
-  Update.Step<typeof TestListbox.Model.Type, never>
->({
-  Selected: () => ListboxMountRequirementsDefinition.step(model => ({ model })),
-})
-
 const ListboxMountRequirementsDefinition = Block.makeDefinition(
   'ListboxMountRequirements',
   {
@@ -103,14 +92,18 @@ const ListboxMountRequirementsDefinition = Block.makeDefinition(
   },
 )
 
-const ListboxBinding = ListboxMountRequirementsDefinition.bindChild(
+const foldListboxOutMessage =
+  ListboxMountRequirementsDefinition.makeOutMessageFold(TestListbox, {
+    Selected: () => model => ({ model }),
+  })
+
+const ListboxBinding = ListboxMountRequirementsDefinition.makeBinding(
   TestListbox,
   {
     read: model => Option.some(model),
     write: (_model, nextListbox) => nextListbox,
-    outMessage: { fold: foldListboxOutMessage },
   },
-)
+).withOutMessagePolicy({ fold: foldListboxOutMessage })
 
 const embeddedListbox = ListboxBinding.embedView({
   slotId: 'listbox',
@@ -126,13 +119,6 @@ const embeddedListbox = ListboxBinding.embedView({
 
 const TestMenu = Menu.create()
 
-const foldMenuOutMessage = TestMenu.OutMessage.match<
-  Update.Step<typeof TestMenu.Model.Type, never>
->({
-  Selected: () => MenuMountRequirementsDefinition.step(model => ({ model })),
-  Closed: () => MenuMountRequirementsDefinition.step(model => ({ model })),
-})
-
 const MenuMountRequirementsDefinition = Block.makeDefinition(
   'MenuMountRequirements',
   {
@@ -141,11 +127,18 @@ const MenuMountRequirementsDefinition = Block.makeDefinition(
   },
 )
 
-const MenuBinding = MenuMountRequirementsDefinition.bindChild(TestMenu, {
+const foldMenuOutMessage = MenuMountRequirementsDefinition.makeOutMessageFold(
+  TestMenu,
+  {
+    Selected: () => model => ({ model }),
+    Closed: () => model => ({ model }),
+  },
+)
+
+const MenuBinding = MenuMountRequirementsDefinition.makeBinding(TestMenu, {
   read: model => Option.some(model),
   write: (_model, nextMenu) => nextMenu,
-  outMessage: { fold: foldMenuOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldMenuOutMessage })
 
 const embeddedMenu = MenuBinding.embedView({
   slotId: 'menu',

@@ -10,3 +10,6 @@ export const ComingFromReactComposition = Block.makeDefinition(
     Message,
   },
 ).makeComposition()
+export type ComingFromReactViewBuilder = Block.ViewBuilderFor<
+  typeof ComingFromReactComposition
+>

@@ -1,7 +1,6 @@
 import { Array, Option, Schema, pipe } from 'effect'
 import { Block, Scene, Story } from 'foldkit'
 import { modifyFields } from 'foldkit/struct'
-import type * as Update from 'foldkit/update'
 import { expect } from 'vitest'
 
 import { describe, it } from '@effect/vitest'
@@ -33,15 +32,14 @@ const TabsSceneDefinition = Block.makeDefinition('TabsScene', {
   Message: Schema.Never,
 })
 
-const foldTabsOutMessage = OutMessage.match<Update.Step<Model, never>>({
-  Selected: () => TabsSceneDefinition.step(model => ({ model })),
+const foldTabsOutMessage = TabsSceneDefinition.makeOutMessageFold(TestTabs, {
+  Selected: () => model => ({ model }),
 })
 
-const TabsBinding = TabsSceneDefinition.bindChild(TestTabs, {
+const TabsBinding = TabsSceneDefinition.makeBinding(TestTabs, {
   read: model => Option.some(model),
   write: (_model, nextTabs) => nextTabs,
-  outMessage: { fold: foldTabsOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldTabsOutMessage })
 
 const TabsSceneComposition = TabsSceneDefinition.makeComposition({
   bindings: [TabsBinding],

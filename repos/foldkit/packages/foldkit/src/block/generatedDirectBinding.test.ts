@@ -5,6 +5,7 @@ import { defineMessageUnion } from '../message/index.js'
 import { modifyFields } from '../struct/index.js'
 import * as Update from '../update/index.js'
 import { makeDefinition } from './define.js'
+import * as Block from './public.js'
 
 const SearchModel = Schema.Struct({ count: Schema.Number })
 const SearchMessage = defineMessageUnion({
@@ -17,29 +18,34 @@ const SearchDefinition = makeDefinition('GeneratedDirectSearch', {
   Message: SearchMessage,
   OutMessage: SearchOutMessage,
 })
-const ScheduleIncrement = SearchDefinition.command('ScheduleIncrement', {
+const ScheduleIncrement = SearchDefinition.makeCommand('ScheduleIncrement', {
   messages: [SearchMessage.CompletedScheduleIncrement],
 })
 const SearchComposition = SearchDefinition.makeComposition()
-const SearchBlock = SearchComposition.assembleBlock({
-  init: SearchComposition.makeInit(() => ({
-    model: { count: 0 },
-    commands: [ScheduleIncrement()],
-  })),
-  update: SearchComposition.makeUpdate((model, message) =>
-    SearchMessage.match(message, {
-      ClickedIncrement: () => ({
-        model: modifyFields(model, { count: count => count + 1 }),
-        outMessage: SearchOutMessage.Incremented(),
+const prepareSearchBlock = () =>
+  SearchComposition.prepareBlock({
+    init: SearchComposition.makeInit(() => ({
+      model: { count: 0 },
+      commands: [ScheduleIncrement()],
+    })),
+    update: SearchComposition.makeUpdate((model, message) =>
+      SearchMessage.match(message, {
+        ClickedIncrement: () => ({
+          model: modifyFields(model, { count: count => count + 1 }),
+          outMessage: SearchOutMessage.Incremented(),
+        }),
+        CompletedScheduleIncrement: () => ({
+          model: modifyFields(model, { count: count => count + 1 }),
+        }),
       }),
-      CompletedScheduleIncrement: () => ({
-        model: modifyFields(model, { count: count => count + 1 }),
-      }),
-    }),
-  ),
-  view: SearchComposition.makeView((_model, h) => h.div([])),
-  hostHandlers: [ScheduleIncrement],
-})
+    ),
+    view: SearchComposition.makeView((_model, h) => h.div([])),
+    hostHandlers: [ScheduleIncrement],
+  })
+const SearchBlock: Block.FromAssemblyWithViewAndOutMessage<
+  typeof SearchModel,
+  typeof prepareSearchBlock
+> = Block.assemble(prepareSearchBlock)
 
 const ParentModel = Schema.Struct({ search: SearchModel, label: Schema.String })
 type ParentModel = typeof ParentModel.Type
@@ -52,12 +58,11 @@ const ParentDefinition = makeDefinition('GeneratedDirectParent', {
 const foldSearchOutMessage = SearchOutMessage.match<
   Update.Step<ParentModel, ParentMessage>
 >({
-  Incremented: () => ParentDefinition.stepNoop(),
+  Incremented: () => ParentDefinition.makeNoopStep(),
 })
-const SearchBinding = ParentDefinition.bindChild(SearchBlock, {
+const SearchBinding = ParentDefinition.makeBinding(SearchBlock, {
   field: 'search',
-  outMessage: { fold: foldSearchOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldSearchOutMessage })
 const ParentComposition = ParentDefinition.makeComposition({
   bindings: [SearchBinding],
 })
@@ -76,20 +81,25 @@ const ContextualSearchDefinition = makeDefinition(
   },
 )
 const ContextualSearchComposition = ContextualSearchDefinition.makeComposition()
-const ContextualSearchBlock = ContextualSearchComposition.assembleBlock({
-  init: ContextualSearchComposition.makeInit(() => ({ model: { count: 0 } })),
-  update: ContextualSearchComposition.makeUpdate(
-    (model, message, _source: string) =>
-      SearchMessage.match(message, {
-        ClickedIncrement: () => ({ model }),
-        CompletedScheduleIncrement: () => ({ model }),
-      }),
-  ),
-  view: ContextualSearchComposition.makeView((_model, h) => h.div([])),
-})
+const prepareContextualSearchBlock = () =>
+  ContextualSearchComposition.prepareBlock({
+    init: ContextualSearchComposition.makeInit(() => ({ model: { count: 0 } })),
+    update: ContextualSearchComposition.makeUpdate(
+      (model, message, _source: string) =>
+        SearchMessage.match(message, {
+          ClickedIncrement: () => ({ model }),
+          CompletedScheduleIncrement: () => ({ model }),
+        }),
+    ),
+    view: ContextualSearchComposition.makeView((_model, h) => h.div([])),
+  })
+const ContextualSearchBlock: Block.FromAssemblyWithView<
+  typeof SearchModel,
+  typeof prepareContextualSearchBlock
+> = Block.assemble(prepareContextualSearchBlock)
 
 if (false) {
-  ParentDefinition.bindChild(ContextualSearchBlock, {
+  ParentDefinition.makeBinding(ContextualSearchBlock, {
     // @ts-expect-error Required update context needs an explicit bidirectional mapping.
     field: 'search',
   })

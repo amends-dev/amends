@@ -1,63 +1,46 @@
 import { Option } from 'effect'
-import type { Block, Update } from 'foldkit'
-import { modifyFields } from 'foldkit/struct'
+import type { Block } from 'foldkit'
 
 import { DatePickerBlock } from '@foldkit/ui'
 
-import {
-  Message,
-  type Model,
-  PersonalInfoDefinition,
-  PronounsListboxBlock,
-} from './definition'
+import { PersonalInfoDefinition, PronounsListboxBlock } from './definition'
 
-const foldPronounsOutMessage = PronounsListboxBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Selected:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, {
-        maybeSelectedPronoun: () => Option.some(value),
-      }),
-    }),
-})
-
-export const PronounsListboxBinding = PersonalInfoDefinition.bindChild(
+export const PronounsListboxBinding = PersonalInfoDefinition.makeBinding(
   PronounsListboxBlock,
   {
     field: 'pronouns',
     init: { contextToArgs: () => [{ id: 'pronouns' }] },
-    outMessage: { fold: foldPronounsOutMessage },
   },
-)
-
-const foldAvailableDateOutMessage = DatePickerBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  SelectedDate:
-    ({ date }) =>
-    model => ({
-      model: modifyFields(model, {
-        maybeAvailableDate: () => Option.some(date),
-      }),
-    }),
-  ClearedDate: () => model => ({
-    model: modifyFields(model, { maybeAvailableDate: () => Option.none() }),
+).withOutMessagePolicy({
+  fold: PersonalInfoDefinition.makeOutMessageFold(PronounsListboxBlock, {
+    Selected: ({ value }) =>
+      PersonalInfoDefinition.makeFieldsStep(() => ({
+        maybeSelectedPronoun: () => Option.some(value),
+      })),
   }),
-  ChangedViewMonth: () => PersonalInfoDefinition.stepNoop(),
 })
 
-export const AvailableDatePickerBinding = PersonalInfoDefinition.bindChild(
+export const AvailableDatePickerBinding = PersonalInfoDefinition.makeBinding(
   DatePickerBlock,
   {
     field: 'availableDate',
     init: {
       contextToArgs: today => [{ id: 'available-date', today, minDate: today }],
     },
-    outMessage: { fold: foldAvailableDateOutMessage },
   },
-)
+).withOutMessagePolicy({
+  fold: PersonalInfoDefinition.makeOutMessageFold(DatePickerBlock, {
+    SelectedDate: ({ date }) =>
+      PersonalInfoDefinition.makeFieldsStep(() => ({
+        maybeAvailableDate: () => Option.some(date),
+      })),
+    ClearedDate: () =>
+      PersonalInfoDefinition.makeFieldsStep(() => ({
+        maybeAvailableDate: () => Option.none(),
+      })),
+    ChangedViewMonth: PersonalInfoDefinition.makeNoopStep,
+  }),
+})
 
 export const PersonalInfoComposition = PersonalInfoDefinition.makeComposition({
   bindings: [PronounsListboxBinding, AvailableDatePickerBinding],

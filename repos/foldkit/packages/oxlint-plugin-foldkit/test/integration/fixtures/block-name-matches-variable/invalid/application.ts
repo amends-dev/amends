@@ -1,8 +1,14 @@
-import * as Application from 'foldkit/application'
-import { makeDefinition as makeApplicationDefinition } from 'foldkit/application'
+import * as Block from 'foldkit/block'
+import { makeDefinition as makeBlockDefinition } from 'foldkit/block'
 
-const WrongNamespaceImport = Application.makeDefinition({ Model, Message })
-const WrongAliasedImport = makeApplicationDefinition({ Model, Message })
+const WrongNamespaceImport = Block.makeDefinition('Application', {
+  Model,
+  Message,
+})
+const WrongAliasedImport = makeBlockDefinition('Application', {
+  Model,
+  Message,
+})
 
 void WrongNamespaceImport
 void WrongAliasedImport

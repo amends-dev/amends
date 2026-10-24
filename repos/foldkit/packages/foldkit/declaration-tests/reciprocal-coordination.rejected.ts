@@ -55,11 +55,14 @@ RoomBinding.informJoined('room-1', 'alice')
 // @ts-expect-error informJoined preserves the string Room context field.
 RoomBinding.informJoined('room-1', 'alice', { roomId: 1 })
 
-// @ts-expect-error A child with OutMessages requires an OutMessage policy.
-ApplicationDefinition.bindChild(HomeBlock, { field: 'home' })
+const PendingHomeBinding = ApplicationDefinition.makeBinding(HomeBlock, {
+  field: 'home',
+})
+// @ts-expect-error A child with OutMessages requires an OutMessage policy before Composition.
+ApplicationDefinition.makeComposition({ bindings: [PendingHomeBinding] })
 
-// @ts-expect-error A keyed child with OutMessages requires an OutMessage policy.
-ApplicationDefinition.bindChild(RoomBlock, {
+const PendingRoomBinding = ApplicationDefinition.makeBinding(RoomBlock, {
+  placement: 'pending-room',
   readAll: (model: typeof ApplicationDefinition.Model.Type) =>
     Option.toArray(model.maybeRoomInstance),
   key: (instance: typeof RoomInstance.Type) => instance.roomId,
@@ -73,18 +76,19 @@ ApplicationDefinition.bindChild(RoomBlock, {
     ) => [{ roomId }],
   },
 })
+// @ts-expect-error A keyed child with OutMessages requires an OutMessage policy before Composition.
+ApplicationDefinition.makeComposition({ bindings: [PendingRoomBinding] })
 
-// @ts-expect-error A static policy must accept every refined child OutMessage.
-ApplicationDefinition.bindChild(HomeBlock, {
+ApplicationDefinition.makeBinding(HomeBlock, {
   field: 'home',
-  outMessage: {
-    fold: (
-      _outMessage: Extract<
-        typeof HomeOutMessage.Type,
-        Readonly<{ username: 'alice' }>
-      >,
-    ) => ApplicationDefinition.step(model => ({ model })),
-  },
+}).withOutMessagePolicy({
+  // @ts-expect-error A static policy must accept every refined child OutMessage.
+  fold: (
+    _outMessage: Extract<
+      typeof HomeOutMessage.Type,
+      Readonly<{ username: 'alice' }>
+    >,
+  ) => ApplicationDefinition.makeStep(model => ({ model })),
 })
 
 // @ts-expect-error A policy-returned sibling recipe retains its required Binding.

@@ -3,6 +3,7 @@ import { expect, it, vi } from 'vitest'
 
 import { defineMessageUnion } from '../message/index.js'
 import { makeDefinition } from './define.js'
+import * as Block from './public.js'
 
 const Config = Schema.Struct({ count: Schema.Number })
 const ChildModel = Schema.Struct({ count: Schema.Number })
@@ -13,20 +14,25 @@ const Child = makeDefinition('InitRecipeSnapshotChild', {
 })
 const ChildComposition = Child.makeComposition()
 const childInitialized = vi.fn((config: typeof Config.Type) => config.count)
-const CompleteChildInit = Child.command('CompleteChildInit', {
+const CompleteChildInit = Child.makeCommand('CompleteChildInit', {
   messages: [ChildMessage.CompletedChildInit],
   handler: function* () {
     return () => Effect.succeed(ChildMessage.CompletedChildInit())
   },
 })
-const childBlock = ChildComposition.assembleBlock({
-  init: ChildComposition.makeInit((config: typeof Config.Type) => ({
-    model: ChildModel.make({ count: childInitialized(config) }),
-    commands: [CompleteChildInit()],
-  })),
-  update: ChildComposition.makeUpdate(model => ({ model })),
-  EffectsLayer: CompleteChildInit.layer,
-})
+const prepareChildBlock = () =>
+  ChildComposition.prepareBlock({
+    init: ChildComposition.makeInit((config: typeof Config.Type) => ({
+      model: ChildModel.make({ count: childInitialized(config) }),
+      commands: [CompleteChildInit()],
+    })),
+    update: ChildComposition.makeUpdate(model => ({ model })),
+    EffectsLayer: CompleteChildInit.layer,
+  })
+const childBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ChildModel,
+  typeof prepareChildBlock
+> = Block.assemble(prepareChildBlock)
 
 const ParentModel = Schema.Struct({ child: Schema.Option(ChildModel) })
 const ParentMessage = defineMessageUnion({
@@ -36,7 +42,7 @@ const Parent = makeDefinition('InitRecipeSnapshotParent', {
   Model: ParentModel,
   Message: ParentMessage,
 })
-const CompleteParentInit = Parent.command('CompleteParentInit', {
+const CompleteParentInit = Parent.makeCommand('CompleteParentInit', {
   args: { label: Schema.String },
   messages: [ParentMessage.CompletedParentInit],
   handler: function* () {
@@ -44,7 +50,7 @@ const CompleteParentInit = Parent.command('CompleteParentInit', {
       Effect.succeed(ParentMessage.CompletedParentInit({ label }))
   },
 })
-const ChildBinding = Parent.bindChild(childBlock, {
+const ChildBinding = Parent.makeBinding(childBlock, {
   field: 'child',
   init: false,
 })
@@ -97,7 +103,7 @@ const Keyed = makeDefinition('InitRecipeSnapshotKeyedParent', {
   Model: KeyedModel,
   Message: Schema.Never,
 })
-const KeyedBinding = Keyed.bindChild(childBlock, {
+const KeyedBinding = Keyed.makeBinding(childBlock, {
   field: 'items',
   key: 'id',
   childField: 'child',

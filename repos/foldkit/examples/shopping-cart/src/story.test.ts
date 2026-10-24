@@ -15,7 +15,7 @@ import { update } from './update'
 const apple = { id: '1', name: 'Apple', price: 1.5 }
 const banana = { id: '2', name: 'Banana', price: 0.75 }
 
-const baseModel: Model = {
+const baseModel: typeof Model.Type = {
   route: ApplicationRoute.Products({ searchText: Option.none() }),
   cart: [],
   deliveryInstructions: '',

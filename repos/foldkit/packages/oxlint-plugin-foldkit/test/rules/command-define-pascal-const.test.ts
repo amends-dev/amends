@@ -9,7 +9,7 @@ const commandDefineCall = (defineArguments: ReadonlyArray<unknown>) =>
 const definitionCommandCall = (
   definitionName: string,
   defineArguments: ReadonlyArray<unknown>,
-) => Testing.callOfMember(definitionName, 'command', defineArguments)
+) => Testing.callOfMember(definitionName, 'makeCommand', defineArguments)
 
 const inDeclaration = (kind: string, declarator: Record<string, unknown>) =>
   Object.assign(declarator, {
@@ -187,7 +187,7 @@ describe('command-define-pascal-const', () => {
 
     expect(result).toHaveLength(1)
     expect(result[0]?.diagnostic.message).toContain(
-      "ApplicationDefinition.command('FetchUser', ...)",
+      "ApplicationDefinition.makeCommand('FetchUser', ...)",
     )
     expect(result[0]?.diagnostic.message).toContain('not SaveUser')
   })

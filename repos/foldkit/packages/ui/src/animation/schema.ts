@@ -34,6 +34,7 @@ export const Message = defineMessageUnion({
   Hid: {},
   RequestedShow: {},
   RequestedHide: {},
+  RequestedWaitForLeaveSettlement: {},
   RequestedFinish: { generation: Schema.Number },
   RequestedToggle: {},
   RequestedResume: {},

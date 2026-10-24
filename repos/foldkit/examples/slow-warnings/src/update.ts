@@ -9,8 +9,10 @@ import { PATCH_ROW_COUNT, UPDATE_WORK_MS, burnCpu } from './workload'
 const MAX_WARNING_COUNT = 8
 
 const prependWarning =
-  (warning: SlowWarning) =>
-  (warnings: ReadonlyArray<SlowWarning>): ReadonlyArray<SlowWarning> =>
+  (warning: typeof SlowWarning.Type) =>
+  (
+    warnings: ReadonlyArray<typeof SlowWarning.Type>,
+  ): ReadonlyArray<typeof SlowWarning.Type> =>
     pipe(warnings, Array.prepend(warning), Array.take(MAX_WARNING_COUNT))
 
 export const update = ApplicationComposition.makeUpdate((model, message) =>
@@ -43,7 +45,10 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
       }),
     }),
     RecordedSlowWarning: ({ report }) => {
-      const warning: SlowWarning = { id: model.nextWarningId, ...report }
+      const warning: typeof SlowWarning.Type = {
+        id: model.nextWarningId,
+        ...report,
+      }
       return {
         model: modifyFields(model, {
           activeWorkload: () => 'Idle',

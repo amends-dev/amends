@@ -58,10 +58,10 @@ export const update = EducationEntryComposition.makeUpdate((model, message) =>
   }),
 )
 
-export const hasErrors = (entry: Model): boolean =>
+export const hasErrors = (entry: typeof Model.Type): boolean =>
   anyInvalid([entry.school, entry.degree, entry.fieldOfStudy])
 
-export const isComplete = (entry: Model): boolean =>
+export const isComplete = (entry: typeof Model.Type): boolean =>
   allValid([
     [entry.school, schoolRules],
     [entry.degree, degreeRules],

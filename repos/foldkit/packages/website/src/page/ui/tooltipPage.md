@@ -50,7 +50,7 @@ Two ViewInputs fields cover the cases a `<label for>` does not. Pass `ariaLabel`
 
 ### InitConfig {#init-config}
 
-Configuration object passed to `Tooltip.init()`.
+Configuration passed to the Tooltip Binding's child initializer. Direct completed Block calls use `Tooltip.TooltipBlock.init()`.
 
 | Name        | Type             | Default                | Description                                                                                                                                                                                                         |
 | ----------- | ---------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -91,7 +91,7 @@ Call `TooltipBinding.informShowDelayChanged(showDelay)` when parent-owned config
 
 Messages emitted to the parent through the optional `outMessage` field. They fire only on visibility transitions, so consumers don’t see spurious events for Messages that only update internal hover/focus/delay state.
 
-| Name     | Type | Default | Description                                                                                                                                                                                                 |
-| -------- | ---- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Shown`  | `{}` | —       | Emitted once the tooltip transitions to visible (isOpen becomes true). Handle it in the Binding's `outMessage.fold` policy. Useful for analytics, instrumentation, or coordinating with other transient UI. |
-| `Hidden` | `{}` | —       | Emitted once the tooltip transitions to hidden (isOpen becomes false).                                                                                                                                      |
+| Name     | Type | Default | Description                                                                                                                                                                                               |
+| -------- | ---- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Shown`  | `{}` | —       | Emitted once the tooltip transitions to visible (isOpen becomes true). Handle it in the Binding's selected `fold` policy. Useful for analytics, instrumentation, or coordinating with other transient UI. |
+| `Hidden` | `{}` | —       | Emitted once the tooltip transitions to hidden (isOpen becomes false).                                                                                                                                    |

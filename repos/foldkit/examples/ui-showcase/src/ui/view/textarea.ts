@@ -3,7 +3,6 @@ import type { Html } from 'foldkit/html'
 import { Textarea } from '@foldkit/ui'
 
 import { UiComposition } from '../composition'
-import type { UiMessage } from '../composition'
 import { Message } from '../message'
 
 const textareaClassName =
@@ -15,7 +14,7 @@ const descriptionClassName = 'text-sm text-gray-500'
 
 export const view = UiComposition.makeView((model, h) => {
   const basicTextareaView = (
-    attributes: Textarea.TextareaAttributes<UiMessage>,
+    attributes: Textarea.TextareaAttributes<typeof UiComposition.Message.Type>,
   ): Html =>
     h.div(
       [h.Class('flex flex-col gap-1.5 w-full')],
@@ -30,7 +29,7 @@ export const view = UiComposition.makeView((model, h) => {
     )
 
   const disabledTextareaView = (
-    attributes: Textarea.TextareaAttributes<UiMessage>,
+    attributes: Textarea.TextareaAttributes<typeof UiComposition.Message.Type>,
   ): Html =>
     h.div(
       [h.Class('flex flex-col gap-1.5 max-w-sm')],

@@ -447,25 +447,30 @@ const makeHostQuery = <Name extends string, A, AI, E, EI>(
     Model,
     Message,
   })
-  const Fetch = QueryDefinition.command('Fetch', {
+  const Fetch = QueryDefinition.makeCommand('Fetch', {
     args: { generation: Schema.Number },
     messages: [Message.CompletedFetch],
   })
   const api = makeQueryApi(config, Model, Message, Fetch)
   const QueryComposition = QueryDefinition.makeComposition()
   const init = QueryComposition.makeInit(api.init)
-  const block = QueryComposition.assembleBlock({
-    init,
-    update: QueryComposition.makeUpdate(api.update),
-    operations: {
-      requestReset: Message.RequestedReset,
-      requestRevalidation: Message.RequestedRevalidation,
-      requestRevalidationOrLoad: Message.RequestedRevalidationOrLoad,
-      requestLoadIfMissing: Message.RequestedLoadIfMissing,
-    },
-    EffectsLayer: Layer.empty,
-    hostHandlers: [Fetch],
-  })
+  const prepare = () =>
+    QueryComposition.prepareBlock({
+      init,
+      update: QueryComposition.makeUpdate(api.update),
+      operations: {
+        requestReset: Message.RequestedReset,
+        requestRevalidation: Message.RequestedRevalidation,
+        requestRevalidationOrLoad: Message.RequestedRevalidationOrLoad,
+        requestLoadIfMissing: Message.RequestedLoadIfMissing,
+      },
+      EffectsLayer: Layer.empty,
+      hostHandlers: [Fetch],
+    })
+  const block: Block.FromAssemblyWithoutViewOrOutMessage<
+    typeof Model,
+    typeof prepare
+  > = Block.assemble(prepare)
 
   return enrichQuery(block, {
     Fetch,
@@ -510,24 +515,29 @@ const makeCanonicalQuery = <
     Model,
     Message,
   })
-  const Fetch = QueryDefinition.command('Fetch', {
+  const Fetch = QueryDefinition.makeCommand('Fetch', {
     args: { generation: Schema.Number },
     messages: [Message.CompletedFetch],
   })
   const api = makeQueryApi(config, Model, Message, Fetch)
   const QueryComposition = QueryDefinition.makeComposition()
   const init = QueryComposition.makeInit(api.init)
-  const block = QueryComposition.assembleBlock({
-    init,
-    update: QueryComposition.makeUpdate(api.update),
-    operations: {
-      requestReset: Message.RequestedReset,
-      requestRevalidation: Message.RequestedRevalidation,
-      requestRevalidationOrLoad: Message.RequestedRevalidationOrLoad,
-      requestLoadIfMissing: Message.RequestedLoadIfMissing,
-    },
-    EffectsLayer: api.toLayer(handler),
-  })
+  const prepare = () =>
+    QueryComposition.prepareBlock({
+      init,
+      update: QueryComposition.makeUpdate(api.update),
+      operations: {
+        requestReset: Message.RequestedReset,
+        requestRevalidation: Message.RequestedRevalidation,
+        requestRevalidationOrLoad: Message.RequestedRevalidationOrLoad,
+        requestLoadIfMissing: Message.RequestedLoadIfMissing,
+      },
+      EffectsLayer: api.toLayer(handler),
+    })
+  const block: Block.FromAssemblyWithoutViewOrOutMessage<
+    typeof Model,
+    typeof prepare
+  > = Block.assemble(prepare)
 
   return enrichQuery(block, {
     Fetch,

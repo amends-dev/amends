@@ -53,7 +53,7 @@ const objectLiteralToString = (
   )
 
 const callSignatureToString = (
-  signature: TypeDocSignature,
+  signature: typeof TypeDocSignature.Type,
   depth: number,
   namedSchemas: NamedSchemas,
 ): string => {

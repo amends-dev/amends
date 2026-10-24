@@ -5,4 +5,3 @@ export const TopLevelRoute = ApplicationRoute.subset([
   'Newsletter',
   'NotFound',
 ])
-export type TopLevelRoute = typeof TopLevelRoute.Type

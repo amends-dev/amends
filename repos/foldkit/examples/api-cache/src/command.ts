@@ -5,7 +5,7 @@ import { ApplicationDefinition } from './definition'
 import { Message } from './message'
 import { FetchedPostDetail, FetchedPosts, FetchedStats } from './model'
 
-export const FetchPosts = ApplicationDefinition.command('FetchPosts', {
+export const FetchPosts = ApplicationDefinition.makeCommand('FetchPosts', {
   messages: [Message.CompletedFetchPosts],
   handler: function* () {
     const clock = yield* Clock.Clock
@@ -24,7 +24,7 @@ export const FetchPosts = ApplicationDefinition.command('FetchPosts', {
   },
 })
 
-export const FetchPostDetail = ApplicationDefinition.command(
+export const FetchPostDetail = ApplicationDefinition.makeCommand(
   'FetchPostDetail',
   {
     args: { postId: Schema.String },
@@ -49,7 +49,7 @@ export const FetchPostDetail = ApplicationDefinition.command(
   },
 )
 
-export const FetchStats = ApplicationDefinition.command('FetchStats', {
+export const FetchStats = ApplicationDefinition.makeCommand('FetchStats', {
   messages: [Message.CompletedFetchStats],
   handler: function* () {
     const clock = yield* Clock.Clock

@@ -11,7 +11,7 @@ import {
   type Return,
   type ReturnWithOutMessage,
   type Step,
-  combine,
+  combineSteps,
   define,
   defineStep,
   foldChild,
@@ -322,11 +322,11 @@ describe('defineStep', () => {
   })
 })
 
-describe('combine inference', () => {
+describe('combineSteps inference', () => {
   it('unions Message and handler requirements across heterogeneous Steps', () => {
-    const combined = combine([loadProfileStep, loadPreferencesStep])
+    const combined = combineSteps([loadProfileStep, loadPreferencesStep])
     const model = Model.make({ count: 0 })
-    const result = combine(model, [loadProfileStep, loadPreferencesStep])
+    const result = combineSteps(model, [loadProfileStep, loadPreferencesStep])
 
     expectTypeOf(combined).toEqualTypeOf<
       Step<
@@ -354,15 +354,15 @@ describe('combine inference', () => {
 
   it('validates every Model return and rejects OutMessages', () => {
     if (false) {
-      combine([
+      combineSteps([
         loadProfileStep,
         // @ts-expect-error Every Step must return the shared Model.
         (_model: Model) => ({ model: 'wrong' }),
       ])
 
-      combine([
+      combineSteps([
         loadProfileStep,
-        // @ts-expect-error combine cannot discard an OutMessage.
+        // @ts-expect-error combineSteps cannot discard an OutMessage.
         outwardStep,
       ])
     }

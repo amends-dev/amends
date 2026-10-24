@@ -12,14 +12,17 @@ import { errorPanel, loadingPanel, toolbarButtonClassName } from './shared'
 const formatFetchedAt = (fetchedAt: number): string =>
   new Date(fetchedAt).toLocaleTimeString()
 
-export const postsTabView = (model: Model, h: ApplicationViewBuilder) =>
+export const postsTabView = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+) =>
   Option.match(model.maybeSelectedPostId, {
     onNone: () =>
       h.section([h.Class('flex flex-col gap-4')], [postsListView(model, h)]),
     onSome: postId => postDetailSection({ model, postId }, h),
   })
 
-const postsListView = (model: Model, h: ApplicationViewBuilder) => {
+const postsListView = (model: typeof Model.Type, h: ApplicationViewBuilder) => {
   const isPending = AsyncData.isPending(model.posts)
 
   return h.div(
@@ -86,14 +89,14 @@ const postsListView = (model: Model, h: ApplicationViewBuilder) => {
 }
 
 const isPostDetailCached = (
-  postDetailById: HashMap.HashMap<string, PostDetailData>,
+  postDetailById: HashMap.HashMap<string, typeof PostDetailData.schema.Type>,
   postId: string,
 ): boolean =>
   Option.exists(HashMap.get(postDetailById, postId), AsyncData.hasData)
 
 type PostListItemsInput = Readonly<{
-  posts: ReadonlyArray<Post>
-  postDetailById: HashMap.HashMap<string, PostDetailData>
+  posts: ReadonlyArray<typeof Post.Type>
+  postDetailById: HashMap.HashMap<string, typeof PostDetailData.schema.Type>
 }>
 
 const postListItems = (
@@ -149,7 +152,7 @@ const postListItems = (
     ),
   )
 
-type PostDetailInput = Readonly<{ model: Model; postId: string }>
+type PostDetailInput = Readonly<{ model: typeof Model.Type; postId: string }>
 
 const postDetailSection = (
   { model, postId }: PostDetailInput,
@@ -227,7 +230,7 @@ const postDetailView = (
 }
 
 type PostDetailCardInput = Readonly<{
-  detail: PostDetail
+  detail: typeof PostDetail.Type
   fetchedAt: number
 }>
 

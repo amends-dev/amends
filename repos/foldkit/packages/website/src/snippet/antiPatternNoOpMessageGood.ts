@@ -5,7 +5,6 @@ import { defineMessageUnion } from 'foldkit/message'
 const Message = defineMessageUnion({
   IgnoredMouseClick: {},
 })
-type Message = typeof Message.Type
 
 const handleMouseClick = () => Message.IgnoredMouseClick()
 

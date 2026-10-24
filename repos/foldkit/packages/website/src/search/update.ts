@@ -16,7 +16,7 @@ const MAX_RESULTS = 8
 
 const SEARCH_RESULT_SELECTOR = '[data-search-result-index='
 
-export const FetchSearchResults = SearchDefinition.command(
+export const FetchSearchResults = SearchDefinition.makeCommand(
   'FetchSearchResults',
   {
     args: { query: Schema.String },
@@ -60,7 +60,7 @@ export const FetchSearchResults = SearchDefinition.command(
   },
 )
 
-export const ScrollToResult = SearchDefinition.command('ScrollToResult', {
+export const ScrollToResult = SearchDefinition.makeCommand('ScrollToResult', {
   args: { index: Schema.Number },
   messages: [Message.CompletedScrollToResult],
   handler: function* () {
@@ -72,33 +72,36 @@ export const ScrollToResult = SearchDefinition.command('ScrollToResult', {
   },
 })
 
-export const NavigateToResult = SearchDefinition.command('NavigateToResult', {
-  args: { url: Schema.String },
-  messages: [Message.CompletedNavigateToResult],
-  handler: function* () {
-    return ({ url }) =>
-      pushUrl(url).pipe(Effect.as(Message.CompletedNavigateToResult()))
+export const NavigateToResult = SearchDefinition.makeCommand(
+  'NavigateToResult',
+  {
+    args: { url: Schema.String },
+    messages: [Message.CompletedNavigateToResult],
+    handler: function* () {
+      return ({ url }) =>
+        pushUrl(url).pipe(Effect.as(Message.CompletedNavigateToResult()))
+    },
   },
-})
+)
 
-export const FocusSearchInput = SearchDefinition.command('FocusSearchInput', {
-  messages: [Message.CompletedFocusSearchInput],
-  handler: function* () {
-    return () =>
-      Dom.focus(`#${SEARCH_INPUT_ID}`).pipe(
-        Effect.ignore,
-        Effect.as(Message.CompletedFocusSearchInput()),
-      )
+export const FocusSearchInput = SearchDefinition.makeCommand(
+  'FocusSearchInput',
+  {
+    messages: [Message.CompletedFocusSearchInput],
+    handler: function* () {
+      return () =>
+        Dom.focus(`#${SEARCH_INPUT_ID}`).pipe(
+          Effect.ignore,
+          Effect.as(Message.CompletedFocusSearchInput()),
+        )
+    },
   },
-})
+)
 
-const focusSearchInput = SearchDefinition.step(model => ({
-  model,
-  commands: [FocusSearchInput()],
-}))
+const focusSearchInput = SearchDefinition.makeCommandsStep([FocusSearchInput()])
 
-const open = SearchDefinition.step(() =>
-  Update.combine([DialogBinding.requestOpen(), focusSearchInput]),
+const open = SearchDefinition.makeStep(() =>
+  Update.combineSteps([DialogBinding.requestOpen(), focusSearchInput]),
 )
 
 export const update = SearchComposition.makeUpdate((model, message) =>
@@ -157,7 +160,10 @@ export const update = SearchComposition.makeUpdate((model, message) =>
     RequestedOpen: () => open(model),
 
     InformedOfRouteChange: () =>
-      Update.combine(model, [clearSearchQuery, DialogBinding.requestClose()]),
+      Update.combineSteps(model, [
+        clearSearchQuery,
+        DialogBinding.requestClose(),
+      ]),
 
     PressedArrowKey: ({ direction }) => {
       const results = resultsFromState(model.searchState)

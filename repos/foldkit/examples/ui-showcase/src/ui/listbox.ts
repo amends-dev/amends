@@ -7,6 +7,7 @@ export type Character = Readonly<{
   lastName: string
 }>
 
-export const ItemListboxBlock = Listbox.create<ListboxItem>()
-export const ItemMultiListboxBlock = Listbox.Multi.create<ListboxItem>()
+export const ItemListboxBlock = Listbox.create<typeof ListboxItem.Type>()
+export const ItemMultiListboxBlock =
+  Listbox.Multi.create<typeof ListboxItem.Type>()
 export const CharacterListboxBlock = Listbox.create<Character>()

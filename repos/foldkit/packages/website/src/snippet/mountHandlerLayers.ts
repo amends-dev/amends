@@ -10,7 +10,7 @@ const Message = defineMessageUnion({
 
 const PanelDefinition = Block.makeDefinition('Panel', { Model, Message })
 
-const MeasurePanel = PanelDefinition.mount('MeasurePanel', {
+const MeasurePanel = PanelDefinition.makeMount('MeasurePanel', {
   messages: [Message.CompletedMeasurePanel],
   handler: function* () {
     return ({ element }) =>
@@ -53,9 +53,14 @@ const init = PanelComposition.makeInit(() => ({
   model: Model.make({ panelHeight: Option.none() }),
 }))
 
-export const PanelBlock = PanelComposition.assembleBlock({
-  init,
-  update,
-  view,
-  EffectsLayer: MeasurePanel.layer,
-})
+const prepare = () =>
+  PanelComposition.prepareBlock({
+    init,
+    update,
+    view,
+    EffectsLayer: MeasurePanel.layer,
+  })
+export const PanelBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

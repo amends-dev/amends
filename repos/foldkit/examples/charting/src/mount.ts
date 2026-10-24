@@ -115,7 +115,7 @@ const mountChart = (
     ),
   )
 
-export const MountChart = ApplicationDefinition.mountStream('MountChart', {
+export const MountChart = ApplicationDefinition.makeMountStream('MountChart', {
   args: { hostId: Schema.String },
   messages: [
     Message.SucceededMountChart,

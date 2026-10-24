@@ -553,10 +553,10 @@ export interface DefineResource<Id extends string> {
 /** The public authoring namespace for one static Block identity. */
 export interface Named<Id extends string, Concrete extends boolean = true> {
   readonly define: DefineBlock<Owner<Id, Concrete>>
-  readonly command: DefineCommand<Id>
-  readonly mount: DefineMount<Id>
-  readonly mountStream: DefineMountStream<Id>
-  readonly resource: DefineResource<Id>
+  readonly makeCommand: DefineCommand<Id>
+  readonly makeMount: DefineMount<Id>
+  readonly makeMountStream: DefineMountStream<Id>
+  readonly makeResource: DefineResource<Id>
 }
 
 /** @internal Creates one identity and its owned primitive declarations. */
@@ -619,9 +619,9 @@ export function makeAuthoringContext(id: string): Named<any, any> {
 
   return Object.assign(owner, {
     define,
-    command,
-    mount,
-    mountStream,
-    resource,
+    makeCommand: command,
+    makeMount: mount,
+    makeMountStream: mountStream,
+    makeResource: resource,
   })
 }

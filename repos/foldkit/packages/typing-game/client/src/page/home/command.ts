@@ -6,7 +6,7 @@ import { RoomsClient } from '../../rpc'
 import { HomeDefinition } from './definition'
 import { Message } from './message'
 
-export const CreateRoom = HomeDefinition.command('CreateRoom', {
+export const CreateRoom = HomeDefinition.makeCommand('CreateRoom', {
   args: { username: Schema.String },
   messages: [Message.SucceededCreateRoom, Message.FailedCreateRoom],
   handler: function* () {
@@ -24,7 +24,7 @@ export const CreateRoom = HomeDefinition.command('CreateRoom', {
   },
 })
 
-export const JoinRoomFromHome = HomeDefinition.command('JoinRoomFromHome', {
+export const JoinRoomFromHome = HomeDefinition.makeCommand('JoinRoomFromHome', {
   args: { username: Schema.String, roomId: Schema.String },
   messages: [Message.SucceededJoinRoomFromHome, Message.FailedJoinRoomFromHome],
   handler: function* () {
@@ -44,18 +44,21 @@ export const JoinRoomFromHome = HomeDefinition.command('JoinRoomFromHome', {
   },
 })
 
-export const FocusUsernameInput = HomeDefinition.command('FocusUsernameInput', {
-  messages: [Message.CompletedFocusUsernameInput],
-  handler: function* () {
-    return () =>
-      Dom.focus(`#${USERNAME_INPUT_ID}`).pipe(
-        Effect.ignore,
-        Effect.as(Message.CompletedFocusUsernameInput()),
-      )
+export const FocusUsernameInput = HomeDefinition.makeCommand(
+  'FocusUsernameInput',
+  {
+    messages: [Message.CompletedFocusUsernameInput],
+    handler: function* () {
+      return () =>
+        Dom.focus(`#${USERNAME_INPUT_ID}`).pipe(
+          Effect.ignore,
+          Effect.as(Message.CompletedFocusUsernameInput()),
+        )
+    },
   },
-})
+)
 
-export const FocusRoomIdInput = HomeDefinition.command('FocusRoomIdInput', {
+export const FocusRoomIdInput = HomeDefinition.makeCommand('FocusRoomIdInput', {
   messages: [Message.CompletedFocusRoomIdInput],
   handler: function* () {
     return () =>

@@ -47,7 +47,7 @@ const isSectionCurrent =
 // carries aria-current="page" and a data-current attribute for styling.
 // Browser-native Tab and Enter handle keyboard navigation; Foldkit's runtime
 // turns the link clicks into route changes:
-const view = (model: Model, h: HtmlBuilder<Message>) => {
+const view = (model: typeof Model.Type, h: HtmlBuilder<Message>) => {
   const navView = ({ nav, items }: Nav.RenderInfo<Section>) =>
     h.nav(
       [...nav, h.Class('flex gap-2')],

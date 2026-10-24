@@ -116,7 +116,7 @@ const DeclarationQueryParentDefinition = Block.makeDefinition(
   },
 )
 
-export const NotesChildBinding = DeclarationQueryParentDefinition.bindChild(
+export const NotesChildBinding = DeclarationQueryParentDefinition.makeBinding(
   Notes,
   {
     field: 'notes',

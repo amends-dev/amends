@@ -249,7 +249,7 @@ const parametersArgumentAt = (
   })
 }
 
-const applicationViewDefinitionPath = (
+const viewDefinitionPath = (
   references: WeakMap<ESTree.Node, Reference>,
   builderType: unknown,
 ): Option.Option<ImportedMessagePath> =>
@@ -330,12 +330,9 @@ const directOwnedBuilderDefinitionPath = (
   references: WeakMap<ESTree.Node, Reference>,
   typeAnnotation: unknown,
 ): Option.Option<ImportedMessagePath> => {
-  const applicationViewPath = applicationViewDefinitionPath(
-    references,
-    typeAnnotation,
-  )
-  if (Option.isSome(applicationViewPath)) {
-    return applicationViewPath
+  const viewPath = viewDefinitionPath(references, typeAnnotation)
+  if (Option.isSome(viewPath)) {
+    return viewPath
   }
 
   return compositionHtmlBuilderDefinitionPath(references, typeAnnotation)
@@ -404,15 +401,15 @@ type DefinitionOperation = Readonly<{
   importedDefinitionPath: ImportedMessagePath | undefined
   members: ReadonlyArray<string>
   operation:
-    | 'bindChild'
-    | 'command'
-    | 'managedResources'
-    | 'mount'
-    | 'mountStream'
+    | 'makeBinding'
+    | 'makeCommand'
+    | 'makeManagedResources'
+    | 'makeMount'
+    | 'makeMountStream'
     | 'render'
-    | 'resource'
-    | 'step'
-    | 'subscriptions'
+    | 'makeResource'
+    | 'makeStep'
+    | 'makeSubscriptions'
     | 'update'
     | 'view'
   root: ESTree.IdentifierReference
@@ -435,15 +432,15 @@ const definitionOperationName = (
     return 'view'
   }
   if (
-    method === 'bindChild' ||
-    method === 'command' ||
-    method === 'managedResources' ||
-    method === 'mount' ||
-    method === 'mountStream' ||
+    method === 'makeBinding' ||
+    method === 'makeCommand' ||
+    method === 'makeManagedResources' ||
+    method === 'makeMount' ||
+    method === 'makeMountStream' ||
     method === 'render' ||
-    method === 'resource' ||
-    method === 'step' ||
-    method === 'subscriptions'
+    method === 'makeResource' ||
+    method === 'makeStep' ||
+    method === 'makeSubscriptions'
   ) {
     return method
   }
@@ -906,11 +903,8 @@ const importedOperationOwnsMessage = (
           operation,
           Option.fromNullishOr(previousOperation),
         ) !== undefined
-      const isCompletion =
-        operation === 'assembleApplication' ||
-        operation === 'assembleBlock' ||
-        operation === 'assembleElement'
-      if (!isDefinitionOperation && !isViewWithInputs && !isCompletion) {
+      const isPreparation = operation === 'prepareBlock'
+      if (!isDefinitionOperation && !isViewWithInputs && !isPreparation) {
         return false
       }
 
