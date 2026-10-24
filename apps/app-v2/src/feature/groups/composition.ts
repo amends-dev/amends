@@ -17,32 +17,32 @@ import {
 
 /** The dialog closing, by the person or by the form's own submit, ends what was being started. */
 const foldDialogOutMessage = DialogBlock.OutMessage.match({
-  Opened: () => GroupsDefinition.stepNoop(),
+  Opened: () => GroupsDefinition.makeNoopStep(),
   Closed: () =>
-    Update.combine([
-      GroupsDefinition.stepFields(() => ({ starting: () => Option.none() })),
+    Update.combineSteps([
+      GroupsDefinition.makeFieldsStep(() => ({ starting: () => Option.none() })),
       MembersBinding.requestClose()
     ]),
-  CompletedClose: () => GroupsDefinition.stepNoop()
+  CompletedClose: () => GroupsDefinition.makeNoopStep()
 })
 
-export const DialogBinding = GroupsDefinition.bindChild(DialogBlock, {
+export const DialogBinding = GroupsDefinition.makeBinding(DialogBlock, {
   field: "dialog",
-  init: { contextToArgs: () => [{ id: "groups-starting" }] },
-  outMessage: { fold: foldDialogOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "groups-starting" }] }
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
 /** The visibility chosen is the new team's. */
 const foldVisibilityOutMessage = VisibilityRadioGroupBlock.OutMessage.match({
   Selected: ({ value }) =>
-    GroupsDefinition.step((model: Model) => ({ model: withTeam(model, (team) => ({ ...team, visibility: value })) }))
+    GroupsDefinition.makeStep((model: Model) => ({
+      model: withTeam(model, (team) => ({ ...team, visibility: value }))
+    }))
 })
 
-export const VisibilityBinding = GroupsDefinition.bindChild(VisibilityRadioGroupBlock, {
+export const VisibilityBinding = GroupsDefinition.makeBinding(VisibilityRadioGroupBlock, {
   field: "visibilityGroup",
-  init: { contextToArgs: () => [{ id: teamVisibilityId }] },
-  outMessage: { fold: foldVisibilityOutMessage }
-})
+  init: { contextToArgs: () => [{ id: teamVisibilityId }] }
+}).withOutMessagePolicy({ fold: foldVisibilityOutMessage })
 
 /**
  * Choosing a member adds them to the team or the conversation being started, unless they are not one of the people who
@@ -51,8 +51,8 @@ export const VisibilityBinding = GroupsDefinition.bindChild(VisibilityRadioGroup
  */
 const foldMembersOutMessage = MembersComboboxBlock.OutMessage.match({
   Selected: ({ value }) =>
-    Update.combine([
-      GroupsDefinition.step((model: Model) => {
+    Update.combineSteps([
+      GroupsDefinition.makeStep((model: Model) => {
         const member = others(model).find(({ id }) => id === value)
 
         return {
@@ -69,14 +69,13 @@ const foldMembersOutMessage = MembersComboboxBlock.OutMessage.match({
       MembersBinding.requestClose(),
       MembersBinding.requestOpen()
     ]),
-  ClearedSelection: () => GroupsDefinition.stepNoop()
+  ClearedSelection: () => GroupsDefinition.makeNoopStep()
 })
 
-export const MembersBinding = GroupsDefinition.bindChild(MembersComboboxBlock, {
+export const MembersBinding = GroupsDefinition.makeBinding(MembersComboboxBlock, {
   field: "membersCombobox",
-  init: { contextToArgs: () => [{ id: startingMembersId }] },
-  outMessage: { fold: foldMembersOutMessage }
-})
+  init: { contextToArgs: () => [{ id: startingMembersId }] }
+}).withOutMessagePolicy({ fold: foldMembersOutMessage })
 
 export const GroupsComposition = GroupsDefinition.makeComposition({
   bindings: [DialogBinding, VisibilityBinding, MembersBinding]

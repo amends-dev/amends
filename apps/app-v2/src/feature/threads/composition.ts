@@ -12,10 +12,10 @@ import { type Model, OutMessage, TaskSortMenu, ThreadsDefinition } from "./defin
  * their typing changes nothing here, and a slash command they run is for whoever holds the threads.
  */
 const foldComposerOutMessage = ComposerBlock.OutMessage.match({
-  ChangedText: () => ThreadsDefinition.stepNoop(),
-  RanSlashCommand: () => ThreadsDefinition.stepNoop(),
+  ChangedText: () => ThreadsDefinition.makeNoopStep(),
+  RanSlashCommand: () => ThreadsDefinition.makeNoopStep(),
   SubmittedText: ({ text }) =>
-    ThreadsDefinition.step((model: Model) => ({
+    ThreadsDefinition.makeStep((model: Model) => ({
       model,
       commands: [
         StartThread({
@@ -36,7 +36,7 @@ const forwardComposerOutMessage = ComposerBlock.OutMessage.match({
   RanSlashCommand: ({ command }) => OutMessage.RanSlashCommand({ command })
 })
 
-export const ComposerBinding = ThreadsDefinition.bindChild(ComposerBlock, {
+export const ComposerBinding = ThreadsDefinition.makeBinding(ComposerBlock, {
   field: "composer",
   init: {
     contextToArgs: ({ workspaceId, memberId, groupId }) => [
@@ -44,48 +44,46 @@ export const ComposerBinding = ThreadsDefinition.bindChild(ComposerBlock, {
       memberId,
       Drafts.Place.cases.Thread.make({ groupId })
     ]
-  },
-  outMessage: { forward: forwardComposerOutMessage, fold: foldComposerOutMessage }
-})
+  }
+}).withOutMessagePolicy({ forward: forwardComposerOutMessage, fold: foldComposerOutMessage })
 
-export const StatusBinding = ThreadsDefinition.bindChild(StatusFilterMenu, {
+export const StatusBinding = ThreadsDefinition.makeBinding(StatusFilterMenu, {
   field: "statusMenu",
-  init: { contextToArgs: () => [{ id: "group-tasks-status" }] },
-  outMessage: {
-    /** Choosing a status narrows the Tasks tab to it. */
-    fold: StatusFilterMenu.OutMessage.match({
-      Selected: ({ value }) =>
-        ThreadsDefinition.stepFields(() => ({ taskFilter: (filter) => modifyFields(filter, { status: () => value }) })),
-      Closed: () => ThreadsDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "group-tasks-status" }] }
+}).withOutMessagePolicy({
+  /** Choosing a status narrows the Tasks tab to it. */
+  fold: StatusFilterMenu.OutMessage.match({
+    Selected: ({ value }) =>
+      ThreadsDefinition.makeFieldsStep(() => ({
+        taskFilter: (filter) => modifyFields(filter, { status: () => value })
+      })),
+    Closed: () => ThreadsDefinition.makeNoopStep()
+  })
 })
 
-export const AssigneeBinding = ThreadsDefinition.bindChild(AssigneeMenu, {
+export const AssigneeBinding = ThreadsDefinition.makeBinding(AssigneeMenu, {
   field: "assigneeMenu",
-  init: { contextToArgs: () => [{ id: "group-tasks-assignee" }] },
-  outMessage: {
-    /** Choosing whom the tasks are assigned to narrows the Tasks tab to them. */
-    fold: AssigneeMenu.OutMessage.match({
-      Selected: ({ value }) =>
-        ThreadsDefinition.stepFields(() => ({
-          taskFilter: (filter) => modifyFields(filter, { assignee: () => assigneeFilterOf(value) })
-        })),
-      Closed: () => ThreadsDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "group-tasks-assignee" }] }
+}).withOutMessagePolicy({
+  /** Choosing whom the tasks are assigned to narrows the Tasks tab to them. */
+  fold: AssigneeMenu.OutMessage.match({
+    Selected: ({ value }) =>
+      ThreadsDefinition.makeFieldsStep(() => ({
+        taskFilter: (filter) => modifyFields(filter, { assignee: () => assigneeFilterOf(value) })
+      })),
+    Closed: () => ThreadsDefinition.makeNoopStep()
+  })
 })
 
-export const SortBinding = ThreadsDefinition.bindChild(TaskSortMenu, {
+export const SortBinding = ThreadsDefinition.makeBinding(TaskSortMenu, {
   field: "sortMenu",
-  init: { contextToArgs: () => [{ id: "group-tasks-sort" }] },
-  outMessage: {
-    /** Choosing an order orders the Tasks tab by it. */
-    fold: TaskSortMenu.OutMessage.match({
-      Selected: ({ value }) => ThreadsDefinition.stepFields(() => ({ taskSort: () => value })),
-      Closed: () => ThreadsDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "group-tasks-sort" }] }
+}).withOutMessagePolicy({
+  /** Choosing an order orders the Tasks tab by it. */
+  fold: TaskSortMenu.OutMessage.match({
+    Selected: ({ value }) => ThreadsDefinition.makeFieldsStep(() => ({ taskSort: () => value })),
+    Closed: () => ThreadsDefinition.makeNoopStep()
+  })
 })
 
 export const ThreadsComposition = ThreadsDefinition.makeComposition({

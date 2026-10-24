@@ -12,7 +12,7 @@ import * as Stream from "effect/Stream"
 import * as Stores from "../../store/Stores.ts"
 import { GroupDefinition, Message } from "./definition.ts"
 
-export const subscriptions = GroupDefinition.subscriptions((entry) => ({
+export const subscriptions = GroupDefinition.makeSubscriptions((entry) => ({
   group: entry(
     "ReadGroup",
     {

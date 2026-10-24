@@ -2,8 +2,9 @@
  * Boot the workshop in the page's `#root`.
  */
 
-import { Runtime } from "foldkit"
+import { Block, Program, Runtime } from "foldkit"
 import { ApplicationComposition } from "./composition.ts"
+import type { Model } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 import {
@@ -29,12 +30,13 @@ const framedViews = new Map([
 
 const framedView = frame === null ? undefined : framedViews.get(frame)
 
-const application = ApplicationComposition.assembleApplication({
-  init,
-  update,
-  view: framedView ?? view,
+const prepare = () => ApplicationComposition.prepareBlock({ init, update, view: framedView ?? view })
+const ApplicationBlock: Block.FromAssemblyWithView<typeof Model, typeof prepare> = Block.assemble(prepare)
+
+const program = Program.make({
+  block: ApplicationBlock,
   container: document.getElementById("root"),
-  devTools: framedView === undefined ? { Message: ApplicationComposition.Message } : false
+  devTools: framedView === undefined ? { dispatch: true } : false
 })
 
-Runtime.run(application)
+Runtime.run(program)

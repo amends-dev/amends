@@ -70,11 +70,10 @@ const HostDefinition = Block.makeDefinition("ComposerConsumer", {
   Message: Schema.Never,
   OutMessage: ComposerBlock.OutMessage
 })
-const ComposerBinding = HostDefinition.bindChild(ComposerBlock, {
+const ComposerBinding = HostDefinition.makeBinding(ComposerBlock, {
   field: "composer",
-  init: false,
-  outMessage: { forward: (message) => message }
-})
+  init: false
+}).withOutMessagePolicy({ forward: (message) => message })
 const HostComposition = HostDefinition.makeComposition({ bindings: [ComposerBinding] })
 const update = HostComposition.makeUpdate()
 const place = Drafts.Place.cases.Reply.make({ threadId: thread.id })

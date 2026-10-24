@@ -16,7 +16,7 @@ const written = [Message.WroteAction, Message.FailedWriteAction]
 const failed = (error: string) => Message.FailedWriteAction({ error })
 
 /** Add a channel over `connectionId`, opening its conversations in `groupId`, as tasks or not. */
-export const CreateChannel = ChannelsDefinition.command("CreateChannel", {
+export const CreateChannel = ChannelsDefinition.makeCommand("CreateChannel", {
   args: {
     ...Stores.AsMember,
     connectionId: Schema.String,
@@ -40,7 +40,7 @@ export const CreateChannel = ChannelsDefinition.command("CreateChannel", {
 })
 
 /** Open the conversations to come of `channelId` in `groupId`. */
-export const RedirectChannel = ChannelsDefinition.command("RedirectChannel", {
+export const RedirectChannel = ChannelsDefinition.makeCommand("RedirectChannel", {
   args: { ...Stores.AsMember, channelId: ChannelId.ChannelId, groupId: Schema.String },
   messages: written,
   handler: function* () {
@@ -58,7 +58,7 @@ export const RedirectChannel = ChannelsDefinition.command("RedirectChannel", {
 })
 
 /** Remove `channelId` from the workspace. */
-export const RemoveChannel = ChannelsDefinition.command("RemoveChannel", {
+export const RemoveChannel = ChannelsDefinition.makeCommand("RemoveChannel", {
   args: { ...Stores.AsMember, channelId: ChannelId.ChannelId },
   messages: written,
   handler: function* () {

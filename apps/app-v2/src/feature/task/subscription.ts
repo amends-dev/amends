@@ -12,7 +12,7 @@ import * as Stream from "effect/Stream"
 import * as Stores from "../../store/Stores.ts"
 import { Message, TaskDefinition } from "./definition.ts"
 
-export const subscriptions = TaskDefinition.subscriptions((entry) => ({
+export const subscriptions = TaskDefinition.makeSubscriptions((entry) => ({
   task: entry(
     "ReadTask",
     { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, threadId: ThreadId.ThreadId },

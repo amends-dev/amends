@@ -84,7 +84,7 @@ export const failureOf = (action: ConnectionsAction, error: unknown): Failure =>
 }
 
 /** Rename `connectionId` to `name`, from the name the person saw. */
-export const RenameConnection = ConnectionsDefinition.command("RenameConnection", {
+export const RenameConnection = ConnectionsDefinition.makeCommand("RenameConnection", {
   args: {
     ...Stores.AsMember,
     connectionId: ConnectionContract.ConnectionId,
@@ -109,7 +109,7 @@ export const RenameConnection = ConnectionsDefinition.command("RenameConnection"
 })
 
 /** Replace the settings of `connectionId` with `settings`. */
-export const ConfigureConnection = ConnectionsDefinition.command("ConfigureConnection", {
+export const ConfigureConnection = ConnectionsDefinition.makeCommand("ConfigureConnection", {
   args: { ...Stores.AsMember, connectionId: ConnectionContract.ConnectionId, settings: Connection.Settings },
   messages: outcomes,
   handler: function* () {
@@ -129,7 +129,7 @@ export const ConfigureConnection = ConnectionsDefinition.command("ConfigureConne
 })
 
 /** Remove `connectionId` from the workspace. */
-export const RemoveConnection = ConnectionsDefinition.command("RemoveConnection", {
+export const RemoveConnection = ConnectionsDefinition.makeCommand("RemoveConnection", {
   args: { ...Stores.AsMember, connectionId: ConnectionContract.ConnectionId },
   messages: outcomes,
   handler: function* () {
@@ -155,7 +155,7 @@ const newRequestKey = Effect.gen(function* () {
  * returns the connection the first made, and not a second; a `key` is the one an earlier attempt sent, and none
  * starts a new request.
  */
-export const AddConnection = ConnectionsDefinition.command("AddConnection", {
+export const AddConnection = ConnectionsDefinition.makeCommand("AddConnection", {
   args: {
     workspaceId: WorkspaceId.WorkspaceId,
     integration: Schema.String,
@@ -198,7 +198,7 @@ export const AddConnection = ConnectionsDefinition.command("AddConnection", {
 })
 
 /** Replace the key of `connectionId` with `apiKey`. */
-export const ReplaceConnectionKey = ConnectionsDefinition.command("ReplaceConnectionKey", {
+export const ReplaceConnectionKey = ConnectionsDefinition.makeCommand("ReplaceConnectionKey", {
   args: { workspaceId: WorkspaceId.WorkspaceId, connectionId: ConnectionContract.ConnectionId, apiKey: Schema.String },
   messages: [Message.ReplacedConnectionKey, Message.FailedReplaceConnectionKey],
   handler: function* () {
@@ -228,7 +228,7 @@ export const ReplaceConnectionKey = ConnectionsDefinition.command("ReplaceConnec
 })
 
 /** Check `connectionId` with its system: whether it answers, and accepts the connection's key. */
-export const CheckConnection = ConnectionsDefinition.command("CheckConnection", {
+export const CheckConnection = ConnectionsDefinition.makeCommand("CheckConnection", {
   args: { workspaceId: WorkspaceId.WorkspaceId, connectionId: ConnectionContract.ConnectionId },
   messages: [Message.CheckedConnection, Message.FailedCheckConnection],
   handler: function* () {
@@ -248,7 +248,7 @@ export const CheckConnection = ConnectionsDefinition.command("CheckConnection", 
 })
 
 /** Move focus to the field `id`, such as the name of the connection a person has just chosen an integration for. */
-export const FocusField = ConnectionsDefinition.command("FocusField", {
+export const FocusField = ConnectionsDefinition.makeCommand("FocusField", {
   args: { id: Schema.String },
   messages: [Message.CompletedFocusField],
   handler: function* () {

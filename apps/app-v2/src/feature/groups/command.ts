@@ -18,7 +18,7 @@ const failed = (error: string) => Message.FailedWriteAction({ error })
 const invalidTeamName = "Use 1 to 80 characters, with no invisible ones."
 
 /** Create the team `name`, `visibility` public or private, with `memberIds` as its first members. */
-export const CreateTeam = GroupsDefinition.command("CreateTeam", {
+export const CreateTeam = GroupsDefinition.makeCommand("CreateTeam", {
   args: {
     ...Stores.AsMember,
     name: Schema.String,
@@ -46,7 +46,7 @@ export const CreateTeam = GroupsDefinition.command("CreateTeam", {
  * Move focus to the input of the members picker of the form for what the person is starting, which the chip they
  * removed held.
  */
-export const FocusStartingMembers = GroupsDefinition.command("FocusStartingMembers", {
+export const FocusStartingMembers = GroupsDefinition.makeCommand("FocusStartingMembers", {
   args: {},
   messages: [Message.CompletedFocusStartingMembers],
   handler: function* () {
@@ -55,7 +55,7 @@ export const FocusStartingMembers = GroupsDefinition.command("FocusStartingMembe
 })
 
 /** Join the public team `groupId`. */
-export const JoinGroup = GroupsDefinition.command("JoinGroup", {
+export const JoinGroup = GroupsDefinition.makeCommand("JoinGroup", {
   args: { ...Stores.AsMember, groupId: GroupId.GroupId },
   messages: [Message.SucceededJoinGroup, Message.FailedJoinGroup],
   handler: function* () {
@@ -68,7 +68,7 @@ export const JoinGroup = GroupsDefinition.command("JoinGroup", {
 })
 
 /** Record that the person read the group `groupId` now. */
-export const MarkGroupRead = GroupsDefinition.command("MarkGroupRead", {
+export const MarkGroupRead = GroupsDefinition.makeCommand("MarkGroupRead", {
   args: { ...Stores.AsMember, groupId: GroupId.GroupId },
   messages: written,
   handler: function* () {

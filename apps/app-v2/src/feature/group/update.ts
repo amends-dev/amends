@@ -33,7 +33,7 @@ import {
 } from "./definition.ts"
 
 /** Write the draft of the team's name, unless it is the name the team has. */
-const writeRenamingWhenChanged = GroupDefinition.step((model: Model) =>
+const writeRenamingWhenChanged = GroupDefinition.makeStep((model: Model) =>
   Option.match(Option.product(model.renaming, teamName(model)), {
     onNone: () => ({ model }),
     onSome: ([name, expectedName]) =>
@@ -42,14 +42,14 @@ const writeRenamingWhenChanged = GroupDefinition.step((model: Model) =>
 )
 
 /** Admit the members chosen, one action written for each, and leave none chosen and the phone's own view for it. */
-const admitChosen = GroupDefinition.step((model: Model) => ({
+const admitChosen = GroupDefinition.makeStep((model: Model) => ({
   model: modifyFields(model, { admitting: () => [], admitQuery: () => "", isAddViewOpen: () => false }),
   commands: model.admitting.length === 0 ? [] : [AdmitMembers({ ...inGroup(model), admitMemberIds: model.admitting })]
 }))
 
 export const update = GroupComposition.makeUpdate((model, message) =>
   Message.match(message, {
-    RequestedDismiss: () => Update.combine(model, [DialogBinding.requestClose()]),
+    RequestedDismiss: () => Update.combineSteps(model, [DialogBinding.requestClose()]),
     ReceivedGroup: ({ group, memberships, follow }) => {
       const received = modifyFields(model, {
         group: () => group,
@@ -59,7 +59,7 @@ export const update = GroupComposition.makeUpdate((model, message) =>
       })
 
       return Option.isNone(group) && model.dialog.isOpen
-        ? Update.combine(received, [DialogBinding.requestClose()])
+        ? Update.combineSteps(received, [DialogBinding.requestClose()])
         : { model: received }
     },
     ReceivedMembers: ({ members }) => ({ model: modifyFields(model, { members: () => members }) }),
@@ -69,11 +69,11 @@ export const update = GroupComposition.makeUpdate((model, message) =>
     ClickedTryAgain: () => ({
       model: modifyFields(model, { notice: () => Option.none(), reads: (reads) => reads + 1 })
     }),
-    ClickedSettings: () => Update.combine(model, [openSettings("General")]),
-    ClickedMembers: () => Update.combine(model, [openSettings("Members")]),
+    ClickedSettings: () => Update.combineSteps(model, [openSettings("General")]),
+    ClickedMembers: () => Update.combineSteps(model, [openSettings("Members")]),
     ChoseSettingsTab: ({ tab }) => ({ model: modifyFields(model, { settingsTab: () => tab }) }),
     TypedName: ({ name }) => ({ model: modifyFields(model, { renaming: () => Option.some(name) }) }),
-    SubmittedRename: () => Update.combine(model, [writeRenamingWhenChanged, DialogBinding.requestClose()]),
+    SubmittedRename: () => Update.combineSteps(model, [writeRenamingWhenChanged, DialogBinding.requestClose()]),
     ClickedFollow: () => ({ model, commands: [FollowGroup(inGroup(model))] }),
     ClickedUnfollow: () => ({ model, commands: [UnfollowGroup(inGroup(model))] }),
     ClickedJoin: () => ({ model, commands: [JoinGroup(inGroup(model))] }),
@@ -94,23 +94,24 @@ export const update = GroupComposition.makeUpdate((model, message) =>
       model: unchooseToAdmit(model, memberId),
       commands: [FocusAdmitMembers({})]
     }),
-    ClickedAdmit: () => Update.combine(model, [admitChosen, MembersBinding.requestClose()]),
+    ClickedAdmit: () => Update.combineSteps(model, [admitChosen, MembersBinding.requestClose()]),
     CompletedFocusAdmitMembers: () => ({ model }),
     ClickedRemoveMember: ({ membershipId }) => ({
       model,
       commands: [RemoveMember({ ...inGroup(model), membershipId })]
     }),
-    ClickedAllThreads: () => Update.withOutMessage(Update.combine(model, [closeThread]), OutMessage.ClosedThread()),
-    RequestedTab: ({ tab }) => Update.combine(model, [ThreadsBinding.requestTab({ tab })]),
+    ClickedAllThreads: () =>
+      Update.withOutMessage(Update.combineSteps(model, [closeThread]), OutMessage.ClosedThread()),
+    RequestedTab: ({ tab }) => Update.combineSteps(model, [ThreadsBinding.requestTab({ tab })]),
     RequestedThread: ({ threadId }) =>
       Option.match(threadId, {
-        onNone: () => Update.combine(model, [closeThread]),
+        onNone: () => Update.combineSteps(model, [closeThread]),
         onSome: (id) =>
           Option.exists(model.thread, ({ threadId }) => threadId === id)
             ? { model }
-            : Update.combine(model, [openThread(id)])
+            : Update.combineSteps(model, [openThread(id)])
       }),
-    RequestedCloseThread: () => Update.combine(model, [closeThread]),
+    RequestedCloseThread: () => Update.combineSteps(model, [closeThread]),
     WroteAction: () => ({ model: modifyFields(model, { notice: () => Option.none() }) }),
     FailedWriteAction: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) })
   })

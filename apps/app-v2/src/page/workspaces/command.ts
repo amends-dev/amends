@@ -40,7 +40,7 @@ const rejectedSessionOr = <Otherwise>(cause: Cause.Cause<unknown>, otherwise: (f
 }
 
 /** List the workspaces the person belongs to and the invitations waiting for them. */
-export const LoadWorkspaces = WorkspacesDefinition.command("LoadWorkspaces", {
+export const LoadWorkspaces = WorkspacesDefinition.makeCommand("LoadWorkspaces", {
   messages: [Message.SucceededLoadWorkspaces, Message.FailedLoadWorkspaces, Message.RejectedSession],
   handler: function* () {
     return () =>
@@ -97,7 +97,7 @@ const newRequestKey = Effect.gen(function* () {
  * same values sends the same request key, so that one made again after an uncertain outcome returns the workspace the
  * first created, and not a second; a `key` is the one an earlier attempt sent, and none starts a new request.
  */
-export const CreateWorkspace = WorkspacesDefinition.command("CreateWorkspace", {
+export const CreateWorkspace = WorkspacesDefinition.makeCommand("CreateWorkspace", {
   args: { name: Schema.String, memberName: Schema.String, key: Schema.Option(Request.Key) },
   messages: [Message.SucceededCreate, Message.FailedCreate, Message.RejectedSession],
   handler: function* () {
@@ -150,7 +150,7 @@ const wordJoinFailure = (failure: unknown): JoinErrors =>
  * around it. Accepting again returns the same member, so a request that ended unsure may be sent again as it was,
  * and carries no key.
  */
-export const AcceptInvitation = WorkspacesDefinition.command("AcceptInvitation", {
+export const AcceptInvitation = WorkspacesDefinition.makeCommand("AcceptInvitation", {
   args: { workspaceId: WorkspaceId.WorkspaceId, invitationId: Invitation.InvitationId, name: Schema.String },
   messages: [Message.SucceededJoin, Message.FailedJoin, Message.RejectedSession],
   handler: function* () {
@@ -175,7 +175,7 @@ export const AcceptInvitation = WorkspacesDefinition.command("AcceptInvitation",
 })
 
 /** Move focus to the row that opens `workspaceId`, such as the one for the workspace the person has just joined. */
-export const FocusWorkspaceRow = WorkspacesDefinition.command("FocusWorkspaceRow", {
+export const FocusWorkspaceRow = WorkspacesDefinition.makeCommand("FocusWorkspaceRow", {
   args: { workspaceId: WorkspaceId.WorkspaceId },
   messages: [Message.CompletedFocusWorkspaceRow],
   handler: function* () {
@@ -188,7 +188,7 @@ export const FocusWorkspaceRow = WorkspacesDefinition.command("FocusWorkspaceRow
 })
 
 /** Wait five seconds, then report that the confirmation `confirmationId` has had its time. */
-export const ExpireConfirmation = WorkspacesDefinition.command("ExpireConfirmation", {
+export const ExpireConfirmation = WorkspacesDefinition.makeCommand("ExpireConfirmation", {
   args: { confirmationId: Schema.Finite },
   messages: [Message.ExpiredConfirmation],
   handler: function* () {
@@ -198,7 +198,7 @@ export const ExpireConfirmation = WorkspacesDefinition.command("ExpireConfirmati
 })
 
 /** Select the text of the field it is mounted on each time the field takes focus, so that typing replaces it. */
-export const SelectOnFocus = WorkspacesDefinition.mount("SelectOnFocus", {
+export const SelectOnFocus = WorkspacesDefinition.makeMount("SelectOnFocus", {
   messages: [Message.CompletedSelectOnFocus],
   handler: function* () {
     return ({ element }) => Effect.as(selectTextOnFocus(element), Message.CompletedSelectOnFocus())

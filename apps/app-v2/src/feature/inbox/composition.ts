@@ -8,7 +8,7 @@ import { ThreadBlock } from "../thread/block.ts"
 import { InboxDefinition, type Model, OutMessage } from "./definition.ts"
 
 /** Close the thread opened beside the inbox, which leaves no notification selected. */
-export const closeThread = InboxDefinition.stepFields(() => ({ selected: () => Option.none() }))
+export const closeThread = InboxDefinition.makeFieldsStep(() => ({ selected: () => Option.none() }))
 
 /**
  * The person closing the log of one of the open thread's turns leaves the thread too; asking for the settings of an
@@ -17,8 +17,8 @@ export const closeThread = InboxDefinition.stepFields(() => ({ selected: () => O
 const foldThreadOutMessage = (_threadId: ThreadId.ThreadId, outMessage: typeof ThreadBlock.OutMessage.Type) =>
   ThreadBlock.OutMessage.match(outMessage, {
     ClosedTurnLog: () => closeThread,
-    OpenedAgent: () => InboxDefinition.stepNoop(),
-    OpenedProfile: () => InboxDefinition.stepNoop()
+    OpenedAgent: () => InboxDefinition.makeNoopStep(),
+    OpenedProfile: () => InboxDefinition.makeNoopStep()
   })
 
 /**
@@ -33,7 +33,7 @@ const forwardThreadOutMessage = (_threadId: ThreadId.ThreadId, outMessage: typeo
   })
 
 /** The thread opened beside the inbox, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong one. */
-export const ThreadBinding = InboxDefinition.bindChild(ThreadBlock, {
+export const ThreadBinding = InboxDefinition.makeBinding(ThreadBlock, {
   readAll: (model) => Option.toArray(model.selected),
   key: (selected) => selected.threadId,
   keySchema: ThreadId.ThreadId,
@@ -43,9 +43,8 @@ export const ThreadBinding = InboxDefinition.bindChild(ThreadBlock, {
       selected: Option.map((selected) =>
         selected.threadId === threadId ? { ...selected, model: nextThread } : selected
       )
-    }),
-  outMessage: { forward: forwardThreadOutMessage, fold: foldThreadOutMessage }
-})
+    })
+}).withOutMessagePolicy({ forward: forwardThreadOutMessage, fold: foldThreadOutMessage })
 
 /**
  * Select the notification `notificationId` and open its thread `threadId`, in the group `groupId`, beside the
@@ -57,7 +56,7 @@ export const selectNotification = (
   threadId: ThreadId.ThreadId,
   messageId: Option.Option<ThreadMessageId.ThreadMessageId>
 ) =>
-  InboxDefinition.step((model: Model) =>
+  InboxDefinition.makeStep((model: Model) =>
     ThreadBinding.init({
       key: threadId,
       args: [model.workspaceId, model.memberId, threadId],

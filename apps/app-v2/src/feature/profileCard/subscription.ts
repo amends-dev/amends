@@ -35,7 +35,7 @@ export const readSubject = (store: Store.Store["Service"], subject: string, self
     )
   )
 
-export const subscriptions = ProfileCardDefinition.subscriptions((entry) => ({
+export const subscriptions = ProfileCardDefinition.makeSubscriptions((entry) => ({
   profile: entry(
     "ReadProfile",
     { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, opened: Schema.Option(Opened) },

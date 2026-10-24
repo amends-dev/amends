@@ -33,7 +33,7 @@ const invitationLasts = { days: 7 }
 const copiedShows = "2 seconds"
 
 /** Rename the workspace to `name`, from the name the person saw. */
-export const RenameWorkspace = SettingsDefinition.command("RenameWorkspace", {
+export const RenameWorkspace = SettingsDefinition.makeCommand("RenameWorkspace", {
   args: { ...Stores.AsMember, name: Schema.String, expectedName: Schema.String },
   messages: outcomes,
   handler: function* () {
@@ -53,7 +53,7 @@ export const RenameWorkspace = SettingsDefinition.command("RenameWorkspace", {
 })
 
 /** Change the name the person goes by in the workspace to `name`. */
-export const RenameSelf = SettingsDefinition.command("RenameSelf", {
+export const RenameSelf = SettingsDefinition.makeCommand("RenameSelf", {
   args: { ...Stores.AsMember, name: Schema.String },
   messages: outcomes,
   handler: function* () {
@@ -73,7 +73,7 @@ export const RenameSelf = SettingsDefinition.command("RenameSelf", {
 })
 
 /** Remove `removeMemberId` from the workspace. */
-export const RemoveMember = SettingsDefinition.command("RemoveMember", {
+export const RemoveMember = SettingsDefinition.makeCommand("RemoveMember", {
   args: { ...Stores.AsMember, removeMemberId: MemberId.MemberId },
   messages: outcomes,
   handler: function* () {
@@ -88,7 +88,7 @@ export const RemoveMember = SettingsDefinition.command("RemoveMember", {
 })
 
 /** Give `changeMemberId` the role `roleId` in place of the workspace roles the person saw them hold. */
-export const ChangeRole = SettingsDefinition.command("ChangeRole", {
+export const ChangeRole = SettingsDefinition.makeCommand("ChangeRole", {
   args: {
     ...Stores.AsMember,
     changeMemberId: MemberId.MemberId,
@@ -108,7 +108,7 @@ export const ChangeRole = SettingsDefinition.command("ChangeRole", {
 })
 
 /** Hand the workspace to `newOwnerMemberId`, from the owner's assignment the person saw. */
-export const TransferOwnership = SettingsDefinition.command("TransferOwnership", {
+export const TransferOwnership = SettingsDefinition.makeCommand("TransferOwnership", {
   args: { ...Stores.AsMember, newOwnerMemberId: MemberId.MemberId, expectedOwnerAssignmentId: Assignment.AssignmentId },
   messages: outcomes,
   handler: function* () {
@@ -123,7 +123,7 @@ export const TransferOwnership = SettingsDefinition.command("TransferOwnership",
 })
 
 /** Invite whoever `email` names, with `roleId`, for as long as an invitation lasts. */
-export const Invite = SettingsDefinition.command("Invite", {
+export const Invite = SettingsDefinition.makeCommand("Invite", {
   args: { ...Stores.AsMember, email: Schema.String, roleId: Role.RoleId },
   messages: outcomes,
   handler: function* () {
@@ -149,7 +149,7 @@ export const Invite = SettingsDefinition.command("Invite", {
 })
 
 /** Revoke the invitation `invitationId`. */
-export const RevokeInvitation = SettingsDefinition.command("RevokeInvitation", {
+export const RevokeInvitation = SettingsDefinition.makeCommand("RevokeInvitation", {
   args: { ...Stores.AsMember, invitationId: Invitation.InvitationId },
   messages: outcomes,
   handler: function* () {
@@ -164,7 +164,7 @@ export const RevokeInvitation = SettingsDefinition.command("RevokeInvitation", {
 })
 
 /** Put the workspace's ID on the browser's clipboard, for the person's `attempt` at copying it. */
-export const CopyWorkspaceId = SettingsDefinition.command("CopyWorkspaceId", {
+export const CopyWorkspaceId = SettingsDefinition.makeCommand("CopyWorkspaceId", {
   args: { workspaceId: WorkspaceId.WorkspaceId, attempt: Schema.Int },
   messages: [Message.CopiedWorkspaceId, Message.FailedCopyWorkspaceId],
   handler: function* () {
@@ -180,7 +180,7 @@ export const CopyWorkspaceId = SettingsDefinition.command("CopyWorkspaceId", {
 /**
  * Wait a moment, then report that the person's `attempt` at copying the workspace's ID has shown as done long enough.
  */
-export const ExpireCopied = SettingsDefinition.command("ExpireCopied", {
+export const ExpireCopied = SettingsDefinition.makeCommand("ExpireCopied", {
   args: { attempt: Schema.Int },
   messages: [Message.ExpiredCopied],
   handler: function* () {
@@ -189,7 +189,7 @@ export const ExpireCopied = SettingsDefinition.command("ExpireCopied", {
 })
 
 /** Select the text of the field it is mounted on each time the field takes focus, so that typing replaces it. */
-export const SelectOnFocus = SettingsDefinition.mount("SelectOnFocus", {
+export const SelectOnFocus = SettingsDefinition.makeMount("SelectOnFocus", {
   messages: [Message.CompletedSelectOnFocus],
   handler: function* () {
     return ({ element }) => Effect.as(selectTextOnFocus(element), Message.CompletedSelectOnFocus())

@@ -25,7 +25,7 @@ import {
 
 /** Open the thread `threadId` in the group. */
 export const openThread = (threadId: ThreadId.ThreadId) =>
-  GroupDefinition.step((model: Model) =>
+  GroupDefinition.makeStep((model: Model) =>
     ThreadBinding.init({
       key: threadId,
       args: [model.workspaceId, model.memberId, threadId],
@@ -34,22 +34,22 @@ export const openThread = (threadId: ThreadId.ThreadId) =>
   )
 
 /** Show the settings' section `tab`. */
-const showSettingsTab = (tab: SettingsTab) => GroupDefinition.stepFields(() => ({ settingsTab: () => tab }))
+const showSettingsTab = (tab: SettingsTab) => GroupDefinition.makeFieldsStep(() => ({ settingsTab: () => tab }))
 
 /** Start the draft of the team's name from its name, for someone who may rename the team, so its field is live. */
-const startRenaming = GroupDefinition.step((model: Model) => ({
+const startRenaming = GroupDefinition.makeStep((model: Model) => ({
   model: mayRename(model) ? modifyFields(model, { renaming: () => teamName(model) }) : model
 }))
 
 /** Open the settings' section `tab`, with the draft of the team's name started for someone who may rename it. */
 export const openSettings = (tab: SettingsTab) =>
-  Update.combine([showSettingsTab(tab), startRenaming, DialogBinding.requestOpen()])
+  Update.combineSteps([showSettingsTab(tab), startRenaming, DialogBinding.requestOpen()])
 
 /**
  * Follow the group as the bell does, and report it, with where the group is, for the page to confirm; nothing happens
  * before the group is read.
  */
-const followBySlashCommand = GroupDefinition.step((model: Model) =>
+const followBySlashCommand = GroupDefinition.makeStep((model: Model) =>
   Option.match(placeOf(model), {
     onNone: () => ({ model }),
     onSome: (place) => ({
@@ -61,7 +61,7 @@ const followBySlashCommand = GroupDefinition.step((model: Model) =>
 )
 
 /** Stop following the group as the bell does, and report it. */
-const unfollowBySlashCommand = GroupDefinition.step((model: Model) =>
+const unfollowBySlashCommand = GroupDefinition.makeStep((model: Model) =>
   Option.match(placeOf(model), {
     onNone: () => ({ model }),
     onSome: (place) => ({
@@ -83,10 +83,10 @@ const runSlashCommand = (command: SlashCommand) =>
 
 /** Picking a thread opens it in the group, and a slash command picked runs; opening a member's card changes nothing. */
 const foldThreadsOutMessage = ThreadsBlock.OutMessage.match({
-  ChangedTab: () => GroupDefinition.stepNoop(),
+  ChangedTab: () => GroupDefinition.makeNoopStep(),
   SelectedThread: ({ threadId }) => openThread(threadId),
   RanSlashCommand: ({ command }) => runSlashCommand(command),
-  OpenedProfile: () => GroupDefinition.stepNoop()
+  OpenedProfile: () => GroupDefinition.makeNoopStep()
 })
 
 /**
@@ -100,18 +100,17 @@ const forwardThreadsOutMessage = ThreadsBlock.OutMessage.match({
   OpenedProfile: ({ memberId, triggerId }) => OutMessage.OpenedProfile({ memberId, triggerId })
 })
 
-export const ThreadsBinding = GroupDefinition.bindChild(ThreadsBlock, {
+export const ThreadsBinding = GroupDefinition.makeBinding(ThreadsBlock, {
   field: "threads",
-  init: { contextToArgs: ({ workspaceId, memberId, groupId }) => [workspaceId, memberId, groupId] },
-  outMessage: { forward: forwardThreadsOutMessage, fold: foldThreadsOutMessage }
-})
+  init: { contextToArgs: ({ workspaceId, memberId, groupId }) => [workspaceId, memberId, groupId] }
+}).withOutMessagePolicy({ forward: forwardThreadsOutMessage, fold: foldThreadsOutMessage })
 
 /** The dialog closing, by the person or by the settings' own submit, drops the drafts it held. */
 const foldDialogOutMessage = DialogBlock.OutMessage.match({
-  Opened: () => GroupDefinition.stepNoop(),
+  Opened: () => GroupDefinition.makeNoopStep(),
   Closed: () =>
-    Update.combine([
-      GroupDefinition.stepFields(() => ({
+    Update.combineSteps([
+      GroupDefinition.makeFieldsStep(() => ({
         renaming: () => Option.none(),
         admitting: () => [],
         admitQuery: () => "",
@@ -119,14 +118,13 @@ const foldDialogOutMessage = DialogBlock.OutMessage.match({
       })),
       MembersBinding.requestClose()
     ]),
-  CompletedClose: () => GroupDefinition.stepNoop()
+  CompletedClose: () => GroupDefinition.makeNoopStep()
 })
 
-export const DialogBinding = GroupDefinition.bindChild(DialogBlock, {
+export const DialogBinding = GroupDefinition.makeBinding(DialogBlock, {
   field: "dialog",
-  init: { contextToArgs: () => [{ id: "group-settings" }] },
-  outMessage: { fold: foldDialogOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "group-settings" }] }
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
 /**
  * Choosing a member chooses them to admit, unless they are not one of the people who may be admitted or are chosen
@@ -135,22 +133,21 @@ export const DialogBinding = GroupDefinition.bindChild(DialogBlock, {
  */
 const foldMembersOutMessage = MembersComboboxBlock.OutMessage.match({
   Selected: ({ value }) =>
-    Update.combine([
-      GroupDefinition.step((model: Model) => ({ model: chooseToAdmit(model, value) })),
+    Update.combineSteps([
+      GroupDefinition.makeStep((model: Model) => ({ model: chooseToAdmit(model, value) })),
       MembersBinding.requestClose(),
       MembersBinding.requestOpen()
     ]),
-  ClearedSelection: () => GroupDefinition.stepNoop()
+  ClearedSelection: () => GroupDefinition.makeNoopStep()
 })
 
-export const MembersBinding = GroupDefinition.bindChild(MembersComboboxBlock, {
+export const MembersBinding = GroupDefinition.makeBinding(MembersComboboxBlock, {
   field: "membersCombobox",
-  init: { contextToArgs: () => [{ id: admitMembersId }] },
-  outMessage: { fold: foldMembersOutMessage }
-})
+  init: { contextToArgs: () => [{ id: admitMembersId }] }
+}).withOutMessagePolicy({ fold: foldMembersOutMessage })
 
 /** Close the thread open in the group. */
-export const closeThread = GroupDefinition.stepFields(() => ({ thread: () => Option.none() }))
+export const closeThread = GroupDefinition.makeFieldsStep(() => ({ thread: () => Option.none() }))
 
 /**
  * The person closing the log of one of the open thread's turns leaves the thread too; asking for the settings of an
@@ -159,8 +156,8 @@ export const closeThread = GroupDefinition.stepFields(() => ({ thread: () => Opt
 const foldThreadOutMessage = (_threadId: ThreadId.ThreadId, outMessage: typeof ThreadBlock.OutMessage.Type) =>
   ThreadBlock.OutMessage.match(outMessage, {
     ClosedTurnLog: () => closeThread,
-    OpenedAgent: () => GroupDefinition.stepNoop(),
-    OpenedProfile: () => GroupDefinition.stepNoop()
+    OpenedAgent: () => GroupDefinition.makeNoopStep(),
+    OpenedProfile: () => GroupDefinition.makeNoopStep()
   })
 
 /**
@@ -175,7 +172,7 @@ const forwardThreadOutMessage = (_threadId: ThreadId.ThreadId, outMessage: typeo
   })
 
 /** The open thread, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong one. */
-export const ThreadBinding = GroupDefinition.bindChild(ThreadBlock, {
+export const ThreadBinding = GroupDefinition.makeBinding(ThreadBlock, {
   readAll: (model) => Option.toArray(model.thread),
   key: (open) => open.threadId,
   keySchema: ThreadId.ThreadId,
@@ -183,9 +180,8 @@ export const ThreadBinding = GroupDefinition.bindChild(ThreadBlock, {
   writeAt: (model, threadId, nextThread) =>
     modifyFields(model, {
       thread: Option.map((open) => (open.threadId === threadId ? { threadId, model: nextThread } : open))
-    }),
-  outMessage: { forward: forwardThreadOutMessage, fold: foldThreadOutMessage }
-})
+    })
+}).withOutMessagePolicy({ forward: forwardThreadOutMessage, fold: foldThreadOutMessage })
 
 export const GroupComposition = GroupDefinition.makeComposition({
   bindings: [ThreadsBinding, ThreadBinding, DialogBinding, MembersBinding]

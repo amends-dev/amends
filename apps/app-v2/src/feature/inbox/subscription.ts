@@ -10,7 +10,7 @@ import * as Store from "../../store/Store.ts"
 import * as Stores from "../../store/Stores.ts"
 import { InboxDefinition, Message } from "./definition.ts"
 
-export const subscriptions = InboxDefinition.subscriptions((entry) => ({
+export const subscriptions = InboxDefinition.makeSubscriptions((entry) => ({
   inbox: entry(
     "ReadInbox",
     { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, reads: Schema.Int },

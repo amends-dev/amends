@@ -20,7 +20,7 @@ const isChecking = (model: Model, connectionId: ConnectionContract.ConnectionId)
 
 /** Check `connectionId` with its system, unless that is under way or the person may not manage it. */
 export const checkStep = (connectionId: ConnectionContract.ConnectionId) =>
-  ConnectionsDefinition.step((model: Model) =>
+  ConnectionsDefinition.makeStep((model: Model) =>
     Option.exists(findConnection(model, connectionId), (item) => mayManage(model, item)) &&
     !isChecking(model, connectionId)
       ? {

@@ -68,7 +68,7 @@ export const readSignals = (store: Store.Store["Service"], memberId: MemberId.Me
     )
   )
 
-export const subscriptions = GroupsDefinition.subscriptions((entry) => ({
+export const subscriptions = GroupsDefinition.makeSubscriptions((entry) => ({
   groups: entry(
     "ReadGroups",
     { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, reads: Schema.Int },

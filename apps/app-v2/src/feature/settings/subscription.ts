@@ -38,7 +38,7 @@ export const readSettings = (store: Store.Store["Service"]) =>
  * The settings are read once the Block opens, and again each time the person asks to refresh them, which a failed read
  * leaves them to ask for.
  */
-export const subscriptions = SettingsDefinition.subscriptions((entry) => ({
+export const subscriptions = SettingsDefinition.makeSubscriptions((entry) => ({
   settings: entry(
     "ReadSettings",
     { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, reads: Schema.Int },

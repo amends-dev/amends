@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect as expectValue, it, vi } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Effect, Layer, Schema } from "effect"
-import { makeApplicationDefinition } from "foldkit"
+import { Block, Program } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { Command, Mount, click, expect, given, role, scene, selector, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
@@ -25,19 +25,18 @@ const Model = Schema.Struct({
   workspaces: Schema.Finite
 })
 
-const Definition = makeApplicationDefinition({ Model, Message })
+const Definition = Block.makeDefinition("Application", { Model, Message })
 
 const foldDialogOutMessage = DialogBlock.OutMessage.match({
-  Opened: () => Definition.stepNoop(),
-  Closed: () => Definition.stepNoop(),
-  CompletedClose: () => Definition.stepNoop()
+  Opened: () => Definition.makeNoopStep(),
+  Closed: () => Definition.makeNoopStep(),
+  CompletedClose: () => Definition.makeNoopStep()
 })
 
-const DialogBinding = Definition.bindChild(DialogBlock, {
+const DialogBinding = Definition.makeBinding(DialogBlock, {
   field: "dialog",
-  init: { contextToArgs: () => [{ id: "workspace-menu", focusSelector: currentSidebarRowSelector }] },
-  outMessage: { fold: foldDialogOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "workspace-menu", focusSelector: currentSidebarRowSelector }] }
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
 const Composition = Definition.makeComposition({ bindings: [DialogBinding] })
 
@@ -166,6 +165,9 @@ describe("shell over a dialog for its drawer", () => {
 const buttonNamed = (name: string): HTMLElement | undefined =>
   [...document.querySelectorAll("button")].find((candidate) => candidate.textContent === name)
 
+const prepare = () => Composition.prepareBlock({ init, update, view, EffectsLayer: Layer.empty })
+const DrawerBlock: Block.FromAssemblyWithView<typeof Model, typeof prepare> = Block.assemble(prepare)
+
 describe("shell over a dialog in the document", () => {
   beforeEach(() => {
     Object.defineProperty(HTMLElement.prototype, "getAnimations", { configurable: true, value: () => [] })
@@ -180,13 +182,7 @@ describe("shell over a dialog in the document", () => {
     const container = document.createElement("div")
     container.id = "drawer-app"
     document.body.append(container)
-    const program = Composition.assembleElement({
-      container,
-      init,
-      update,
-      view,
-      EffectsLayer: Layer.empty
-    })
+    const program = Program.makeElement({ block: DrawerBlock, container })
     yield* Effect.forkScoped(program.start())
   })
 

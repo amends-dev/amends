@@ -1,7 +1,7 @@
 import { describe, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option, Schema } from "effect"
-import { makeApplicationDefinition } from "foldkit"
+import { Block } from "foldkit"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
 import {
@@ -489,29 +489,28 @@ const ParentMessage = defineMessageUnion({
   SubmittedSettings: {}
 })
 
-const ParentDefinition = makeApplicationDefinition({ Model: ParentModel, Message: ParentMessage })
+const ParentDefinition = Block.makeDefinition("Application", { Model: ParentModel, Message: ParentMessage })
 
 const foldDialogOutMessage = DialogBlock.OutMessage.match({
-  Opened: () => ParentDefinition.stepNoop(),
-  Closed: () => ParentDefinition.stepNoop(),
-  CompletedClose: () => ParentDefinition.stepNoop()
+  Opened: () => ParentDefinition.makeNoopStep(),
+  Closed: () => ParentDefinition.makeNoopStep(),
+  CompletedClose: () => ParentDefinition.makeNoopStep()
 })
 
-const DialogBinding = ParentDefinition.bindChild(DialogBlock, {
+const DialogBinding = ParentDefinition.makeBinding(DialogBlock, {
   field: "dialog",
-  init: { contextToArgs: () => [{ id: "settings-dialog" }] },
-  outMessage: { fold: foldDialogOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "settings-dialog" }] }
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
 const ParentComposition = ParentDefinition.makeComposition({ bindings: [DialogBinding] })
 
-const countSaving = ParentDefinition.stepFields(() => ({ saved: (saved: number) => saved + 1 }))
+const countSaving = ParentDefinition.makeFieldsStep(() => ({ saved: (saved: number) => saved + 1 }))
 
 const parentUpdate = ParentComposition.makeUpdate((model, message) =>
   ParentMessage.match(message, {
     ClickedOpen: () => DialogBinding.requestOpen()(model),
     TypedName: ({ value }) => ({ model: modifyFields(model, { name: () => value }) }),
-    SubmittedSettings: () => Update.combine(model, [countSaving, DialogBinding.requestClose()])
+    SubmittedSettings: () => Update.combineSteps(model, [countSaving, DialogBinding.requestClose()])
   })
 )
 

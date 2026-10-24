@@ -28,7 +28,7 @@ import {
 } from "./definition.ts"
 
 /** Ask for a new team: unnamed, private, and with no one added besides the person. */
-const openTeamForm = GroupsDefinition.stepFields(() => ({
+const openTeamForm = GroupsDefinition.makeFieldsStep(() => ({
   starting: () =>
     Option.some(
       Starting.Team({
@@ -42,7 +42,7 @@ const openTeamForm = GroupsDefinition.stepFields(() => ({
 }))
 
 /** Ask for a new conversation, with no one chosen. */
-const openConversationForm = GroupsDefinition.stepFields(() => ({
+const openConversationForm = GroupsDefinition.makeFieldsStep(() => ({
   starting: () => Option.some(Starting.Conversation({ memberIds: [] }))
 }))
 
@@ -51,7 +51,7 @@ const openConversationForm = GroupsDefinition.stepFields(() => ({
  * they asked already for the activity it has now. Asking is recorded, so that a store that still lists the group as
  * unread until the server has the action does not ask again.
  */
-const readOpenGroup = GroupsDefinition.step((model: Model) =>
+const readOpenGroup = GroupsDefinition.makeStep((model: Model) =>
   Option.match(unreadInOpenGroup(model), {
     onNone: () => ({ model }),
     onSome: (unread) => ({
@@ -63,7 +63,10 @@ const readOpenGroup = GroupsDefinition.step((model: Model) =>
 
 /** Mark the group `groupId` as the one open, and read it. */
 const selectGroup = (groupId: GroupId.GroupId) =>
-  Update.combine([GroupsDefinition.stepFields(() => ({ selected: () => Option.some(groupId) })), readOpenGroup])
+  Update.combineSteps([
+    GroupsDefinition.makeFieldsStep(() => ({ selected: () => Option.some(groupId) })),
+    readOpenGroup
+  ])
 
 /**
  * Picking the group already picked changes nothing; any other is marked and reported, as a click on its row does, and
@@ -72,7 +75,7 @@ const selectGroup = (groupId: GroupId.GroupId) =>
 const pickGroup = (model: Model, groupId: GroupId.GroupId) =>
   Option.contains(model.selected, groupId)
     ? { model }
-    : Update.withOutMessage(Update.combine(model, [selectGroup(groupId)]), OutMessage.SelectedGroup({ groupId }))
+    : Update.withOutMessage(Update.combineSteps(model, [selectGroup(groupId)]), OutMessage.SelectedGroup({ groupId }))
 
 /** Ask to browse the groups, on the tab `tab`. */
 const browseOn = (model: Model, tab: BrowseTab) => ({
@@ -141,8 +144,8 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
       onNone: () => ({ model: current }),
       onSome: ({ group }) =>
         pipe(
-          Update.combine(current, [
-            GroupsDefinition.stepFields(() => ({ selected: () => Option.some(group.id) })),
+          Update.combineSteps(current, [
+            GroupsDefinition.makeFieldsStep(() => ({ selected: () => Option.some(group.id) })),
             DialogBinding.requestClose()
           ]),
           Update.withOutMessage(OutMessage.CreatedGroup({ groupId: group.id }))
@@ -157,14 +160,14 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
     Option.match(conversationWith(model, memberIds), {
       onSome: ({ id: groupId }) =>
         Option.contains(model.selected, groupId)
-          ? Update.combine(model, [DialogBinding.requestClose()])
+          ? Update.combineSteps(model, [DialogBinding.requestClose()])
           : Update.withOutMessage(
-              Update.combine(model, [selectGroup(groupId), DialogBinding.requestClose()]),
+              Update.combineSteps(model, [selectGroup(groupId), DialogBinding.requestClose()]),
               OutMessage.SelectedGroup({ groupId })
             ),
       onNone: () =>
         Update.withOutMessage(
-          Update.combine(model, [DialogBinding.requestClose()]),
+          Update.combineSteps(model, [DialogBinding.requestClose()]),
           OutMessage.SelectedPeople({ memberIds })
         )
     })
@@ -180,7 +183,7 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
     })
 
   return Message.match(message, {
-    RequestedDismiss: () => Update.combine(model, [DialogBinding.requestClose()]),
+    RequestedDismiss: () => Update.combineSteps(model, [DialogBinding.requestClose()]),
     ReceivedGroups: ({ groups, members, memberships, grants }) =>
       finishCreating(
         modifyFields(model, {
@@ -192,8 +195,8 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
         })
       ),
     ReceivedSignals: ({ newActivity, waiting, turns, agents }) =>
-      Update.combine(model, [
-        GroupsDefinition.stepFields(() => ({
+      Update.combineSteps(model, [
+        GroupsDefinition.makeFieldsStep(() => ({
           newActivity: () => newActivity,
           waiting: () => waiting,
           turns: () => turns,
@@ -207,7 +210,7 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
     }),
     ClickedGroup: ({ groupId }) => pickGroup(model, groupId),
     InformedOfOpenGroup: ({ groupId }) =>
-      Update.combine(model, [GroupsDefinition.stepFields(() => ({ selected: () => groupId })), readOpenGroup]),
+      Update.combineSteps(model, [GroupsDefinition.makeFieldsStep(() => ({ selected: () => groupId })), readOpenGroup]),
     ClickedGroupsTitle: () => browseOn(model, "Yours"),
     ClickedBrowse: () => browseOn(model, "Discover"),
     ChoseBrowseTab: ({ tab }) => ({
@@ -223,7 +226,7 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
       model: modifyFields(joined(model, groupId), { notice: () => Option.some(error) })
     }),
     ClickedNewTeam: () =>
-      Update.combine(model, [openTeamForm, MembersBinding.requestClose(), DialogBinding.requestOpen()]),
+      Update.combineSteps(model, [openTeamForm, MembersBinding.requestClose(), DialogBinding.requestOpen()]),
     TypedTeamName: ({ name }) => ({ model: withTeam(model, (team) => ({ ...team, name })) }),
     ClickedRemoveStartingMember: ({ memberId }) => ({
       model: modifyFields(model, {
@@ -250,7 +253,7 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
     }),
     CompletedFocusStartingMembers: () => ({ model }),
     ClickedNewConversation: () =>
-      Update.combine(model, [openConversationForm, MembersBinding.requestClose(), DialogBinding.requestOpen()]),
+      Update.combineSteps(model, [openConversationForm, MembersBinding.requestClose(), DialogBinding.requestOpen()]),
     ClickedTeammate: ({ memberId }) => talkWith(memberId),
     RequestedConversationWith: ({ memberId }) => talkWith(memberId),
     SubmittedConversation: () =>

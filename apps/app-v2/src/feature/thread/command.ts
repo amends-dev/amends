@@ -21,7 +21,7 @@ const posted = [Message.WroteAction, Message.FailedWriteAction]
 const failed = (error: string) => Message.FailedWriteAction({ error })
 
 /** Reply in `threadId` with `text`. */
-export const PostReply = ThreadDefinition.command("PostReply", {
+export const PostReply = ThreadDefinition.makeCommand("PostReply", {
   args: { ...Stores.AsMember, threadId: ThreadId.ThreadId, text: Schema.String },
   messages: posted,
   handler: function* () {
@@ -39,7 +39,7 @@ export const PostReply = ThreadDefinition.command("PostReply", {
 })
 
 /** Rename `threadId` to `title`, from the title the person saw. */
-export const RenameThread = ThreadDefinition.command("RenameThread", {
+export const RenameThread = ThreadDefinition.makeCommand("RenameThread", {
   args: {
     ...Stores.AsMember,
     threadId: ThreadId.ThreadId,
@@ -62,7 +62,7 @@ export const RenameThread = ThreadDefinition.command("RenameThread", {
 })
 
 /** Change the text of `messageId`, from the revision the person saw. */
-export const EditMessage = ThreadDefinition.command("EditMessage", {
+export const EditMessage = ThreadDefinition.makeCommand("EditMessage", {
   args: {
     ...Stores.AsMember,
     messageId: ThreadMessageId.ThreadMessageId,
@@ -85,7 +85,7 @@ export const EditMessage = ThreadDefinition.command("EditMessage", {
 })
 
 /** Delete `messageId`. */
-export const DeleteMessage = ThreadDefinition.command("DeleteMessage", {
+export const DeleteMessage = ThreadDefinition.makeCommand("DeleteMessage", {
   args: { ...Stores.AsMember, messageId: ThreadMessageId.ThreadMessageId },
   messages: posted,
   handler: function* () {
@@ -95,7 +95,7 @@ export const DeleteMessage = ThreadDefinition.command("DeleteMessage", {
 })
 
 /** Follow `threadId`. */
-export const FollowThread = ThreadDefinition.command("FollowThread", {
+export const FollowThread = ThreadDefinition.makeCommand("FollowThread", {
   args: { ...Stores.AsMember, threadId: ThreadId.ThreadId },
   messages: posted,
   handler: function* () {
@@ -105,7 +105,7 @@ export const FollowThread = ThreadDefinition.command("FollowThread", {
 })
 
 /** Stop following `threadId`, ending the person's participation in it. */
-export const UnfollowThread = ThreadDefinition.command("UnfollowThread", {
+export const UnfollowThread = ThreadDefinition.makeCommand("UnfollowThread", {
   args: {
     ...Stores.AsMember,
     threadId: ThreadId.ThreadId,
@@ -120,7 +120,7 @@ export const UnfollowThread = ThreadDefinition.command("UnfollowThread", {
 })
 
 /** Note that the person read `threadId` through `throughSequence`. */
-export const MarkThreadRead = ThreadDefinition.command("MarkThreadRead", {
+export const MarkThreadRead = ThreadDefinition.makeCommand("MarkThreadRead", {
   args: { ...Stores.AsMember, threadId: ThreadId.ThreadId, throughSequence: Schema.Int },
   messages: posted,
   handler: function* () {
@@ -139,7 +139,7 @@ export const MarkThreadRead = ThreadDefinition.command("MarkThreadRead", {
  * Say the person types in `threadId`, or, given none, that they stopped; then, while they type, wait
  * as long as typing goes without being said again, so it is said at most that often.
  */
-export const TellTyping = ThreadDefinition.command("TellTyping", {
+export const TellTyping = ThreadDefinition.makeCommand("TellTyping", {
   args: { workspaceId: WorkspaceId.WorkspaceId, threadId: Schema.NullOr(ThreadId.ThreadId) },
   messages: [Message.ToldTyping],
   handler: function* () {
@@ -158,7 +158,7 @@ export const TellTyping = ThreadDefinition.command("TellTyping", {
  * is the current one, which a notification came for; or, with `onlyIfNearEnd`, only if the person was near their end,
  * so that what is added stays in view while they are there and leaves them where they scrolled to when they are not.
  */
-export const ScrollMessagesToEnd = ThreadDefinition.command("ScrollMessagesToEnd", {
+export const ScrollMessagesToEnd = ThreadDefinition.makeCommand("ScrollMessagesToEnd", {
   args: { threadId: ThreadId.ThreadId, onlyIfNearEnd: Schema.Boolean },
   messages: [Message.CompletedScrollMessagesToEnd],
   handler: function* () {
@@ -174,7 +174,7 @@ export const ScrollMessagesToEnd = ThreadDefinition.command("ScrollMessagesToEnd
  * Scroll the message it is mounted on to the middle of the pane when it is drawn, so that the person sees what a
  * notification came for.
  */
-export const RevealHighlightedMessage = ThreadDefinition.mount("RevealHighlightedMessage", {
+export const RevealHighlightedMessage = ThreadDefinition.makeMount("RevealHighlightedMessage", {
   messages: [Message.CompletedRevealHighlightedMessage],
   handler: function* () {
     return ({ element }) => Effect.as(revealMessage(element), Message.CompletedRevealHighlightedMessage())

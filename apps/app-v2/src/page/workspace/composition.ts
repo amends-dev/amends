@@ -27,47 +27,47 @@ import { AppAccountEntry, type Model, Open, OutMessage, type SettingsPage, Works
 import { HomeBlock } from "./home/block.ts"
 
 /** List the integrations the host installs again, when a Block that showed them failing asks. */
-const loadIntegrationsAgain = WorkspaceDefinition.step((model: Model) => ({
+const loadIntegrationsAgain = WorkspaceDefinition.makeStep((model: Model) => ({
   model,
   commands: [LoadIntegrations({ workspaceId: model.workspaceId })]
 }))
 
 /** Show Home in the main content. */
-export const showHome = WorkspaceDefinition.step((model: Model) => ({
+export const showHome = WorkspaceDefinition.makeStep((model: Model) => ({
   model: modifyFields(model, { open: () => Open.Home() })
 }))
 
 /** Show the connections in the main content. */
-export const showConnections = WorkspaceDefinition.step((model: Model) => ({
+export const showConnections = WorkspaceDefinition.makeStep((model: Model) => ({
   model: modifyFields(model, { open: () => Open.Connections() })
 }))
 
 /** Show the page of the connection `connectionId` in the main content. */
 export const showConnection = (connectionId: ConnectionContract.ConnectionId) =>
-  WorkspaceDefinition.step((model: Model) => ({
+  WorkspaceDefinition.makeStep((model: Model) => ({
     model: modifyFields(model, { open: () => Open.Connection({ connectionId }) })
   }))
 
 /** Show the agents in the main content. */
-export const showAgents = WorkspaceDefinition.step((model: Model) => ({
+export const showAgents = WorkspaceDefinition.makeStep((model: Model) => ({
   model: modifyFields(model, { open: () => Open.Agents() })
 }))
 
 /** Show the page of the agent `agentId` in the main content. */
 export const showAgent = (agentId: Identity.AgentId) =>
-  WorkspaceDefinition.step((model: Model) => ({
+  WorkspaceDefinition.makeStep((model: Model) => ({
     model: modifyFields(model, { open: () => Open.Agent({ agentId }) })
   }))
 
 /** Show the page `page` of the settings in the main content, with no member open beside it. */
 export const showSettings = (page: SettingsPage) =>
-  WorkspaceDefinition.step((model: Model) => ({
+  WorkspaceDefinition.makeStep((model: Model) => ({
     model: modifyFields(model, { open: () => Open.Settings({ page, memberId: Option.none() }) })
   }))
 
 /** Open the member `memberId` beside the page of the settings that is showing. */
 const openMember = (memberId: MemberId.MemberId) =>
-  WorkspaceDefinition.step((model: Model) => ({
+  WorkspaceDefinition.makeStep((model: Model) => ({
     model: modifyFields(model, {
       open: (open) =>
         Open.isAnyOf(["Settings"])(open) ? Open.Settings({ page: open.page, memberId: Option.some(memberId) }) : open
@@ -75,7 +75,7 @@ const openMember = (memberId: MemberId.MemberId) =>
   }))
 
 /** Close the member open beside the page of the settings that is showing. */
-const closeMember = WorkspaceDefinition.step((model: Model) => ({
+const closeMember = WorkspaceDefinition.makeStep((model: Model) => ({
   model: modifyFields(model, {
     open: (open) =>
       Open.isAnyOf(["Settings"])(open) ? Open.Settings({ page: open.page, memberId: Option.none() }) : open
@@ -83,7 +83,7 @@ const closeMember = WorkspaceDefinition.step((model: Model) => ({
 }))
 
 /** Show the channels in the main content. */
-export const showChannels = WorkspaceDefinition.step((model: Model) => ({
+export const showChannels = WorkspaceDefinition.makeStep((model: Model) => ({
   model: modifyFields(model, { open: () => Open.Channels() })
 }))
 
@@ -92,13 +92,13 @@ export const showChannels = WorkspaceDefinition.step((model: Model) => ({
  * leaves no group marked in the sidebar, and `show` it, leaving the navigation drawer as it is, so the person sees the
  * sidebar of the destination they picked.
  */
-export const switchTo = (show: typeof showHome) => Update.combine([hideAside, HomeBinding.requestReset(), show])
+export const switchTo = (show: typeof showHome) => Update.combineSteps([hideAside, HomeBinding.requestReset(), show])
 
 /** Go to a destination, as picking an item of the sidebar does: close the navigation drawer, and switch to it. */
-export const goTo = (show: typeof showHome) => Update.combine([MenuBinding.requestClose(), switchTo(show)])
+export const goTo = (show: typeof showHome) => Update.combineSteps([MenuBinding.requestClose(), switchTo(show)])
 
 /** Show Home, where the person moved, with the navigation drawer and the side pane's dialog closed. */
-const goToHome = () => Update.combine([MenuBinding.requestClose(), hideAside, showHome])
+const goToHome = () => Update.combineSteps([MenuBinding.requestClose(), hideAside, showHome])
 
 /**
  * Home reports that the person moved within it, which shows it and closes the navigation drawer, that they joined a
@@ -116,7 +116,7 @@ const foldHomeOutMessage = (outMessage: typeof HomeBlock.OutMessage.Type) =>
       ActionsBinding.confirm({ text: `Joined ${place}`, offer: Offer.OpenGroup({ groupId }) }),
     FollowedGroup: ({ place }) => ActionsBinding.confirm({ text: `Following ${place}` }),
     UnfollowedGroup: ({ place }) => ActionsBinding.confirm({ text: `Unfollowed ${place}` }),
-    CreatedGroup: () => Update.combine([ActionsBinding.confirm({ text: "Group created" }), goToHome()]),
+    CreatedGroup: () => Update.combineSteps([ActionsBinding.confirm({ text: "Group created" }), goToHome()]),
     OpenedAgent: ({ agentId }) => goTo(showAgent(agentId)),
     OpenedPerson: ({ memberId }) => HomeBinding.requestConversationWith({ memberId }),
     RequestedNameChange: () => SettingsBinding.requestNameChange(),
@@ -125,7 +125,7 @@ const foldHomeOutMessage = (outMessage: typeof HomeBlock.OutMessage.Type) =>
 
 /** Open the group `groupId` in Home, as picking it in the sidebar does, and show Home. */
 const openGroupInHome = (groupId: GroupId.GroupId) =>
-  Update.combine([HomeBinding.requestOpenGroup({ groupId }), goToHome()])
+  Update.combineSteps([HomeBinding.requestOpenGroup({ groupId }), goToHome()])
 
 /** The page of `destination` a search opened: the one the rail goes to, or, for Settings, the account menu's. */
 const goToDestination = (destination: Destination) =>
@@ -147,7 +147,7 @@ const foldSearchOutMessage = SearchBlock.OutMessage.match({
   OpenedDestination: ({ destination }) => goToDestination(destination),
   OpenedGroup: ({ groupId }) => openGroupInHome(groupId),
   OpenedThread: ({ groupId, threadId }) =>
-    Update.combine([HomeBinding.requestOpenThread({ groupId, threadId }), goToHome()]),
+    Update.combineSteps([HomeBinding.requestOpenThread({ groupId, threadId }), goToHome()]),
   OpenedPerson: ({ memberId }) => HomeBinding.requestConversationWith({ memberId }),
   OpenedAgent: ({ agentId }) => goTo(showAgent(agentId))
 })
@@ -163,12 +163,13 @@ const foldAgentsOutMessage = AgentsBlock.OutMessage.match({
   RequestedBrowse: () => goTo(showAgents),
   OpenedAgent: ({ agentId }) => goTo(showAgent(agentId)),
   OpenedThread: ({ groupId, threadId }) =>
-    Update.combine([HomeBinding.requestOpenThread({ groupId, threadId }), goToHome()]),
+    Update.combineSteps([HomeBinding.requestOpenThread({ groupId, threadId }), goToHome()]),
   SavedName: () => ActionsBinding.confirm({ text: "Name saved" }),
   SavedSetup: () => ActionsBinding.confirm({ text: "Setup saved" }),
   CreatedAgent: ({ agentId, name }) =>
-    Update.combine([ActionsBinding.confirm({ text: `${name} created` }), goTo(showAgent(agentId))]),
-  RemovedAgent: ({ name }) => Update.combine([ActionsBinding.confirm({ text: `${name} removed` }), goTo(showAgents)])
+    Update.combineSteps([ActionsBinding.confirm({ text: `${name} created` }), goTo(showAgent(agentId))]),
+  RemovedAgent: ({ name }) =>
+    Update.combineSteps([ActionsBinding.confirm({ text: `${name} removed` }), goTo(showAgents)])
 })
 
 /**
@@ -186,12 +187,12 @@ const foldConnectionsOutMessage = ConnectionsBlock.OutMessage.match({
   SavedSettings: () => ActionsBinding.confirm({ text: connectionsToast.settingsSaved }),
   ReplacedKey: () => ActionsBinding.confirm({ text: connectionsToast.keyReplaced }),
   CreatedConnection: ({ connectionId, name }) =>
-    Update.combine([
+    Update.combineSteps([
       ActionsBinding.confirm({ text: connectionsToast.created(name) }),
       goTo(showConnection(connectionId))
     ]),
   RemovedConnection: ({ name }) =>
-    Update.combine([ActionsBinding.confirm({ text: connectionsToast.removed(name) }), goTo(showConnections)])
+    Update.combineSteps([ActionsBinding.confirm({ text: connectionsToast.removed(name) }), goTo(showConnections)])
 })
 
 /**
@@ -202,18 +203,18 @@ const foldConnectionsOutMessage = ConnectionsBlock.OutMessage.match({
  * member confirms it too, and closes the member, who is no longer there to show.
  */
 const foldSettingsOutMessage = SettingsBlock.OutMessage.match({
-  OpenedMember: ({ memberId }) => Update.combine([openMember(memberId), showAside]),
-  ClosedMember: () => Update.combine([closeMember, hideAside]),
+  OpenedMember: ({ memberId }) => Update.combineSteps([openMember(memberId), showAside]),
+  ClosedMember: () => Update.combineSteps([closeMember, hideAside]),
   RenamedWorkspace: () => ActionsBinding.confirm({ text: settingsToast.workspaceRenamed }),
   RenamedSelf: () => ActionsBinding.confirm({ text: settingsToast.ownNameSaved }),
   ChangedRole: ({ name }) => ActionsBinding.confirm({ text: settingsToast.roleSaved(name) }),
   RemovedMember: ({ name }) =>
-    Update.combine([closeMember, hideAside, ActionsBinding.confirm({ text: settingsToast.memberRemoved(name) })]),
+    Update.combineSteps([closeMember, hideAside, ActionsBinding.confirm({ text: settingsToast.memberRemoved(name) })]),
   TransferredOwnership: ({ name }) => ActionsBinding.confirm({ text: settingsToast.ownerChanged(name) }),
   InvitedMember: () => ActionsBinding.confirm({ text: settingsToast.invitationCreated }),
   RevokedInvitation: () => ActionsBinding.confirm({ text: settingsToast.invitationRevoked }),
   ChoseAccountEntry: ({ entry }) =>
-    entry === "WorkspaceSettings" ? switchTo(showSettings("Workspace")) : WorkspaceDefinition.stepNoop()
+    entry === "WorkspaceSettings" ? switchTo(showSettings("Workspace")) : WorkspaceDefinition.makeNoopStep()
 })
 
 /**
@@ -221,9 +222,9 @@ const foldSettingsOutMessage = SettingsBlock.OutMessage.match({
  * sidebar's current row, and closing it returns focus to the button that opened it.
  */
 const foldMenuOutMessage = DialogBlock.OutMessage.match({
-  Opened: () => WorkspaceDefinition.stepNoop(),
-  Closed: () => WorkspaceDefinition.stepNoop(),
-  CompletedClose: () => WorkspaceDefinition.stepNoop()
+  Opened: () => WorkspaceDefinition.makeNoopStep(),
+  Closed: () => WorkspaceDefinition.makeNoopStep(),
+  CompletedClose: () => WorkspaceDefinition.makeNoopStep()
 })
 
 /**
@@ -232,36 +233,34 @@ const foldMenuOutMessage = DialogBlock.OutMessage.match({
  * person leaving the member.
  */
 const foldAsideOutMessage = DialogBlock.OutMessage.match({
-  Opened: () => WorkspaceDefinition.stepNoop(),
+  Opened: () => WorkspaceDefinition.makeNoopStep(),
   Closed: () =>
-    WorkspaceDefinition.step((model: Model) =>
-      isAsideInDialog(model.viewport) ? closeMember : WorkspaceDefinition.stepNoop()
+    WorkspaceDefinition.makeStep((model: Model) =>
+      isAsideInDialog(model.viewport) ? closeMember : WorkspaceDefinition.makeNoopStep()
     ),
-  CompletedClose: () => WorkspaceDefinition.stepNoop()
+  CompletedClose: () => WorkspaceDefinition.makeNoopStep()
 })
 
-export const MenuBinding = WorkspaceDefinition.bindChild(DialogBlock, {
+export const MenuBinding = WorkspaceDefinition.makeBinding(DialogBlock, {
   field: "menu",
-  init: { contextToArgs: () => [{ id: "workspace-menu", focusSelector: currentSidebarRowSelector }] },
-  outMessage: { fold: foldMenuOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "workspace-menu", focusSelector: currentSidebarRowSelector }] }
+}).withOutMessagePolicy({ fold: foldMenuOutMessage })
 
-export const AsideBinding = WorkspaceDefinition.bindChild(DialogBlock, {
+export const AsideBinding = WorkspaceDefinition.makeBinding(DialogBlock, {
   field: "aside",
-  init: { contextToArgs: () => [{ id: "workspace-aside" }] },
-  outMessage: {
-    fold: foldAsideOutMessage,
-    forward: DialogBlock.OutMessage.match({
-      Opened: () => undefined,
-      Closed: () => OutMessage.Navigated(),
-      CompletedClose: () => undefined
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workspace-aside" }] }
+}).withOutMessagePolicy({
+  fold: foldAsideOutMessage,
+  forward: DialogBlock.OutMessage.match({
+    Opened: () => undefined,
+    Closed: () => OutMessage.Navigated(),
+    CompletedClose: () => undefined
+  })
 })
 
 /** Open the side pane's dialog, where the window's width puts the side pane in one. */
-export const showAside = WorkspaceDefinition.step((model: Model) =>
-  isAsideInDialog(model.viewport) ? AsideBinding.requestOpen() : WorkspaceDefinition.stepNoop()
+export const showAside = WorkspaceDefinition.makeStep((model: Model) =>
+  isAsideInDialog(model.viewport) ? AsideBinding.requestOpen() : WorkspaceDefinition.makeNoopStep()
 )
 
 /** Close the side pane's dialog; closing one that is closed does nothing. */
@@ -272,105 +271,100 @@ const foldActionsOutMessage = ActionsBlock.OutMessage.match({
   TookOffer: ({ offer }) => Offer.match(offer, { OpenGroup: ({ groupId }) => openGroupInHome(groupId) })
 })
 
-export const ActionsBinding = WorkspaceDefinition.bindChild(ActionsBlock, {
+export const ActionsBinding = WorkspaceDefinition.makeBinding(ActionsBlock, {
   field: "actions",
-  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { fold: foldActionsOutMessage, forward: () => OutMessage.Navigated() }
-})
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+}).withOutMessagePolicy({ fold: foldActionsOutMessage, forward: () => OutMessage.Navigated() })
 
-export const SearchBinding = WorkspaceDefinition.bindChild(SearchBlock, {
+export const SearchBinding = WorkspaceDefinition.makeBinding(SearchBlock, {
   field: "search",
-  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { fold: foldSearchOutMessage, forward: () => OutMessage.Navigated() }
-})
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+}).withOutMessagePolicy({ fold: foldSearchOutMessage, forward: () => OutMessage.Navigated() })
 
-export const HomeBinding = WorkspaceDefinition.bindChild(HomeBlock, {
+export const HomeBinding = WorkspaceDefinition.makeBinding(HomeBlock, {
   field: "home",
-  init: { contextToArgs: ({ workspaceId, memberId, viewport }) => [workspaceId, memberId, viewport] },
-  outMessage: {
-    fold: foldHomeOutMessage,
-    forward: HomeBlock.OutMessage.match({
-      Navigated: () => OutMessage.Navigated(),
-      ReplacedConversation: () => OutMessage.ReplacedDestination(),
-      CreatedGroup: () => OutMessage.Navigated(),
-      OpenedAgent: () => OutMessage.Navigated(),
-      JoinedGroup: () => undefined,
-      OpenedPerson: () => undefined,
-      RequestedNameChange: () => undefined,
-      FollowedGroup: () => undefined,
-      UnfollowedGroup: () => undefined,
-      RequestedSearch: () => undefined
-    })
-  }
+  init: { contextToArgs: ({ workspaceId, memberId, viewport }) => [workspaceId, memberId, viewport] }
+}).withOutMessagePolicy({
+  fold: foldHomeOutMessage,
+  forward: HomeBlock.OutMessage.match({
+    Navigated: () => OutMessage.Navigated(),
+    ReplacedConversation: () => OutMessage.ReplacedDestination(),
+    CreatedGroup: () => OutMessage.Navigated(),
+    OpenedAgent: () => OutMessage.Navigated(),
+    JoinedGroup: () => undefined,
+    OpenedPerson: () => undefined,
+    RequestedNameChange: () => undefined,
+    FollowedGroup: () => undefined,
+    UnfollowedGroup: () => undefined,
+    RequestedSearch: () => undefined
+  })
 })
 
-export const ConnectionsBinding = WorkspaceDefinition.bindChild(ConnectionsBlock, {
+export const ConnectionsBinding = WorkspaceDefinition.makeBinding(ConnectionsBlock, {
   field: "connections",
-  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: {
-    fold: foldConnectionsOutMessage,
-    forward: ConnectionsBlock.OutMessage.match({
-      RequestedBrowse: () => OutMessage.Navigated(),
-      OpenedConnection: () => OutMessage.Navigated(),
-      RequestedChannels: () => OutMessage.Navigated(),
-      CreatedConnection: () => OutMessage.Navigated(),
-      RemovedConnection: () => OutMessage.Navigated(),
-      RequestedIntegrations: () => undefined,
-      SavedName: () => undefined,
-      SavedSettings: () => undefined,
-      ReplacedKey: () => undefined
-    })
-  }
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+}).withOutMessagePolicy({
+  fold: foldConnectionsOutMessage,
+  forward: ConnectionsBlock.OutMessage.match({
+    RequestedBrowse: () => OutMessage.Navigated(),
+    OpenedConnection: () => OutMessage.Navigated(),
+    RequestedChannels: () => OutMessage.Navigated(),
+    CreatedConnection: () => OutMessage.Navigated(),
+    RemovedConnection: () => OutMessage.Navigated(),
+    RequestedIntegrations: () => undefined,
+    SavedName: () => undefined,
+    SavedSettings: () => undefined,
+    ReplacedKey: () => undefined
+  })
 })
 
-export const AgentsBinding = WorkspaceDefinition.bindChild(AgentsBlock, {
+export const AgentsBinding = WorkspaceDefinition.makeBinding(AgentsBlock, {
   field: "agents",
-  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: {
-    fold: foldAgentsOutMessage,
-    forward: AgentsBlock.OutMessage.match({
-      RequestedBrowse: () => OutMessage.Navigated(),
-      OpenedAgent: () => OutMessage.Navigated(),
-      OpenedThread: () => OutMessage.Navigated(),
-      CreatedAgent: () => OutMessage.Navigated(),
-      RemovedAgent: () => OutMessage.Navigated(),
-      RequestedIntegrations: () => undefined,
-      SavedName: () => undefined,
-      SavedSetup: () => undefined
-    })
-  }
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+}).withOutMessagePolicy({
+  fold: foldAgentsOutMessage,
+  forward: AgentsBlock.OutMessage.match({
+    RequestedBrowse: () => OutMessage.Navigated(),
+    OpenedAgent: () => OutMessage.Navigated(),
+    OpenedThread: () => OutMessage.Navigated(),
+    CreatedAgent: () => OutMessage.Navigated(),
+    RemovedAgent: () => OutMessage.Navigated(),
+    RequestedIntegrations: () => undefined,
+    SavedName: () => undefined,
+    SavedSetup: () => undefined
+  })
 })
 
-export const SettingsBinding = WorkspaceDefinition.bindChild(SettingsBlock, {
+export const SettingsBinding = WorkspaceDefinition.makeBinding(SettingsBlock, {
   field: "settings",
-  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: {
-    /** The entries of the account menu that the app acts on are reported to it. */
-    forward: SettingsBlock.OutMessage.match({
-      OpenedMember: () => OutMessage.Navigated(),
-      ClosedMember: () => OutMessage.Navigated(),
-      RenamedWorkspace: () => undefined,
-      RenamedSelf: () => undefined,
-      ChangedRole: () => undefined,
-      RemovedMember: () => OutMessage.Navigated(),
-      TransferredOwnership: () => undefined,
-      InvitedMember: () => undefined,
-      RevokedInvitation: () => undefined,
-      ChoseAccountEntry: ({ entry }) =>
-        Schema.is(AppAccountEntry)(entry) ? OutMessage.ChoseAccountEntry({ entry }) : OutMessage.Navigated()
-    }),
-    fold: foldSettingsOutMessage
-  }
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+}).withOutMessagePolicy({
+  /** The entries of the account menu that the app acts on are reported to it. */
+  forward: SettingsBlock.OutMessage.match({
+    OpenedMember: () => OutMessage.Navigated(),
+    ClosedMember: () => OutMessage.Navigated(),
+    RenamedWorkspace: () => undefined,
+    RenamedSelf: () => undefined,
+    ChangedRole: () => undefined,
+    RemovedMember: () => OutMessage.Navigated(),
+    TransferredOwnership: () => undefined,
+    InvitedMember: () => undefined,
+    RevokedInvitation: () => undefined,
+    ChoseAccountEntry: ({ entry }) =>
+      Schema.is(AppAccountEntry)(entry) ? OutMessage.ChoseAccountEntry({ entry }) : OutMessage.Navigated()
+  }),
+  fold: foldSettingsOutMessage
 })
 
-export const ChannelsBinding = WorkspaceDefinition.bindChild(ChannelsBlock, {
+export const ChannelsBinding = WorkspaceDefinition.makeBinding(ChannelsBlock, {
   field: "channels",
-  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { fold: ChannelsBlock.OutMessage.match({ RequestedIntegrations: () => loadIntegrationsAgain }) }
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+}).withOutMessagePolicy({
+  fold: ChannelsBlock.OutMessage.match({ RequestedIntegrations: () => loadIntegrationsAgain })
 })
 
 /** Restore a destination through the same child operations used by visible navigation. */
-export const dismissOverlays = Update.combine([
+export const dismissOverlays = Update.combineSteps([
   SearchBinding.requestDismiss(),
   AgentsBinding.requestDismiss(),
   ConnectionsBinding.requestDismiss(),
@@ -381,20 +375,21 @@ export const dismissOverlays = Update.combine([
 export const showDestination = (destination: WorkspaceDestination) =>
   WorkspaceDestination.match(destination, {
     Home: ({ destination }) =>
-      Update.combine([
+      Update.combineSteps([
         MenuBinding.requestClose(),
         hideAside,
         showHome,
         HomeBinding.requestDestination({ destination })
       ]),
-    Connections: ({ tab }) => Update.combine([goTo(showConnections), ConnectionsBinding.requestBrowseTab({ tab })]),
+    Connections: ({ tab }) =>
+      Update.combineSteps([goTo(showConnections), ConnectionsBinding.requestBrowseTab({ tab })]),
     Connection: ({ connectionId }) => goTo(showConnection(connectionId)),
-    Agents: ({ tab }) => Update.combine([goTo(showAgents), AgentsBinding.requestBrowseTab({ tab })]),
+    Agents: ({ tab }) => Update.combineSteps([goTo(showAgents), AgentsBinding.requestBrowseTab({ tab })]),
     Agent: ({ agentId }) => goTo(showAgent(agentId)),
     Settings: ({ page, memberId }) =>
-      Update.combine([
+      Update.combineSteps([
         goTo(showSettings(page)),
-        ...Option.toArray(Option.map(memberId, (id) => Update.combine([openMember(id), showAside])))
+        ...Option.toArray(Option.map(memberId, (id) => Update.combineSteps([openMember(id), showAside])))
       ]),
     Channels: () => goTo(showChannels)
   })

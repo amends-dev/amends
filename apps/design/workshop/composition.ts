@@ -19,326 +19,294 @@ import {
 } from "./definition.ts"
 
 const foldDialogOutMessage = DialogBlock.OutMessage.match({
-  Opened: () => ApplicationDefinition.stepNoop(),
-  Closed: () => ApplicationDefinition.stepNoop(),
-  CompletedClose: () => ApplicationDefinition.stepNoop()
+  Opened: () => ApplicationDefinition.makeNoopStep(),
+  Closed: () => ApplicationDefinition.makeNoopStep(),
+  CompletedClose: () => ApplicationDefinition.makeNoopStep()
 })
 
-export const ModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+export const ModalBinding = ApplicationDefinition.makeBinding(DialogBlock, {
   field: "modal",
-  init: { contextToArgs: () => [{ id: "workshop-modal" }] },
-  outMessage: { fold: foldDialogOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "workshop-modal" }] }
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
-export const SettingsModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+export const SettingsModalBinding = ApplicationDefinition.makeBinding(DialogBlock, {
   field: "settingsModal",
-  init: { contextToArgs: () => [{ id: "workshop-settings-modal" }] },
-  outMessage: { fold: foldDialogOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "workshop-settings-modal" }] }
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
-export const FormModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+export const FormModalBinding = ApplicationDefinition.makeBinding(DialogBlock, {
   field: "formModal",
-  init: { contextToArgs: () => [{ id: "workshop-form-modal" }] },
-  outMessage: { fold: foldDialogOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "workshop-form-modal" }] }
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
-export const WideModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+export const WideModalBinding = ApplicationDefinition.makeBinding(DialogBlock, {
   field: "wideModal",
-  init: { contextToArgs: () => [{ id: "workshop-wide-modal" }] },
-  outMessage: { fold: foldDialogOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "workshop-wide-modal" }] }
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
-export const PaletteModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+export const PaletteModalBinding = ApplicationDefinition.makeBinding(DialogBlock, {
   field: "paletteModal",
-  init: { contextToArgs: () => [{ id: "workshop-palette-modal" }] },
-  outMessage: { fold: foldDialogOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "workshop-palette-modal" }] }
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
-export const ChooserModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+export const ChooserModalBinding = ApplicationDefinition.makeBinding(DialogBlock, {
   field: "chooserModal",
-  init: { contextToArgs: () => [{ id: "workshop-chooser-modal" }] },
-  outMessage: { fold: foldDialogOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "workshop-chooser-modal" }] }
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
-export const ConfirmModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+export const ConfirmModalBinding = ApplicationDefinition.makeBinding(DialogBlock, {
   field: "confirmModal",
-  init: { contextToArgs: () => [{ id: "workshop-confirm-modal" }] },
-  outMessage: { fold: foldDialogOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "workshop-confirm-modal" }] }
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
-export const CompactModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+export const CompactModalBinding = ApplicationDefinition.makeBinding(DialogBlock, {
   field: "compactModal",
-  init: { contextToArgs: () => [{ id: "workshop-compact-modal" }] },
-  outMessage: { fold: foldDialogOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "workshop-compact-modal" }] }
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
-export const AddViewModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+export const AddViewModalBinding = ApplicationDefinition.makeBinding(DialogBlock, {
   field: "addViewModal",
-  init: { contextToArgs: () => [{ id: "workshop-add-view-modal" }] },
-  outMessage: { fold: foldDialogOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "workshop-add-view-modal" }] }
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
-export const NavigationDrawerBinding = ApplicationDefinition.bindChild(DialogBlock, {
+export const NavigationDrawerBinding = ApplicationDefinition.makeBinding(DialogBlock, {
   field: "navigationDrawer",
-  init: { contextToArgs: () => [{ id: "workshop-navigation-drawer", focusSelector: currentSidebarRowSelector }] },
-  outMessage: { fold: foldDialogOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "workshop-navigation-drawer", focusSelector: currentSidebarRowSelector }] }
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
-export const CreateModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+export const CreateModalBinding = ApplicationDefinition.makeBinding(DialogBlock, {
   field: "createModal",
-  init: { contextToArgs: () => [{ id: "workshop-create-modal" }] },
-  outMessage: { fold: foldDialogOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "workshop-create-modal" }] }
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
-export const NewMessageModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+export const NewMessageModalBinding = ApplicationDefinition.makeBinding(DialogBlock, {
   field: "newMessageModal",
-  init: { contextToArgs: () => [{ id: "workshop-new-message-modal" }] },
-  outMessage: { fold: foldDialogOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "workshop-new-message-modal" }] }
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
 /** Choosing a person adds them to the field, empties what was typed, and keeps the list open for the next. */
-export const EmptyPickerBinding = ApplicationDefinition.bindChild(MembersPicker, {
+export const EmptyPickerBinding = ApplicationDefinition.makeBinding(MembersPicker, {
   field: "emptyPicker",
-  init: { contextToArgs: () => [{ id: "workshop-empty-picker" }] },
-  outMessage: {
-    fold: MembersPicker.OutMessage.match({
-      Selected: ({ value }) =>
-        Update.combine([
-          ApplicationDefinition.stepFields(() => ({ emptyMembers: (members) => [...members, value] })),
-          EmptyPickerBinding.requestClose(),
-          EmptyPickerBinding.requestOpen()
-        ]),
-      ClearedSelection: () => ApplicationDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workshop-empty-picker" }] }
+}).withOutMessagePolicy({
+  fold: MembersPicker.OutMessage.match({
+    Selected: ({ value }) =>
+      Update.combineSteps([
+        ApplicationDefinition.makeFieldsStep(() => ({ emptyMembers: (members) => [...members, value] })),
+        EmptyPickerBinding.requestClose(),
+        EmptyPickerBinding.requestOpen()
+      ]),
+    ClearedSelection: () => ApplicationDefinition.makeNoopStep()
+  })
 })
 
-export const ChosenPickerBinding = ApplicationDefinition.bindChild(MembersPicker, {
+export const ChosenPickerBinding = ApplicationDefinition.makeBinding(MembersPicker, {
   field: "chosenPicker",
-  init: { contextToArgs: () => [{ id: "workshop-chosen-picker" }] },
-  outMessage: {
-    fold: MembersPicker.OutMessage.match({
-      Selected: ({ value }) =>
-        Update.combine([
-          ApplicationDefinition.stepFields(() => ({ chosenMembers: (members) => [...members, value] })),
-          ChosenPickerBinding.requestClose(),
-          ChosenPickerBinding.requestOpen()
-        ]),
-      ClearedSelection: () => ApplicationDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workshop-chosen-picker" }] }
+}).withOutMessagePolicy({
+  fold: MembersPicker.OutMessage.match({
+    Selected: ({ value }) =>
+      Update.combineSteps([
+        ApplicationDefinition.makeFieldsStep(() => ({ chosenMembers: (members) => [...members, value] })),
+        ChosenPickerBinding.requestClose(),
+        ChosenPickerBinding.requestOpen()
+      ]),
+    ClearedSelection: () => ApplicationDefinition.makeNoopStep()
+  })
 })
 
-export const CreatePickerBinding = ApplicationDefinition.bindChild(MembersPicker, {
+export const CreatePickerBinding = ApplicationDefinition.makeBinding(MembersPicker, {
   field: "createPicker",
-  init: { contextToArgs: () => [{ id: "workshop-create-picker" }] },
-  outMessage: {
-    fold: MembersPicker.OutMessage.match({
-      Selected: ({ value }) =>
-        Update.combine([
-          ApplicationDefinition.stepFields(() => ({ createMembers: (members) => [...members, value] })),
-          CreatePickerBinding.requestClose(),
-          CreatePickerBinding.requestOpen()
-        ]),
-      ClearedSelection: () => ApplicationDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workshop-create-picker" }] }
+}).withOutMessagePolicy({
+  fold: MembersPicker.OutMessage.match({
+    Selected: ({ value }) =>
+      Update.combineSteps([
+        ApplicationDefinition.makeFieldsStep(() => ({ createMembers: (members) => [...members, value] })),
+        CreatePickerBinding.requestClose(),
+        CreatePickerBinding.requestOpen()
+      ]),
+    ClearedSelection: () => ApplicationDefinition.makeNoopStep()
+  })
 })
 
-export const NewMessagePickerBinding = ApplicationDefinition.bindChild(MembersPicker, {
+export const NewMessagePickerBinding = ApplicationDefinition.makeBinding(MembersPicker, {
   field: "newMessagePicker",
-  init: { contextToArgs: () => [{ id: "workshop-new-message-picker" }] },
-  outMessage: {
-    fold: MembersPicker.OutMessage.match({
-      Selected: ({ value }) =>
-        Update.combine([
-          ApplicationDefinition.stepFields(() => ({ newMessageMembers: (members) => [...members, value] })),
-          NewMessagePickerBinding.requestClose(),
-          NewMessagePickerBinding.requestOpen()
-        ]),
-      ClearedSelection: () => ApplicationDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workshop-new-message-picker" }] }
+}).withOutMessagePolicy({
+  fold: MembersPicker.OutMessage.match({
+    Selected: ({ value }) =>
+      Update.combineSteps([
+        ApplicationDefinition.makeFieldsStep(() => ({ newMessageMembers: (members) => [...members, value] })),
+        NewMessagePickerBinding.requestClose(),
+        NewMessagePickerBinding.requestOpen()
+      ]),
+    ClearedSelection: () => ApplicationDefinition.makeNoopStep()
+  })
 })
 
-export const AddPickerBinding = ApplicationDefinition.bindChild(MembersPicker, {
+export const AddPickerBinding = ApplicationDefinition.makeBinding(MembersPicker, {
   field: "addPicker",
-  init: { contextToArgs: () => [{ id: "workshop-add-picker" }] },
-  outMessage: {
-    fold: MembersPicker.OutMessage.match({
-      Selected: ({ value }) =>
-        Update.combine([
-          ApplicationDefinition.stepFields(() => ({ addMembers: (members) => [...members, value] })),
-          AddPickerBinding.requestClose(),
-          AddPickerBinding.requestOpen()
-        ]),
-      ClearedSelection: () => ApplicationDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workshop-add-picker" }] }
+}).withOutMessagePolicy({
+  fold: MembersPicker.OutMessage.match({
+    Selected: ({ value }) =>
+      Update.combineSteps([
+        ApplicationDefinition.makeFieldsStep(() => ({ addMembers: (members) => [...members, value] })),
+        AddPickerBinding.requestClose(),
+        AddPickerBinding.requestOpen()
+      ]),
+    ClearedSelection: () => ApplicationDefinition.makeNoopStep()
+  })
 })
 
-export const VisibilityBinding = ApplicationDefinition.bindChild(VisibilityRadioGroup, {
+export const VisibilityBinding = ApplicationDefinition.makeBinding(VisibilityRadioGroup, {
   field: "visibilityGroup",
-  init: { contextToArgs: () => [{ id: "workshop-visibility" }] },
-  outMessage: {
-    fold: VisibilityRadioGroup.OutMessage.match({
-      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ visibility: () => value }))
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workshop-visibility" }] }
+}).withOutMessagePolicy({
+  fold: VisibilityRadioGroup.OutMessage.match({
+    Selected: ({ value }) => ApplicationDefinition.makeFieldsStep(() => ({ visibility: () => value }))
+  })
 })
 
-export const LockedVisibilityBinding = ApplicationDefinition.bindChild(VisibilityRadioGroup, {
+export const LockedVisibilityBinding = ApplicationDefinition.makeBinding(VisibilityRadioGroup, {
   field: "lockedVisibilityGroup",
-  init: { contextToArgs: () => [{ id: "workshop-locked-visibility" }] },
-  outMessage: {
-    fold: VisibilityRadioGroup.OutMessage.match({
-      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ visibility: () => value }))
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workshop-locked-visibility" }] }
+}).withOutMessagePolicy({
+  fold: VisibilityRadioGroup.OutMessage.match({
+    Selected: ({ value }) => ApplicationDefinition.makeFieldsStep(() => ({ visibility: () => value }))
+  })
 })
 
-export const CreateVisibilityBinding = ApplicationDefinition.bindChild(VisibilityRadioGroup, {
+export const CreateVisibilityBinding = ApplicationDefinition.makeBinding(VisibilityRadioGroup, {
   field: "createVisibilityGroup",
-  init: { contextToArgs: () => [{ id: "workshop-create-visibility" }] },
-  outMessage: {
-    fold: VisibilityRadioGroup.OutMessage.match({
-      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ visibility: () => value }))
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workshop-create-visibility" }] }
+}).withOutMessagePolicy({
+  fold: VisibilityRadioGroup.OutMessage.match({
+    Selected: ({ value }) => ApplicationDefinition.makeFieldsStep(() => ({ visibility: () => value }))
+  })
 })
 
-export const MemberFilterBinding = ApplicationDefinition.bindChild(MemberFilterMenu, {
+export const MemberFilterBinding = ApplicationDefinition.makeBinding(MemberFilterMenu, {
   field: "memberFilterMenu",
-  init: { contextToArgs: () => [{ id: "workshop-member-filter" }] },
-  outMessage: {
-    fold: MemberFilterMenu.OutMessage.match({
-      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ memberFilter: () => value })),
-      Closed: () => ApplicationDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workshop-member-filter" }] }
+}).withOutMessagePolicy({
+  fold: MemberFilterMenu.OutMessage.match({
+    Selected: ({ value }) => ApplicationDefinition.makeFieldsStep(() => ({ memberFilter: () => value })),
+    Closed: () => ApplicationDefinition.makeNoopStep()
+  })
 })
 
-export const AssigneeFilterBinding = ApplicationDefinition.bindChild(AssigneeFilterMenu, {
+export const AssigneeFilterBinding = ApplicationDefinition.makeBinding(AssigneeFilterMenu, {
   field: "assigneeFilterMenu",
-  init: { contextToArgs: () => [{ id: "workshop-assignee-filter" }] },
-  outMessage: {
-    fold: AssigneeFilterMenu.OutMessage.match({
-      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ assigneeFilter: () => value })),
-      Closed: () => ApplicationDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workshop-assignee-filter" }] }
+}).withOutMessagePolicy({
+  fold: AssigneeFilterMenu.OutMessage.match({
+    Selected: ({ value }) => ApplicationDefinition.makeFieldsStep(() => ({ assigneeFilter: () => value })),
+    Closed: () => ApplicationDefinition.makeNoopStep()
+  })
 })
 
-export const TaskFilterBinding = ApplicationDefinition.bindChild(TaskFilterMenu, {
+export const TaskFilterBinding = ApplicationDefinition.makeBinding(TaskFilterMenu, {
   field: "taskFilterMenu",
-  init: { contextToArgs: () => [{ id: "workshop-task-filter" }] },
-  outMessage: {
-    fold: TaskFilterMenu.OutMessage.match({
-      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ taskFilter: () => value })),
-      Closed: () => ApplicationDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workshop-task-filter" }] }
+}).withOutMessagePolicy({
+  fold: TaskFilterMenu.OutMessage.match({
+    Selected: ({ value }) => ApplicationDefinition.makeFieldsStep(() => ({ taskFilter: () => value })),
+    Closed: () => ApplicationDefinition.makeNoopStep()
+  })
 })
 
-export const TaskSortBinding = ApplicationDefinition.bindChild(TaskSortMenu, {
+export const TaskSortBinding = ApplicationDefinition.makeBinding(TaskSortMenu, {
   field: "taskSortMenu",
-  init: { contextToArgs: () => [{ id: "workshop-task-sort" }] },
-  outMessage: {
-    fold: TaskSortMenu.OutMessage.match({
-      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ taskSort: () => value })),
-      Closed: () => ApplicationDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workshop-task-sort" }] }
+}).withOutMessagePolicy({
+  fold: TaskSortMenu.OutMessage.match({
+    Selected: ({ value }) => ApplicationDefinition.makeFieldsStep(() => ({ taskSort: () => value })),
+    Closed: () => ApplicationDefinition.makeNoopStep()
+  })
 })
 
 /** Choosing from a menu of a task's properties changes the property the selects of the fields show too. */
-export const TaskStatusBinding = ApplicationDefinition.bindChild(TaskStatusMenu, {
+export const TaskStatusBinding = ApplicationDefinition.makeBinding(TaskStatusMenu, {
   field: "statusPropertyMenu",
-  init: { contextToArgs: () => [{ id: "workshop-status-property" }] },
-  outMessage: {
-    fold: TaskStatusMenu.OutMessage.match({
-      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ taskStatus: () => value })),
-      Closed: () => ApplicationDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workshop-status-property" }] }
+}).withOutMessagePolicy({
+  fold: TaskStatusMenu.OutMessage.match({
+    Selected: ({ value }) => ApplicationDefinition.makeFieldsStep(() => ({ taskStatus: () => value })),
+    Closed: () => ApplicationDefinition.makeNoopStep()
+  })
 })
 
-export const TaskPriorityBinding = ApplicationDefinition.bindChild(TaskPriorityMenu, {
+export const TaskPriorityBinding = ApplicationDefinition.makeBinding(TaskPriorityMenu, {
   field: "priorityPropertyMenu",
-  init: { contextToArgs: () => [{ id: "workshop-priority-property" }] },
-  outMessage: {
-    fold: TaskPriorityMenu.OutMessage.match({
-      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ taskPriority: () => value })),
-      Closed: () => ApplicationDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workshop-priority-property" }] }
+}).withOutMessagePolicy({
+  fold: TaskPriorityMenu.OutMessage.match({
+    Selected: ({ value }) => ApplicationDefinition.makeFieldsStep(() => ({ taskPriority: () => value })),
+    Closed: () => ApplicationDefinition.makeNoopStep()
+  })
 })
 
-export const TaskAssigneeBinding = ApplicationDefinition.bindChild(TaskAssigneeMenu, {
+export const TaskAssigneeBinding = ApplicationDefinition.makeBinding(TaskAssigneeMenu, {
   field: "assigneePropertyMenu",
-  init: { contextToArgs: () => [{ id: "workshop-assignee-property" }] },
-  outMessage: {
-    fold: TaskAssigneeMenu.OutMessage.match({
-      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ taskAssignee: () => value })),
-      Closed: () => ApplicationDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workshop-assignee-property" }] }
+}).withOutMessagePolicy({
+  fold: TaskAssigneeMenu.OutMessage.match({
+    Selected: ({ value }) => ApplicationDefinition.makeFieldsStep(() => ({ taskAssignee: () => value })),
+    Closed: () => ApplicationDefinition.makeNoopStep()
+  })
 })
 
 /** The toolbar over the tasks and the roster have menus of their own, since a Block's ids are for one place. */
-export const ToolbarFilterBinding = ApplicationDefinition.bindChild(TaskFilterMenu, {
+export const ToolbarFilterBinding = ApplicationDefinition.makeBinding(TaskFilterMenu, {
   field: "toolbarFilterMenu",
-  init: { contextToArgs: () => [{ id: "workshop-toolbar-filter" }] },
-  outMessage: {
-    fold: TaskFilterMenu.OutMessage.match({
-      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ taskFilter: () => value })),
-      Closed: () => ApplicationDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workshop-toolbar-filter" }] }
+}).withOutMessagePolicy({
+  fold: TaskFilterMenu.OutMessage.match({
+    Selected: ({ value }) => ApplicationDefinition.makeFieldsStep(() => ({ taskFilter: () => value })),
+    Closed: () => ApplicationDefinition.makeNoopStep()
+  })
 })
 
-export const ToolbarSortBinding = ApplicationDefinition.bindChild(TaskSortMenu, {
+export const ToolbarSortBinding = ApplicationDefinition.makeBinding(TaskSortMenu, {
   field: "toolbarSortMenu",
-  init: { contextToArgs: () => [{ id: "workshop-toolbar-sort" }] },
-  outMessage: {
-    fold: TaskSortMenu.OutMessage.match({
-      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ taskSort: () => value })),
-      Closed: () => ApplicationDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workshop-toolbar-sort" }] }
+}).withOutMessagePolicy({
+  fold: TaskSortMenu.OutMessage.match({
+    Selected: ({ value }) => ApplicationDefinition.makeFieldsStep(() => ({ taskSort: () => value })),
+    Closed: () => ApplicationDefinition.makeNoopStep()
+  })
 })
 
-export const MembersPaneFilterBinding = ApplicationDefinition.bindChild(MemberFilterMenu, {
+export const MembersPaneFilterBinding = ApplicationDefinition.makeBinding(MemberFilterMenu, {
   field: "membersPaneFilterMenu",
-  init: { contextToArgs: () => [{ id: "workshop-members-pane-filter" }] },
-  outMessage: {
-    fold: MemberFilterMenu.OutMessage.match({
-      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ memberFilter: () => value })),
-      Closed: () => ApplicationDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "workshop-members-pane-filter" }] }
+}).withOutMessagePolicy({
+  fold: MemberFilterMenu.OutMessage.match({
+    Selected: ({ value }) => ApplicationDefinition.makeFieldsStep(() => ({ memberFilter: () => value })),
+    Closed: () => ApplicationDefinition.makeNoopStep()
+  })
 })
 
 /** Choosing an appearance moves the check; choosing another entry is only remembered, to show it was chosen. */
 const foldAccountOutMessage = AccountMenu.OutMessage.match({
   Selected: ({ value }) =>
     Schema.is(Appearance)(value)
-      ? ApplicationDefinition.stepFields(() => ({ appearance: () => value, accountChoice: () => value }))
-      : ApplicationDefinition.stepFields(() => ({ accountChoice: () => value })),
-  Closed: () => ApplicationDefinition.stepNoop()
+      ? ApplicationDefinition.makeFieldsStep(() => ({ appearance: () => value, accountChoice: () => value }))
+      : ApplicationDefinition.makeFieldsStep(() => ({ accountChoice: () => value })),
+  Closed: () => ApplicationDefinition.makeNoopStep()
 })
 
-export const AccountBinding = ApplicationDefinition.bindChild(AccountMenu, {
+export const AccountBinding = ApplicationDefinition.makeBinding(AccountMenu, {
   field: "accountMenu",
-  init: { contextToArgs: () => [{ id: "workshop-account" }] },
-  outMessage: { fold: foldAccountOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "workshop-account" }] }
+}).withOutMessagePolicy({ fold: foldAccountOutMessage })
 
-export const RailAccountBinding = ApplicationDefinition.bindChild(AccountMenu, {
+export const RailAccountBinding = ApplicationDefinition.makeBinding(AccountMenu, {
   field: "railAccountMenu",
-  init: { contextToArgs: () => [{ id: "workshop-rail-account" }] },
-  outMessage: { fold: foldAccountOutMessage }
-})
+  init: { contextToArgs: () => [{ id: "workshop-rail-account" }] }
+}).withOutMessagePolicy({ fold: foldAccountOutMessage })
 
 export const ApplicationComposition = ApplicationDefinition.makeComposition({
   bindings: [

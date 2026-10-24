@@ -22,51 +22,46 @@ const changing = (model: Model, changeOf: (task: Task.Task) => Task.Change) =>
     }
   })
 
-export const StatusBinding = TaskDefinition.bindChild(StatusMenu, {
+export const StatusBinding = TaskDefinition.makeBinding(StatusMenu, {
   field: "statusMenu",
-  init: { contextToArgs: () => [{ id: "task-status" }] },
-  outMessage: {
-    /** Choosing a status changes the task's, from the one the person saw. */
-    fold: StatusMenu.OutMessage.match({
-      Selected: ({ value }) =>
-        TaskDefinition.step((model: Model) =>
-          changing(model, (task) => Task.Change.cases.Status.make({ from: task.status, to: value }))
-        ),
-      Closed: () => TaskDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "task-status" }] }
+}).withOutMessagePolicy({
+  /** Choosing a status changes the task's, from the one the person saw. */
+  fold: StatusMenu.OutMessage.match({
+    Selected: ({ value }) =>
+      TaskDefinition.makeStep((model: Model) =>
+        changing(model, (task) => Task.Change.cases.Status.make({ from: task.status, to: value }))
+      ),
+    Closed: () => TaskDefinition.makeNoopStep()
+  })
 })
 
-export const PriorityBinding = TaskDefinition.bindChild(PriorityMenu, {
+export const PriorityBinding = TaskDefinition.makeBinding(PriorityMenu, {
   field: "priorityMenu",
-  init: { contextToArgs: () => [{ id: "task-priority" }] },
-  outMessage: {
-    /** Choosing a priority changes the task's, from the one the person saw. */
-    fold: PriorityMenu.OutMessage.match({
-      Selected: ({ value }) =>
-        TaskDefinition.step((model: Model) =>
-          changing(model, (task) => Task.Change.cases.Priority.make({ from: task.priority, to: value }))
-        ),
-      Closed: () => TaskDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "task-priority" }] }
+}).withOutMessagePolicy({
+  /** Choosing a priority changes the task's, from the one the person saw. */
+  fold: PriorityMenu.OutMessage.match({
+    Selected: ({ value }) =>
+      TaskDefinition.makeStep((model: Model) =>
+        changing(model, (task) => Task.Change.cases.Priority.make({ from: task.priority, to: value }))
+      ),
+    Closed: () => TaskDefinition.makeNoopStep()
+  })
 })
 
-export const AssigneeBinding = TaskDefinition.bindChild(AssigneeMenu, {
+export const AssigneeBinding = TaskDefinition.makeBinding(AssigneeMenu, {
   field: "assigneeMenu",
-  init: { contextToArgs: () => [{ id: "task-assignee" }] },
-  outMessage: {
-    /** Choosing a person assigns the task to them, and Unassigned to no one, from the assignee the person saw. */
-    fold: AssigneeMenu.OutMessage.match({
-      Selected: ({ value }) =>
-        TaskDefinition.step((model: Model) =>
-          changing(model, (task) =>
-            Task.Change.cases.Assignee.make({ from: task.assignee, to: assigneeOfChoice(value) })
-          )
-        ),
-      Closed: () => TaskDefinition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "task-assignee" }] }
+}).withOutMessagePolicy({
+  /** Choosing a person assigns the task to them, and Unassigned to no one, from the assignee the person saw. */
+  fold: AssigneeMenu.OutMessage.match({
+    Selected: ({ value }) =>
+      TaskDefinition.makeStep((model: Model) =>
+        changing(model, (task) => Task.Change.cases.Assignee.make({ from: task.assignee, to: assigneeOfChoice(value) }))
+      ),
+    Closed: () => TaskDefinition.makeNoopStep()
+  })
 })
 
 export const TaskComposition = TaskDefinition.makeComposition({

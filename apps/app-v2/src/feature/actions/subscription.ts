@@ -99,7 +99,7 @@ const describe = (action: Store.ActionView): ActionItem => ({
   rejection: Option.map(action.rejection, (error) => error.message)
 })
 
-export const subscriptions = ActionsDefinition.subscriptions((entry) => ({
+export const subscriptions = ActionsDefinition.makeSubscriptions((entry) => ({
   actions: entry(
     "ReadActions",
     { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId },

@@ -9,7 +9,7 @@ import * as Store from "../../store/Store.ts"
 import * as Stores from "../../store/Stores.ts"
 import { ChannelsDefinition, Message } from "./definition.ts"
 
-export const subscriptions = ChannelsDefinition.subscriptions((entry) => ({
+export const subscriptions = ChannelsDefinition.makeSubscriptions((entry) => ({
   channels: entry(
     "ReadChannels",
     { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId },

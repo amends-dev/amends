@@ -97,13 +97,16 @@ Back/Forward restore these same destinations.
 | Root `src/` modules | Application assembly, session and API access, browser services, appearance, viewport, and input methods. |
 
 A feature's `definition.ts` owns its schemas, messages, outgoing messages, and queries.
-`composition.ts` binds children and interprets their outgoing messages; a feature with no children
-may keep its empty composition in its definition. `init.ts`, `update.ts`, `command.ts`, and
-`subscription.ts` implement the behavior that `block.ts` assembles.
+`composition.ts` binds children and chooses each one's outgoing-message policy with
+`withOutMessagePolicy`; a feature with no children may keep its empty composition in its definition.
+`init.ts`, `update.ts`, `command.ts`, and `subscription.ts` implement the behavior that `block.ts`
+prepares in a private `prepare` producer and completes with `Block.assemble(prepare)`. The root
+completes the application Block the same way in `src/block.ts`, and `src/entry.ts` starts it with
+`Program.make`.
 
-All feature Blocks assemble without a default view. Their views use the completed Block's
+All feature Blocks are prepared without a default view. Their views use the completed Block's
 `makeView`; parents choose a renderer explicitly with `Binding.embedView({ view, ... })`.
-Pages assemble their default views at the application edge. The
+Pages prepare their default views. The
 [composer consumer test](src/feature/composer/block.scene.test.ts) embeds one Block with both a
 plain HTML view and the Amends view.
 
@@ -216,25 +219,33 @@ record kinds and filter in memory; these are scaling considerations for larger w
 
 ## Foldkit preview patch
 
-The app pins `foldkit` and `@foldkit/ui` to `0.168.0-canary.bfd880b1e6ca`.
-The root manifest applies [this patch](../../patches/foldkit@0.168.0-canary.bfd880b1e6ca.patch):
+The app pins `foldkit` and `@foldkit/ui` to `0.169.0-canary.1f6776fa7ece` and
+`@foldkit/vite-plugin` to `0.28.0-canary.1f6776fa7ece`, the preview of
+[foldkit/foldkit#1655](https://github.com/foldkit/foldkit/pull/1655) at source commit `1f6776fa7ece`.
+The root manifest applies [this patch](../../patches/foldkit@0.169.0-canary.1f6776fa7ece.patch),
+which changes declarations only:
 
-| Patched file under `dist/block/`       | Why it is needed                                                                                                                                                                                                      |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `keyedBinding.js`                      | Resolves a keyed child's outgoing-message policy result through `resolveOperationOutput`, including child-init recipes. Without it, opening another child can leave the parent model undefined.                       |
-| `requirements.d.ts`, `definition.d.ts` | Validates handler contracts against the Block's own effects layer through `LocalBlockLayer` and `LocalEffectsLayerTypeId`. Descendants were already validated; expanding them again at every parent can reach TS2589. |
-| `deferredPolicy.d.ts`                  | Collects message, requirement, and registration channels while resolving cyclic sibling policies, then builds the update result at the outer boundary. Retains the visited-placement check and registration evidence. |
+| Patched file under `dist/`                         | Why it is needed                                                                                                                                                                                                                                             |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `block/requirements.d.ts`, `block/definition.d.ts` | Validates a Block's handler contracts against its own effects layer through `LocalBlockLayer` and `LocalEffectsLayerTypeId`, in `ValidateLocalCompositionChannels`. Descendants were already validated; expanding them again at every parent reaches TS2589. |
+| `block/deferredPolicy.d.ts`                        | Collects message, requirement, and registration channels while resolving cyclic sibling policies, then builds the update result at the outer boundary. Retains the visited-placement check and registration evidence.                                        |
+| `update/update.d.ts`                               | Returns `Update.combineSteps`'s operation-step results without `NoInfer`. Wrapped, the union a step array returns is not distributed by `Update.withOutMessage`, whose result becomes `never`, so the update's type silently loses that outgoing message.    |
+| `html/viewInputs.d.ts`                             | Exempts Effect `Inspectable`'s `toString` and `toJSON` from the check for callbacks nested in view inputs, as Foldkit exempts `Pipeable`'s and `Date`'s methods, so a view input can hold a `DateTime.Utc` such as `now`.                                    |
 
-Only the keyed-binding fix changes runtime code; the other changes are declarations.
-The corresponding upstream modules live under `repos/foldkit/packages/foldkit/src/block/`.
+The corresponding upstream modules live under `repos/foldkit/packages/foldkit/src/`.
 Vendored source is reference material, not an application import or an edit target.
 
 The cyclic-policy patch lets the workspace handle search and name-change requests directly;
-the command round trips described in PR #50 are no longer needed. It is a local mitigation,
+the command round trips described in PR #50 are no longer needed. The `update.d.ts` patch keeps
+the outgoing messages that Settings and Connections attach after closing their dialogs, such as
+`RenamedSelf` and `RemovedConnection`, in their updates' types. The patch is a local mitigation,
 not a claim that any later Foldkit release is compatible. For an upgrade, inspect the matching
-upstream changes and remove only fixes that the replacement actually supplies. Run the full app
-type-check and tests, including [foldkit-policies.test.ts](test/foldkit-policies.test.ts), which
-covers cyclic transitions, inferred channels, missing handlers, and unregistered siblings.
+upstream changes and remove only fixes that the replacement actually supplies, as this preview's
+`Definition.makeStep` did for the earlier keyed-binding fix by running a registered Binding's init
+itself. Run the full app type-check and tests, including
+[foldkit-policies.test.ts](test/foldkit-policies.test.ts), which covers cyclic transitions,
+inferred channels, missing handlers, unregistered siblings, and a keyed child's policy opening
+another occurrence in its place.
 
 ## Tests
 
@@ -278,4 +289,4 @@ it does not implement the following product work:
 | Original discussion      | Core accepts `Thread.origin` and the pending-action projection preserves it; the app has no flow that supplies it or links back to that discussion.        |
 | Turn logs                | No reply-draft phase/card. A failed HTTP log stream offers Try again rather than automatically reconnecting with a reconnecting state.                     |
 | Rich-text editing        | WYSIWYG editing is a product/integration decision. The current toolbar edits Markdown; it has no active-format state or link-address dialog.               |
-| Foldkit upgrade          | The local preview patch and named Block interfaces remain necessary for this pinned build; an upstream replacement needs explicit verification.            |
+| Foldkit preview          | The app runs on an unreleased preview with a local declaration patch and named Block interfaces; each later preview needs the patch checked again.         |

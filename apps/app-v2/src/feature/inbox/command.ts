@@ -16,7 +16,7 @@ const failed = (error: string) => Message.FailedWriteAction({ error })
 const failedAll = (error: string) => Message.FailedWriteAllSeen({ error })
 
 /** Mark the notification `notificationId` seen. */
-export const MarkNotificationSeen = InboxDefinition.command("MarkNotificationSeen", {
+export const MarkNotificationSeen = InboxDefinition.makeCommand("MarkNotificationSeen", {
   args: { ...Stores.AsMember, notificationId: Notification.NotificationId },
   messages: written,
   handler: function* () {
@@ -27,7 +27,7 @@ export const MarkNotificationSeen = InboxDefinition.command("MarkNotificationSee
 })
 
 /** Mark every notification seen, up to and including the one `through` names. */
-export const MarkAllNotificationsSeen = InboxDefinition.command("MarkAllNotificationsSeen", {
+export const MarkAllNotificationsSeen = InboxDefinition.makeCommand("MarkAllNotificationsSeen", {
   args: { ...Stores.AsMember, through: NotificationStore.Cursor },
   messages: allWritten,
   handler: function* () {

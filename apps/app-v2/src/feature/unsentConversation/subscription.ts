@@ -32,7 +32,7 @@ export const receivedConversation = (
     )
   })
 
-export const subscriptions = UnsentConversationDefinition.subscriptions((entry) => ({
+export const subscriptions = UnsentConversationDefinition.makeSubscriptions((entry) => ({
   people: entry(
     "ReadPeople",
     {

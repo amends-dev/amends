@@ -36,24 +36,24 @@ const blankAdding: Adding = {
 }
 
 /** Ask for the dialog on a blank form that adds an agent. */
-const openAdding = AgentsDefinition.stepFields(() => ({
+const openAdding = AgentsDefinition.makeFieldsStep(() => ({
   adding: () => Option.some(blankAdding),
   removing: () => Option.none()
 }))
 
 /** Ask for the dialog on the confirmation that removes `agentId`, which is called `name` now. */
 const openRemoving = (agentId: Identity.AgentId, name: string) =>
-  AgentsDefinition.stepFields(() => ({
+  AgentsDefinition.makeFieldsStep(() => ({
     adding: () => Option.none(),
     removing: () => Option.some({ agentId, name, isSending: false, failure: Option.none() })
   }))
 
 /** Ask for the models of the connection `connectionId` unless they are loaded or on their way. */
 const askForModelsOnceStep = (connectionId: string) =>
-  AgentsDefinition.step((model: Model) => askForModelsOnce(model, connectionId))
+  AgentsDefinition.makeStep((model: Model) => askForModelsOnce(model, connectionId))
 
 /** Close the dialog, whose form or confirmation is done with. */
-const closeDialog = Update.combine([leaveDialog, DialogBinding.requestClose()])
+const closeDialog = Update.combineSteps([leaveDialog, DialogBinding.requestClose()])
 
 export const update = AgentsComposition.makeUpdate((model, message) => {
   /**
@@ -69,7 +69,7 @@ export const update = AgentsComposition.makeUpdate((model, message) => {
         onNone: () => ({ model: current }),
         onSome: ({ agent }) =>
           pipe(
-            Update.combine(current, [askForModelsOnceStep(agent.model.connectionId), closeDialog]),
+            Update.combineSteps(current, [askForModelsOnceStep(agent.model.connectionId), closeDialog]),
             Update.withOutMessage(OutMessage.CreatedAgent({ agentId: agent.id, name: nameOfAgent(current, agent) }))
           )
       }
@@ -84,7 +84,7 @@ export const update = AgentsComposition.makeUpdate((model, message) => {
       current.removing,
       ({ agentId, isSending }) => !isSending && Option.isNone(findListedAgent(current, agentId))
     )
-      ? Update.combine(current, [closeDialog])
+      ? Update.combineSteps(current, [closeDialog])
       : { model: current }
 
   /** Open the confirmation that removes `agentId`, where the person may remove it. */
@@ -93,7 +93,10 @@ export const update = AgentsComposition.makeUpdate((model, message) => {
       onNone: () => ({ model }),
       onSome: (item) =>
         mayRemove(model, item.agent) && !item.pending
-          ? Update.combine(model, [openRemoving(agentId, nameOfAgent(model, item.agent)), DialogBinding.requestOpen()])
+          ? Update.combineSteps(model, [
+              openRemoving(agentId, nameOfAgent(model, item.agent)),
+              DialogBinding.requestOpen()
+            ])
           : { model }
     })
 
@@ -123,13 +126,13 @@ export const update = AgentsComposition.makeUpdate((model, message) => {
           {
             onNone: () => ({ model }),
             onSome: ({ name }) =>
-              pipe(Update.combine(model, [closeDialog]), Update.withOutMessage(OutMessage.RemovedAgent({ name })))
+              pipe(Update.combineSteps(model, [closeDialog]), Update.withOutMessage(OutMessage.RemovedAgent({ name })))
           }
         )
     })
 
   return Message.match(message, {
-    RequestedDismiss: () => Update.combine(model, [DialogBinding.requestClose()]),
+    RequestedDismiss: () => Update.combineSteps(model, [DialogBinding.requestClose()]),
     ReceivedAgents: ({ agents, members, connections, roles, workspace, grants }) => {
       const received = modifyFields(model, {
         isLoaded: () => true,
@@ -183,7 +186,7 @@ export const update = AgentsComposition.makeUpdate((model, message) => {
         onSome: ({ agent }) => ({ ...askForModelsOnce(model, agent.model.connectionId), outMessage })
       })
     },
-    ClickedAdd: () => Update.combine(model, [openAdding, DialogBinding.requestOpen()]),
+    ClickedAdd: () => Update.combineSteps(model, [openAdding, DialogBinding.requestOpen()]),
     TypedAddingName: ({ name }) => ({
       model: atAdding(model, (adding) => modifyFields(adding, { name: () => name, failure: () => Option.none() }))
     }),

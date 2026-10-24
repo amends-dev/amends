@@ -14,7 +14,7 @@ import * as Stores from "../../store/Stores.ts"
 import { ComposerDefinition, Message, Reading } from "./definition.ts"
 
 /** Read the draft at `place`; one that cannot be read is empty. */
-export const ReadDraft = ComposerDefinition.command("ReadDraft", {
+export const ReadDraft = ComposerDefinition.makeCommand("ReadDraft", {
   args: { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, place: Drafts.Place },
   messages: [Message.ReceivedDraft],
   handler: function* () {
@@ -28,7 +28,7 @@ export const ReadDraft = ComposerDefinition.command("ReadDraft", {
 })
 
 /** Keep `text` as the draft at `place`, or forget the draft, given none. */
-export const SaveDraft = ComposerDefinition.command("SaveDraft", {
+export const SaveDraft = ComposerDefinition.makeCommand("SaveDraft", {
   args: {
     workspaceId: WorkspaceId.WorkspaceId,
     memberId: MemberId.MemberId,
@@ -53,7 +53,7 @@ export const SaveDraft = ComposerDefinition.command("SaveDraft", {
  * Read the selection of the box `id`, as it stands before the render in progress commits, which is what the person
  * selected, and say what it was read for.
  */
-export const ReadSelection = ComposerDefinition.command("ReadSelection", {
+export const ReadSelection = ComposerDefinition.makeCommand("ReadSelection", {
   args: { id: Schema.String, reading: Reading },
   messages: [Message.ReceivedSelection],
   handler: function* () {
@@ -77,7 +77,7 @@ export const ReadSelection = ComposerDefinition.command("ReadSelection", {
  * so that the person goes on typing where the text was changed for them: setting a box's value moves the caret to its
  * end.
  */
-export const SelectText = ComposerDefinition.command("SelectText", {
+export const SelectText = ComposerDefinition.makeCommand("SelectText", {
   args: { id: Schema.String, from: Schema.Int, to: Schema.Int },
   messages: [Message.CompletedSelectText],
   handler: function* () {

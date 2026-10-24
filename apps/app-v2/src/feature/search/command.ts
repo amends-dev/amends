@@ -6,7 +6,7 @@ import * as Dom from "foldkit/dom"
 import { Message, SearchDefinition } from "./definition.ts"
 
 /** Scroll the item `id` into view in the list, so that the one the arrow keys reach is seen. */
-export const ScrollToItem = SearchDefinition.command("ScrollToItem", {
+export const ScrollToItem = SearchDefinition.makeCommand("ScrollToItem", {
   args: { id: Schema.String },
   messages: [Message.CompletedScrollToItem],
   handler: function* () {

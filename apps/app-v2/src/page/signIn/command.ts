@@ -36,7 +36,7 @@ const codeErrorOf = (error: unknown): CodeError =>
  * Send a sign-in code to `email`. The client reports a status the contract does not list as a defect, which a failure
  * handler misses, so any cause of the request ends in the reason told for it and the form never stays waiting.
  */
-export const SendCode = SignInDefinition.command("SendCode", {
+export const SendCode = SignInDefinition.makeCommand("SendCode", {
   args: { email: Schema.String },
   messages: [Message.SucceededSendCode, Message.FailedSendCode],
   handler: function* () {
@@ -63,7 +63,7 @@ export const SendCode = SignInDefinition.command("SendCode", {
  * Exchange the code sent to `email` for a session, kept for the next visit before it is reported. As with `SendCode`,
  * any cause of the request ends in a reason, and a code the host rejected is told apart by why it did.
  */
-export const CheckCode = SignInDefinition.command("CheckCode", {
+export const CheckCode = SignInDefinition.makeCommand("CheckCode", {
   args: { email: Schema.String, code: Schema.String },
   messages: [Message.SucceededSignIn, Message.FailedSignIn],
   handler: function* () {
@@ -87,7 +87,7 @@ export const CheckCode = SignInDefinition.command("CheckCode", {
 })
 
 /** Move focus to the code's input, such as once a new code was sent and the person types it. */
-export const FocusCode = SignInDefinition.command("FocusCode", {
+export const FocusCode = SignInDefinition.makeCommand("FocusCode", {
   messages: [Message.CompletedFocusCode],
   handler: function* () {
     return () => Dom.focus(`#${codeFieldId}`).pipe(Effect.ignore, Effect.as(Message.CompletedFocusCode()))

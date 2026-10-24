@@ -2,33 +2,22 @@
  * Boot the app in the page's `#root`, from the session kept from the last visit and the window's width.
  */
 
-import * as Layer from "effect/Layer"
-import { Runtime } from "foldkit"
-import { EffectsLayer } from "./command.ts"
-import { ApplicationComposition } from "./composition.ts"
+import { Program, Runtime } from "foldkit"
+import { ApplicationBlock } from "./block.ts"
 import { Flags, flags } from "./flags.ts"
-import { init } from "./init.ts"
-import { Message } from "./message.ts"
 import { ApplicationLayer } from "./services.ts"
-import { subscriptions } from "./subscription.ts"
-import { update } from "./update.ts"
-import { view } from "./view.ts"
 import { crashView } from "./view/crash.ts"
 
-const application = ApplicationComposition.assembleApplication({
-  init,
-  update,
-  view,
-  subscriptions,
-  EffectsLayer: Layer.mergeAll(EffectsLayer, subscriptions.layer),
+const program = Program.make({
+  block: ApplicationBlock,
   Flags,
   container: document.getElementById("root"),
   routing: {
-    onUrlRequest: (request) => Message.ClickedLink({ request }),
-    onUrlChange: (url) => Message.ChangedUrl({ url })
+    onUrlRequest: ApplicationBlock.Message.ClickedLink,
+    onUrlChange: ApplicationBlock.Message.ChangedUrl
   },
   crash: { view: crashView },
-  devTools: { Message: ApplicationComposition.Message }
+  devTools: { dispatch: true }
 })
 
-Runtime.run(application.provide(ApplicationLayer), { flags })
+Runtime.run(program.provide(ApplicationLayer), { flags })

@@ -11,7 +11,7 @@ import * as Stream from "effect/Stream"
 import * as Stores from "../../store/Stores.ts"
 import { Message, ThreadDefinition } from "./definition.ts"
 
-export const subscriptions = ThreadDefinition.subscriptions((entry) => ({
+export const subscriptions = ThreadDefinition.makeSubscriptions((entry) => ({
   thread: entry(
     "ReadThread",
     {

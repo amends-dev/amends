@@ -77,6 +77,6 @@
     "vite-node": "5.0.0"
   },
   "patchedDependencies": {
-    "foldkit@0.168.0-canary.bfd880b1e6ca": "patches/foldkit@0.168.0-canary.bfd880b1e6ca.patch"
+    "foldkit@0.169.0-canary.1f6776fa7ece": "patches/foldkit@0.169.0-canary.1f6776fa7ece.patch"
   }
 }

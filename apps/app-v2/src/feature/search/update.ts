@@ -10,7 +10,7 @@ export const update = SearchComposition.makeUpdate((model, message) => {
   /** Close the dialog and report the page, the group, the thread, the person, or the agent `item` opens. */
   const choose = (item: Item) =>
     Update.withOutMessage(
-      Update.combine(model, [DialogBinding.requestClose()]),
+      Update.combineSteps(model, [DialogBinding.requestClose()]),
       Item.match(item, {
         Destination: ({ destination }) => OutMessage.OpenedDestination({ destination }),
         Group: ({ group }) => OutMessage.OpenedGroup({ groupId: group.id }),
@@ -21,8 +21,8 @@ export const update = SearchComposition.makeUpdate((model, message) => {
     )
 
   return Message.match(message, {
-    RequestedDismiss: () => Update.combine(model, [DialogBinding.requestClose()]),
-    RequestedOpen: () => Update.combine(model, [clearQuery, DialogBinding.requestOpen()]),
+    RequestedDismiss: () => Update.combineSteps(model, [DialogBinding.requestClose()]),
+    RequestedOpen: () => Update.combineSteps(model, [clearQuery, DialogBinding.requestOpen()]),
     // The item reached stays reached while the places change under it, unless the list is now too short to hold it.
     ReceivedTargets: ({ targets }) => {
       const received = modifyFields(model, { status: () => SearchStatus.Read({ targets: orderTargets(targets) }) })

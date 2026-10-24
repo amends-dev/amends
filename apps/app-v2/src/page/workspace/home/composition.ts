@@ -19,7 +19,7 @@ import { HomeDefinition, type Model, Open, OutMessage } from "./definition.ts"
 
 /** Open the group `groupId` in the main pane, with the thread `threadId` open in it, if there is one. */
 const openGroup = (groupId: GroupId.GroupId, threadId: Option.Option<ThreadId.ThreadId>) =>
-  HomeDefinition.step((model: Model) =>
+  HomeDefinition.makeStep((model: Model) =>
     GroupBinding.init({
       key: groupId,
       args: [model.workspaceId, model.memberId, groupId, threadId],
@@ -33,7 +33,7 @@ const openGroup = (groupId: GroupId.GroupId, threadId: Option.Option<ThreadId.Th
  * so that it is named from its first view.
  */
 const openUnsentConversation = (memberIds: ReadonlyArray<MemberId.MemberId>) =>
-  HomeDefinition.step((model: Model) => {
+  HomeDefinition.makeStep((model: Model) => {
     const people = Group.directMembers(memberIds)
 
     return UnsentBinding.init({
@@ -44,22 +44,22 @@ const openUnsentConversation = (memberIds: ReadonlyArray<MemberId.MemberId>) =>
   })
 
 /** Show the inbox in the main pane. */
-export const showInbox = HomeDefinition.step((model: Model) => ({
+export const showInbox = HomeDefinition.makeStep((model: Model) => ({
   model: modifyFields(model, { open: () => Open.Inbox() })
 }))
 
 /** Show the tasks in triage in the main pane. */
-export const showTriage = HomeDefinition.step((model: Model) => ({
+export const showTriage = HomeDefinition.makeStep((model: Model) => ({
   model: modifyFields(model, { open: () => Open.Triage() })
 }))
 
 /** Show every open task in the main pane. */
-export const showTasks = HomeDefinition.step((model: Model) => ({
+export const showTasks = HomeDefinition.makeStep((model: Model) => ({
   model: modifyFields(model, { open: () => Open.Tasks() })
 }))
 
 /** Show the groups to browse in the main pane. */
-export const showGroups = HomeDefinition.step((model: Model) => ({
+export const showGroups = HomeDefinition.makeStep((model: Model) => ({
   model: modifyFields(model, { open: () => Open.Groups() })
 }))
 
@@ -68,7 +68,7 @@ export const showGroups = HomeDefinition.step((model: Model) => ({
  * no group marked in the sidebar, and `show` the list.
  */
 export const switchTo = (show: typeof showInbox) =>
-  Update.combine([
+  Update.combineSteps([
     hideAside,
     InboxBinding.requestCloseThread(),
     GroupsBinding.informOpenGroup({ groupId: Option.none() }),
@@ -77,14 +77,14 @@ export const switchTo = (show: typeof showInbox) =>
 
 /** Open the group `groupId` without a thread, and close the side pane's dialog and the thread beside the inbox. */
 export const openGroupAlone = (groupId: GroupId.GroupId) =>
-  Update.combine([hideAside, InboxBinding.requestCloseThread(), openGroup(groupId, Option.none())])
+  Update.combineSteps([hideAside, InboxBinding.requestCloseThread(), openGroup(groupId, Option.none())])
 
 /**
  * Open the conversation with the members `memberIds` before it is started, as picking a group opens it: close the side
  * pane's dialog and the thread beside the inbox, and leave no group marked in the sidebar, since there is none.
  */
 export const openUnsentConversationAlone = (memberIds: ReadonlyArray<MemberId.MemberId>) =>
-  Update.combine([
+  Update.combineSteps([
     hideAside,
     InboxBinding.requestCloseThread(),
     GroupsBinding.informOpenGroup({ groupId: Option.none() }),
@@ -93,14 +93,14 @@ export const openUnsentConversationAlone = (memberIds: ReadonlyArray<MemberId.Me
 
 /** Mark the group `groupId` in the sidebar and open it without a thread, as asking Home to open it does. */
 export const markAndOpenGroup = (groupId: GroupId.GroupId) =>
-  Update.combine([GroupsBinding.informOpenGroup({ groupId: Option.some(groupId) }), openGroupAlone(groupId)])
+  Update.combineSteps([GroupsBinding.informOpenGroup({ groupId: Option.some(groupId) }), openGroupAlone(groupId)])
 
 /**
  * Open the group `groupId` with the thread `threadId` open in it, mark the group open in the list, close the thread
  * beside the inbox, and open the side pane's dialog where the pane is one.
  */
 export const openThreadInGroup = (groupId: GroupId.GroupId, threadId: ThreadId.ThreadId) =>
-  Update.combine([
+  Update.combineSteps([
     InboxBinding.requestCloseThread(),
     GroupsBinding.informOpenGroup({ groupId: Option.some(groupId) }),
     openGroup(groupId, Option.some(threadId)),
@@ -113,11 +113,11 @@ export const openThreadInGroup = (groupId: GroupId.GroupId, threadId: ThreadId.T
  * created opens, as picking it does.
  */
 const foldGroupsOutMessage = GroupsBlock.OutMessage.match({
-  ChangedBrowseTab: () => HomeDefinition.stepNoop(),
+  ChangedBrowseTab: () => HomeDefinition.makeNoopStep(),
   SelectedGroup: ({ groupId }) => openGroupAlone(groupId),
   SelectedPeople: ({ memberIds }) => openUnsentConversationAlone(memberIds),
   RequestedBrowse: () => switchTo(showGroups),
-  JoinedGroup: () => HomeDefinition.stepNoop(),
+  JoinedGroup: () => HomeDefinition.makeNoopStep(),
   CreatedGroup: ({ groupId }) => openGroupAlone(groupId)
 })
 
@@ -140,10 +140,10 @@ const forwardGroupsOutMessage = GroupsBlock.OutMessage.match({
  * thread's turn asked for are the page's to open, which Home reports as they are.
  */
 const foldInboxOutMessage = InboxBlock.OutMessage.match({
-  ChangedTab: () => HomeDefinition.stepNoop(),
+  ChangedTab: () => HomeDefinition.makeNoopStep(),
   OpenedThread: () => showAside,
   ClosedThread: () => hideAside,
-  OpenedAgent: () => HomeDefinition.stepNoop(),
+  OpenedAgent: () => HomeDefinition.makeNoopStep(),
   OpenedProfile: ({ memberId, triggerId }) => ProfileCardBinding.requestOpen({ memberId, triggerId })
 })
 
@@ -171,42 +171,43 @@ const forwardTasksOutMessage = TasksBlock.OutMessage.match({
  * person leaving the thread.
  */
 const foldAsideOutMessage = DialogBlock.OutMessage.match({
-  Opened: () => HomeDefinition.stepNoop(),
+  Opened: () => HomeDefinition.makeNoopStep(),
   Closed: () =>
-    HomeDefinition.step((model: Model) => (isAsideInDialog(model.viewport) ? closeThread : HomeDefinition.stepNoop())),
-  CompletedClose: () => HomeDefinition.stepNoop()
+    HomeDefinition.makeStep((model: Model) =>
+      isAsideInDialog(model.viewport) ? closeThread : HomeDefinition.makeNoopStep()
+    ),
+  CompletedClose: () => HomeDefinition.makeNoopStep()
 })
 
-export const AsideBinding = HomeDefinition.bindChild(DialogBlock, {
+export const AsideBinding = HomeDefinition.makeBinding(DialogBlock, {
   field: "aside",
-  init: { contextToArgs: () => [{ id: "home-aside" }] },
-  outMessage: {
-    fold: foldAsideOutMessage,
-    forward: DialogBlock.OutMessage.match({
-      Opened: () => undefined,
-      Closed: () => OutMessage.Navigated(),
-      CompletedClose: () => undefined
-    })
-  }
+  init: { contextToArgs: () => [{ id: "home-aside" }] }
+}).withOutMessagePolicy({
+  fold: foldAsideOutMessage,
+  forward: DialogBlock.OutMessage.match({
+    Opened: () => undefined,
+    Closed: () => OutMessage.Navigated(),
+    CompletedClose: () => undefined
+  })
 })
 
 /** Open the side pane's dialog, where the window's width puts the side pane in one. */
-export const showAside = HomeDefinition.step((model: Model) =>
-  isAsideInDialog(model.viewport) ? AsideBinding.requestOpen() : HomeDefinition.stepNoop()
+export const showAside = HomeDefinition.makeStep((model: Model) =>
+  isAsideInDialog(model.viewport) ? AsideBinding.requestOpen() : HomeDefinition.makeNoopStep()
 )
 
 /** Close the side pane's dialog; closing one that is closed does nothing. */
 export const hideAside = AsideBinding.requestClose()
 
 /** Close the thread open in the group open or beside the inbox, if there is one. */
-const closeThread = HomeDefinition.step((model: Model) =>
+const closeThread = HomeDefinition.makeStep((model: Model) =>
   Open.matchOrElse(
     model.open,
     {
       Inbox: () => InboxBinding.requestCloseThread(),
       Group: ({ groupId }) => GroupBinding.requestCloseThread(groupId)
     },
-    () => HomeDefinition.stepNoop()
+    () => HomeDefinition.makeNoopStep()
   )
 )
 
@@ -219,11 +220,10 @@ const foldUnsentOutMessage = (_key: string, outMessage: typeof UnsentConversatio
     FoundConversation: ({ groupId }) => markAndOpenGroup(groupId)
   })
 
-export const GroupsBinding = HomeDefinition.bindChild(GroupsBlock, {
+export const GroupsBinding = HomeDefinition.makeBinding(GroupsBlock, {
   field: "groups",
-  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { forward: forwardGroupsOutMessage, fold: foldGroupsOutMessage }
-})
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+}).withOutMessagePolicy({ forward: forwardGroupsOutMessage, fold: foldGroupsOutMessage })
 
 /**
  * What the person chose on a member's card is the page's to do, which Home reports as it is: Message opens the
@@ -235,23 +235,20 @@ const forwardProfileCardOutMessage = ProfileCardBlock.OutMessage.match({
   RequestedNameChange: () => OutMessage.RequestedNameChange()
 })
 
-export const ProfileCardBinding = HomeDefinition.bindChild(ProfileCardBlock, {
+export const ProfileCardBinding = HomeDefinition.makeBinding(ProfileCardBlock, {
   field: "profileCard",
-  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { forward: forwardProfileCardOutMessage }
-})
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+}).withOutMessagePolicy({ forward: forwardProfileCardOutMessage })
 
-export const InboxBinding = HomeDefinition.bindChild(InboxBlock, {
+export const InboxBinding = HomeDefinition.makeBinding(InboxBlock, {
   field: "inbox",
-  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { forward: forwardInboxOutMessage, fold: foldInboxOutMessage }
-})
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+}).withOutMessagePolicy({ forward: forwardInboxOutMessage, fold: foldInboxOutMessage })
 
-export const TasksBinding = HomeDefinition.bindChild(TasksBlock, {
+export const TasksBinding = HomeDefinition.makeBinding(TasksBlock, {
   field: "tasks",
-  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { forward: forwardTasksOutMessage, fold: foldTasksOutMessage }
-})
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+}).withOutMessagePolicy({ forward: forwardTasksOutMessage, fold: foldTasksOutMessage })
 
 /**
  * The open group's thread opening opens the side pane's dialog where the pane is one, and closing it closes it, and an
@@ -260,14 +257,14 @@ export const TasksBinding = HomeDefinition.bindChild(TasksBlock, {
  */
 const foldGroupOutMessage = (_groupId: GroupId.GroupId, outMessage: typeof GroupBlock.OutMessage.Type) =>
   GroupBlock.OutMessage.match(outMessage, {
-    ChangedTab: () => HomeDefinition.stepNoop(),
+    ChangedTab: () => HomeDefinition.makeNoopStep(),
     OpenedThread: () => showAside,
     ClosedThread: () => hideAside,
-    OpenedAgent: () => HomeDefinition.stepNoop(),
+    OpenedAgent: () => HomeDefinition.makeNoopStep(),
     OpenedProfile: ({ memberId, triggerId }) => ProfileCardBinding.requestOpen({ memberId, triggerId }),
-    FollowedGroup: () => HomeDefinition.stepNoop(),
-    UnfollowedGroup: () => HomeDefinition.stepNoop(),
-    RequestedSearch: () => HomeDefinition.stepNoop()
+    FollowedGroup: () => HomeDefinition.makeNoopStep(),
+    UnfollowedGroup: () => HomeDefinition.makeNoopStep(),
+    RequestedSearch: () => HomeDefinition.makeNoopStep()
   })
 
 /**
@@ -291,7 +288,7 @@ const forwardGroupOutMessage = (_groupId: GroupId.GroupId, outMessage: typeof Gr
  * The open group, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong
  * one.
  */
-export const GroupBinding = HomeDefinition.bindChild(GroupBlock, {
+export const GroupBinding = HomeDefinition.makeBinding(GroupBlock, {
   readAll: (model) => (Open.isAnyOf(["Group"])(model.open) ? [model.open] : []),
   key: (open) => open.groupId,
   keySchema: GroupId.GroupId,
@@ -300,15 +297,14 @@ export const GroupBinding = HomeDefinition.bindChild(GroupBlock, {
     modifyFields(model, {
       open: (open) =>
         Open.isAnyOf(["Group"])(open) && open.groupId === groupId ? Open.Group({ groupId, model: nextGroup }) : open
-    }),
-  outMessage: { forward: forwardGroupOutMessage, fold: foldGroupOutMessage }
-})
+    })
+}).withOutMessagePolicy({ forward: forwardGroupOutMessage, fold: foldGroupOutMessage })
 
 /**
  * The conversation not started, a keyed occurrence by its people, so opening another makes a fresh one and a late
  * result cannot land in the wrong one.
  */
-export const UnsentBinding = HomeDefinition.bindChild(UnsentConversationBlock, {
+export const UnsentBinding = HomeDefinition.makeBinding(UnsentConversationBlock, {
   readAll: (model) => (Open.isAnyOf(["Unsent"])(model.open) ? [model.open] : []),
   key: (open) => Group.directKey(open.model.memberIds),
   keySchema: Schema.String,
@@ -319,12 +315,11 @@ export const UnsentBinding = HomeDefinition.bindChild(UnsentConversationBlock, {
         Open.isAnyOf(["Unsent"])(open) && Group.directKey(open.model.memberIds) === key
           ? Open.Unsent({ model: nextUnsent })
           : open
-    }),
-  outMessage: { fold: foldUnsentOutMessage, forward: () => OutMessage.ReplacedConversation() }
-})
+    })
+}).withOutMessagePolicy({ fold: foldUnsentOutMessage, forward: () => OutMessage.ReplacedConversation() })
 
-export const dismissOverlays = HomeDefinition.step((model: Model) =>
-  Update.combine([
+export const dismissOverlays = HomeDefinition.makeStep((model: Model) =>
+  Update.combineSteps([
     GroupsBinding.requestDismiss(),
     ProfileCardBinding.requestDismiss(),
     ...(Open.isAnyOf(["Group"])(model.open) ? [GroupBinding.requestDismiss(model.open.groupId)] : [])
@@ -334,7 +329,7 @@ export const dismissOverlays = HomeDefinition.step((model: Model) =>
 export const showDestination = (destination: HomeDestination) =>
   HomeDestination.match(destination, {
     Inbox: ({ tab, selected }) =>
-      Update.combine([
+      Update.combineSteps([
         switchTo(showInbox),
         ...Option.match(selected, {
           onNone: () => [InboxBinding.requestTab({ tab })],
@@ -343,10 +338,10 @@ export const showDestination = (destination: HomeDestination) =>
       ]),
     Triage: () => switchTo(showTriage),
     Tasks: () => switchTo(showTasks),
-    Groups: ({ tab }) => Update.combine([switchTo(showGroups), GroupsBinding.requestBrowseTab({ tab })]),
+    Groups: ({ tab }) => Update.combineSteps([switchTo(showGroups), GroupsBinding.requestBrowseTab({ tab })]),
     Group: ({ groupId, threadId, tab }) =>
-      HomeDefinition.step((model: Model) =>
-        Update.combine([
+      HomeDefinition.makeStep((model: Model) =>
+        Update.combineSteps([
           InboxBinding.requestCloseThread(),
           GroupsBinding.informOpenGroup({ groupId: Option.some(groupId) }),
           Open.isAnyOf(["Group"])(model.open) && model.open.groupId === groupId

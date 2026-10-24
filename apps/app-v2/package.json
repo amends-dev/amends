@@ -17,14 +17,14 @@
     "@amends-dev/markdown": "workspace:*",
     "@amends-dev/sync": "workspace:*",
     "@effect/platform-browser": "catalog:",
-    "@foldkit/ui": "0.168.0-canary.bfd880b1e6ca",
+    "@foldkit/ui": "0.169.0-canary.1f6776fa7ece",
     "effect": "catalog:",
-    "foldkit": "0.168.0-canary.bfd880b1e6ca"
+    "foldkit": "0.169.0-canary.1f6776fa7ece"
   },
   "devDependencies": {
     "@amends-dev/channel": "workspace:*",
     "@effect/platform-bun": "catalog:",
-    "@foldkit/vite-plugin": "0.27.1-canary.bfd880b1e6ca",
+    "@foldkit/vite-plugin": "0.28.0-canary.1f6776fa7ece",
     "@tailwindcss/vite": "^4.3.3",
     "fake-indexeddb": "6.2.5",
     "happy-dom": "^20.10.6",

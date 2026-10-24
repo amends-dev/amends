@@ -30,7 +30,7 @@ const atSignedIn = (model: Model, change: (page: SignedIn) => SignedIn): Model =
 
 const foldSignInOutMessage = SignInBlock.OutMessage.match({
   SignedIn: ({ session }) =>
-    ApplicationDefinition.step((model: Model) =>
+    ApplicationDefinition.makeStep((model: Model) =>
       WorkspacesBinding.init({
         args: [session.account.email],
         toParentModel: (workspaces) =>
@@ -41,22 +41,21 @@ const foldSignInOutMessage = SignInBlock.OutMessage.match({
     )
 })
 
-export const SignInBinding = ApplicationDefinition.bindChild(SignInBlock, {
+export const SignInBinding = ApplicationDefinition.makeBinding(SignInBlock, {
   read: (model) =>
     Page.matchOrElse(model.page, { SignedOut: ({ signIn }) => Option.some(signIn) }, () => Option.none()),
   write: (model, nextSignIn) =>
     modifyFields(model, {
       page: (page) => Page.matchOrElse(page, { SignedOut: () => Page.SignedOut({ signIn: nextSignIn }) }, () => page)
-    }),
-  outMessage: { fold: foldSignInOutMessage }
-})
+    })
+}).withOutMessagePolicy({ fold: foldSignInOutMessage })
 
 /**
  * Go to the sign-in form with the address kept and `notice` over it, if any, and forget the session, the person's
  * stores, and their sync identity.
  */
 const signOutWithNotice = (notice: string | undefined) =>
-  ApplicationDefinition.step((model: Model) =>
+  ApplicationDefinition.makeStep((model: Model) =>
     SignInBinding.init({
       args: [Page.matchOrElse(model.page, { SignedIn: ({ account }) => account.email }, () => ""), notice],
       toParentModel: (signIn) =>
@@ -78,8 +77,8 @@ export const endSession = signOutWithNotice("Your session has ended. Sign in aga
 
 /** Open only a workspace the directory resolved for this account. */
 const openWorkspace = (membership: WorkspaceDirectory.Membership, destination: Destination) =>
-  Update.combine([
-    ApplicationDefinition.step((model: Model) =>
+  Update.combineSteps([
+    ApplicationDefinition.makeStep((model: Model) =>
       WorkspaceBinding.init({
         key: membership.workspace.id,
         args: [membership.workspace.id, membership.member.id, membership.workspace.name, model.viewport],
@@ -95,14 +94,14 @@ const openWorkspace = (membership: WorkspaceDirectory.Membership, destination: D
   ])
 
 /** Apply the latest URL, including when a directory request started for an older one. */
-export const restoreRoute = ApplicationDefinition.step((model: Model) => {
+export const restoreRoute = ApplicationDefinition.makeStep((model: Model) => {
   if (!Route.isAnyOf(["Workspace"])(model.route) || !Page.isAnyOf(["SignedIn"])(model.page))
-    return ApplicationDefinition.stepNoop()
+    return ApplicationDefinition.makeNoopStep()
   const { workspaceId, destination } = model.route
   const opened = model.page.workspace
   if (Option.isSome(opened) && opened.value.workspaceId === workspaceId) {
     return destinationPath(destinationOf(opened.value.model)) === destinationPath(destination)
-      ? ApplicationDefinition.stepNoop()
+      ? ApplicationDefinition.makeNoopStep()
       : WorkspaceBinding.requestDestination(workspaceId, { destination })
   }
   return Workspaces.matchOrElse(
@@ -110,16 +109,16 @@ export const restoreRoute = ApplicationDefinition.step((model: Model) => {
     {
       Loaded: ({ memberships }) => {
         const membership = memberships.find(({ workspace }) => workspace.id === workspaceId)
-        return membership === undefined ? ApplicationDefinition.stepNoop() : openWorkspace(membership, destination)
+        return membership === undefined ? ApplicationDefinition.makeNoopStep() : openWorkspace(membership, destination)
       }
     },
-    () => ApplicationDefinition.stepNoop()
+    () => ApplicationDefinition.makeNoopStep()
   )
 })
 
 /** Record a user navigation once; Foldkit's ensuing URL event observes the same route. */
 export const navigate = (route: Route, replace = false) =>
-  ApplicationDefinition.step((model: Model) => ({
+  ApplicationDefinition.makeStep((model: Model) => ({
     model: modifyFields(model, { route: () => route }),
     commands: sameRoute(model.route, route) ? [] : [Navigate({ url: href(route), replace })]
   }))
@@ -128,31 +127,30 @@ const foldWorkspacesOutMessage = WorkspacesBlock.OutMessage.match({
   EndedSession: () => endSession,
   ListedWorkspaces: () => restoreRoute,
   OpenedWorkspace: ({ membership }) =>
-    Update.combine([
+    Update.combineSteps([
       navigate(Route.Workspace({ workspaceId: membership.workspace.id, destination: home() })),
       openWorkspace(membership, home())
     ])
 })
 
-export const WorkspacesBinding = ApplicationDefinition.bindChild(WorkspacesBlock, {
+export const WorkspacesBinding = ApplicationDefinition.makeBinding(WorkspacesBlock, {
   read: (model) =>
     Page.matchOrElse(model.page, { SignedIn: ({ workspaces }) => Option.some(workspaces) }, () => Option.none()),
   write: (model, nextWorkspaces) =>
-    atSignedIn(model, (page) => modifyFields(page, { workspaces: () => nextWorkspaces })),
-  outMessage: { fold: foldWorkspacesOutMessage }
-})
+    atSignedIn(model, (page) => modifyFields(page, { workspaces: () => nextWorkspaces }))
+}).withOutMessagePolicy({ fold: foldWorkspacesOutMessage })
 
 /** Choose the Appearance: the page shows it and the browser keeps it for the next visit. */
 const chooseAppearance = (appearance: Appearance) =>
-  ApplicationDefinition.step((model: Model) => ({
+  ApplicationDefinition.makeStep((model: Model) => ({
     model: modifyFields(model, { appearance: () => appearance }),
     commands: [ShowAppearance({ appearance }), KeepAppearance({ appearance })]
   }))
 
 /** Leave the open workspace for the list of the person's workspaces. */
-export const closeWorkspace = Update.combine([
+export const closeWorkspace = Update.combineSteps([
   navigate(Route.Workspaces()),
-  ApplicationDefinition.step((model: Model) => ({
+  ApplicationDefinition.makeStep((model: Model) => ({
     model: atSignedIn(model, (page) => modifyFields(page, { workspace: () => Option.none() }))
   }))
 ])
@@ -171,18 +169,18 @@ const chooseAccountEntry = (entry: AppAccountEntry) =>
 
 /** A destination changed inside the workspace; automatic resolution replaces its temporary address. */
 const recordWorkspaceDestination = (replace: boolean) =>
-  ApplicationDefinition.step((model: Model) =>
+  ApplicationDefinition.makeStep((model: Model) =>
     Page.matchOrElse(
       model.page,
       {
         SignedIn: ({ workspace }) =>
           Option.match(workspace, {
-            onNone: () => ApplicationDefinition.stepNoop(),
+            onNone: () => ApplicationDefinition.makeNoopStep(),
             onSome: ({ workspaceId, model: workspace }) =>
               navigate(Route.Workspace({ workspaceId, destination: destinationOf(workspace) }), replace)
           })
       },
-      () => ApplicationDefinition.stepNoop()
+      () => ApplicationDefinition.makeNoopStep()
     )
   )
 
@@ -200,7 +198,7 @@ const foldWorkspaceOutMessage = (
     ChoseAccountEntry: ({ entry }) => chooseAccountEntry(entry)
   })
 
-export const WorkspaceBinding = ApplicationDefinition.bindChild(WorkspaceBlock, {
+export const WorkspaceBinding = ApplicationDefinition.makeBinding(WorkspaceBlock, {
   readAll: (model) =>
     Page.matchOrElse(model.page, { SignedIn: ({ workspace }) => Option.toArray(workspace) }, () => []),
   key: (opened) => opened.workspaceId,
@@ -213,9 +211,8 @@ export const WorkspaceBinding = ApplicationDefinition.bindChild(WorkspaceBlock, 
           opened.workspaceId === workspaceId ? { workspaceId, model: nextWorkspace } : opened
         )
       })
-    ),
-  outMessage: { fold: foldWorkspaceOutMessage }
-})
+    )
+}).withOutMessagePolicy({ fold: foldWorkspaceOutMessage })
 
 export const ApplicationComposition = ApplicationDefinition.makeComposition({
   bindings: [SignInBinding, WorkspacesBinding, WorkspaceBinding]

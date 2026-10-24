@@ -5,7 +5,7 @@ import * as Stores from "../../store/Stores.ts"
 import { ActionsDefinition, Message } from "./definition.ts"
 
 /** Forget a refused action, once the person has seen why. */
-export const Dismiss = ActionsDefinition.command("Dismiss", {
+export const Dismiss = ActionsDefinition.makeCommand("Dismiss", {
   args: { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, key: Schema.String },
   messages: [Message.CompletedDismiss],
   handler: function* () {
@@ -18,7 +18,7 @@ export const Dismiss = ActionsDefinition.command("Dismiss", {
 })
 
 /** Wait five seconds, then report that the confirmation `id` has had its time. */
-export const ExpireConfirmation = ActionsDefinition.command("ExpireConfirmation", {
+export const ExpireConfirmation = ActionsDefinition.makeCommand("ExpireConfirmation", {
   args: { id: Schema.Finite },
   messages: [Message.ExpiredConfirmation],
   handler: function* () {
