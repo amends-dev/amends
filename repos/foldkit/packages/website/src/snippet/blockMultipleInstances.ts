@@ -1,13 +1,16 @@
 import { Array } from 'effect'
-import { makeApplicationDefinition } from 'foldkit'
+import { Block } from 'foldkit'
 
 import { Applicant } from './applicant'
 import { Message } from './message'
 import { Model } from './model'
 
-const ApplicationDefinition = makeApplicationDefinition({ Model, Message })
+const ApplicationDefinition = Block.makeDefinition('Application', {
+  Model,
+  Message,
+})
 
-export const ApplicantsBinding = ApplicationDefinition.bindChild(
+export const ApplicantsBinding = ApplicationDefinition.makeBinding(
   Applicant.ApplicantBlock,
   {
     field: 'applicants',

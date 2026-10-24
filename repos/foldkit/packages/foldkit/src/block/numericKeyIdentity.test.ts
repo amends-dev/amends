@@ -4,6 +4,7 @@ import { expect, it, vi } from 'vitest'
 import { defineMessageUnion } from '../message/index.js'
 import { modifyFields } from '../struct/index.js'
 import { makeDefinition } from './define.js'
+import * as Block from './public.js'
 
 const ChildModel = Schema.Struct({ count: Schema.Number })
 const ChildMessage = defineMessageUnion({
@@ -13,7 +14,7 @@ const Child = makeDefinition('NumericIdentityChild', {
   Model: ChildModel,
   Message: ChildMessage,
 })
-const Read = Child.command('Read', {
+const Read = Child.makeCommand('Read', {
   messages: [ChildMessage.CompletedRead],
   handler: function* () {
     return () => Effect.succeed(ChildMessage.CompletedRead({ value: 4 }))
@@ -21,16 +22,21 @@ const Read = Child.command('Read', {
 })
 const initialized = vi.fn()
 const ChildComposition = Child.makeComposition()
-const child = ChildComposition.assembleBlock({
-  init: ChildComposition.makeInit(() => {
-    initialized()
-    return { model: { count: 0 }, commands: [Read()] }
-  }),
-  update: ChildComposition.makeUpdate((model, { value }) => ({
-    model: modifyFields(model, { count: () => value }),
-  })),
-  EffectsLayer: Read.layer,
-})
+const prepareChild = () =>
+  ChildComposition.prepareBlock({
+    init: ChildComposition.makeInit(() => {
+      initialized()
+      return { model: { count: 0 }, commands: [Read()] }
+    }),
+    update: ChildComposition.makeUpdate((model, { value }) => ({
+      model: modifyFields(model, { count: () => value }),
+    })),
+    EffectsLayer: Read.layer,
+  })
+const child: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ChildModel,
+  typeof prepareChild
+> = Block.assemble(prepareChild)
 const Model = Schema.Struct({
   entries: Schema.Array(
     Schema.Struct({ id: Schema.Number, child: ChildModel }),
@@ -40,7 +46,7 @@ const Parent = makeDefinition('NumericIdentityParent', {
   Model,
   Message: Schema.Never,
 })
-const EntriesBinding = Parent.bindChild(child, {
+const EntriesBinding = Parent.makeBinding(child, {
   field: 'entries',
   key: 'id',
   childField: 'child',
@@ -57,10 +63,15 @@ it('uses one zero identity for connected initialization and later dispatch', asy
       toParentModel: child => Model.make({ entries: [{ id: 0, child }] }),
     }),
   )
-  const parent = ParentComposition.assembleBlock({
-    init,
-    update: ParentComposition.makeUpdate(),
-  })
+  const prepareParent = () =>
+    ParentComposition.prepareBlock({
+      init,
+      update: ParentComposition.makeUpdate(),
+    })
+  const parent: Block.FromAssemblyWithoutViewOrOutMessage<
+    typeof Model,
+    typeof prepareParent
+  > = Block.assemble(prepareParent)
   const parentInit = init()
   const command = Option.getOrThrow(Array.head(parentInit.commands ?? []))
   const completed = await Effect.runPromise(
@@ -101,7 +112,7 @@ it('rejects zero and negative zero as duplicate occurrences of the requested key
 })
 
 it('retains automatic startup Commands when Schema storage normalizes a zero key', () => {
-  const StartupBinding = Parent.bindChild(child, {
+  const StartupBinding = Parent.makeBinding(child, {
     field: 'entries',
     key: 'id',
     childField: 'child',
@@ -119,7 +130,7 @@ it('retains automatic startup Commands when Schema storage normalizes a zero key
 })
 
 it('rejects duplicate signed-zero startup keys before initializing either occurrence', () => {
-  const StartupBinding = Parent.bindChild(child, {
+  const StartupBinding = Parent.makeBinding(child, {
     field: 'entries',
     key: 'id',
     childField: 'child',

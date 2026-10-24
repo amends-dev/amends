@@ -44,7 +44,7 @@ const fieldRow = (
     : h.empty
 
 const personalInfoSection = (
-  personalInfo: Model['personalInfo'],
+  personalInfo: (typeof Model.Type)['personalInfo'],
   pronounLabel: string,
   h: ApplicationViewBuilder,
 ): Html =>
@@ -100,7 +100,7 @@ const workEntryReview = (
 }
 
 const workHistorySection = (
-  workHistory: Model['workHistory'],
+  workHistory: (typeof Model.Type)['workHistory'],
   h: ApplicationViewBuilder,
 ): Html =>
   reviewSection(
@@ -146,7 +146,7 @@ const educationEntryReview = (
 }
 
 const educationSection = (
-  education: Model['education'],
+  education: (typeof Model.Type)['education'],
   h: ApplicationViewBuilder,
 ): Html =>
   reviewSection(
@@ -159,7 +159,7 @@ const educationSection = (
   )
 
 const skillsSection = (
-  skills: Model['skills'],
+  skills: (typeof Model.Type)['skills'],
   h: ApplicationViewBuilder,
 ): Html =>
   reviewSection(
@@ -184,7 +184,7 @@ const skillsSection = (
   )
 
 const coverLetterSection = (
-  coverLetter: Model['coverLetter'],
+  coverLetter: (typeof Model.Type)['coverLetter'],
   h: ApplicationViewBuilder,
 ): Html =>
   reviewSection(
@@ -202,7 +202,7 @@ const coverLetterSection = (
   )
 
 const attachmentsSection = (
-  attachments: Model['attachments'],
+  attachments: (typeof Model.Type)['attachments'],
   h: ApplicationViewBuilder,
 ): Html =>
   reviewSection(
@@ -242,7 +242,9 @@ const attachmentsSection = (
 const submitButtonClass =
   'w-full rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-700 transition cursor-pointer'
 
-const blockedNoticeText = (attentionSteps: ReadonlyArray<Step.Step>): string =>
+const blockedNoticeText = (
+  attentionSteps: ReadonlyArray<typeof Step.Step.Type>,
+): string =>
   Array.match(attentionSteps, {
     onEmpty: () => 'Review the required fields before submitting.',
     onNonEmpty: steps =>
@@ -250,7 +252,7 @@ const blockedNoticeText = (attentionSteps: ReadonlyArray<Step.Step>): string =>
   })
 
 const blockedNotice = (
-  attentionSteps: ReadonlyArray<Step.Step>,
+  attentionSteps: ReadonlyArray<typeof Step.Step.Type>,
   h: ApplicationViewBuilder,
 ): Html =>
   h.p(
@@ -259,9 +261,9 @@ const blockedNotice = (
   )
 
 const submissionSection = (
-  submission: Model['submission'],
+  submission: (typeof Model.Type)['submission'],
   shouldShowBlockedNotice: boolean,
-  attentionSteps: ReadonlyArray<Step.Step>,
+  attentionSteps: ReadonlyArray<typeof Step.Step.Type>,
   h: ApplicationViewBuilder,
 ): Html =>
   Submission.match(submission, {
@@ -357,8 +359,8 @@ const submissionSection = (
   })
 
 export const review = (
-  model: Model,
-  attentionSteps: ReadonlyArray<Step.Step>,
+  model: typeof Model.Type,
+  attentionSteps: ReadonlyArray<typeof Step.Step.Type>,
   h: ApplicationViewBuilder,
 ): Html => {
   const pronounLabel = Option.match(model.personalInfo.maybeSelectedPronoun, {

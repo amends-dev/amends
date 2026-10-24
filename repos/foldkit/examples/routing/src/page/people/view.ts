@@ -1,14 +1,14 @@
 import { Array, String } from 'effect'
-import { Html, HtmlBuilder } from 'foldkit/html'
+import { Html } from 'foldkit/html'
 
 import { Button, Input } from '@foldkit/ui'
 
 import { personRouter } from '../../route'
-import { PeopleComposition } from './composition'
+import { PeopleComposition, type PeopleViewBuilder } from './composition'
 import { Message } from './message'
 import { type Person, SearchResults } from './model'
 
-const statusText = (results: SearchResults): string =>
+const statusText = (results: typeof SearchResults.Type): string =>
   SearchResults.match<string>(results, {
     Loading: () => 'Searching…',
     Loaded: ({ query, people: found }) => {
@@ -24,7 +24,7 @@ const statusText = (results: SearchResults): string =>
 
 const recentSearchesView = (
   history: ReadonlyArray<string>,
-  h: HtmlBuilder<Message>,
+  h: PeopleViewBuilder,
 ): Html =>
   h.div(
     [h.Class('mb-6 text-sm text-gray-600 flex flex-wrap gap-2')],
@@ -40,7 +40,10 @@ const recentSearchesView = (
     ],
   )
 
-const personListItemView = (person: Person, h: HtmlBuilder<Message>): Html =>
+const personListItemView = (
+  person: typeof Person.Type,
+  h: PeopleViewBuilder,
+): Html =>
   h.keyed('li')(
     person.id.toString(),
     [h.Class('border border-gray-200 rounded-lg hover:bg-gray-50')],

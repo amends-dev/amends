@@ -208,14 +208,14 @@
         "@amends-dev/markdown": "workspace:*",
         "@amends-dev/sync": "workspace:*",
         "@effect/platform-browser": "catalog:",
-        "@foldkit/ui": "0.168.0-canary.bfd880b1e6ca",
+        "@foldkit/ui": "0.169.0-canary.1f6776fa7ece",
         "effect": "catalog:",
-        "foldkit": "0.168.0-canary.bfd880b1e6ca",
+        "foldkit": "0.169.0-canary.1f6776fa7ece",
       },
       "devDependencies": {
         "@amends-dev/channel": "workspace:*",
         "@effect/platform-bun": "catalog:",
-        "@foldkit/vite-plugin": "0.27.1-canary.bfd880b1e6ca",
+        "@foldkit/vite-plugin": "0.28.0-canary.1f6776fa7ece",
         "@tailwindcss/vite": "^4.3.3",
         "fake-indexeddb": "6.2.5",
         "happy-dom": "^20.10.6",
@@ -229,14 +229,14 @@
       "dependencies": {
         "@amends-dev/icons": "workspace:*",
         "@amends-dev/markdown": "workspace:*",
-        "@foldkit/ui": "0.168.0-canary.bfd880b1e6ca",
+        "@foldkit/ui": "0.169.0-canary.1f6776fa7ece",
         "@fontsource/figtree": "^5.3.0",
         "@fontsource/geist-mono": "^5.3.0",
         "effect": "catalog:",
-        "foldkit": "0.168.0-canary.bfd880b1e6ca",
+        "foldkit": "0.169.0-canary.1f6776fa7ece",
       },
       "devDependencies": {
-        "@foldkit/vite-plugin": "0.27.1-canary.bfd880b1e6ca",
+        "@foldkit/vite-plugin": "0.28.0-canary.1f6776fa7ece",
         "@tailwindcss/vite": "^4.3.3",
         "happy-dom": "^20.10.6",
         "tailwindcss": "^4.3.3",
@@ -534,7 +534,7 @@
     },
   },
   "patchedDependencies": {
-    "foldkit@0.168.0-canary.bfd880b1e6ca": "patches/foldkit@0.168.0-canary.bfd880b1e6ca.patch",
+    "foldkit@0.169.0-canary.1f6776fa7ece": "patches/foldkit@0.169.0-canary.1f6776fa7ece.patch",
   },
   "overrides": {
     "@effect/platform-browser": "catalog:",
@@ -1024,9 +1024,9 @@
 
     "@floating-ui/utils": ["@floating-ui/utils@0.2.12", "", {}, "sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww=="],
 
-    "@foldkit/ui": ["@foldkit/ui@0.168.0-canary.bfd880b1e6ca", "", { "dependencies": { "@floating-ui/dom": "^1.8.0" }, "peerDependencies": { "effect": "4.0.0", "foldkit": "0.168.0-canary.bfd880b1e6ca" } }, "sha512-F75LiWS9/L9fLdYmH0Nmwf8LfXkqeC6Fj8D2eSUQabr/GR5Zl9vMJXW1P+to3qkv1ortlBcWMw1apw08XAh4IA=="],
+    "@foldkit/ui": ["@foldkit/ui@0.169.0-canary.1f6776fa7ece", "", { "dependencies": { "@floating-ui/dom": "^1.8.0" }, "peerDependencies": { "effect": "4.0.0", "foldkit": "0.169.0-canary.1f6776fa7ece" } }, "sha512-WqI3jshbX+4bVvMSviM5nS6bY5lqfxIXHnaSA4t/10gRQHzC4vLJB+48w6fls7WSD3LCmQe49op9AgMlRgcAlw=="],
 
-    "@foldkit/vite-plugin": ["@foldkit/vite-plugin@0.27.1-canary.bfd880b1e6ca", "", { "dependencies": { "@effect/platform-node": "4.0.0", "@effect/platform-node-shared": "4.0.0", "magic-string": "^1.4.2", "vitefu": "^1.1.3", "ws": "^8.21.3" }, "peerDependencies": { "effect": "4.0.0", "foldkit": "0.168.0-canary.bfd880b1e6ca", "vite": "^8.0.0" } }, "sha512-Xb5pB8N8z8imghejhnXYvavCJw3uPGhZTAdMCYNdCLeQ7Tf0U92YPMRg70gXYfumX9DAhSSEEnHdUne6CkxECQ=="],
+    "@foldkit/vite-plugin": ["@foldkit/vite-plugin@0.28.0-canary.1f6776fa7ece", "", { "dependencies": { "@effect/platform-node": "4.0.0", "@effect/platform-node-shared": "4.0.0", "magic-string": "^1.4.2", "vitefu": "^1.1.3", "ws": "^8.21.3" }, "peerDependencies": { "effect": "4.0.0", "foldkit": "0.169.0-canary.1f6776fa7ece", "vite": "^8.0.0" } }, "sha512-qi6jsmQp6qOhjo9MjYp3LvohP8l/DhDoWtavdEKhZF8nK/KTpRtqymM/QFqybCKDQntKVjY3MXpR1V1acgM5IQ=="],
 
     "@fontsource/figtree": ["@fontsource/figtree@5.3.0", "", {}, "sha512-/iTcTXL1eRBGhvD7NN9dnKzXzWqDLVZVEUFI9xIxAC1G/hXU8tCyYeXCAuPOuvSYPInFUP7H6KLGgygmDfy1SA=="],
 
@@ -2236,7 +2236,7 @@
 
     "flattie": ["flattie@1.1.1", "", {}, "sha512-9UbaD6XdAL97+k/n+N7JwX46K/M6Zc6KcFYskrYL8wbBV/Uyk0CTAMY0VT+qiK5PM7AIc9aTWYtq65U7T+aCNQ=="],
 
-    "foldkit": ["foldkit@0.168.0-canary.bfd880b1e6ca", "", { "dependencies": { "parse5": "^8.0.1" }, "peerDependencies": { "@effect/platform-browser": "4.0.0", "effect": "4.0.0" } }, "sha512-9ID225WgXzes3S7QZanTv2ngqyf0kEHAYLiA956o60T1B0n5bfuSVV/msabzqsrxpPvZN2y0Pl6gLvuHSe8/ug=="],
+    "foldkit": ["foldkit@0.169.0-canary.1f6776fa7ece", "", { "dependencies": { "parse5": "^8.0.1" }, "peerDependencies": { "@effect/platform-browser": "4.0.0", "effect": "4.0.0" } }, "sha512-epotaxGS7FC+bY0UdFanqDZ1aTzhUfcyUuLfVJ/GSdzzg7Gbltud7kGdcHCNoWYFGqU2tjK7MGmMtXpo56642Q=="],
 
     "follow-redirects": ["follow-redirects@1.16.0", "", { "peerDependencies": { "debug": "*" }, "optionalPeers": ["debug"] }, "sha512-y5rN/uOsadFT/JfYwhxRS5R7Qce+g3zG97+JrtFZlC9klX/W5hD7iiLzScI4nZqUS7DNUdhPgw4xI8W2LuXlUw=="],
 

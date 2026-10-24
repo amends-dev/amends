@@ -10,7 +10,7 @@ import * as Store from "../../store/Store.ts"
 import * as Stores from "../../store/Stores.ts"
 import { ConnectionsDefinition, Message } from "./definition.ts"
 
-export const subscriptions = ConnectionsDefinition.subscriptions((entry) => ({
+export const subscriptions = ConnectionsDefinition.makeSubscriptions((entry) => ({
   connections: entry(
     "ReadConnections",
     { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, reads: Schema.Int },

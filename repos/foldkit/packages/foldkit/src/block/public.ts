@@ -29,7 +29,14 @@ export type {
 } from './binding.js'
 export { inspectBinding } from './binding.js'
 export type { BindingInitRecipe } from './initRecipe.js'
-export type { BindChild } from './bindChild.js'
+export type { AssemblyDraft } from './assemblyState.js'
+export type {
+  BindChild,
+  BindingWithoutOutMessagePolicy,
+  SelectedChildBinding,
+  UnselectedOutMessagePolicy,
+  WithOutMessagePolicy,
+} from './bindChild.js'
 export type {
   BindingDeliveryEvidence,
   DefineCompositionUpdate,
@@ -53,6 +60,7 @@ export type {
   CompletedBlockWithViewAndOutMessage,
   CompletedBlockWithoutViewOrOutMessage,
   CompletedWithViewAndOutMessage,
+  CompletedWithView,
   Definition,
   DefinitionAuthoredView,
   DefinitionView,
@@ -66,9 +74,11 @@ export type {
   DefineView,
   Block,
   Implementation,
+  InvalidViewInputs,
   ViewBuilderFor,
   OwnedAuthoredView,
-  AssembleBlock,
+  PrepareBlock,
+  AuthoredViewInputs,
   OwnedManagedResourceEntryBuilder,
   OwnedSubscriptionEntryBuilder,
   OwnedSubscriptionRegistry,
@@ -76,6 +86,8 @@ export type {
 } from './definition.js'
 export { makeDefinition, makeNamespace } from './define.js'
 export type { DefineStepFields, DefineStepNoop } from './fieldStep.js'
+export type { CommandsStep, MakeCommandsStep } from './commandsStep.js'
+export type { OutMessageStep, MakeOutMessageStep } from './outMessageStep.js'
 export type {
   Namespace,
   AuthoringDefinition,
@@ -94,6 +106,15 @@ export type { Owner } from './owner.js'
 export type { Qualify, Scoped } from './scope.js'
 export type { BindingPolicyEvidence } from './policyEvidence.js'
 export type { DeferredBindingPolicy } from './deferredPolicy.js'
+export type {
+  MakeOutMessageFold,
+  OutMessageFold,
+  OutMessageFoldStep,
+} from './outMessageFold.js'
+export type {
+  MakeOutMessageForward,
+  OutMessageForward,
+} from './outMessageForward.js'
 export type { ValidateConcreteComposition } from './requirements.js'
 export type { InstanceKey } from './instanceContext.js'
 export type {
@@ -101,3 +122,15 @@ export type {
   OperationParameters,
   OperationPayload,
 } from './operation.js'
+
+export type {
+  AssemblyWithView,
+  AssemblyWithOutMessage,
+  AssemblyWithViewAndOutMessage,
+  AssemblyWithoutViewOrOutMessage,
+  FromAssemblyWithView,
+  FromAssemblyWithOutMessage,
+  FromAssemblyWithViewAndOutMessage,
+  FromAssemblyWithoutViewOrOutMessage,
+} from './fromAssembly.js'
+export { assemble } from './fromAssembly.js'

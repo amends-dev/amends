@@ -1,5 +1,5 @@
 import { Context, Effect, Layer, Number, Schema, Stream } from 'effect'
-import { makeApplicationDefinition } from 'foldkit'
+import { Program } from 'foldkit'
 import * as Block from 'foldkit/block'
 import * as Command from 'foldkit/command'
 import { defineMessageUnion } from 'foldkit/message'
@@ -42,20 +42,23 @@ export const GeneratedDispatchChildDefinition = Block.makeDefinition(
   'GeneratedDispatchChild',
   { Model: ChildModel, Message: ChildMessage },
 )
-export const ReadCount = GeneratedDispatchChildDefinition.command('ReadCount', {
-  messages: [ChildMessage.CompletedReadCount],
-  handler: function* () {
-    const store = yield* CountStore
-    yield* store.prepare
+export const ReadCount = GeneratedDispatchChildDefinition.makeCommand(
+  'ReadCount',
+  {
+    messages: [ChildMessage.CompletedReadCount],
+    handler: function* () {
+      const store = yield* CountStore
+      yield* store.prepare
 
-    return () =>
-      store.read.pipe(
-        Effect.map(count => ChildMessage.CompletedReadCount({ count })),
-      )
+      return () =>
+        store.read.pipe(
+          Effect.map(count => ChildMessage.CompletedReadCount({ count })),
+        )
+    },
   },
-})
+)
 export const childSubscriptions =
-  GeneratedDispatchChildDefinition.subscriptions(entry => ({
+  GeneratedDispatchChildDefinition.makeSubscriptions(entry => ({
     observations: entry('Observations', {
       messages: [ChildMessage.ObservedCount],
       handler: function* () {
@@ -65,6 +68,10 @@ export const childSubscriptions =
   }))
 export const GeneratedDispatchChildComposition =
   GeneratedDispatchChildDefinition.makeComposition()
+export const childSceneSubscriptions = Scene.subscriptions(
+  GeneratedDispatchChildComposition,
+  childSubscriptions,
+)
 export const childInit = GeneratedDispatchChildComposition.makeInit(() => ({
   model: { count: 0 },
   commands: [ReadCount()],
@@ -94,8 +101,8 @@ export const childView = GeneratedDispatchChildComposition.makeView(
       [globalThis.String(model.count)],
     ),
 )
-export const GeneratedDispatchChildBlock =
-  GeneratedDispatchChildComposition.assembleBlock({
+export const prepareGeneratedDispatchChildBlock = () =>
+  GeneratedDispatchChildComposition.prepareBlock({
     init: childInit,
     update: childUpdate,
     view: childView,
@@ -110,6 +117,14 @@ export const GeneratedDispatchChildBlock =
     ),
   })
 
+export const RawGeneratedDispatchChildBlock: CompletedAssembly<
+  typeof prepareGeneratedDispatchChildBlock
+> = Block.assemble(prepareGeneratedDispatchChildBlock)
+export const GeneratedDispatchChildBlock: Block.FromAssemblyWithView<
+  typeof GeneratedDispatchChildComposition.Model,
+  typeof prepareGeneratedDispatchChildBlock
+> = Block.assemble(prepareGeneratedDispatchChildBlock)
+
 export const ParentModel = Schema.Struct({
   child: GeneratedDispatchChildBlock.Model,
   title: Schema.String,
@@ -121,7 +136,7 @@ export const GeneratedDispatchParentDefinition = Block.makeDefinition(
   'GeneratedDispatchParent',
   { Model: ParentModel, Message: ParentMessage },
 )
-export const ChildBinding = GeneratedDispatchParentDefinition.bindChild(
+export const ChildBinding = GeneratedDispatchParentDefinition.makeBinding(
   GeneratedDispatchChildBlock,
   { field: 'child' },
 )
@@ -162,12 +177,20 @@ export const parentView = GeneratedDispatchParentComposition.makeView(
       ],
     ),
 )
-export const GeneratedDispatchParentBlock =
-  GeneratedDispatchParentComposition.assembleBlock({
+export const prepareGeneratedDispatchParentBlock = () =>
+  GeneratedDispatchParentComposition.prepareBlock({
     init: parentInit,
     update: parentUpdate,
     view: parentView,
   })
+
+export const RawGeneratedDispatchParentBlock: CompletedAssembly<
+  typeof prepareGeneratedDispatchParentBlock
+> = Block.assemble(prepareGeneratedDispatchParentBlock)
+export const GeneratedDispatchParentBlock: Block.FromAssemblyWithView<
+  typeof GeneratedDispatchParentComposition.Model,
+  typeof prepareGeneratedDispatchParentBlock
+> = Block.assemble(prepareGeneratedDispatchParentBlock)
 
 export const simulateChildObservations = () =>
   Scene.scene(
@@ -188,11 +211,11 @@ export const Model = Schema.Struct({
   parent: GeneratedDispatchParentBlock.Model,
 })
 export const Message = defineMessageUnion({ ClickedApplication: {} })
-export const ApplicationDefinition = makeApplicationDefinition({
+export const ApplicationDefinition = Block.makeDefinition('Application', {
   Model,
   Message,
 })
-export const ParentBinding = ApplicationDefinition.bindChild(
+export const ParentBinding = ApplicationDefinition.makeBinding(
   GeneratedDispatchParentBlock,
   { field: 'parent' },
 )
@@ -214,12 +237,25 @@ export const view = ApplicationComposition.makeView((model, h) =>
     ],
   ),
 )
-export const element = ApplicationComposition.assembleElement({
-  init,
-  update,
-  view,
+export const prepareApplicationBlock = () =>
+  ApplicationComposition.prepareBlock({
+    init,
+    update,
+    view,
+  })
+
+export const RawApplicationBlock: CompletedAssembly<
+  typeof prepareApplicationBlock
+> = Block.assemble(prepareApplicationBlock)
+export const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof ApplicationComposition.Model,
+  typeof prepareApplicationBlock
+> = Block.assemble(prepareApplicationBlock)
+
+export const element = Program.makeElement({
+  block: ApplicationBlock,
   container: null,
-  devTools: { Message: ApplicationComposition.Message },
+  devTools: { dispatch: true },
 })
 export const CountStoreLayer = Layer.succeed(CountStore, {
   prepare: Effect.void,
@@ -241,6 +277,9 @@ export type CompleteApplicationDispatch = Expect<
     (typeof ApplicationComposition.Message.Type)['_tag'],
     'ClickedApplication' | 'GotParentMessage'
   >
+>
+export type ExactChildSceneSubscriptionKeys = Expect<
+  Equal<keyof typeof childSceneSubscriptions, 'observations'>
 >
 export type ExactSceneSubscriptionKeys = Expect<
   Equal<keyof typeof sceneSubscriptions, 'parent/child/observations'>
@@ -276,3 +315,8 @@ export type OrdinaryServicesRemainExact = Expect<
     CountStore
   >
 >
+
+type CompletedAssembly<Producer extends () => Block.AssemblyDraft<object>> =
+  ReturnType<Producer> extends Block.AssemblyDraft<infer Completed>
+    ? Completed
+    : never

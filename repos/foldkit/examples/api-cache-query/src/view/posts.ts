@@ -16,11 +16,14 @@ import {
 } from './shared'
 
 const isPostCached = (
-  postDetails: Model['postDetails'],
+  postDetails: (typeof Model.Type)['postDetails'],
   postId: string,
 ): boolean => AsyncData.hasData(postQuery.read(postDetails, { postId }))
 
-export const postsTabView = (model: Model, h: ApplicationViewBuilder) =>
+export const postsTabView = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+) =>
   Option.match(model.maybeSelectedPostId, {
     onNone: () =>
       h.section([h.Class('flex flex-col gap-4')], [postsListView(model, h)]),
@@ -32,7 +35,10 @@ export const postsTabView = (model: Model, h: ApplicationViewBuilder) =>
       ),
   })
 
-export const postsListView = (model: Model, h: ApplicationViewBuilder) => {
+export const postsListView = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+) => {
   const postsAsyncData = postsQuery.read(model.posts)
   const isPending = AsyncData.isPending(postsAsyncData)
 
@@ -100,8 +106,8 @@ export const postListItems = (
     posts,
     postDetails,
   }: Readonly<{
-    posts: ReadonlyArray<Post>
-    postDetails: Model['postDetails']
+    posts: ReadonlyArray<typeof Post.Type>
+    postDetails: (typeof Model.Type)['postDetails']
   }>,
   h: ApplicationViewBuilder,
 ) =>
@@ -155,7 +161,7 @@ export const postListItems = (
   )
 
 export const postDetailView = (
-  { model, postId }: Readonly<{ model: Model; postId: string }>,
+  { model, postId }: Readonly<{ model: typeof Model.Type; postId: string }>,
   h: ApplicationViewBuilder,
 ) => {
   const postAsyncData = postQuery.read(model.postDetails, { postId })
@@ -211,7 +217,10 @@ export const postDetailView = (
 }
 
 export const postCard = (
-  { post, fetchedAt }: Readonly<{ post: PostDetail; fetchedAt: number }>,
+  {
+    post,
+    fetchedAt,
+  }: Readonly<{ post: typeof PostDetail.Type; fetchedAt: number }>,
   h: ApplicationViewBuilder,
 ) =>
   h.article(

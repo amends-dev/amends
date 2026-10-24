@@ -45,7 +45,7 @@ import {
 } from './compositionRuntime.js'
 import type { CrashConfig } from './crashUI.js'
 import { deepFreeze } from './deepFreeze.js'
-import type { DevToolsConfig } from './devToolsConfig.js'
+import type { RuntimeDevToolsConfig } from './devToolsConfig.js'
 import { makeDevToolsIntegration } from './devToolsIntegration.js'
 import { createDuplicateIdScanner } from './duplicateIdScanner.js'
 import {
@@ -201,7 +201,7 @@ export type RuntimeConfig<
    * registered child bindings supply their occurrence-scoped registrations.
    */
   managedResources?: ManagedResources<Model, Message, ManagedResourceServices>
-  devTools?: DevToolsConfig
+  devTools?: RuntimeDevToolsConfig<Resources>
 }>
 
 export type FlagsSchemaConfig<Flags> = Readonly<{
@@ -612,12 +612,14 @@ export const makeRuntime = <
         }
         const devToolsIntegration = yield* makeDevToolsIntegration<
           Model,
-          Message
+          Message,
+          Resources
         >({
           devTools,
           update,
           maybeFreezeModel,
           prepareDispatch,
+          provideDispatchServices: provideApplicationServices,
         })
         const {
           isRecordingCommands,
@@ -897,7 +899,10 @@ export const makeRuntime = <
           }
         }
 
-        yield* installDevToolsStore(devToolsRenderBridge)
+        yield* Effect.provideContext(
+          installDevToolsStore(devToolsRenderBridge),
+          runtimeContext,
+        )
 
         const initRenderExit = yield* Effect.exit(
           render(initModel, Option.none()),

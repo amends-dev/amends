@@ -17,7 +17,7 @@ const isEmailTaken = (emailInput: string): Effect.Effect<boolean> =>
     return Array.contains(TAKEN_EMAILS, emailInput.toLowerCase())
   })
 
-export const ValidateEmailAsync = PersonalInfoDefinition.command(
+export const ValidateEmailAsync = PersonalInfoDefinition.makeCommand(
   'ValidateEmailAsync',
   {
     args: { emailInput: Schema.String, validationId: Schema.Number },

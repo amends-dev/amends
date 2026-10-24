@@ -24,7 +24,7 @@ import type { City } from '../domain/domain'
 
 export { CityComboboxBlock, CityMultiComboboxBlock }
 
-const CITIES: ReadonlyArray<City> = [
+const CITIES: ReadonlyArray<typeof City.Type> = [
   'Johannesburg',
   'Kyiv',
   'Oxford',
@@ -53,7 +53,7 @@ const backdropClassName = 'fixed inset-0 z-0'
 
 const wrapperClassName = 'relative w-72'
 
-const filterCities = (inputValue: string): ReadonlyArray<City> =>
+const filterCities = (inputValue: string): ReadonlyArray<typeof City.Type> =>
   inputValue === ''
     ? CITIES
     : Array.filter(CITIES, city =>
@@ -70,7 +70,7 @@ export const comboboxViewInputs = ({
   restingInputValue: string
   anchor?: AnchorConfig
   wrapperClass?: string
-}>): Omit<ComboboxViewInputs<City>, 'maybeSelectedValue'> => {
+}>): Omit<ComboboxViewInputs<typeof City.Type>, 'maybeSelectedValue'> => {
   const filteredCities = filterCities(inputValue)
 
   return {
@@ -112,7 +112,7 @@ export const comboboxViewInputs = ({
 
 export const view = (
   comboboxModel: typeof CityComboboxBlock.Model.Type,
-  maybeSelectedCity: Option.Option<City>,
+  maybeSelectedCity: Option.Option<typeof City.Type>,
   h: UiViewBuilder,
 ) => {
   return [
@@ -151,7 +151,7 @@ export const view = (
 
 export const nullableDemo = (
   comboboxNullableModel: typeof CityComboboxBlock.Model.Type,
-  maybeSelectedCity: Option.Option<City>,
+  maybeSelectedCity: Option.Option<typeof City.Type>,
   h: UiViewBuilder,
 ) => {
   return [
@@ -190,7 +190,7 @@ export const nullableDemo = (
 
 export const selectOnFocusDemo = (
   comboboxSelectOnFocusModel: typeof CityComboboxBlock.Model.Type,
-  maybeSelectedCity: Option.Option<City>,
+  maybeSelectedCity: Option.Option<typeof City.Type>,
   h: UiViewBuilder,
 ) => {
   return [
@@ -232,7 +232,7 @@ export const selectOnFocusDemo = (
 
 export const placementLockDemo = (
   comboboxPlacementLockModel: typeof CityComboboxBlock.Model.Type,
-  maybeSelectedCity: Option.Option<City>,
+  maybeSelectedCity: Option.Option<typeof City.Type>,
   h: UiViewBuilder,
 ) => [
   h.div(
@@ -292,7 +292,7 @@ const emptyTagClassName = 'text-sm py-0.5 text-gray-700 dark:text-gray-400'
 
 export const multiDemo = (
   comboboxMultiModel: typeof CityMultiComboboxBlock.Model.Type,
-  selectedCities: ReadonlyArray<City>,
+  selectedCities: ReadonlyArray<typeof City.Type>,
   h: UiViewBuilder,
 ) => {
   return [

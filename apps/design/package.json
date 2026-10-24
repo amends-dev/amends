@@ -43,14 +43,14 @@
   "dependencies": {
     "@amends-dev/icons": "workspace:*",
     "@amends-dev/markdown": "workspace:*",
-    "@foldkit/ui": "0.168.0-canary.bfd880b1e6ca",
+    "@foldkit/ui": "0.169.0-canary.1f6776fa7ece",
     "@fontsource/figtree": "^5.3.0",
     "@fontsource/geist-mono": "^5.3.0",
     "effect": "catalog:",
-    "foldkit": "0.168.0-canary.bfd880b1e6ca"
+    "foldkit": "0.169.0-canary.1f6776fa7ece"
   },
   "devDependencies": {
-    "@foldkit/vite-plugin": "0.27.1-canary.bfd880b1e6ca",
+    "@foldkit/vite-plugin": "0.28.0-canary.1f6776fa7ece",
     "@tailwindcss/vite": "^4.3.3",
     "happy-dom": "^20.10.6",
     "tailwindcss": "^4.3.3",

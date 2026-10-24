@@ -64,7 +64,11 @@ const OVERLAY_COMBOBOX_ANCHOR = {
 
 // PANEL CONTENT
 
-const trigger = (label: string, message: Message, h: UiViewBuilder) =>
+const trigger = (
+  label: string,
+  message: typeof Message.Type,
+  h: UiViewBuilder,
+) =>
   h.div(
     [h.Class('flex gap-3')],
     [h.button([h.Class(triggerClassName), h.OnClick(message)], [label])],
@@ -102,7 +106,7 @@ const editFiltersContent = (
   title: DialogRenderInfo['title'],
   description: DialogRenderInfo['description'],
   comboboxModel: typeof CityComboboxBlock.Model.Type,
-  maybeSelectedCity: Option.Option<City>,
+  maybeSelectedCity: Option.Option<typeof City.Type>,
   h: UiViewBuilder,
 ): Html =>
   h.div(
@@ -247,7 +251,7 @@ export const view = (
 export const overlayDialogDemo = (
   dialogModel: typeof DialogBlock.Model.Type,
   comboboxModel: typeof CityComboboxBlock.Model.Type,
-  maybeSelectedCity: Option.Option<City>,
+  maybeSelectedCity: Option.Option<typeof City.Type>,
   h: UiViewBuilder,
 ) => {
   return [

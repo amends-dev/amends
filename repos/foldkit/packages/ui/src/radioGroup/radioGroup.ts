@@ -113,7 +113,7 @@ const descriptionId = (id: string, index: number): string =>
   `${id}-option-${index}-description`
 
 /** Moves focus to the option at the given index. */
-export const FocusOption = RadioGroupNamespace.command('FocusOption', {
+export const FocusOption = RadioGroupNamespace.makeCommand('FocusOption', {
   args: { id: Schema.String, index: Schema.Number },
   messages: [Message.CompletedFocusOption],
   handler: function* () {
@@ -458,13 +458,18 @@ const internalView = RadioGroupComposition.makeView.withInputs<ViewInputs>(
   },
 )
 
+const prepareRadioGroupBlock = () =>
+  RadioGroupComposition.prepareBlock({
+    init,
+    update,
+    view: internalView,
+    EffectsLayer,
+  })
 /** Complete RadioGroup Block definition. */
-export const block = RadioGroupComposition.assembleBlock({
-  init,
-  update,
-  view: internalView,
-  EffectsLayer,
-})
+export const block: Block.FromAssemblyWithViewAndOutMessage<
+  typeof Model,
+  typeof prepareRadioGroupBlock
+> = Block.assemble(prepareRadioGroupBlock)
 
 const makeBlockParts = <Value extends string>() => {
   type GenericReturn = Update.ReturnWithOutMessage<
@@ -526,7 +531,13 @@ export interface Completed<
 const makeBlock = <Value extends string>(): Completed<Value> => {
   const { composition, implementation } = makeBlockParts<Value>()
 
-  return composition.assembleBlock(implementation)
+  const prepare = () => composition.prepareBlock(implementation)
+  const completedBlock: Block.FromAssemblyWithViewAndOutMessage<
+    typeof Model,
+    typeof prepare
+  > = Block.assemble(prepare)
+
+  return completedBlock
 }
 
 /**

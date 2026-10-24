@@ -19,6 +19,7 @@ import type {
 import { modifyFields } from '../struct/index.js'
 import { inspectBinding } from './binding.js'
 import { makeDefinition } from './define.js'
+import * as Block from './public.js'
 
 const CounterModel = Schema.Struct({ count: Schema.Number })
 const StoredCounterModel = Schema.Struct({ count: Schema.Number })
@@ -31,7 +32,7 @@ const Counter = makeDefinition('WrappedKeyedFieldCounter', {
   Model: CounterModel,
   Message: CounterMessage,
 })
-const FinishInitialization = Counter.command('FinishInitialization', {
+const FinishInitialization = Counter.makeCommand('FinishInitialization', {
   args: { count: Schema.Number },
   messages: [CounterMessage.CompletedFinishInitialization],
   handler: function* () {
@@ -39,28 +40,33 @@ const FinishInitialization = Counter.command('FinishInitialization', {
       Effect.succeed(CounterMessage.CompletedFinishInitialization({ count }))
   },
 })
-const setCount = Counter.step((model, count: number) => ({
+const setCount = Counter.makeStep((model, count: number) => ({
   model: modifyFields(model, { count: () => count }),
 }))
 const CounterComposition = Counter.makeComposition()
-const counterBlock = CounterComposition.assembleBlock({
-  init: CounterComposition.makeInit((count: number) => ({
-    model: CounterModel.make({ count }),
-    commands: [FinishInitialization({ count })],
-  })),
-  update: CounterComposition.makeUpdate((model, message) =>
-    CounterMessage.match(message, {
-      RequestedSetCount: ({ count }) => setCount(model, count),
-      UpdatedCount: ({ count }) => setCount(model, count),
-      CompletedFinishInitialization: ({ count }) => setCount(model, count),
-    }),
-  ),
-  operations: {
-    setCount: (count: number) =>
-      Tuple.make(CounterMessage.RequestedSetCount({ count })),
-  },
-  EffectsLayer: FinishInitialization.layer,
-})
+const prepareCounterBlock = () =>
+  CounterComposition.prepareBlock({
+    init: CounterComposition.makeInit((count: number) => ({
+      model: CounterModel.make({ count }),
+      commands: [FinishInitialization({ count })],
+    })),
+    update: CounterComposition.makeUpdate((model, message) =>
+      CounterMessage.match(message, {
+        RequestedSetCount: ({ count }) => setCount(model, count),
+        UpdatedCount: ({ count }) => setCount(model, count),
+        CompletedFinishInitialization: ({ count }) => setCount(model, count),
+      }),
+    ),
+    operations: {
+      setCount: (count: number) =>
+        Tuple.make(CounterMessage.RequestedSetCount({ count })),
+    },
+    EffectsLayer: FinishInitialization.layer,
+  })
+const counterBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof CounterModel,
+  typeof prepareCounterBlock
+> = Block.assemble(prepareCounterBlock)
 
 const CounterEntry = Schema.Struct({
   id: Schema.String,
@@ -76,10 +82,17 @@ const TextComposition = makeDefinition('WrappedKeyedFieldText', {
   Model: Schema.String,
   Message: TextMessage,
 }).makeComposition()
-const textBlock = TextComposition.assembleBlock({
-  init: TextComposition.makeInit((value: string) => ({ model: value })),
-  update: TextComposition.makeUpdate((_model, { value }) => ({ model: value })),
-})
+const prepareTextBlock = () =>
+  TextComposition.prepareBlock({
+    init: TextComposition.makeInit((value: string) => ({ model: value })),
+    update: TextComposition.makeUpdate((_model, { value }) => ({
+      model: value,
+    })),
+  })
+const textBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof Schema.String,
+  typeof prepareTextBlock
+> = Block.assemble(prepareTextBlock)
 const TextEntry = Schema.Struct({
   id: Schema.String,
   text: Schema.String,
@@ -97,18 +110,18 @@ const Parent = makeDefinition('WrappedKeyedFieldParent', {
   Model: ParentModel,
   Message: ParentMessage,
 })
-const CountersBinding = Parent.bindChild(counterBlock, {
+const CountersBinding = Parent.makeBinding(counterBlock, {
   field: 'counters',
   key: 'id',
   childField: 'counter',
 })
-const AlternateCountersBinding = Parent.bindChild(counterBlock, {
+const AlternateCountersBinding = Parent.makeBinding(counterBlock, {
   field: 'counters',
   key: 'id',
   childField: 'counter',
   placement: 'alternateCounters',
 })
-const TextEntriesBinding = Parent.bindChild(textBlock, {
+const TextEntriesBinding = Parent.makeBinding(textBlock, {
   field: 'textEntries',
   key: 'id',
   childField: 'text',
@@ -116,21 +129,26 @@ const TextEntriesBinding = Parent.bindChild(textBlock, {
 const ParentComposition = Parent.makeComposition({
   bindings: [CountersBinding, TextEntriesBinding],
 })
-const ParentBlock = ParentComposition.assembleBlock({
-  init: ParentComposition.makeInit(() => ({
-    model: ParentModel.make({ counters: [], textEntries: [] }),
-  })),
-  update: ParentComposition.makeUpdate((model, message) =>
-    ParentMessage.match(message, {
-      RequestedSetCount: ({ id, count }) =>
-        CountersBinding.setCount(id, count)(model),
-    }),
-  ),
-  operations: {
-    setCount: (id: string, count: number) =>
-      Tuple.make(ParentMessage.RequestedSetCount({ id, count })),
-  },
-})
+const prepareParentBlock = () =>
+  ParentComposition.prepareBlock({
+    init: ParentComposition.makeInit(() => ({
+      model: ParentModel.make({ counters: [], textEntries: [] }),
+    })),
+    update: ParentComposition.makeUpdate((model, message) =>
+      ParentMessage.match(message, {
+        RequestedSetCount: ({ id, count }) =>
+          CountersBinding.setCount(id, count)(model),
+      }),
+    ),
+    operations: {
+      setCount: (id: string, count: number) =>
+        Tuple.make(ParentMessage.RequestedSetCount({ id, count })),
+    },
+  })
+const ParentBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ParentModel,
+  typeof prepareParentBlock
+> = Block.assemble(prepareParentBlock)
 const noSlowSubscriptionDependencies: Option.Option<
   ResolvedSlowPhaseConfig<SlowSubscriptionDependenciesContext<ParentModel>>
 > = Option.none()
@@ -353,7 +371,7 @@ const invalidConfig = (
   childField,
 })
 const bindInvalid = (field: string, key?: string, childField?: string) =>
-  Reflect.apply(InvalidParent.bindChild, undefined, [
+  Reflect.apply(InvalidParent.makeBinding, undefined, [
     counterBlock,
     invalidConfig(field, key, childField),
   ])
@@ -405,7 +423,7 @@ it('rejects invalid wrapper key and child fields at runtime', () => {
   })
 
   expect(() =>
-    Reflect.apply(SameFieldParent.bindChild, undefined, [
+    Reflect.apply(SameFieldParent.makeBinding, undefined, [
       textBlock,
       {
         field: 'values',
@@ -419,7 +437,7 @@ it('rejects invalid wrapper key and child fields at runtime', () => {
 it('rejects Schema and custom adapter conflicts at runtime', () => {
   for (const schemaField of ['Model', 'ChildModel']) {
     expect(() =>
-      Reflect.apply(Parent.bindChild, undefined, [
+      Reflect.apply(Parent.makeBinding, undefined, [
         counterBlock,
         { ...invalidConfig('counters'), [schemaField]: CounterModel },
       ]),
@@ -434,7 +452,7 @@ it('rejects Schema and custom adapter conflicts at runtime', () => {
     'presentWhen',
   ]) {
     expect(() =>
-      Reflect.apply(Parent.bindChild, undefined, [
+      Reflect.apply(Parent.makeBinding, undefined, [
         counterBlock,
         { ...invalidConfig('counters'), [conflict]: () => undefined },
       ]),

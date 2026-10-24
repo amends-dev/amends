@@ -1,5 +1,5 @@
 {
-  "typescriptVersion": "7.0.2",
+  "typescriptVersion": "7.1.0-beta",
   "fixtures": {
     "deep-composition-8": {
       "maxInstantiationsDelta": 1152618,

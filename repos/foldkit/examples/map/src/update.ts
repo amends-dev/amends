@@ -15,9 +15,9 @@ import { Message } from './message'
 import { GeolocateState, type Model } from './model'
 
 const findLocation = (
-  model: Model,
+  model: typeof Model.Type,
   locationId: string,
-): Option.Option<Location> =>
+): Option.Option<typeof Location.Type> =>
   Array.findFirst(model.locations, ({ id }) => Equal.equals(id, locationId))
 
 export const update = ApplicationComposition.makeUpdate((model, message) =>

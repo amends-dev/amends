@@ -1,12 +1,7 @@
 import { clsx } from 'clsx'
 import { Array, Option, Record, Result, pipe } from 'effect'
 import { AsyncData } from 'foldkit'
-import {
-  Html,
-  type HtmlBuilder,
-  createKeyedLazy,
-  inertHtml as ih,
-} from 'foldkit/html'
+import { Html, createKeyedLazy, inertHtml as ih } from 'foldkit/html'
 
 import { Disclosure } from '@foldkit/ui'
 
@@ -18,7 +13,10 @@ import {
 } from '../../prose'
 import { homeRouter } from '../../route'
 import * as NotFound from '../notFound'
-import { ApiReferenceComposition } from './composition'
+import {
+  ApiReferenceComposition,
+  type ApiReferenceViewBuilder,
+} from './composition'
 import type { ApiData } from './domain'
 import {
   type ApiFunction,
@@ -33,7 +31,7 @@ import {
 } from './domain'
 import { Message } from './message'
 
-type Highlights = ApiData['highlights']
+type Highlights = (typeof ApiData.Type)['highlights']
 
 const sourceLink = (
   sourceUrl: Option.Option<string>,
@@ -59,11 +57,11 @@ const lazyItem = createKeyedLazy()
 
 const functionView = (
   moduleName: string,
-  apiFunction: ApiFunction,
+  apiFunction: typeof ApiFunction.Type,
   isSignatureDisclosureOpen: boolean | undefined,
   highlights: Highlights,
   renderHeadingLink: RenderHeadingLink,
-  h: HtmlBuilder<Message>,
+  h: ApiReferenceViewBuilder,
 ): Html => {
   const id = scopedId('function', moduleName, apiFunction.name)
 
@@ -109,7 +107,7 @@ const functionView = (
 }
 
 const allParameterDescriptions = (
-  apiFunction: ApiFunction,
+  apiFunction: typeof ApiFunction.Type,
 ): ReadonlyArray<Html> =>
   pipe(
     Array.flatMap(apiFunction.signatures, signature => signature.parameters),
@@ -168,10 +166,10 @@ const disclosurePanelClassName = 'rounded-b-lg overflow-x-auto'
 
 const signaturesView = (
   key: string,
-  apiFunction: ApiFunction,
+  apiFunction: typeof ApiFunction.Type,
   isSignatureDisclosureOpen: boolean | undefined,
   highlights: Highlights,
-  h: HtmlBuilder<Message>,
+  h: ApiReferenceViewBuilder,
 ): Html => {
   const maybeHighlighted = Record.get(highlights, key)
   const isInDisclosure = isSignatureDisclosureOpen !== undefined
@@ -244,7 +242,7 @@ const signaturesView = (
 }
 
 const parameterDescriptions = (
-  parameters: ReadonlyArray<ApiParameter>,
+  parameters: ReadonlyArray<typeof ApiParameter.Type>,
 ): ReadonlyArray<Html> =>
   pipe(
     parameters,
@@ -286,7 +284,9 @@ const parameterDescriptions = (
 const punctuation = (text: string): Html =>
   ih.span([ih.Class('text-gray-600')], [text])
 
-const parameterView = (parameter: ApiParameter): ReadonlyArray<Html> => [
+const parameterView = (
+  parameter: typeof ApiParameter.Type,
+): ReadonlyArray<Html> => [
   ...(parameter.isRest ? [punctuation('...')] : []),
   ih.span(
     [ih.Class('font-normal text-gray-900 dark:text-gray-200')],
@@ -298,7 +298,7 @@ const parameterView = (parameter: ApiParameter): ReadonlyArray<Html> => [
 ]
 
 const parameterListView = (
-  parameters: ReadonlyArray<ApiParameter>,
+  parameters: ReadonlyArray<typeof ApiParameter.Type>,
 ): ReadonlyArray<Html> =>
   Array.match(parameters, {
     onEmpty: () => [ih.div([ih.Class('mb-2')], [punctuation('()')])],
@@ -341,7 +341,7 @@ const descriptionCommentFallback = (
   })
 
 const signatureChildrenFallback = (signature: {
-  readonly parameters: ReadonlyArray<ApiParameter>
+  readonly parameters: ReadonlyArray<typeof ApiParameter.Type>
   readonly returnType: string
   readonly typeParameters: ReadonlyArray<string>
 }): ReadonlyArray<Html> => [
@@ -360,10 +360,10 @@ const signatureChildrenFallback = (signature: {
 
 const typeView = (
   moduleName: string,
-  type: ApiType,
+  type: typeof ApiType.Type,
   highlights: Highlights,
   renderHeadingLink: RenderHeadingLink,
-  h: HtmlBuilder<Message>,
+  h: ApiReferenceViewBuilder,
 ): Html => {
   const id = scopedId('type', moduleName, type.name)
   const maybeHighlighted = Record.get(highlights, id)
@@ -433,10 +433,10 @@ const typeView = (
 
 const interfaceView = (
   moduleName: string,
-  apiInterface: ApiInterface,
+  apiInterface: typeof ApiInterface.Type,
   highlights: Highlights,
   renderHeadingLink: RenderHeadingLink,
-  h: HtmlBuilder<Message>,
+  h: ApiReferenceViewBuilder,
 ): Html => {
   const id = scopedId('interface', moduleName, apiInterface.name)
   const maybeHighlighted = Record.get(highlights, id)
@@ -506,10 +506,10 @@ const interfaceView = (
 
 const variableView = (
   moduleName: string,
-  variable: ApiVariable,
+  variable: typeof ApiVariable.Type,
   highlights: Highlights,
   renderHeadingLink: RenderHeadingLink,
-  h: HtmlBuilder<Message>,
+  h: ApiReferenceViewBuilder,
 ): Html => {
   const id = scopedId('const', moduleName, variable.name)
   const maybeHighlighted = Record.get(highlights, id)
@@ -599,7 +599,7 @@ const section = <T extends { readonly name: string }>(
   })
 
 type ModuleViewInputs = Readonly<{
-  module: ApiModule
+  module: typeof ApiModule.Type
   highlights: Highlights
   renderHeadingLink: RenderHeadingLink
 }>

@@ -20,7 +20,7 @@ import {
 } from './route'
 import type { AppTransition } from './transition'
 
-const routeLabel = (route: ApplicationRoute): string =>
+const routeLabel = (route: typeof ApplicationRoute.Type): string =>
   ApplicationRoute.match(route, {
     Home: () => 'Home',
     Gallery: () => 'Gallery',
@@ -30,7 +30,7 @@ const routeLabel = (route: ApplicationRoute): string =>
   })
 
 const navigationView = (
-  currentRoute: ApplicationRoute,
+  currentRoute: typeof ApplicationRoute.Type,
   h: ApplicationViewBuilder,
 ): Html => {
   const navLinkClassName = (isActive: boolean) =>
@@ -181,7 +181,7 @@ const paintingGridView = (h: ApplicationViewBuilder): Html =>
   )
 
 const galleryView = (
-  catalogStatus: CatalogStatus,
+  catalogStatus: typeof CatalogStatus.Type,
   h: ApplicationViewBuilder,
 ): Html => {
   const isCatalogReady = catalogStatus === 'Ready'
@@ -205,7 +205,7 @@ const galleryView = (
 
 const neighborView = (
   label: string,
-  maybeNeighbor: Option.Option<Painting>,
+  maybeNeighbor: Option.Option<typeof Painting.Type>,
   h: ApplicationViewBuilder,
 ): Html =>
   Option.match(maybeNeighbor, {
@@ -259,9 +259,9 @@ const missingPaintingView = (
   )
 
 const foundPaintingView = (
-  painting: Painting,
+  painting: typeof Painting.Type,
   paintingIndex: number,
-  paintingStatus: PaintingStatus,
+  paintingStatus: typeof PaintingStatus.Type,
   h: ApplicationViewBuilder,
 ): Html => {
   const isPaintingReady =
@@ -302,7 +302,7 @@ const foundPaintingView = (
 
 const paintingView = (
   paintingId: number,
-  paintingStatus: PaintingStatus,
+  paintingStatus: typeof PaintingStatus.Type,
   h: ApplicationViewBuilder,
 ): Html =>
   Option.match(findPaintingWithIndex(paintingId), {
@@ -438,7 +438,7 @@ const logEntryBadges = (
 }
 
 const logEntryView = (
-  entry: LoggedTransition,
+  entry: typeof LoggedTransition.Type,
   h: ApplicationViewBuilder,
 ): Html => {
   const sourceLabel = Option.match(entry.maybePreviousRoute, {
@@ -462,7 +462,7 @@ const logEntryView = (
 }
 
 const transitionLogView = (
-  transitionLog: ReadonlyArray<LoggedTransition>,
+  transitionLog: ReadonlyArray<typeof LoggedTransition.Type>,
   h: ApplicationViewBuilder,
 ): Html =>
   h.aside(
@@ -483,7 +483,7 @@ const transitionLogView = (
     ],
   )
 
-const routeTitle = (route: ApplicationRoute): string =>
+const routeTitle = (route: typeof ApplicationRoute.Type): string =>
   Match.value(route).pipe(
     Match.tag('Home', () => 'Route Transitions'),
     Match.orElse(

@@ -22,7 +22,7 @@ const Message = defineMessageUnion({
 const EditorDefinition = Block.makeDefinition('Editor', { Model, Message })
 const EditorComposition = EditorDefinition.makeComposition()
 
-const SaveDocument = EditorDefinition.command('SaveDocument', {
+const SaveDocument = EditorDefinition.makeCommand('SaveDocument', {
   args: { contents: Schema.String },
   messages: [Message.SucceededSaveDocument, Message.FailedSaveDocument],
 })
@@ -46,8 +46,13 @@ const update = EditorComposition.makeUpdate((model, message) =>
   }),
 )
 
-export const EditorBlock = EditorComposition.assembleBlock({
-  init,
-  update,
-  hostHandlers: [SaveDocument],
-})
+const prepare = () =>
+  EditorComposition.prepareBlock({
+    init,
+    update,
+    hostHandlers: [SaveDocument],
+  })
+export const EditorBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

@@ -11,6 +11,7 @@ import {
   type RequiredKeyedField,
   normalizeKeyedFieldConfig,
 } from './keyedFieldConnection.js'
+import * as Block from './public.js'
 
 const ChildModel = Schema.Struct({ id: Schema.String, count: Schema.Number })
 const EquivalentChildModel = Schema.Struct({
@@ -54,35 +55,45 @@ const ChildComposition = makeDefinition('KeyedFieldConnectionChild', {
   Model: ChildModel,
   Message: ChildMessage,
 }).makeComposition()
-const childBlock = ChildComposition.assembleBlock({
-  init: ChildComposition.makeInit(() => ({
-    model: ChildModel.make({ id: 'initial', count: 0 }),
-  })),
-  update: ChildComposition.makeUpdate((model, message) =>
-    ChildMessage.match(message, {
-      UpdatedCount: ({ count }) => ({
-        model: modifyFields(model, { count: () => count }),
+const prepareChildBlock = () =>
+  ChildComposition.prepareBlock({
+    init: ChildComposition.makeInit(() => ({
+      model: ChildModel.make({ id: 'initial', count: 0 }),
+    })),
+    update: ChildComposition.makeUpdate((model, message) =>
+      ChildMessage.match(message, {
+        UpdatedCount: ({ count }) => ({
+          model: modifyFields(model, { count: () => count }),
+        }),
+        UpdatedId: ({ id }) => ({
+          model: modifyFields(model, { id: () => id }),
+        }),
       }),
-      UpdatedId: ({ id }) => ({
-        model: modifyFields(model, { id: () => id }),
-      }),
-    }),
-  ),
-  EffectsLayer: Layer.empty,
-})
+    ),
+    EffectsLayer: Layer.empty,
+  })
+const childBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ChildModel,
+  typeof prepareChildBlock
+> = Block.assemble(prepareChildBlock)
 const ArrayChildMessage = defineMessageUnion({ IgnoredValue: {} })
 
 const ArrayChildComposition = makeDefinition('KeyedFieldConnectionArrayChild', {
   Model: ArrayChildModel,
   Message: ArrayChildMessage,
 }).makeComposition()
-const arrayChildBlock = ArrayChildComposition.assembleBlock({
-  init: ArrayChildComposition.makeInit(() => ({
-    model: ArrayChildModel.make(['initial']),
-  })),
-  update: ArrayChildComposition.makeUpdate(model => ({ model })),
-  EffectsLayer: Layer.empty,
-})
+const prepareArrayChildBlock = () =>
+  ArrayChildComposition.prepareBlock({
+    init: ArrayChildComposition.makeInit(() => ({
+      model: ArrayChildModel.make(['initial']),
+    })),
+    update: ArrayChildComposition.makeUpdate(model => ({ model })),
+    EffectsLayer: Layer.empty,
+  })
+const arrayChildBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ArrayChildModel,
+  typeof prepareArrayChildBlock
+> = Block.assemble(prepareArrayChildBlock)
 const keyedFieldCandidate: RequiredKeyedField<
   typeof ParentModel.Type,
   typeof childBlock.Model.Type
@@ -94,11 +105,11 @@ const Parent = makeDefinition('KeyedFieldConnectionParent', {
   Model: ParentModel,
   Message: Schema.Never,
 })
-const ChildrenBinding = Parent.bindChild(childBlock, {
+const ChildrenBinding = Parent.makeBinding(childBlock, {
   field: 'entries',
   key: 'id',
 })
-const ArrayChildBinding = Parent.bindChild(arrayChildBlock, {
+const ArrayChildBinding = Parent.makeBinding(arrayChildBlock, {
   field: 'arrayChild',
   init: false,
 })
@@ -120,22 +131,27 @@ const CallableChildComposition = makeDefinition(
     Message: ChildMessage,
   },
 ).makeComposition()
-const callableChildBlock = CallableChildComposition.assembleBlock({
-  init: CallableChildComposition.makeInit(() => ({
-    model: CallableChildModel({ id: 'initial', count: 0 }),
-  })),
-  update: CallableChildComposition.makeUpdate((model, message) =>
-    ChildMessage.match(message, {
-      UpdatedCount: ({ count }) => ({
-        model: modifyFields(model, { count: () => count }),
+const prepareCallableChildBlock = () =>
+  CallableChildComposition.prepareBlock({
+    init: CallableChildComposition.makeInit(() => ({
+      model: CallableChildModel({ id: 'initial', count: 0 }),
+    })),
+    update: CallableChildComposition.makeUpdate((model, message) =>
+      ChildMessage.match(message, {
+        UpdatedCount: ({ count }) => ({
+          model: modifyFields(model, { count: () => count }),
+        }),
+        UpdatedId: ({ id }) => ({
+          model: modifyFields(model, { id: () => id }),
+        }),
       }),
-      UpdatedId: ({ id }) => ({
-        model: modifyFields(model, { id: () => id }),
-      }),
-    }),
-  ),
-  EffectsLayer: Layer.empty,
-})
+    ),
+    EffectsLayer: Layer.empty,
+  })
+const callableChildBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof CallableChildModel,
+  typeof prepareCallableChildBlock
+> = Block.assemble(prepareCallableChildBlock)
 const CallableParentModel = taggedStruct('CallableParent', {
   entries: Schema.Array(CallableChildModel),
 })
@@ -143,7 +159,7 @@ const CallableParent = makeDefinition('KeyedFieldConnectionCallableParent', {
   Model: CallableParentModel,
   Message: Schema.Never,
 })
-const CallableChildrenBinding = CallableParent.bindChild(callableChildBlock, {
+const CallableChildrenBinding = CallableParent.makeBinding(callableChildBlock, {
   field: 'entries',
   key: 'id',
 })
@@ -463,7 +479,7 @@ it('rejects ambiguous shorthand and incomplete general keyed adapters', () => {
   )
 
   expect(() =>
-    Reflect.apply(Parent.bindChild, undefined, [
+    Reflect.apply(Parent.makeBinding, undefined, [
       childBlock,
       {
         field: 'entries',
@@ -472,7 +488,7 @@ it('rejects ambiguous shorthand and incomplete general keyed adapters', () => {
   ).toThrow('requires a derivable key Schema')
 
   expect(() =>
-    Reflect.apply(Parent.bindChild, undefined, [
+    Reflect.apply(Parent.makeBinding, undefined, [
       childBlock,
       {
         field: 'entries',
@@ -485,7 +501,7 @@ it('rejects ambiguous shorthand and incomplete general keyed adapters', () => {
   ).toThrow('cannot supply field or presentWhen')
 
   expect(() =>
-    Reflect.apply(Parent.bindChild, undefined, [
+    Reflect.apply(Parent.makeBinding, undefined, [
       childBlock,
       {
         readAll: (model: typeof ParentModel.Type) => model.entries,
@@ -496,7 +512,7 @@ it('rejects ambiguous shorthand and incomplete general keyed adapters', () => {
   ).toThrow('requires a read function')
 
   expect(() =>
-    Reflect.apply(Parent.bindChild, undefined, [
+    Reflect.apply(Parent.makeBinding, undefined, [
       childBlock,
       {
         readAll: (model: typeof ParentModel.Type) => model.entries,

@@ -17,14 +17,29 @@ import {
   PlainBlock,
   RestContextBlock,
   StrictBlock,
+  combinedMixedConnectedStep,
+  deferredMixedConnectedStep,
+  deferredMixedConnectedUpdate,
+  emptyPlainSteps,
+  explicitGenericOrdinaryUpdate,
   foldPlain,
   foldStableProjected,
   initialParentModel,
   initialize,
+  initializeDerivedModel,
+  initializeDerivedSteps,
   initializeEntry,
   initializePlain,
   initializePlainWithParentCommands,
   makeParentCommandInitRecipe,
+  mixedConnectedCommandsStep,
+  mixedConnectedCommandsUpdate,
+  mixedConnectedSteps,
+  mixedConnectedUpdate,
+  pureMixedCommandsFirst,
+  pureMixedCommandsLast,
+  reversedMixedConnectedUpdate,
+  tupleMixedConnectedUpdate,
 } from './composition-safety.accepted.js'
 
 type Equal<Left, Right> =
@@ -38,6 +53,10 @@ type Equal<Left, Right> =
       : false
     : false
 type Expect<Value extends true> = Value
+type EveryMemberEqual<Value, Expected> = Equal<
+  Value extends unknown ? Equal<Value, Expected> : never,
+  true
+>
 type RecipeModel<Value> =
   Value extends Update.ResultRecipe<
     infer Model,
@@ -59,11 +78,135 @@ type RecipeMessage<Value> =
     ? Message
     : never
 
+type EmittedMixedConnectedRecipeIsExact = Expect<
+  Equal<
+    ReturnType<typeof combinedMixedConnectedStep>,
+    ReturnType<ReturnType<typeof PlainBinding.increment>>
+  >
+>
+type EmittedDeferredMixedRecipeIsExact = Expect<
+  Equal<
+    ReturnType<typeof deferredMixedConnectedStep>,
+    ReturnType<typeof combinedMixedConnectedStep>
+  >
+>
+type EmittedMixedRegistrationIsExact = Expect<
+  Equal<
+    Update.RegistrationEvidenceOf<ReturnType<typeof mixedConnectedUpdate>>,
+    | Block.RequirementOfBinding<typeof PlainBinding>
+    | Block.RequirementOfBinding<typeof ParentCommandsBinding>
+    | Block.RequirementOfBinding<typeof EntryBinding>
+  >
+>
+type EmittedReversedMixedResultIsExact = Expect<
+  Equal<
+    ReturnType<typeof reversedMixedConnectedUpdate>,
+    ReturnType<typeof mixedConnectedUpdate>
+  >
+>
+type EmittedTupleMixedResultIsExact = Expect<
+  Equal<
+    ReturnType<typeof tupleMixedConnectedUpdate>,
+    ReturnType<typeof mixedConnectedUpdate>
+  >
+>
+type EmittedDeferredMixedResultIsExact = Expect<
+  Equal<
+    ReturnType<typeof deferredMixedConnectedUpdate>,
+    ReturnType<typeof mixedConnectedUpdate>
+  >
+>
+type EmittedExplicitGenericOrdinaryModelIsExact = Expect<
+  Equal<
+    ReturnType<typeof explicitGenericOrdinaryUpdate>['model'],
+    typeof ParentModel.Type
+  >
+>
+type EmittedExplicitGenericOrdinaryRequirementsAreExact = Expect<
+  Equal<Update.RequirementsOf<typeof explicitGenericOrdinaryUpdate>, never>
+>
+type EmittedMixedCommandsModelIsExact = Expect<
+  Equal<
+    RecipeModel<ReturnType<typeof mixedConnectedCommandsStep>>,
+    typeof ParentModel.Type
+  >
+>
+type EmittedMixedCommandsMessageIsExact = Expect<
+  Equal<
+    RecipeMessage<ReturnType<typeof mixedConnectedCommandsStep>>,
+    | RecipeMessage<ReturnType<ReturnType<typeof PlainBinding.increment>>>
+    | typeof ParentMessage.CompletedParentInitialization.Type
+  >
+>
+type EmittedMixedCommandsRequirementsAreExact = Expect<
+  EveryMemberEqual<
+    Update.RequirementsOf<typeof mixedConnectedCommandsStep>,
+    Command.HandlerOf<typeof CompleteParentInitialization>
+  >
+>
+type EmittedMixedCommandsRegistrationIsExact = Expect<
+  EveryMemberEqual<
+    Update.RegistrationEvidenceOf<
+      ReturnType<typeof mixedConnectedCommandsStep>
+    >,
+    Block.RequirementOfBinding<typeof PlainBinding>
+  >
+>
+type EmittedRegisteredMixedCommandsRequirementsAreExact = Expect<
+  Equal<
+    Update.RequirementsOf<typeof mixedConnectedCommandsUpdate>,
+    Command.HandlerOf<typeof CompleteParentInitialization>
+  >
+>
+type EmittedPureMixedCommandsAreExact = Expect<
+  Equal<
+    typeof pureMixedCommandsLast,
+    Update.Return<
+      typeof ParentModel.Type,
+      typeof ParentMessage.CompletedParentInitialization.Type,
+      Command.HandlerOf<typeof CompleteParentInitialization>
+    >
+  >
+>
+type EmittedReversedPureMixedCommandsAreExact = Expect<
+  Equal<typeof pureMixedCommandsFirst, typeof pureMixedCommandsLast>
+>
+
+const rejectRawMixedConnectedSteps = () => {
+  // @ts-expect-error Emission retains the graph requirement beside a generic no-op.
+  // oxfmt-ignore
+  Update.combineSteps(initialParentModel, [PlainBinding.increment(), CompositionSafetyParentDefinition.makeNoopStep()])
+  // @ts-expect-error Reversing emitted Steps cannot erase the connected graph requirement.
+  // oxfmt-ignore
+  Update.combineSteps(initialParentModel, [CompositionSafetyParentDefinition.makeNoopStep(), PlainBinding.increment()])
+  // @ts-expect-error An emitted predeclared tuple retains the connected graph requirement.
+  Update.combineSteps(initialParentModel, mixedConnectedSteps)
+  // @ts-expect-error An emitted deferred combination still requires its registered Composition.
+  deferredMixedConnectedStep(initialParentModel)
+}
+const rejectReadableMixedRecipe = (
+  model: Parameters<typeof combinedMixedConnectedStep>[0],
+) => {
+  const combined = combinedMixedConnectedStep(model)
+
+  // @ts-expect-error The emitted connected combination remains opaque.
+  combined.model
+  // @ts-expect-error The emitted combination cannot expose unresolved Commands.
+  combined.commands
+}
+void rejectRawMixedConnectedSteps
+void rejectReadableMixedRecipe
+
 const initial = initialize()
 const parentMessage = ParentMessage.CompletedParentInitialization()
 foldStableProjected(initial.model, parentMessage, ChildMessage.Incremented())
 foldPlain(initial.model, parentMessage, ChildMessage.Incremented())
 StrictBlock.operations.initializeEntry(initialParentModel, 'emitted-entry', 2)
+const appliedDerivedInitialization = initializeDerivedModel(
+  initialParentModel,
+  parentMessage,
+)
+appliedDerivedInitialization.model.first.count
 
 type EmittedEntryInitRequirementsAreExact = Expect<
   Equal<
@@ -125,20 +268,33 @@ type EmittedParentCommandRecipeRegistrationIsExact = Expect<
     Block.RequirementOfBinding<typeof ParentCommandsBinding>
   >
 >
-
+type EmittedDerivedModelRequirementsAreExact = Expect<
+  Equal<
+    Update.RequirementsOf<typeof initializeDerivedModel>,
+    | Block.Qualify<'entries', Command.HandlerOf<typeof LoadParameterizedChild>>
+    | Command.HandlerOf<typeof CompleteParentInitialization>
+  >
+>
+type EmittedDerivedModelRegistrationIsExact = Expect<
+  Equal<
+    Update.RegistrationEvidenceOf<ReturnType<typeof initializeDerivedSteps>>,
+    | Block.RequirementOfBinding<typeof EntryBinding>
+    | Block.RequirementOfBinding<typeof ParentCommandsBinding>
+  >
+>
 declare const useSecondField: boolean
 
 // @ts-expect-error Emitted accessor init projections retain one stable parent Model field.
 // oxfmt-ignore
-CompositionSafetyParentDefinition.bindChild(PlainBlock, { placement: 'emittedUnstableProjected', read: model => Option.some(model.first), write: (model, nextChild) => Struct.modifyFields(model, { first: () => nextChild }),  init: { contextToArgs: () => [], toParentFields: child => useSecondField ? { second: child } : { first: child } } })
+CompositionSafetyParentDefinition.makeBinding(PlainBlock, { placement: 'emittedUnstableProjected', read: model => Option.some(model.first), write: (model, nextChild) => Struct.modifyFields(model, { first: () => nextChild }),  init: { contextToArgs: () => [], toParentFields: child => useSecondField ? { second: child } : { first: child } } })
 
 // @ts-expect-error Emitted optional update context requires an explicit delivery context mapper.
 // oxfmt-ignore
-CompositionSafetyParentDefinition.bindChild(OptionalContextBlock, { field: 'optionalContext', })
+CompositionSafetyParentDefinition.makeBinding(OptionalContextBlock, { field: 'optionalContext', })
 
 // @ts-expect-error Emitted required rest update context requires an explicit delivery context mapper.
 // oxfmt-ignore
-CompositionSafetyParentDefinition.bindChild(RestContextBlock, { field: 'restContext', })
+CompositionSafetyParentDefinition.makeBinding(RestContextBlock, { field: 'restContext', })
 
 // @ts-expect-error Emitted connected initializers require their parent configuration.
 PlainBinding.init()
@@ -216,7 +372,7 @@ const emittedDirectConnectedInit =
     }),
   )
 // @ts-expect-error Emitted directly connected initializers retain their missing Binding evidence.
-EmittedMissingPlainBindingComposition.assembleBlock({
+EmittedMissingPlainBindingComposition.prepareBlock({
   init: emittedDirectConnectedInit,
   update: EmittedMissingPlainBindingComposition.makeUpdate(model => ({
     model,
@@ -225,6 +381,21 @@ EmittedMissingPlainBindingComposition.assembleBlock({
 })
 
 export type EmittedCompositionSafetyAssertions = [
+  EmittedMixedConnectedRecipeIsExact,
+  EmittedDeferredMixedRecipeIsExact,
+  EmittedMixedRegistrationIsExact,
+  EmittedReversedMixedResultIsExact,
+  EmittedTupleMixedResultIsExact,
+  EmittedDeferredMixedResultIsExact,
+  EmittedExplicitGenericOrdinaryModelIsExact,
+  EmittedExplicitGenericOrdinaryRequirementsAreExact,
+  EmittedMixedCommandsModelIsExact,
+  EmittedMixedCommandsMessageIsExact,
+  EmittedMixedCommandsRequirementsAreExact,
+  EmittedMixedCommandsRegistrationIsExact,
+  EmittedRegisteredMixedCommandsRequirementsAreExact,
+  EmittedPureMixedCommandsAreExact,
+  EmittedReversedPureMixedCommandsAreExact,
   EmittedEntryInitRequirementsAreExact,
   EmittedParentCommandRequirementsAreExact,
   EmittedParentCommandRegistrationIsExact,
@@ -234,6 +405,8 @@ export type EmittedCompositionSafetyAssertions = [
   EmittedPlainInitRegistrationIsExact,
   EmittedParentCommandRecipeRequirementsAreExact,
   EmittedParentCommandRecipeRegistrationIsExact,
+  EmittedDerivedModelRequirementsAreExact,
+  EmittedDerivedModelRegistrationIsExact,
 ]
 
 // @ts-expect-error Passive operation construction is private to checked composition.
@@ -258,3 +431,33 @@ export type HiddenOperationRuntime =
 export type HiddenInitializationRuntime =
   // @ts-expect-error Private Binding initialization modules are not package subpaths.
   typeof import('foldkit/block/initRecipe')
+
+const emptyPublicSteps = PublicUpdate.combineSteps(initialParentModel, [])
+export type EmittedEmptyPlainStepsAssertions = [
+  Expect<
+    Equal<
+      ReturnType<typeof emptyPlainSteps>,
+      Update.Return<typeof PlainBlock.Model.Type, never>
+    >
+  >,
+  Expect<
+    Equal<
+      typeof emptyPublicSteps,
+      Update.Return<typeof ParentModel.Type, never>
+    >
+  >,
+  Expect<
+    Equal<
+      ReturnType<typeof emptyPlainSteps>['model'],
+      typeof PlainBlock.Model.Type
+    >
+  >,
+  Expect<Equal<Update.RequirementsOf<typeof emptyPlainSteps>, never>>,
+  Expect<
+    Equal<
+      Update.RegistrationEvidenceOf<ReturnType<typeof emptyPlainSteps>>,
+      never
+    >
+  >,
+  Expect<Equal<typeof emptyPublicSteps.model, typeof ParentModel.Type>>,
+]

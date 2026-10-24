@@ -12,7 +12,7 @@ import { Message, UnsentConversationDefinition } from "./definition.ts"
 const failed = (error: string) => Message.FailedWriteAction({ error })
 
 /** Start a conversation with `memberIds`, `text` its first message. */
-export const StartConversation = UnsentConversationDefinition.command("StartConversation", {
+export const StartConversation = UnsentConversationDefinition.makeCommand("StartConversation", {
   args: { ...Stores.AsMember, memberIds: Schema.Array(MemberId.MemberId), text: Schema.String },
   messages: [Message.WroteAction, Message.FailedWriteAction],
   handler: function* () {

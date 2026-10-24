@@ -31,7 +31,7 @@ import {
 } from '../route'
 import { type GroupKey, type SidebarGroups } from '../sidebarStorage'
 
-const GROUP_ID: Record<GroupKey, string> = {
+const GROUP_ID: Record<typeof GroupKey.Type, string> = {
   blog: 'blog-group',
   introduction: 'introduction-group',
   coreConcepts: 'core-concepts-group',
@@ -52,7 +52,7 @@ const sidebarGroup = (
     id: string
     label: string
     isOpen: boolean
-    onToggle: (isOpen: boolean) => Message
+    onToggle: (isOpen: boolean) => typeof Message.Type
     children: Html
     isLocked: boolean
   }>,
@@ -161,7 +161,7 @@ const getStartedClass = (isActive: boolean) =>
   })
 
 const getStartedNavItem = (
-  route: Model['route'],
+  route: (typeof Model.Type)['route'],
   maybeExampleSlug: Option.Option<string>,
   h: ApplicationViewBuilder,
 ): Html => {
@@ -191,8 +191,8 @@ const MOBILE_ID_PREFIX = 'mobile'
 
 const computeNavLinks = (
   idPrefix: string,
-  route: Model['route'],
-  sidebarGroups: SidebarGroups,
+  route: (typeof Model.Type)['route'],
+  sidebarGroups: typeof SidebarGroups.Type,
   h: ApplicationViewBuilder,
 ): Html => {
   const isOnApiModulePage = route._tag === 'ApiModule'
@@ -201,7 +201,7 @@ const computeNavLinks = (
     route._tag,
     maybeExampleSlug,
   )
-  const isLocked = (key: GroupKey): boolean =>
+  const isLocked = (key: typeof GroupKey.Type): boolean =>
     Option.exists(maybeActiveSectionKey, Equal.equals(key))
 
   const pageGroupList = (pages: ReadonlyArray<NavPage>): Html =>
@@ -292,7 +292,10 @@ const computeNavLinks = (
 
 const lazyNavLinks = createKeyedLazy()
 
-export const view = (model: Model, h: ApplicationViewBuilder): Html => {
+export const view = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+): Html => {
   const desktopNavLinks = lazyNavLinks(DESKTOP_ID_PREFIX, computeNavLinks, [
     DESKTOP_ID_PREFIX,
     model.route,
@@ -320,7 +323,10 @@ export const view = (model: Model, h: ApplicationViewBuilder): Html => {
   )
 }
 
-export const mobileView = (model: Model, h: ApplicationViewBuilder): Html => {
+export const mobileView = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+): Html => {
   const mobileNavLinks = lazyNavLinks(MOBILE_ID_PREFIX, computeNavLinks, [
     MOBILE_ID_PREFIX,
     model.route,

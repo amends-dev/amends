@@ -14,7 +14,7 @@ export const EMPTY_PREVIEW_POSITIONS: ReadonlyArray<readonly [number, number]> =
   []
 
 export const computePreviewPositions = (
-  model: Model,
+  model: typeof Model.Type,
 ): ReadonlyArray<readonly [number, number]> => {
   if (model.isDrawing) {
     return EMPTY_PREVIEW_POSITIONS
@@ -34,10 +34,10 @@ export const computePreviewPositions = (
 }
 
 export const computeFillPreview = (
-  grid: Grid,
+  grid: typeof Grid.Type,
   startX: number,
   startY: number,
-  fillColorIndex: PaletteIndex,
+  fillColorIndex: typeof PaletteIndex.Type,
 ): ReadonlyArray<readonly [number, number]> => {
   const filledGrid = floodFill(grid, startX, startY, fillColorIndex)
   const positions: Array<readonly [number, number]> = []
@@ -52,7 +52,7 @@ export const computeFillPreview = (
 }
 
 export const canvasView = (
-  model: Model,
+  model: typeof Model.Type,
   theme: PaletteTheme,
   h: ApplicationViewBuilder,
 ): Html => {
@@ -108,9 +108,9 @@ export const canvasView = (
 }
 
 export const rowView = (
-  row: ReadonlyArray<Cell>,
+  row: ReadonlyArray<typeof Cell.Type>,
   y: number,
-  previewColor: HexColor,
+  previewColor: typeof HexColor.Type,
   previewPositions: ReadonlyArray<readonly [number, number]>,
   theme: PaletteTheme,
   h: ApplicationViewBuilder,

@@ -14,7 +14,7 @@ const CanvasAppDefinition = Block.makeDefinition('CanvasApp', {
 })
 const CanvasAppComposition = CanvasAppDefinition.makeComposition()
 
-const subscriptions = CanvasAppDefinition.subscriptions(entry => ({
+const subscriptions = CanvasAppDefinition.makeSubscriptions(entry => ({
   animationFrameTicks: entry(
     'AnimationFrameTicks',
     { isActive: Schema.Boolean },

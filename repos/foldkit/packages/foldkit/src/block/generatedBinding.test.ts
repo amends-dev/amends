@@ -5,6 +5,7 @@ import { defineMessageUnion } from '../message/index.js'
 import { modifyFields } from '../struct/index.js'
 import { runtimeBindingOf } from './composition.js'
 import { makeDefinition } from './define.js'
+import * as Block from './public.js'
 
 const ChildMessage = defineMessageUnion({ ClickedIncrement: {} })
 
@@ -14,15 +15,20 @@ const AccessorChildDefinition = makeDefinition('GeneratedAccessorChild', {
   Message: ChildMessage,
 })
 const AccessorChildComposition = AccessorChildDefinition.makeComposition()
-const AccessorChildBlock = AccessorChildComposition.assembleBlock({
-  init: AccessorChildComposition.makeInit(() => ({ model: { count: 0 } })),
-  update: AccessorChildComposition.makeUpdate(
-    (model, _message, amount: number) => ({
-      model: modifyFields(model, { count: count => count + amount }),
-    }),
-  ),
-  view: AccessorChildComposition.makeView((_model, h) => h.div([])),
-})
+const prepareAccessorChildBlock = () =>
+  AccessorChildComposition.prepareBlock({
+    init: AccessorChildComposition.makeInit(() => ({ model: { count: 0 } })),
+    update: AccessorChildComposition.makeUpdate(
+      (model, _message, amount: number) => ({
+        model: modifyFields(model, { count: count => count + amount }),
+      }),
+    ),
+    view: AccessorChildComposition.makeView((_model, h) => h.div([])),
+  })
+const AccessorChildBlock: Block.FromAssemblyWithView<
+  typeof AccessorChildModel,
+  typeof prepareAccessorChildBlock
+> = Block.assemble(prepareAccessorChildBlock)
 
 const AccessorParentModel = Schema.Struct({
   child: AccessorChildModel,
@@ -34,14 +40,18 @@ const AccessorParentDefinition = makeDefinition('GeneratedAccessorParent', {
   Model: AccessorParentModel,
   Message: AccessorParentMessage,
 })
-const AccessorBinding = AccessorParentDefinition.bindChild(AccessorChildBlock, {
-  read: model => Option.some(model.child),
-  write: (model, nextChild) => modifyFields(model, { child: () => nextChild }),
-  delivery: {
-    when: model => model.isEnabled,
-    toUpdateContext: model => [model.amount],
+const AccessorBinding = AccessorParentDefinition.makeBinding(
+  AccessorChildBlock,
+  {
+    read: model => Option.some(model.child),
+    write: (model, nextChild) =>
+      modifyFields(model, { child: () => nextChild }),
+    delivery: {
+      when: model => model.isEnabled,
+      toUpdateContext: model => [model.amount],
+    },
   },
-})
+)
 const AccessorParentComposition = AccessorParentDefinition.makeComposition({
   bindings: [AccessorBinding],
 })
@@ -61,8 +71,8 @@ const OptionalContextChildDefinition = makeDefinition(
 )
 const OptionalContextChildComposition =
   OptionalContextChildDefinition.makeComposition()
-const OptionalContextChildBlock = OptionalContextChildComposition.assembleBlock(
-  {
+const prepareOptionalContextChildBlock = () =>
+  OptionalContextChildComposition.prepareBlock({
     init: OptionalContextChildComposition.makeInit(() => ({
       model: { count: 0 },
     })),
@@ -74,8 +84,11 @@ const OptionalContextChildBlock = OptionalContextChildComposition.assembleBlock(
       }),
     ),
     view: OptionalContextChildComposition.makeView((_model, h) => h.div([])),
-  },
-)
+  })
+const OptionalContextChildBlock: Block.FromAssemblyWithView<
+  typeof AccessorChildModel,
+  typeof prepareOptionalContextChildBlock
+> = Block.assemble(prepareOptionalContextChildBlock)
 
 const DefaultContextChildDefinition = makeDefinition(
   'GeneratedDefaultContextChild',
@@ -86,39 +99,49 @@ const DefaultContextChildDefinition = makeDefinition(
 )
 const DefaultContextChildComposition =
   DefaultContextChildDefinition.makeComposition()
-const DefaultContextChildBlock = DefaultContextChildComposition.assembleBlock({
-  init: DefaultContextChildComposition.makeInit(() => ({
-    model: { count: 0 },
-  })),
-  update: DefaultContextChildComposition.makeUpdate(
-    (model, _message, amount: number = 0) => ({
-      model: modifyFields(model, { count: count => count + amount }),
-    }),
-  ),
-  view: DefaultContextChildComposition.makeView((_model, h) => h.div([])),
-})
+const prepareDefaultContextChildBlock = () =>
+  DefaultContextChildComposition.prepareBlock({
+    init: DefaultContextChildComposition.makeInit(() => ({
+      model: { count: 0 },
+    })),
+    update: DefaultContextChildComposition.makeUpdate(
+      (model, _message, amount: number = 0) => ({
+        model: modifyFields(model, { count: count => count + amount }),
+      }),
+    ),
+    view: DefaultContextChildComposition.makeView((_model, h) => h.div([])),
+  })
+const DefaultContextChildBlock: Block.FromAssemblyWithView<
+  typeof AccessorChildModel,
+  typeof prepareDefaultContextChildBlock
+> = Block.assemble(prepareDefaultContextChildBlock)
 
 const RestContextChildDefinition = makeDefinition('GeneratedRestContextChild', {
   Model: AccessorChildModel,
   Message: ChildMessage,
 })
 const RestContextChildComposition = RestContextChildDefinition.makeComposition()
-const RestContextChildBlock = RestContextChildComposition.assembleBlock({
-  init: RestContextChildComposition.makeInit(() => ({
-    model: { count: 0 },
-  })),
-  update: RestContextChildComposition.makeUpdate(
-    (model, _message, ...amounts: ReadonlyArray<number>) => ({
-      model: modifyFields(model, {
-        count: count =>
-          count + Array.reduce(amounts, 0, (sum, amount) => sum + amount),
+const prepareRestContextChildBlock = () =>
+  RestContextChildComposition.prepareBlock({
+    init: RestContextChildComposition.makeInit(() => ({
+      model: { count: 0 },
+    })),
+    update: RestContextChildComposition.makeUpdate(
+      (model, _message, ...amounts: ReadonlyArray<number>) => ({
+        model: modifyFields(model, {
+          count: count =>
+            count + Array.reduce(amounts, 0, (sum, amount) => sum + amount),
+        }),
       }),
-    }),
-  ),
-  view: RestContextChildComposition.makeView((_model, h) => h.div([])),
-})
+    ),
+    view: RestContextChildComposition.makeView((_model, h) => h.div([])),
+  })
+const RestContextChildBlock: Block.FromAssemblyWithView<
+  typeof AccessorChildModel,
+  typeof prepareRestContextChildBlock
+> = Block.assemble(prepareRestContextChildBlock)
 
-const optionalContextBinding = AccessorParentDefinition.bindChild(
+const optionalContextBinding = AccessorParentDefinition.makeBinding(
   OptionalContextChildBlock,
   {
     placement: 'optionalContext',
@@ -128,7 +151,7 @@ const optionalContextBinding = AccessorParentDefinition.bindChild(
     delivery: { toUpdateContext: model => [model.amount] },
   },
 )
-const defaultContextBinding = AccessorParentDefinition.bindChild(
+const defaultContextBinding = AccessorParentDefinition.makeBinding(
   DefaultContextChildBlock,
   {
     placement: 'defaultContext',
@@ -138,7 +161,7 @@ const defaultContextBinding = AccessorParentDefinition.bindChild(
     delivery: { toUpdateContext: model => [model.amount] },
   },
 )
-const restContextBinding = AccessorParentDefinition.bindChild(
+const restContextBinding = AccessorParentDefinition.makeBinding(
   RestContextChildBlock,
   {
     placement: 'restContext',
@@ -172,17 +195,22 @@ const KeyedChildDefinition = makeDefinition('GeneratedKeyedChild', {
   Message: ChildMessage,
 })
 const KeyedChildComposition = KeyedChildDefinition.makeComposition()
-const KeyedChildBlock = KeyedChildComposition.assembleBlock({
-  init: KeyedChildComposition.makeInit((id: string) => ({
-    model: { id, count: 0 },
-  })),
-  update: KeyedChildComposition.makeUpdate(
-    (model, _message, amount: number) => ({
-      model: modifyFields(model, { count: count => count + amount }),
-    }),
-  ),
-  view: KeyedChildComposition.makeView((_model, h) => h.div([])),
-})
+const prepareKeyedChildBlock = () =>
+  KeyedChildComposition.prepareBlock({
+    init: KeyedChildComposition.makeInit((id: string) => ({
+      model: { id, count: 0 },
+    })),
+    update: KeyedChildComposition.makeUpdate(
+      (model, _message, amount: number) => ({
+        model: modifyFields(model, { count: count => count + amount }),
+      }),
+    ),
+    view: KeyedChildComposition.makeView((_model, h) => h.div([])),
+  })
+const KeyedChildBlock: Block.FromAssemblyWithView<
+  typeof KeyedChildModel,
+  typeof prepareKeyedChildBlock
+> = Block.assemble(prepareKeyedChildBlock)
 
 const KeyedParentModel = Schema.Struct({
   children: Schema.Array(KeyedChildModel),
@@ -194,7 +222,7 @@ const KeyedParentDefinition = makeDefinition('GeneratedKeyedParent', {
   Model: KeyedParentModel,
   Message: KeyedParentMessage,
 })
-const KeyedBinding = KeyedParentDefinition.bindChild(KeyedChildBlock, {
+const KeyedBinding = KeyedParentDefinition.makeBinding(KeyedChildBlock, {
   field: 'children',
   key: 'id',
   delivery: {
@@ -230,7 +258,7 @@ const readRooms = (
 const roomId = (room: typeof Room.Type): string => room.roomId
 const readRoomChild = (room: typeof Room.Type): typeof KeyedChildModel.Type =>
   room.child
-const RoomBinding = RoomParentDefinition.bindChild(KeyedChildBlock, {
+const RoomBinding = RoomParentDefinition.makeBinding(KeyedChildBlock, {
   readAll: readRooms,
   key: roomId,
   keySchema: Room.fields.roomId,
@@ -269,7 +297,7 @@ const WrappedParentDefinition = makeDefinition('GeneratedWrappedParent', {
   Model: WrappedParentModel,
   Message: WrappedParentMessage,
 })
-const WrappedBinding = WrappedParentDefinition.bindChild(KeyedChildBlock, {
+const WrappedBinding = WrappedParentDefinition.makeBinding(KeyedChildBlock, {
   field: 'rooms',
   key: 'roomId',
   childField: 'child',
@@ -395,7 +423,7 @@ it('uses an explicit key Schema for generated general keyed delivery', () => {
 })
 
 it('validates generated selector keys against the decoded side of a transformed refinement', () => {
-  const binding = Reflect.apply(RoomParentDefinition.bindChild, undefined, [
+  const binding = Reflect.apply(RoomParentDefinition.makeBinding, undefined, [
     KeyedChildBlock,
     {
       readAll: readRooms,
@@ -419,7 +447,7 @@ it('validates generated selector keys against the decoded side of a transformed 
 })
 
 it('rejects an erased selector result outside the generated key Schema', () => {
-  const binding = Reflect.apply(RoomParentDefinition.bindChild, undefined, [
+  const binding = Reflect.apply(RoomParentDefinition.makeBinding, undefined, [
     KeyedChildBlock,
     {
       readAll: readRooms,
@@ -467,7 +495,7 @@ it('derives wrapped keyed field envelopes from the wrapper key Schema', () => {
 })
 
 it('reports an invalid general keyed collection at the Binding boundary', () => {
-  const binding = Reflect.apply(RoomParentDefinition.bindChild, undefined, [
+  const binding = Reflect.apply(RoomParentDefinition.makeBinding, undefined, [
     KeyedChildBlock,
     {
       readAll: () => ({ roomId: 'not-an-array' }),
@@ -497,7 +525,7 @@ it('rejects removed authored parent Message mapping fields', () => {
     'fromParentMessage',
   ]) {
     expect(() =>
-      Reflect.apply(AccessorParentDefinition.bindChild, undefined, [
+      Reflect.apply(AccessorParentDefinition.makeBinding, undefined, [
         AccessorChildBlock,
         {
           field: 'child',
@@ -511,7 +539,7 @@ it('rejects removed authored parent Message mapping fields', () => {
   }
 
   expect(() =>
-    Reflect.apply(RoomParentDefinition.bindChild, undefined, [
+    Reflect.apply(RoomParentDefinition.makeBinding, undefined, [
       KeyedChildBlock,
       {
         readAll: readRooms,
@@ -532,7 +560,7 @@ it('rejects removed authored parent Message mapping fields', () => {
 })
 
 if (false) {
-  AccessorParentDefinition.bindChild(AccessorChildBlock, {
+  AccessorParentDefinition.makeBinding(AccessorChildBlock, {
     // @ts-expect-error A missing delivery context makes the accessor config ineligible.
     read: (model: typeof AccessorParentModel.Type) => Option.some(model.child),
     // @ts-expect-error A missing delivery context makes the accessor config ineligible.
@@ -545,7 +573,7 @@ if (false) {
   })
 
   // @ts-expect-error General generated keyed delivery requires an exact key Schema.
-  RoomParentDefinition.bindChild(KeyedChildBlock, {
+  RoomParentDefinition.makeBinding(KeyedChildBlock, {
     readAll: readRooms,
     key: roomId,
     read: readRoomChild,

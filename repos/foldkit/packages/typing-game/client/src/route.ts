@@ -8,7 +8,10 @@ export const ApplicationRoute = defineRouteUnion({
   NotFound: { path: Schema.String },
 })
 
-export type ApplicationRoute = typeof ApplicationRoute.Type
+export const isRoomRouteFor = (
+  route: typeof ApplicationRoute.Type,
+  roomId: string,
+) => ApplicationRoute.guards.Room(route) && route.roomId === roomId
 
 export const homeRouter = pipe(Route.root, Route.mapTo(ApplicationRoute.Home))
 export const roomRouter = pipe(

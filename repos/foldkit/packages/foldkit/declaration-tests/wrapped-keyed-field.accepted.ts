@@ -34,7 +34,7 @@ const makeChoice = <const Values extends ReadonlyArray<string>>(
       OutMessage: ChoiceOutMessage,
     },
   )
-  const ReadChoice = DeclarationWrappedKeyedFieldChoiceDefinition.command(
+  const ReadChoice = DeclarationWrappedKeyedFieldChoiceDefinition.makeCommand(
     'ReadChoice',
     {
       messages: [ChoiceMessage.CompletedRefresh],
@@ -47,44 +47,53 @@ const makeChoice = <const Values extends ReadonlyArray<string>>(
       },
     },
   )
-  const setValue = DeclarationWrappedKeyedFieldChoiceDefinition.step(
+  const setValue = DeclarationWrappedKeyedFieldChoiceDefinition.makeStep(
     (model, value: Value) => ({
       model: Struct.modifyFields(model, { value: () => value }),
     }),
   )
-  const refresh = DeclarationWrappedKeyedFieldChoiceDefinition.step(model => ({
-    model,
-    commands: [ReadChoice()],
-  }))
-  const select = DeclarationWrappedKeyedFieldChoiceDefinition.step(model => ({
-    model,
-    outMessage: ChoiceOutMessage.SelectedValue({ value: model.value }),
-  }))
+  const refresh = DeclarationWrappedKeyedFieldChoiceDefinition.makeStep(
+    model => ({
+      model,
+      commands: [ReadChoice()],
+    }),
+  )
+  const select = DeclarationWrappedKeyedFieldChoiceDefinition.makeStep(
+    model => ({
+      model,
+      outMessage: ChoiceOutMessage.SelectedValue({ value: model.value }),
+    }),
+  )
   const DeclarationWrappedKeyedFieldChoiceComposition =
     DeclarationWrappedKeyedFieldChoiceDefinition.makeComposition()
-  const block = DeclarationWrappedKeyedFieldChoiceComposition.assembleBlock({
-    init: DeclarationWrappedKeyedFieldChoiceComposition.makeInit(
-      (value: Value) => ({
-        model: Model.make({ value }),
-        commands: [ReadChoice()],
-      }),
-    ),
-    update: DeclarationWrappedKeyedFieldChoiceComposition.makeUpdate(
-      (model, message) =>
-        ChoiceMessage.match(message, {
-          UpdatedValue: ({ value }) => setValue(model, value),
-          RequestedRefresh: () => refresh(model),
-          RequestedSelect: () => select(model),
-          CompletedRefresh: () => ({ model }),
+  const prepareBlock = () =>
+    DeclarationWrappedKeyedFieldChoiceComposition.prepareBlock({
+      init: DeclarationWrappedKeyedFieldChoiceComposition.makeInit(
+        (value: Value) => ({
+          model: Model.make({ value }),
+          commands: [ReadChoice()],
         }),
-    ),
-    operations: {
-      setValue: (value: Value) => [ChoiceMessage.UpdatedValue({ value })],
-      refresh: () => [ChoiceMessage.RequestedRefresh()],
-      select: () => [ChoiceMessage.RequestedSelect()],
-    },
-    EffectsLayer: ReadChoice.layer,
-  })
+      ),
+      update: DeclarationWrappedKeyedFieldChoiceComposition.makeUpdate(
+        (model, message) =>
+          ChoiceMessage.match(message, {
+            UpdatedValue: ({ value }) => setValue(model, value),
+            RequestedRefresh: () => refresh(model),
+            RequestedSelect: () => select(model),
+            CompletedRefresh: () => ({ model }),
+          }),
+      ),
+      operations: {
+        setValue: (value: Value) => [ChoiceMessage.UpdatedValue({ value })],
+        refresh: () => [ChoiceMessage.RequestedRefresh()],
+        select: () => [ChoiceMessage.RequestedSelect()],
+      },
+      EffectsLayer: ReadChoice.layer,
+    })
+  const block: Block.FromAssemblyWithOutMessage<
+    typeof Model,
+    typeof prepareBlock
+  > = Block.assemble(prepareBlock)
 
   return {
     block,
@@ -103,8 +112,8 @@ const DeclarationWrappedKeyedFieldPlainChoiceComposition = Block.makeDefinition(
     Message: Choice.Message,
   },
 ).makeComposition()
-export const PlainChoiceBlock =
-  DeclarationWrappedKeyedFieldPlainChoiceComposition.assembleBlock({
+const preparePlainChoiceBlock = () =>
+  DeclarationWrappedKeyedFieldPlainChoiceComposition.prepareBlock({
     init: DeclarationWrappedKeyedFieldPlainChoiceComposition.makeInit(() => ({
       model: Choice.block.Model.make({ value: 'One' }),
     })),
@@ -121,6 +130,10 @@ export const PlainChoiceBlock =
     ),
     EffectsLayer: Layer.empty,
   })
+export const PlainChoiceBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof Choice.block.Model,
+  typeof preparePlainChoiceBlock
+> = Block.assemble(preparePlainChoiceBlock)
 
 export const ChoiceId = Schema.String.pipe(
   Schema.brand('DeclarationWrappedKeyedFieldChoiceId'),
@@ -146,8 +159,8 @@ const DeclarationWrappedKeyedFieldTextComposition = Block.makeDefinition(
     Message: TextMessage,
   },
 ).makeComposition()
-export const TextBlock =
-  DeclarationWrappedKeyedFieldTextComposition.assembleBlock({
+const prepareTextBlock = () =>
+  DeclarationWrappedKeyedFieldTextComposition.prepareBlock({
     init: DeclarationWrappedKeyedFieldTextComposition.makeInit(() => ({
       model: '',
     })),
@@ -156,6 +169,10 @@ export const TextBlock =
     ),
     EffectsLayer: Layer.empty,
   })
+export const TextBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof Schema.String,
+  typeof prepareTextBlock
+> = Block.assemble(prepareTextBlock)
 export const TextEntry = Schema.Struct({
   id: Schema.String,
   text: Schema.String,
@@ -208,14 +225,15 @@ export const makePayloadParent = <A, I>(payloadSchema: Schema.Codec<A, I>) => {
       Model,
       Message: ParentMessage,
     })
-  const Binding = DeclarationWrappedKeyedFieldPayloadParentDefinition.bindChild(
-    PlainChoiceBlock,
-    {
-      field: 'entries',
-      key: 'id',
-      childField: 'choice',
-    },
-  )
+  const Binding =
+    DeclarationWrappedKeyedFieldPayloadParentDefinition.makeBinding(
+      PlainChoiceBlock,
+      {
+        field: 'entries',
+        key: 'id',
+        childField: 'choice',
+      },
+    )
 
   return { Binding, Model }
 }
@@ -226,13 +244,29 @@ export const payloadParent = makePayloadParent(
 
 export const firstChoiceId = Schema.decodeSync(ChoiceId)('first')
 
+const foldChoiceOutMessage =
+  DeclarationWrappedKeyedFieldParentDefinition.makeOutMessageFold(
+    Choice.block,
+    {
+      SelectedValue:
+        ({ value }, { liftCommand }) =>
+        model => {
+          const exactValue: 'One' | 'Two' = value
+          void exactValue
+
+          return {
+            model,
+            commands: [liftCommand(Choice.ReadChoice())],
+          }
+        },
+    },
+  )
+
 export const choiceOutMessagePolicy = {
   fold: (
     id: typeof ChoiceId.Type,
     outMessage: typeof Choice.OutMessage.Type,
-    {
-      liftCommand,
-    }: Update.FoldContext<
+    context: Update.FoldContext<
       typeof Choice.Message.Type,
       typeof ParentMessage.Type,
       typeof ParentModel.Type
@@ -241,23 +275,12 @@ export const choiceOutMessagePolicy = {
     const exactId: typeof ChoiceId.Type = id
     void exactId
 
-    return Choice.OutMessage.match(outMessage, {
-      SelectedValue: ({ value }) =>
-        DeclarationWrappedKeyedFieldParentDefinition.step(model => {
-          const exactValue: 'One' | 'Two' = value
-          void exactValue
-
-          return {
-            model,
-            commands: [liftCommand(Choice.ReadChoice())],
-          }
-        }),
-    })
+    return foldChoiceOutMessage(outMessage, context)
   },
 }
 
 export const ChoicesBinding =
-  DeclarationWrappedKeyedFieldParentDefinition.bindChild(Choice.block, {
+  DeclarationWrappedKeyedFieldParentDefinition.makeBinding(Choice.block, {
     field: 'choices',
     key: 'id',
     childField: 'choice',
@@ -279,8 +302,7 @@ export const ChoicesBinding =
         return true
       },
     },
-    outMessage: choiceOutMessagePolicy,
-  })
+  }).withOutMessagePolicy(choiceOutMessagePolicy)
 
 export type InitializationContext = Readonly<{
   id: typeof ChoiceId.Type
@@ -288,11 +310,10 @@ export type InitializationContext = Readonly<{
 }>
 
 export const InitializedChoicesBinding =
-  DeclarationWrappedKeyedFieldParentDefinition.bindChild(Choice.block, {
+  DeclarationWrappedKeyedFieldParentDefinition.makeBinding(Choice.block, {
     field: 'choices',
     key: 'id',
     childField: 'choice',
-    outMessage: choiceOutMessagePolicy,
     init: {
       instances: (context: InitializationContext) => {
         expectNotAnyOrUnknown(context)
@@ -321,15 +342,14 @@ export const InitializedChoicesBinding =
         return ChoiceEntry.make({ id: key, choice })
       },
     },
-  })
+  }).withOutMessagePolicy(choiceOutMessagePolicy)
 
 export const LiteralInitializedChoicesBinding =
-  DeclarationWrappedKeyedFieldParentDefinition.bindChild(Choice.block, {
+  DeclarationWrappedKeyedFieldParentDefinition.makeBinding(Choice.block, {
     field: 'choices',
     key: 'id',
     childField: 'choice',
     placement: 'literalInitializedChoices',
-    outMessage: choiceOutMessagePolicy,
     init: {
       instances: () => [{ key: firstChoiceId, args: ['One'] }],
       toItem: ({ key, args }, choice) => {
@@ -345,38 +365,16 @@ export const LiteralInitializedChoicesBinding =
         return ChoiceEntry.make({ id: key, choice })
       },
     },
-  })
+  }).withOutMessagePolicy(choiceOutMessagePolicy)
 
 export const GeneralChoicesBinding =
-  DeclarationWrappedKeyedFieldParentDefinition.bindChild(Choice.block, {
+  DeclarationWrappedKeyedFieldParentDefinition.makeBinding(Choice.block, {
     placement: 'generalChoices',
     readAll: model => model.choices,
     key: item => item.id,
     keySchema: ChoiceEntry.fields.id,
     read: item => item.choice,
     writeAt: model => model,
-    outMessage: {
-      fold: (key, outMessage, context) => {
-        expectNotAnyOrUnknown(key)
-        expectNotAnyOrUnknown(outMessage)
-        expectNotAnyOrUnknown(context)
-        type KeyIsExact = Expect<
-          MutuallyAssignable<typeof key, typeof ChoiceId.Type>
-        >
-        type OutMessageIsExact = Expect<
-          MutuallyAssignable<typeof outMessage, typeof Choice.OutMessage.Type>
-        >
-        const keyIsExact: KeyIsExact = true
-        const outMessageIsExact: OutMessageIsExact = true
-        void keyIsExact
-        void outMessageIsExact
-
-        return DeclarationWrappedKeyedFieldParentDefinition.step(model => ({
-          model,
-          commands: [context.liftCommand(Choice.ReadChoice())],
-        }))
-      },
-    },
     subscriptions: {
       when: (model, key) => {
         expectNotAnyOrUnknown(model)
@@ -395,48 +393,67 @@ export const GeneralChoicesBinding =
         return true
       },
     },
+  }).withOutMessagePolicy({
+    fold: (key, outMessage, context) => {
+      expectNotAnyOrUnknown(key)
+      expectNotAnyOrUnknown(outMessage)
+      expectNotAnyOrUnknown(context)
+      type KeyIsExact = Expect<
+        MutuallyAssignable<typeof key, typeof ChoiceId.Type>
+      >
+      type OutMessageIsExact = Expect<
+        MutuallyAssignable<typeof outMessage, typeof Choice.OutMessage.Type>
+      >
+      const keyIsExact: KeyIsExact = true
+      const outMessageIsExact: OutMessageIsExact = true
+      void keyIsExact
+      void outMessageIsExact
+
+      return DeclarationWrappedKeyedFieldParentDefinition.makeStep(model => ({
+        model,
+        commands: [context.liftCommand(Choice.ReadChoice())],
+      }))
+    },
   })
 
 export const GeneralExtractedPolicyChoicesBinding =
-  DeclarationWrappedKeyedFieldParentDefinition.bindChild(Choice.block, {
+  DeclarationWrappedKeyedFieldParentDefinition.makeBinding(Choice.block, {
     placement: 'generalExtractedPolicyChoices',
     readAll: model => model.choices,
     key: item => item.id,
     keySchema: ChoiceEntry.fields.id,
     read: item => item.choice,
     writeAt: model => model,
-    outMessage: choiceOutMessagePolicy,
-  })
+  }).withOutMessagePolicy(choiceOutMessagePolicy)
 
 export const PlainChoicesBinding =
-  DeclarationWrappedKeyedFieldParentDefinition.bindChild(PlainChoiceBlock, {
+  DeclarationWrappedKeyedFieldParentDefinition.makeBinding(PlainChoiceBlock, {
     field: 'plainChoices',
     key: 'id',
     childField: 'choice',
   })
 
 export const LiteralChoicesBinding =
-  DeclarationWrappedKeyedFieldParentDefinition.bindChild(Choice.block, {
+  DeclarationWrappedKeyedFieldParentDefinition.makeBinding(Choice.block, {
     placement: 'literalChoices',
     field: 'literalChoices',
     key: 'kind',
     childField: 'choice',
-    outMessage: {
-      fold: (kind, outMessage) => {
-        const exactKind: 'Primary' | 'Secondary' = kind
-        const exactOutMessage: typeof Choice.OutMessage.Type = outMessage
-        void exactKind
-        void exactOutMessage
+  }).withOutMessagePolicy({
+    fold: (kind, outMessage) => {
+      const exactKind: 'Primary' | 'Secondary' = kind
+      const exactOutMessage: typeof Choice.OutMessage.Type = outMessage
+      void exactKind
+      void exactOutMessage
 
-        return DeclarationWrappedKeyedFieldParentDefinition.step(model => ({
-          model,
-        }))
-      },
+      return DeclarationWrappedKeyedFieldParentDefinition.makeStep(model => ({
+        model,
+      }))
     },
   })
 
 export const TextEntriesBinding =
-  DeclarationWrappedKeyedFieldParentDefinition.bindChild(TextBlock, {
+  DeclarationWrappedKeyedFieldParentDefinition.makeBinding(TextBlock, {
     field: 'textEntries',
     key: 'id',
     childField: 'text',
@@ -470,11 +487,16 @@ export const initialize = initialComposition.makeInit(
   }),
 )
 
-export const initializedBlock = initialComposition.assembleBlock({
-  init: initialize,
-  update: initialComposition.makeUpdate(model => ({ model })),
-  EffectsLayer: Layer.empty,
-})
+const prepareInitializedBlock = () =>
+  initialComposition.prepareBlock({
+    init: initialize,
+    update: initialComposition.makeUpdate(model => ({ model })),
+    EffectsLayer: Layer.empty,
+  })
+export const initializedBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ParentModel,
+  typeof prepareInitializedBlock
+> = Block.assemble(prepareInitializedBlock)
 
 export const initialParentModel = ParentModel.make({
   choices: [

@@ -13,13 +13,13 @@ import {
 } from '../route'
 
 const HeaderSection = Schema.Literals(['Docs', 'Blog'])
-type HeaderSection = typeof HeaderSection.Type
 
-const headerSections: ReadonlyArray<HeaderSection> = HeaderSection.literals
+const headerSections: ReadonlyArray<typeof HeaderSection.Type> =
+  HeaderSection.literals
 
 const isSectionCurrent = (
-  route: ApplicationRoute,
-  section: HeaderSection,
+  route: typeof ApplicationRoute.Type,
+  section: typeof HeaderSection.Type,
 ): boolean =>
   Match.value(section).pipe(
     Match.when('Docs', () => isDocsSectionRoute(route)),
@@ -27,7 +27,7 @@ const isSectionCurrent = (
     Match.exhaustive,
   )
 
-const sectionToHref = (section: HeaderSection): string =>
+const sectionToHref = (section: typeof HeaderSection.Type): string =>
   Match.value(section).pipe(
     Match.when('Docs', () => coreArchitectureRouter()),
     Match.when('Blog', () => blogRouter()),
@@ -38,11 +38,11 @@ const linkClassName =
   'text-sm font-normal text-gray-700 dark:text-gray-300 transition hover:text-gray-900 dark:hover:text-gray-200 data-[current]:font-medium data-[current]:text-accent-700 data-[current]:dark:text-accent-400 data-[current]:hover:text-accent-700 data-[current]:dark:hover:text-accent-400'
 
 export const view = (
-  route: ApplicationRoute,
+  route: typeof ApplicationRoute.Type,
   className: string,
   h: ApplicationViewBuilder,
 ): Html =>
-  Nav.view<HeaderSection>({
+  Nav.view<typeof HeaderSection.Type>({
     items: headerSections,
     ariaLabel: 'Primary',
     toHref: sectionToHref,

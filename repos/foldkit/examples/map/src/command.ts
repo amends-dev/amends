@@ -37,7 +37,7 @@ const flyToMap = (
     })
   })
 
-export const FlyTo = ApplicationDefinition.command('FlyTo', {
+export const FlyTo = ApplicationDefinition.makeCommand('FlyTo', {
   args: {
     maybeHostId: Schema.Option(Schema.String),
     lng: Schema.Number,
@@ -61,7 +61,7 @@ export const FlyTo = ApplicationDefinition.command('FlyTo', {
   },
 })
 
-export const Geolocate = ApplicationDefinition.command('Geolocate', {
+export const Geolocate = ApplicationDefinition.makeCommand('Geolocate', {
   messages: [Message.SucceededGeolocate, Message.FailedGeolocate],
   handler: function* () {
     return () =>
@@ -104,7 +104,7 @@ export const Geolocate = ApplicationDefinition.command('Geolocate', {
   },
 })
 
-export const FocusSearchInput = ApplicationDefinition.command(
+export const FocusSearchInput = ApplicationDefinition.makeCommand(
   'FocusSearchInput',
   {
     messages: [Message.CompletedFocusSearchInput],
@@ -118,18 +118,21 @@ export const FocusSearchInput = ApplicationDefinition.command(
   },
 )
 
-export const LockBodyScroll = ApplicationDefinition.command('LockBodyScroll', {
-  messages: [Message.CompletedLockBodyScroll],
-  handler: function* () {
-    return () =>
-      Effect.sync(() => {
-        document.body.classList.add('overflow-hidden')
-        return Message.CompletedLockBodyScroll()
-      })
+export const LockBodyScroll = ApplicationDefinition.makeCommand(
+  'LockBodyScroll',
+  {
+    messages: [Message.CompletedLockBodyScroll],
+    handler: function* () {
+      return () =>
+        Effect.sync(() => {
+          document.body.classList.add('overflow-hidden')
+          return Message.CompletedLockBodyScroll()
+        })
+    },
   },
-})
+)
 
-export const UnlockBodyScroll = ApplicationDefinition.command(
+export const UnlockBodyScroll = ApplicationDefinition.makeCommand(
   'UnlockBodyScroll',
   {
     messages: [Message.CompletedUnlockBodyScroll],

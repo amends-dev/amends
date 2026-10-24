@@ -1,14 +1,12 @@
 import { Array, Option, Schema, Tuple } from 'effect'
-import { Block, Update } from 'foldkit'
+import { Block } from 'foldkit'
 import { childAttributes } from 'foldkit/html'
 import { defineMessageUnion } from 'foldkit/message'
-import { modifyFields } from 'foldkit/struct'
 
 import { Combobox } from '@foldkit/ui'
 import { inputId as ComboboxInputId } from '@foldkit/ui/combobox'
 
 const City = Schema.Literals(['Johannesburg', 'Kyiv', 'Oxford', 'Wellington'])
-type City = typeof City.Type
 
 const CityCombobox = Combobox.create(City)
 
@@ -16,33 +14,30 @@ const Model = Schema.Struct({
   maybeCity: Schema.Option(City),
   combobox: CityCombobox.Model,
 })
-type Model = typeof Model.Type
 
 const Message = defineMessageUnion({})
-type Message = typeof Message.Type
-
-// The parent stores the committed selection reported by the child.
-const foldComboboxOutMessage = CityCombobox.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Selected:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, { maybeCity: () => Option.some(value) }),
-    }),
-  ClearedSelection: () => CityPickerDefinition.stepNoop(),
-})
 
 const CityPickerDefinition = Block.makeDefinition('CityPicker', {
   Model,
   Message,
 })
 
-const ComboboxBinding = CityPickerDefinition.bindChild(CityCombobox, {
+// The parent stores the committed selection reported by the child.
+const foldComboboxOutMessage = CityPickerDefinition.makeOutMessageFold(
+  CityCombobox,
+  {
+    Selected: ({ value }) =>
+      CityPickerDefinition.makeFieldsStep(() => ({
+        maybeCity: () => Option.some(value),
+      })),
+    ClearedSelection: CityPickerDefinition.makeNoopStep,
+  },
+)
+
+const ComboboxBinding = CityPickerDefinition.makeBinding(CityCombobox, {
   field: 'combobox',
   init: { contextToArgs: () => Tuple.make({ id: 'city' }) },
-  outMessage: { fold: foldComboboxOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldComboboxOutMessage })
 
 // Including the Binding collects its lifecycle and handler graph.
 
@@ -56,7 +51,7 @@ const init = CityPickerComposition.makeInit(() => ({
 
 const update = CityPickerComposition.makeUpdate()
 
-const cities: ReadonlyArray<City> = [
+const cities: ReadonlyArray<typeof City.Type> = [
   'Johannesburg',
   'Kyiv',
   'Oxford',
@@ -114,8 +109,13 @@ const view = CityPickerComposition.makeView((model, h) => {
   )
 })
 
-export const CityPickerBlock = CityPickerComposition.assembleBlock({
-  init,
-  update,
-  view,
-})
+const prepare = () =>
+  CityPickerComposition.prepareBlock({
+    init,
+    update,
+    view,
+  })
+export const CityPickerBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

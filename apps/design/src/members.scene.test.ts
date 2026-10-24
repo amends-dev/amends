@@ -2,7 +2,7 @@ import { describe, it } from "@effect/vitest"
 import { Combobox } from "@foldkit/ui"
 import { Multi } from "@foldkit/ui/combobox"
 import { Schema } from "effect"
-import { makeApplicationDefinition } from "foldkit"
+import { Block } from "foldkit"
 import { type HtmlBuilder, childAttributes } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
 import {
@@ -44,20 +44,19 @@ type Model = typeof Model.Type
 
 const Message = defineMessageUnion({ ClickedRemove: { id: Schema.String }, ClickedAdd: {} })
 
-const Definition = makeApplicationDefinition({ Model, Message })
+const Definition = Block.makeDefinition("Application", { Model, Message })
 
-const addPerson = (id: string) => Definition.stepFields(() => ({ chosen: (chosen) => [...chosen, id] }))
+const addPerson = (id: string) => Definition.makeFieldsStep(() => ({ chosen: (chosen) => [...chosen, id] }))
 
-const PickerBinding = Definition.bindChild(PickerBlock, {
+const PickerBinding = Definition.makeBinding(PickerBlock, {
   field: "picker",
-  init: { contextToArgs: () => [{ id: "members" }] },
-  outMessage: {
-    fold: PickerBlock.OutMessage.match({
-      Selected: ({ value }) =>
-        Update.combine([addPerson(value), PickerBinding.requestClose(), PickerBinding.requestOpen()]),
-      ClearedSelection: () => Definition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "members" }] }
+}).withOutMessagePolicy({
+  fold: PickerBlock.OutMessage.match({
+    Selected: ({ value }) =>
+      Update.combineSteps([addPerson(value), PickerBinding.requestClose(), PickerBinding.requestOpen()]),
+    ClearedSelection: () => Definition.makeNoopStep()
+  })
 })
 
 const Composition = Definition.makeComposition({ bindings: [PickerBinding] })

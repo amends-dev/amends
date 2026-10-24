@@ -11,8 +11,10 @@ import {
 import { Message } from './message'
 import { PostDetailData } from './model'
 
-const setPostDetail = (postId: string, postDetail: PostDetailData) =>
-  HashMap.set(postId, postDetail)
+const setPostDetail = (
+  postId: string,
+  postDetail: typeof PostDetailData.schema.Type,
+) => HashMap.set(postId, postDetail)
 
 export const update = ApplicationComposition.makeUpdate((model, message) =>
   Message.match(message, {

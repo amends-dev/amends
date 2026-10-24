@@ -12,7 +12,15 @@ import {
   Stream,
   SubscriptionRef,
 } from 'effect'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  expectTypeOf,
+  it,
+  vi,
+} from 'vitest'
 
 import type { DevToolsStore } from '../devTools/store.js'
 import { INIT_INDEX, latestEntryIndex } from '../devTools/store.js'
@@ -29,7 +37,7 @@ import { modifyFields } from '../struct/index.js'
 import * as Subscription from '../subscription/subscription.js'
 import * as Update from '../update/index.js'
 import * as Application from './application.js'
-import { __setDevToolsOverlay } from './devToolsConfig.js'
+import { type DevToolsConfig, __setDevToolsOverlay } from './devToolsConfig.js'
 
 const Message = defineMessageUnion({
   CompletedMountEditor: {},
@@ -1077,25 +1085,52 @@ describe('Mount view-state awareness', () => {
       return Effect.void
     })
 
-    const runtime = Application.__makeElementFromConfig({
+    const init = () => ({ model: initialModel(true) })
+    const recordMessageAndUpdate = (model: Model, message: Message) => {
+      processedMessages.push(message)
+      return update(model, message)
+    }
+    const view = (model: Model) =>
+      modelView(
+        model,
+        MountEditor({
+          entityId: model.tickCount,
+        }),
+      )
+    const devTools = {
+      show: 'Always',
+      keyframeInterval: 1,
+    } satisfies DevToolsConfig
+    const config = {
       Model,
-      init: () => ({ model: initialModel(true) }),
-      update: (model, message) => {
-        processedMessages.push(message)
-        return update(model, message)
-      },
-      view: model =>
-        modelView(
-          model,
-          MountEditor({
-            entityId: model.tickCount,
-          }),
-        ),
+      init,
+      update: recordMessageAndUpdate,
+      view,
       subscriptions,
       mounts: [MountEditor],
       container,
-      devTools: { show: 'Always', keyframeInterval: 1 },
-    })
+      devTools,
+    }
+    const runtime = Application.__makeElementFromConfig<
+      typeof Model,
+      typeof recordMessageAndUpdate,
+      typeof config.mounts,
+      typeof config
+    >(config)
+    expectTypeOf(runtime).toEqualTypeOf<
+      Application.Element<
+        undefined,
+        | Layer.Success<typeof TestMessagesLayer>
+        | Layer.Success<typeof MountEditorLayer>
+      >
+    >()
+    expectTypeOf<
+      Layer.Services<typeof TestMessagesLayer>
+    >().toEqualTypeOf<never>()
+    expectTypeOf<
+      Layer.Services<typeof MountEditorLayer>
+    >().toEqualTypeOf<never>()
+
     const runtimeFiber = Effect.runFork(
       runtime
         .provide(Layer.mergeAll(TestMessagesLayer, MountEditorLayer))

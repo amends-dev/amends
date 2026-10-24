@@ -4,7 +4,6 @@ const Message = defineMessageUnion({
   SucceededSubmitOrder: { order: Order },
   FailedSubmitOrder: { error: Schema.String },
 })
-type Message = typeof Message.Type
 
 const SubmitOrder = Command.define('SubmitOrder', {
   args: { orderDraft: OrderDraft },

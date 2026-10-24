@@ -8,13 +8,13 @@ Mount is the escape hatch for work whose cause is a particular element existing 
 
 ### Mount Definitions
 
-Use `FeatureDefinition.mount` for work that produces one Message when it starts. Its handler receives the live element and the rendered view's state, then returns an `Effect<Message>` that emits that Message. Its scope remains open until unmount so cleanup registered with `Effect.acquireRelease` runs at the right time. Use `FeatureDefinition.mountStream` when listeners or observers on the element must emit a continuing `Stream<Message>`.
+Use `FeatureDefinition.makeMount` for work that produces one Message when it starts. Its handler receives the live element and the rendered view's state, then returns an `Effect<Message>` that emits that Message. Its scope remains open until unmount so cleanup registered with `Effect.acquireRelease` runs at the right time. Use `FeatureDefinition.makeMountStream` when listeners or observers on the element must emit a continuing `Stream<Message>`.
 
 Mount definitions declare their name, args, and result Messages in the config, then set `config.handler` to a generator constructor. Foldkit applies `Effect.gen` internally. Both owned constructors expose the attached recipe as `.layer`.
 
 ### Result Messages
 
-Both `FeatureDefinition.mount` and `FeatureDefinition.mountStream` require at least one declared result Message. When no result needs to change the Model, return a descriptive `Completed*` Message and leave the Model unchanged in update. The Message keeps the effect visible to DevTools, Scene tests, and replay.
+Both `FeatureDefinition.makeMount` and `FeatureDefinition.makeMountStream` require at least one declared result Message. When no result needs to change the Model, return a descriptive `Completed*` Message and leave the Model unchanged in update. The Message keeps the effect visible to DevTools, Scene tests, and replay.
 
 :::Info{label="Functional core, imperative shell"}
 The view describes what should be on screen. `OnMount` handles imperative work at the boundary between the virtual DOM and a live element. Results still return to update as Messages, and setup stays paired with cleanup inside the Mount's Effect or Stream.
@@ -64,7 +64,7 @@ Portal-to-body is a small example. When an overlay enters the DOM, its Mount mov
 
 ### Handler Layers
 
-A Mount starts when its element enters the DOM and stops when that element leaves. In a split feature, `mount.ts` owns the definition and handler, while `composition.ts` owns its registration, including when the feature has no children. Both Composition and view import the definition from `mount.ts`, avoiding a Composition/view cycle. Include its definition in the owning Composition's `mounts`, include its handler recipe in the local `EffectsLayer`, and complete that Composition with `assembleBlock`. Composition declares a Mount the view may render; a conditional Mount need not appear in every render.
+A Mount starts when its element enters the DOM and stops when that element leaves. In a split feature, `mount.ts` owns the definition and handler, while `composition.ts` owns its registration, including when the feature has no children. Both Composition and view import the definition from `mount.ts`, avoiding a Composition/view cycle. Include its definition in the owning Composition's `mounts`, include its handler recipe in the local `EffectsLayer`, produce the opaque draft with `prepareBlock`, and finish it with `Block.assemble`. Composition declares a Mount the view may render; a conditional Mount need not appear in every render.
 
 ::Snippet{name="mountHandlerLayers" label="Registering a Mount handler Layer"}
 
@@ -100,7 +100,7 @@ A Mount often needs an input that differs by element instance, such as an initia
 
 #### Runtime Invocation
 
-Calling the Definition with an args record creates the MountAction passed to `OnMount`. That call never runs the handler. The Runtime invokes it when the element enters the DOM, so the pure view only describes the action. A `FeatureDefinition.mountStream` handler returns a `Stream<Message>` instead.
+Calling the Definition with an args record creates the MountAction passed to `OnMount`. That call never runs the handler. The Runtime invokes it when the element enters the DOM, so the pure view only describes the action. A `FeatureDefinition.makeMountStream` handler returns a `Stream<Message>` instead.
 
 #### What Belongs in Args
 
@@ -182,13 +182,13 @@ Registering a Mount that the view never renders starts no element lifecycle, lis
 
 ### Block Assembly and Child Placements
 
-For an owned Block, create `NameDefinition = Block.makeDefinition('Name', { Model, Message })`, create Mounts through that Definition, and list them in `NameComposition = NameDefinition.makeComposition({ mounts })`. Author the canonical view with `NameComposition.makeView`, then pass the local handler recipes to `NameComposition.assembleBlock({ EffectsLayer })`. A parent that includes the child Binding receives its Mount registrations and handler graph together. `ApplicationComposition` assembles the root graph through `assembleApplication({ init, update, view, ... })`.
+For an owned Block, create `NameDefinition = Block.makeDefinition('Name', { Model, Message })`, create Mounts through that Definition, and list them in `NameComposition = NameDefinition.makeComposition({ mounts })`. Author the canonical view with `NameComposition.makeView`, then pass the local handler recipes to `NameComposition.prepareBlock({ EffectsLayer })` inside the private producer and finish it with `Block.assemble`. A parent that includes the child Binding receives its Mount registrations and handler graph together. The root uses the same producer and finisher path before `Program.make` supplies host behavior.
 
-For a direct array of child Models with declared Struct key fields, use `ParentDefinition.bindChild` with `field` and a string-valued `key`. An exact array of closed Struct wrappers adds a distinct required `childField`, leaving its key on the wrapper. Custom writes, opaque, union, or open/index-signature wrappers, and non-array enumeration retain general keyed accessors. Each active key gets independent Mount ownership, and the parent includes the keyed Binding once under `bindings`.
+For a direct array of child Models with declared Struct key fields, use `ParentDefinition.makeBinding` with `field` and a string-valued `key`. An exact array of closed Struct wrappers adds a distinct required `childField`, leaving its key on the wrapper. Custom writes, opaque, union, or open/index-signature wrappers, and non-array enumeration retain general keyed accessors. Each active key gets independent Mount ownership, and the parent includes the keyed Binding once under `bindings`.
 
 ### Mount Requirements in Reusable Views
 
-An owned view receives a builder whose allowed Mounts are inferred from its Composition. Immediately after establishing `NameComposition`, derive `NameViewBuilder` with `Block.ViewBuilderFor<typeof NameComposition>` and use it for ordinary helpers on the same mounted or child embedding path. Keep it private unless another file uses it. The alias retains the Composition's Message, local Mounts, and child Bindings without constructing a runtime builder. `NameComposition.makeView` remains the canonical owned view and leaves its `h` parameter inferred:
+An owned view receives a builder whose allowed Mounts are inferred from its Composition. Immediately after establishing `NameComposition`, derive `NameViewBuilder` with `Block.ViewBuilderFor<typeof NameComposition>` and use it for ordinary helpers on the same mounted or child embedding path. Keep it private unless another file uses it. The alias retains the Composition's Message, local Mounts, and child Bindings without constructing a runtime builder. When a helper must stay generic over a more specific compatible builder, use `<Builder extends NameViewBuilder>` and return the Html it builds; this preserves the caller's exact capability set. `NameComposition.makeView` remains the canonical owned view and leaves its `h` parameter inferred:
 
 ::Snippet{name="mountBlockView" label="Preserving a Block view's Mount requirements"}
 

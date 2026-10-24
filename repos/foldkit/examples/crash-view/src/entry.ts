@@ -1,18 +1,10 @@
 import { Option } from 'effect'
-import { Runtime } from 'foldkit'
+import { Program, Runtime } from 'foldkit'
 
-import {
-  ApplicationComposition,
-  crashView,
-  init,
-  update,
-  view,
-} from './application'
+import { ApplicationBlock, crashView } from './application'
 
-const application = ApplicationComposition.assembleApplication({
-  init,
-  update,
-  view,
+const program = Program.make({
+  block: ApplicationBlock,
   container: document.getElementById('root'),
   crash: {
     view: crashView,
@@ -24,7 +16,7 @@ const application = ApplicationComposition.assembleApplication({
       })
     },
   },
-  devTools: { Message: ApplicationComposition.Message },
+  devTools: { dispatch: true },
 })
 
-Runtime.run(application)
+Runtime.run(program)

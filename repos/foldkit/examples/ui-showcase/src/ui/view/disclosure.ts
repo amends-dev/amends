@@ -5,7 +5,7 @@ import { Disclosure } from '@foldkit/ui'
 
 import * as Icon from '../../icon'
 import { UiComposition } from '../composition'
-import type { UiMessage, UiViewBuilder } from '../composition'
+import type { UiViewBuilder } from '../composition'
 import { Message } from '../message'
 
 const DISCLOSURE_BASIC_DEMO_ID = 'disclosure-basic-demo'
@@ -68,7 +68,9 @@ const subheading = (text: string, h: UiViewBuilder) => {
 
 export const view = UiComposition.makeView((model, h) => {
   const basicDisclosureView = (
-    attributes: Disclosure.DisclosureAttributes<UiMessage>,
+    attributes: Disclosure.DisclosureAttributes<
+      typeof UiComposition.Message.Type
+    >,
   ): Html =>
     h.div(
       [],
@@ -97,7 +99,9 @@ export const view = UiComposition.makeView((model, h) => {
     )
 
   const animatedDisclosureView = (
-    attributes: Disclosure.DisclosureAttributes<UiMessage>,
+    attributes: Disclosure.DisclosureAttributes<
+      typeof UiComposition.Message.Type
+    >,
   ): Html =>
     h.div(
       [h.Class('border border-gray-300 rounded-lg overflow-hidden')],
@@ -127,7 +131,9 @@ export const view = UiComposition.makeView((model, h) => {
     button,
     panel,
     animatePanel,
-  }: Disclosure.DisclosureAttributes<UiMessage>): Html =>
+  }: Disclosure.DisclosureAttributes<
+    typeof UiComposition.Message.Type
+  >): Html =>
     h.article(
       [
         h.Class(

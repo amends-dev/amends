@@ -8,13 +8,13 @@ import {
 } from './child-placement.accepted.js'
 
 const DirectAtPrimaryBinding =
-  DeclarationChildPlacementParentDefinition.bindChild(ChildBlock, {
+  DeclarationChildPlacementParentDefinition.makeBinding(ChildBlock, {
     field: 'secondary',
     placement: 'primary',
   })
 
 const KeyedAtOptionalBinding =
-  DeclarationChildPlacementParentDefinition.bindChild(ChildBlock, {
+  DeclarationChildPlacementParentDefinition.makeBinding(ChildBlock, {
     placement: 'optional',
     readAll: model => model.entries,
     key: entry => entry.id,
@@ -23,20 +23,20 @@ const KeyedAtOptionalBinding =
   })
 
 const AccessorAtPrimaryBinding =
-  DeclarationChildPlacementParentDefinition.bindChild(ChildBlock, {
+  DeclarationChildPlacementParentDefinition.makeBinding(ChildBlock, {
     placement: 'primary',
     read: model => Option.some(model.secondary),
     write: model => model,
   })
 
 const DefaultAccessorBinding =
-  DeclarationChildPlacementParentDefinition.bindChild(ChildBlock, {
+  DeclarationChildPlacementParentDefinition.makeBinding(ChildBlock, {
     read: model => model.maybeChild,
     write: model => model,
   })
 
 const DefaultKeyedByIdBinding =
-  DeclarationChildPlacementParentDefinition.bindChild(ChildBlock, {
+  DeclarationChildPlacementParentDefinition.makeBinding(ChildBlock, {
     readAll: model => model.entries,
     key: entry => entry.id,
     read: entry => entry.child,
@@ -44,7 +44,7 @@ const DefaultKeyedByIdBinding =
   })
 
 const DefaultKeyedByIdLengthBinding =
-  DeclarationChildPlacementParentDefinition.bindChild(ChildBlock, {
+  DeclarationChildPlacementParentDefinition.makeBinding(ChildBlock, {
     readAll: model => model.entries,
     key: entry => entry.id.length,
     read: entry => entry.child,

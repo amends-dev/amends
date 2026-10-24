@@ -10,22 +10,22 @@ declare const anyConstructor: any
 declare const unknownConstructor: unknown
 
 // @ts-expect-error Even an erased constructor cannot enable authored wrappers.
-DeclarationCanonicalConstructorParentDefinition.bindChild(ChildBlock, {
+DeclarationCanonicalConstructorParentDefinition.makeBinding(ChildBlock, {
   field: 'child',
   parentMessage: anyConstructor,
 })
 // @ts-expect-error Unknown constructors cannot enable authored wrappers.
-DeclarationCanonicalConstructorParentDefinition.bindChild(ChildBlock, {
+DeclarationCanonicalConstructorParentDefinition.makeBinding(ChildBlock, {
   field: 'child',
   parentMessage: unknownConstructor,
 })
 // @ts-expect-error Composition derives outgoing delivery; mapper fields are forbidden.
-DeclarationCanonicalConstructorParentDefinition.bindChild(ChildBlock, {
+DeclarationCanonicalConstructorParentDefinition.makeBinding(ChildBlock, {
   field: 'child',
   toParentMessage: () => ParentMessage.ReceivedPayload({ payload: 'value' }),
 })
 // @ts-expect-error Composition derives incoming routing; mapper fields are forbidden.
-DeclarationCanonicalConstructorParentDefinition.bindChild(ChildBlock, {
+DeclarationCanonicalConstructorParentDefinition.makeBinding(ChildBlock, {
   field: 'child',
   fromParentMessage: false,
 })

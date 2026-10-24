@@ -2,9 +2,8 @@
 // block below is an excerpt. Fit them into your own Model, init, Message,
 // update, and view definitions.
 import { Array, Schema, Tuple } from 'effect'
-import { Block, File, Update } from 'foldkit'
+import { Block, File } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
-import { modifyFields } from 'foldkit/struct'
 
 import { FileDrop } from '@foldkit/ui'
 import type { FileDropAttributes as FileDropFileDropAttributes } from '@foldkit/ui/fileDrop'
@@ -15,47 +14,43 @@ const Model = Schema.Struct({
   uploadedFiles: Schema.Array(File.File),
   // ...your other fields
 })
-type Model = typeof Model.Type
 
 // This excerpt has no parent-owned facts. The Composition derives delivery.
 const Message = defineMessageUnion({})
-type Message = typeof Message.Type
 
-// At module scope, fold the OutMessage FileDrop emits when files arrive (via
-// drop or input change) into your own Model. Each arm returns an Update.Step
-// over the parent Model, which already has the next FileDrop Model written
-// back:
-const foldFileDropOutMessage = FileDrop.FileDropBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  ReceivedFiles:
-    ({ files }) =>
-    model => ({
-      model: modifyFields(model, {
-        uploadedFiles: Array.appendAll(files),
-      }),
-    }),
-  // Fires when something is dropped but no files came through (e.g.
-  // a drag of text or a URL). Ignore, or show a hint to the user.
-  RejectedNonFiles: () => FileDropExampleDefinition.stepNoop(),
-})
-
-// The Binding wires the completed child Block into the parent: it runs FileDrop.FileDropBlock.update,
-// writes the next FileDrop Model back, routes generated delivery, and hands
-// any OutMessage to the OutMessage fold.
 const FileDropExampleDefinition = Block.makeDefinition('FileDropExample', {
   Model,
   Message,
 })
 
-const FileDropBinding = FileDropExampleDefinition.bindChild(
+// At module scope, fold the OutMessage FileDrop emits when files arrive (via
+// drop or input change) into your own Model. Each arm returns an Update.Step
+// over the parent Model, which already has the next FileDrop Model written
+// back. The parent Definition checks every named child variant and infers the
+// parent Step from each handler:
+const foldFileDropOutMessage = FileDropExampleDefinition.makeOutMessageFold(
+  FileDrop.FileDropBlock,
+  {
+    ReceivedFiles: ({ files }) =>
+      FileDropExampleDefinition.makeFieldsStep(() => ({
+        uploadedFiles: Array.appendAll(files),
+      })),
+    // Fires when something is dropped but no files came through (e.g.
+    // a drag of text or a URL). Ignore, or show a hint to the user.
+    RejectedNonFiles: FileDropExampleDefinition.makeNoopStep,
+  },
+)
+
+// The Binding wires the completed child Block into the parent: it runs FileDrop.FileDropBlock.update,
+// writes the next FileDrop Model back, routes generated delivery, and hands
+// any OutMessage to the OutMessage fold.
+const FileDropBinding = FileDropExampleDefinition.makeBinding(
   FileDrop.FileDropBlock,
   {
     field: 'uploader',
     init: { contextToArgs: () => Tuple.make({ id: 'uploader' }) },
-    outMessage: { fold: foldFileDropOutMessage },
   },
-)
+).withOutMessagePolicy({ fold: foldFileDropOutMessage })
 
 const FileDropExampleComposition = FileDropExampleDefinition.makeComposition({
   bindings: [FileDropBinding],

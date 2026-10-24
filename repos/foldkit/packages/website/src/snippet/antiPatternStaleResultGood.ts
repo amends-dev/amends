@@ -10,7 +10,6 @@ const Message = defineMessageUnion({
     suggestions: Schema.Array(Schema.String),
   },
 })
-type Message = typeof Message.Type
 
 const update = ApplicationComposition.makeUpdate((model, message) =>
   Message.match(message, {

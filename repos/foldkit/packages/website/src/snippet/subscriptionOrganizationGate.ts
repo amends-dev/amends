@@ -1,7 +1,7 @@
 import { ApplicationDefinition } from './definition'
 import * as Settings from './settings'
 
-export const SettingsBinding = ApplicationDefinition.bindChild(
+export const SettingsBinding = ApplicationDefinition.makeBinding(
   Settings.SettingsBlock,
   {
     field: 'settings',

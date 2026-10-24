@@ -28,7 +28,7 @@ The Kind column below identifies each component category.
 
 Some components use Commands, Subscriptions, or Mounts for focus, positioning, animation, and other effects. Connect each stateful component’s completed Block value and include the Binding in the parent's `bindings`. The parent Composition collects the component's handlers and lifecycle registrations.
 
-The example below shows two component Bindings included by one owning Block. Assume its Model, Message, init, named OutMessage folds, and component ViewInputs are defined in the application's other modules. The feature includes its component Bindings with the typed Application; the final lines show the separate `entry.ts` startup through the root’s owned `assembleApplication` method. Supply external service providers through the root `ApplicationLayer` as described in [Layers](/core/layers).
+The example below shows two component Bindings included by one owning Block. Assume its Model, Message, init, named OutMessage folds, and component ViewInputs are defined in the application's other modules. The root includes its component Bindings in `ApplicationComposition` and assembles `ApplicationBlock`; the final lines show separate `entry.ts` startup through `Program.make`. Supply external service providers through the root `ApplicationLayer` as described in [Layers](/core/layers).
 
 ::Snippet{name="uiEffects" label="Providing Foldkit UI effects"}
 

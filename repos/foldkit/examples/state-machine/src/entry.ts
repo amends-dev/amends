@@ -1,18 +1,11 @@
-import { Runtime } from 'foldkit'
+import { Program, Runtime } from 'foldkit'
 
-import { EffectsLayer } from './command'
-import { ApplicationComposition } from './composition'
-import { init } from './init'
-import { update } from './update'
-import { view } from './view'
+import { ApplicationBlock } from './block'
 
-const application = ApplicationComposition.assembleApplication({
-  init,
-  update,
-  view,
-  EffectsLayer,
+const program = Program.make({
+  block: ApplicationBlock,
   container: document.getElementById('root'),
-  devTools: { Message: ApplicationComposition.Message },
+  devTools: { dispatch: true },
 })
 
-Runtime.run(application)
+Runtime.run(program)

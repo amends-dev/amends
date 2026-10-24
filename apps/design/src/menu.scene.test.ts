@@ -1,7 +1,7 @@
 import { describe, it } from "@effect/vitest"
 import * as Menu from "@foldkit/ui/menu"
 import { Schema } from "effect"
-import { makeApplicationDefinition } from "foldkit"
+import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import {
   Command,
@@ -45,39 +45,37 @@ type Model = typeof Model.Type
 
 const Message = defineMessageUnion({ Refreshed: {} })
 
-const Definition = makeApplicationDefinition({ Model, Message })
+const Definition = Block.makeDefinition("Application", { Model, Message })
 
-const SortBinding = Definition.bindChild(SortMenu, {
+const SortBinding = Definition.makeBinding(SortMenu, {
   field: "sortMenu",
-  init: { contextToArgs: () => [{ id: "sort-menu" }] },
-  outMessage: {
-    fold: SortMenu.OutMessage.match({
-      Selected: ({ value }) => Definition.stepFields(() => ({ sort: () => value })),
-      Closed: () => Definition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "sort-menu" }] }
+}).withOutMessagePolicy({
+  fold: SortMenu.OutMessage.match({
+    Selected: ({ value }) => Definition.makeFieldsStep(() => ({ sort: () => value })),
+    Closed: () => Definition.makeNoopStep()
+  })
 })
 
-const AccountBinding = Definition.bindChild(AccountMenu, {
+const AccountBinding = Definition.makeBinding(AccountMenu, {
   field: "accountMenu",
-  init: { contextToArgs: () => [{ id: "account-menu" }] },
-  outMessage: {
-    fold: AccountMenu.OutMessage.match({
-      Selected: ({ value }) => {
-        switch (value) {
-          case "System":
-          case "Light":
-          case "Dark":
-            return Definition.stepFields(() => ({ appearance: () => value }))
-          case "SwitchWorkspace":
-            return Definition.stepFields(() => ({ switched: () => true }))
-          case "SignOut":
-            return Definition.stepFields(() => ({ signedOut: () => true }))
-        }
-      },
-      Closed: () => Definition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "account-menu" }] }
+}).withOutMessagePolicy({
+  fold: AccountMenu.OutMessage.match({
+    Selected: ({ value }) => {
+      switch (value) {
+        case "System":
+        case "Light":
+        case "Dark":
+          return Definition.makeFieldsStep(() => ({ appearance: () => value }))
+        case "SwitchWorkspace":
+          return Definition.makeFieldsStep(() => ({ switched: () => true }))
+        case "SignOut":
+          return Definition.makeFieldsStep(() => ({ signedOut: () => true }))
+      }
+    },
+    Closed: () => Definition.makeNoopStep()
+  })
 })
 
 const Composition = Definition.makeComposition({ bindings: [SortBinding, AccountBinding] })

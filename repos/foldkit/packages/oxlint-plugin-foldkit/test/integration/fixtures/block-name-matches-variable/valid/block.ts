@@ -1,7 +1,6 @@
 import {
   Block,
   Block as AliasedBlock,
-  makeApplicationDefinition as makeRootApplicationDefinition,
 } from 'foldkit'
 import * as Foldkit from 'foldkit'
 import {
@@ -42,8 +41,11 @@ const IdentityFirstDefinition = Block.makeNamespace(
 const IdentityFirstComposition = Block.makeNamespace('IdentityFirst')
   .makeDefinition({ Model, Message })
   .makeComposition({})
-const ApplicationDefinition = makeRootApplicationDefinition({ Model, Message })
-const ApplicationComposition = makeRootApplicationDefinition({
+const ApplicationDefinition = Block.makeDefinition('Application', {
+  Model,
+  Message,
+})
+const ApplicationComposition = Block.makeDefinition('Application', {
   Model,
   Message,
 }).makeComposition({})

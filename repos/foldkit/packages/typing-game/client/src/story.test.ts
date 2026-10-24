@@ -30,7 +30,7 @@ const ROOM_B = 'r2'
 const alice = { id: 'p1', username: 'alice' }
 const bob = { id: 'p2', username: 'bob' }
 
-const waitingRoom: Shared.Room = {
+const waitingRoom: typeof Shared.Room.Type = {
   id: ROOM_A,
   players: [alice],
   hostId: alice.id,
@@ -78,13 +78,13 @@ const toRoomMessage = (
     view: emptyRoomView,
   }).toParentMessage(message)
 
-const givenHomeRoute = given<Model>({
+const givenHomeRoute = given<typeof Model.Type>({
   route: ApplicationRoute.Home(),
   home: selectActionHome,
   maybeRoomInstance: Option.none(),
 })
 
-const givenRoomRoute = given<Model>({
+const givenRoomRoute = given<typeof Model.Type>({
   route: ApplicationRoute.Room({ roomId: ROOM_A }),
   home: selectActionHome,
   maybeRoomInstance: Option.some({ roomId: ROOM_A, model: joinedRoom }),
@@ -101,7 +101,7 @@ const homeUrl = pipe(
   Option.getOrThrow,
 )
 
-const makeRoom = (roomId: string, createdAt: number): Shared.Room =>
+const makeRoom = (roomId: string, createdAt: number): typeof Shared.Room.Type =>
   Shared.Room.make({
     id: roomId,
     players: [],
@@ -113,7 +113,7 @@ const makeRoom = (roomId: string, createdAt: number): Shared.Room =>
     usedGameTexts: [],
   })
 
-const getRoomInstance = (model: Model): RoomInstance =>
+const getRoomInstance = (model: typeof Model.Type): typeof RoomInstance.Type =>
   pipe(model.maybeRoomInstance, Option.getOrThrow)
 
 const dirtyRoomModel = (roomId: string) =>
@@ -128,10 +128,10 @@ const dirtyRoomModel = (roomId: string) =>
   })
 
 const modelWithRoom = (
-  route: Model['route'],
+  route: (typeof Model.Type)['route'],
   roomId: string,
   roomModel = dirtyRoomModel(roomId),
-): Model =>
+): typeof Model.Type =>
   Model.make({
     route,
     home: selectActionHome,

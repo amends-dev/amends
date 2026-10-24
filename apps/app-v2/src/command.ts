@@ -19,7 +19,7 @@ import * as Store from "./store/Store.ts"
 import * as SyncKey from "./store/SyncKey.ts"
 
 /** Sign out. */
-export const SignOut = ApplicationDefinition.command("SignOut", {
+export const SignOut = ApplicationDefinition.makeCommand("SignOut", {
   messages: [Message.CompletedSignOut],
   handler: function* () {
     const session = yield* Session.Session
@@ -44,7 +44,7 @@ export const SignOut = ApplicationDefinition.command("SignOut", {
 })
 
 /** Show the Appearance on the page. */
-export const ShowAppearance = ApplicationDefinition.command("ShowAppearance", {
+export const ShowAppearance = ApplicationDefinition.makeCommand("ShowAppearance", {
   args: { appearance: Appearance },
   messages: [Message.CompletedShowAppearance],
   handler: function* () {
@@ -53,7 +53,7 @@ export const ShowAppearance = ApplicationDefinition.command("ShowAppearance", {
 })
 
 /** Keep the Appearance for the next visit. */
-export const KeepAppearance = ApplicationDefinition.command("KeepAppearance", {
+export const KeepAppearance = ApplicationDefinition.makeCommand("KeepAppearance", {
   args: { appearance: Appearance },
   messages: [Message.CompletedKeepAppearance],
   handler: function* () {
@@ -61,7 +61,7 @@ export const KeepAppearance = ApplicationDefinition.command("KeepAppearance", {
   }
 })
 
-export const Navigate = ApplicationDefinition.command("Navigate", {
+export const Navigate = ApplicationDefinition.makeCommand("Navigate", {
   args: { url: Schema.String, replace: Schema.Boolean },
   messages: [Message.CompletedNavigation],
   handler: function* () {
@@ -88,7 +88,7 @@ export const Navigate = ApplicationDefinition.command("Navigate", {
   }
 })
 
-export const LoadExternal = ApplicationDefinition.command("LoadExternal", {
+export const LoadExternal = ApplicationDefinition.makeCommand("LoadExternal", {
   args: { href: Schema.String },
   messages: [Message.CompletedNavigation],
   handler: function* () {

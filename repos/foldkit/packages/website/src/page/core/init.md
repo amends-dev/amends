@@ -24,7 +24,7 @@ The counter starts at zero and has no startup work:
 
 ::Snippet{name="initSimple" label="Using init"}
 
-A non-routing application or element calls `init` with no arguments. A routing application passes the current URL, so its first Model can reflect the route. When the application declares Flags, they become the first argument in either form. `ApplicationComposition.assembleApplication` or `assembleElement` receives `init` explicitly and checks its arguments against the completion's Flags and routing configuration, along with the registered child and handler graph.
+A non-routing Program calls `init` with no arguments. A routing Program passes the current URL, so its first Model can reflect the route. When the Program declares Flags, they become the first argument in either form. `ApplicationComposition.prepareBlock` receives `init` explicitly and checks it against the registered child and handler graph. `Program.make` or `Program.makeElement` then checks the initializer's arguments against its Flags and routing configuration.
 
 Give `ApplicationComposition.makeInit` one concrete function signature. Optional, default, and rest parameters are supported. Wrap an overloaded domain helper or callable object in a concretely typed callback. A generic Block factory closes over its type parameters and keeps the initializer itself concrete.
 
@@ -54,15 +54,19 @@ Parent Commands appear first in the returned collection, followed by retained ch
 
 These calls assemble values only. They do not construct Services, build handler Layers, or perform Commands.
 
+Keep a child's initial state transition and initial Command in that child's `makeInit`. The parent Binding selects the child's arguments through `init.contextToArgs`, and root init supplies their shared `childInitContext`. Keep root-owned work that does not depend on a preceding Model transition in the root plan's `commands`. For example, API data and example source loading belong to their child initializers, while initial sidebar and anchor scrolling are ordinary root Commands.
+
 ### Optional and custom child storage
 
-For an exact `Option` field, omitting `init` leaves presence with the parent. Return `Option.none()` from `init.contextToArgs` for absence or `Option.some(args)` for presence. Keyed and accessor Bindings also remain parent-owned when `init` is omitted; use `init.instances` or `init.contextToArgs` when Composition should initialize them.
+For an exact unkeyed `Option` field, omitting `init` leaves presence with the parent. Return `Option.none()` from `init.contextToArgs` for absence or `Option.some(args)` for presence.
+
+An exact keyed Option wrapper also leaves presence with the parent. Create it through the registered `Binding.init({ key, args, toParentModel })` operation described below. Automatic `init.instances` is available only for keyed arrays. Accessor Bindings likewise remain parent-owned unless the parent initializes them explicitly.
 
 The final parent Model determines which initialized occurrences are active. Init Commands for absent or `presentWhen`-inactive children are omitted. A `subscriptions.when` policy only gates Subscription Streams; it does not suppress child init Commands. Initial Steps may change the child Model without discarding its init Commands.
 
-For custom storage, deliberate Command ordering, or dynamic creation, call the registered Binding's explicit `init` operation. Pass `{ args, toParentModel }`, plus `key` for a keyed Binding and optional parent `commands`. `args` is the exact child init tuple. `toParentModel` receives the initialized child Model and constructs the complete parent Model. `Binding.init` returns a passive initialization recipe. The recipe has no `.model` or `.commands` fields to project.
+For custom storage or dynamic creation, call the registered Binding's explicit `init` operation. Pass `{ args, toParentModel }`, plus `key` for a keyed Binding and optional parent `commands`. `args` is the exact child init tuple. `toParentModel` receives the initialized child Model and constructs the complete parent Model. `Binding.init` returns a passive initialization recipe. The recipe has no `.model` or `.commands` fields to project.
 
-Return that recipe directly from the owning Composition's `makeInit` or `makeUpdate` callback, or preserve it through the owning Definition's `step` producer. The Composition callbacks interpret it directly. Checked execution enters the registered graph, then returns the complete parent Model with every lifted child init Command followed by the optional parent Commands. The compiler checks the key, argument tuple, complete parent Model, Command requirements, and exact Binding requirement at these boundaries.
+Return that recipe directly from the owning Composition's `makeInit` or `makeUpdate` callback, or preserve it through the owning Definition's `makeStep` producer. The Composition callbacks interpret it directly. Checked execution enters the registered graph, then returns the complete parent Model with every lifted child init Command followed by the optional parent Commands. That collection order does not sequence their effects or completion. The compiler checks the key, argument tuple, complete parent Model, Command requirements, and exact Binding requirement at these boundaries.
 
 During checked execution, runtime validation verifies the active composition frame, validates the complete parent Model against its Schema, checks that `toParentModel` stores a schema-equivalent initialized child, and checks that a keyed result contains exactly one occurrence with the requested key. These guards protect JavaScript with erased types and operations captured for later execution. Ordinary Model construction remains available for fixtures and other pure values.
 
@@ -110,9 +114,9 @@ Define the boundary with a Flags Schema. For a fresh client start, also define a
 
 ### Fresh Client Start
 
-This compact Counter keeps the graphless root in `application.ts` with its Model, Message, init, update, and view. Because the Definition has no other use, it creates `ApplicationComposition` with a top-level `makeApplicationDefinition(...).makeComposition()` chain. The entry imports that Composition and passes the Schema to its owned `assembleApplication` method as `Flags`.
+This compact Counter keeps the graphless root in `application.ts` with its Model, Message, init, update, view, and `ApplicationBlock`. Because the Definition has no other use, it creates `ApplicationComposition` with a top-level `Block.makeDefinition('Application', ...).makeComposition()` chain. The entry imports the Block and passes the Schema to `Program.make` as `Flags`.
 
-::Snippet{name="counterApplicationWithFlags" label="Application configuration with Flags"}
+::Snippet{name="counterApplicationWithFlags" label="Assembling the Application Block"}
 
 Define the browser storage provider in `services.ts`:
 
@@ -122,13 +126,13 @@ The entry imports `ApplicationLayer`, chooses the container and passes the Flags
 
 ::Snippet{name="counterEntryWithFlags" label="Flags wiring"}
 
-The Flags Effect leaves `KeyValueStore` in its requirements, and the completed application supplies the browser provider through `application.provide(ApplicationLayer)`. A whole-application test can supply a deterministic store through the same method. The Runtime builds the Layer once and shares the resulting Service with Flags, Commands, and Subscriptions that require it. Effect's [Managing Services](https://effect.website/docs/v4/requirements-management/services) guide explains how requirements appear in an Effect's type, and [Managing Layers](https://effect.website/docs/v4/requirements-management/layers) explains how Layers construct those Services. See [Layers](/core/layers) for Foldkit's full setup.
+The Flags Effect leaves `KeyValueStore` in its requirements, and the Program supplies the browser provider through `program.provide(ApplicationLayer)`. A whole-application test can supply a deterministic store through the same method. The Runtime builds the Layer once and shares the resulting Service with Flags, Commands, and Subscriptions that require it. Effect's [Managing Services](https://effect.website/docs/v4/requirements-management/services) guide explains how requirements appear in an Effect's type, and [Managing Layers](https://effect.website/docs/v4/requirements-management/layers) explains how Layers construct those Services. See [Layers](/core/layers) for Foldkit's full setup.
 
 ### Server Rendering and Hydration
 
 #### Server-Supplied Flags
 
-Server rendering provides Flags from the request or build instead of running a client Flags Effect. `Server.renderToString(ApplicationComposition, { init, update, view, Flags }, { flags })` uses that value to call `init`, encodes it through the Schema, and embeds the result in the HTML. List every completion field explicitly, importing it from its real owner. `Runtime.hydrate` decodes the same value and calls the same `init`, so the client reconstructs the Model that produced the server HTML.
+Server rendering provides Flags from the request or build instead of running a client Flags Effect. `Server.renderToString(ApplicationBlock, { Flags }, { flags })` uses that value to call the Block's `init`, encodes it through the Schema, and embeds the result in the HTML. `Runtime.hydrate` decodes the same value and calls the same `init`, so the client reconstructs the Model that produced the server HTML.
 
 #### Handoff Validation
 

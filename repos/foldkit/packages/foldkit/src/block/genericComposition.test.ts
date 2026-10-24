@@ -3,17 +3,16 @@ import { expectTypeOf, it } from 'vitest'
 
 import { defineMessageUnion } from '../message/index.js'
 import { makeDefinition, makeNamespace } from './define.js'
+import * as Block from './public.js'
 
 const Message = defineMessageUnion({
   RequestedWork: {},
   CompletedWork: {},
 })
-type Message = typeof Message.Type
 const makeGenericComplete = <const Id extends string>(id: Id) => {
   const FeatureNamespace = makeNamespace(id)
   const Model = Schema.Struct({ value: Schema.String })
-  type Model = typeof Model.Type
-  const Work = FeatureNamespace.command('Work', {
+  const Work = FeatureNamespace.makeCommand('Work', {
     messages: [Message.CompletedWork],
     handler: function* () {
       return () => Effect.succeed(Message.CompletedWork())
@@ -25,24 +24,29 @@ const makeGenericComplete = <const Id extends string>(id: Id) => {
     Message,
   }).makeComposition()
 
-  return composition.assembleBlock({
-    init: () => ({ model: Model.make({ value: '' }) }),
-    update: composition.makeUpdate((model, message) =>
-      Message.match(message, {
-        RequestedWork: () => ({ model, commands: [Work()] }),
-        CompletedWork: () => ({ model }),
-      }),
-    ),
-    view: composition.makeView((model, h) => h.div([], [model.value])),
-    EffectsLayer: Work.layer,
-  })
+  const prepare = () =>
+    composition.prepareBlock({
+      init: () => ({ model: Model.make({ value: '' }) }),
+      update: composition.makeUpdate((model, message) =>
+        Message.match(message, {
+          RequestedWork: () => ({ model, commands: [Work()] }),
+          CompletedWork: () => ({ model }),
+        }),
+      ),
+      view: composition.makeView((model, h) => h.div([], [model.value])),
+      EffectsLayer: Work.layer,
+    })
+  const completedBlock: Block.FromAssemblyWithView<
+    typeof Model,
+    typeof prepare
+  > = Block.assemble(prepare)
+  return completedBlock
 }
 
 const makeGenericMissing = <const Id extends string>(id: Id) => {
   const FeatureNamespace = makeNamespace(id)
   const Model = Schema.Struct({ value: Schema.String })
-  type Model = typeof Model.Type
-  const Work = FeatureNamespace.command('Work', {
+  const Work = FeatureNamespace.makeCommand('Work', {
     messages: [Message.CompletedWork],
   })
 
@@ -51,17 +55,23 @@ const makeGenericMissing = <const Id extends string>(id: Id) => {
     Message,
   }).makeComposition()
 
-  return composition.assembleBlock({
-    init: () => ({ model: Model.make({ value: '' }) }),
-    update: composition.makeUpdate((model, message) =>
-      Message.match(message, {
-        RequestedWork: () => ({ model, commands: [Work()] }),
-        CompletedWork: () => ({ model }),
-      }),
-    ),
-    view: composition.makeView((model, h) => h.div([], [model.value])),
-    EffectsLayer: Layer.empty,
-  })
+  const prepare = () =>
+    composition.prepareBlock({
+      init: () => ({ model: Model.make({ value: '' }) }),
+      update: composition.makeUpdate((model, message) =>
+        Message.match(message, {
+          RequestedWork: () => ({ model, commands: [Work()] }),
+          CompletedWork: () => ({ model }),
+        }),
+      ),
+      view: composition.makeView((model, h) => h.div([], [model.value])),
+      EffectsLayer: Layer.empty,
+    })
+  const completedBlock: Block.FromAssemblyWithView<
+    typeof Model,
+    typeof prepare
+  > = Block.assemble(prepare)
+  return completedBlock
 }
 
 const complete = makeGenericComplete('GenericComplete')
@@ -71,7 +81,7 @@ const CompleteParent = makeDefinition('GenericCompleteParent', {
   Model: CompleteParentModel,
   Message: Schema.Never,
 })
-const CompleteBinding = CompleteParent.bindChild(complete, {
+const CompleteBinding = CompleteParent.makeBinding(complete, {
   placement: 'GenericComplete',
   field: 'child',
 })
@@ -89,7 +99,7 @@ if (false) {
   })
 
   // @ts-expect-error Concrete Bindings validate deferred generic handler coverage.
-  MissingParent.bindChild(missing, {
+  MissingParent.makeBinding(missing, {
     placement: 'GenericMissing',
     field: 'child',
   })

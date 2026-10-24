@@ -1,20 +1,12 @@
-import { Runtime } from 'foldkit'
+import { Program, Runtime } from 'foldkit'
 
-import {
-  ApplicationComposition,
-  FetchCountLayer,
-  update,
-} from './counterHttpCommand'
-import { init, view } from './counterHttpCompletion'
+import { ApplicationBlock } from './counterHttpCompletion'
 import { ApplicationLayer } from './services'
 
-const application = ApplicationComposition.assembleApplication({
-  init,
-  update,
-  view,
-  EffectsLayer: FetchCountLayer,
+const program = Program.make({
+  block: ApplicationBlock,
   container: document.getElementById('root'),
-  devTools: { Message: ApplicationComposition.Message },
+  devTools: { dispatch: true },
 })
 
-Runtime.run(application.provide(ApplicationLayer))
+Runtime.run(program.provide(ApplicationLayer))

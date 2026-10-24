@@ -163,9 +163,9 @@ export const message = <Message>(message_: Message): MessageStep<Message> => ({
   message: message_,
 })
 
-/** Resolves a pending Command with the given result Message. Accepts either
- *  a Command Definition (matches by name; any pending Command of that name)
- *  or a Command instance (matches by name AND args; strict). */
+/** Resolves a pending Command with its raw result Message. A Definition matches
+ *  its originating identity; an instance also matches its complete args.
+ *  A scoped instance selects its composition occurrence. */
 const resolveCommand: {
   <Name extends string, ResultMessage>(
     definition: ResolvableCommandDefinition<Name, ResultMessage>,
@@ -288,8 +288,9 @@ export const steps = <Steps extends ReadonlyArray<StoryStep<any, any, any>>>(
   steps: storySteps,
 })
 
-/** Asserts that every given matcher matches a pending Command. Definition
- *  matchers match by name only; Instance matchers match by name + args. */
+/** Asserts that every matcher selects a pending Command. Definitions select
+ *  their originating identity; instances also compare complete args and any
+ *  explicitly scoped composition occurrence. */
 const expectHasCommandsStep =
   (...matchers: ReadonlyArray<CommandMatcher>) =>
   <Model, Message, OutMessage = undefined>(
@@ -300,8 +301,9 @@ const expectHasCommandsStep =
   }
 
 /** Asserts that the pending Commands match the given matchers exactly
- *  (order-independent). Definition matchers compare by name; Instance
- *  matchers compare by name + args. Each matcher must consume exactly one
+ *  (order-independent). Definitions select their originating identity;
+ *  instances also compare complete args and any scoped occurrence.
+ *  Each matcher must consume exactly one
  *  pending Command. */
 const expectExactCommandsStep =
   (...matchers: ReadonlyArray<CommandMatcher>) =>

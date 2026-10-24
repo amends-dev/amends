@@ -2,7 +2,7 @@
 // block below is an excerpt. Fit them into your own Model, init, Message,
 // update, and view definitions.
 import { Schema, Tuple } from 'effect'
-import { Block, Update } from 'foldkit'
+import { Block } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 
 import { Tooltip } from '@foldkit/ui'
@@ -13,45 +13,44 @@ const Model = Schema.Struct({
   tooltip: Tooltip.TooltipBlock.Model,
   // ...your other fields
 })
-type Model = typeof Model.Type
 
 // This excerpt has no parent-owned facts. The Composition derives delivery.
 const Message = defineMessageUnion({})
-type Message = typeof Message.Type
 
-// At module scope, fold the OutMessage into your own Model. `Shown` and
-// `Hidden` mark the visibility transitions. Fire analytics or coordinate with
-// the rest of your UI from the parent. Each arm returns an Update.Step over
-// the parent Model, which already has the next Tooltip Model written back:
-const foldTooltipOutMessage = Tooltip.TooltipBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  // The child has emitted `Shown`. In this arm the parent can update its
-  // own state or dispatch its own Commands, for example log analytics,
-  // prefetch content, or trigger a downstream Command.
-  Shown: () => TooltipExampleDefinition.stepNoop(),
-  // The child has emitted `Hidden`. In this arm the parent can update its
-  // own state or dispatch its own Commands, for example clear ephemeral
-  // state, fire analytics, or trigger a downstream Command.
-  Hidden: () => TooltipExampleDefinition.stepNoop(),
-})
-
-// The Binding wires the completed child Block into the parent: it runs Tooltip.TooltipBlock.update,
-// writes the next Tooltip Model back, routes generated delivery and Command
-// results, and hands any OutMessage to the OutMessage fold.
 const TooltipExampleDefinition = Block.makeDefinition('TooltipExample', {
   Model,
   Message,
 })
 
-const TooltipBinding = TooltipExampleDefinition.bindChild(
+// At module scope, fold the OutMessage into your own Model. `Shown` and
+// `Hidden` mark the visibility transitions. Fire analytics or coordinate with
+// the rest of your UI from the parent. Each arm returns an Update.Step over
+// the parent Model, which already has the next Tooltip Model written back.
+// The parent Definition checks every named child variant:
+const foldTooltipOutMessage = TooltipExampleDefinition.makeOutMessageFold(
+  Tooltip.TooltipBlock,
+  {
+    // The child has emitted `Shown`. In this arm the parent can update its
+    // own state or dispatch its own Commands, for example log analytics,
+    // prefetch content, or trigger a downstream Command.
+    Shown: TooltipExampleDefinition.makeNoopStep,
+    // The child has emitted `Hidden`. In this arm the parent can update its
+    // own state or dispatch its own Commands, for example clear ephemeral
+    // state, fire analytics, or trigger a downstream Command.
+    Hidden: TooltipExampleDefinition.makeNoopStep,
+  },
+)
+
+// The Binding wires the completed child Block into the parent: it runs Tooltip.TooltipBlock.update,
+// writes the next Tooltip Model back, routes generated delivery and Command
+// results, and hands any OutMessage to the OutMessage fold.
+const TooltipBinding = TooltipExampleDefinition.makeBinding(
   Tooltip.TooltipBlock,
   {
     field: 'tooltip',
     init: { contextToArgs: () => Tuple.make({ id: 'save-button' }) },
-    outMessage: { fold: foldTooltipOutMessage },
   },
-)
+).withOutMessagePolicy({ fold: foldTooltipOutMessage })
 
 const TooltipExampleComposition = TooltipExampleDefinition.makeComposition({
   bindings: [TooltipBinding],

@@ -9,7 +9,7 @@ import { Message } from './message'
 import { urlToApplicationRoute } from './route'
 
 const stepRoute = (url: Url) =>
-  ApplicationDefinition.stepFields(() => ({
+  ApplicationDefinition.makeFieldsStep(() => ({
     route: () => urlToApplicationRoute(url),
   }))
 
@@ -31,7 +31,7 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
       }),
 
     ChangedUrl: ({ url }) =>
-      Update.combine(model, [
+      Update.combineSteps(model, [
         stepRoute(url),
         UiBinding.requestCloseMobileMenu(),
       ]),

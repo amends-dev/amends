@@ -1,12 +1,5 @@
 import { Context, Effect, Layer, Option, Schema, Tuple } from 'effect'
-import {
-  Block,
-  Message,
-  Route,
-  Struct,
-  Update,
-  makeApplicationDefinition,
-} from 'foldkit'
+import { Block, Message, Route, Struct, Update } from 'foldkit'
 
 type Equal<Left, Right> =
   (<Value>() => Value extends Left ? 1 : 2) extends <
@@ -84,7 +77,7 @@ const DeclarationReciprocalHomeDefinition = Block.makeDefinition(
     OutMessage: HomeOutMessage,
   },
 )
-export const ClearJoinDraft = DeclarationReciprocalHomeDefinition.command(
+export const ClearJoinDraft = DeclarationReciprocalHomeDefinition.makeCommand(
   'ClearJoinDraft',
   {
     messages: [HomeMessage.CompletedClearJoinDraft],
@@ -97,7 +90,7 @@ export const ClearJoinDraft = DeclarationReciprocalHomeDefinition.command(
 )
 const DeclarationReciprocalHomeComposition =
   DeclarationReciprocalHomeDefinition.makeComposition()
-const resetJoinForm = DeclarationReciprocalHomeDefinition.step(
+const resetJoinForm = DeclarationReciprocalHomeDefinition.makeStep(
   (model, username: string) => ({
     model: Struct.modifyFields(model, {
       username: () => username,
@@ -106,34 +99,40 @@ const resetJoinForm = DeclarationReciprocalHomeDefinition.step(
     commands: [ClearJoinDraft()],
   }),
 )
-const requestJoin = DeclarationReciprocalHomeDefinition.step(
+const requestJoin = DeclarationReciprocalHomeDefinition.makeStep(
   (model, roomId: string, username: string) => ({
     model,
     commands: [ClearJoinDraft()],
     outMessage: HomeOutMessage.JoinedRoom({ roomId, username }),
   }),
 )
-export const HomeBlock = DeclarationReciprocalHomeComposition.assembleBlock({
-  init: DeclarationReciprocalHomeComposition.makeInit(() => ({
-    model: HomeModel.make({ username: '', resetCount: 0 }),
-  })),
-  update: DeclarationReciprocalHomeComposition.makeUpdate((model, message) =>
-    HomeMessage.match(message, {
-      SucceededJoinRoom: () => ({ model }),
-      RequestedJoin: ({ roomId, username }) =>
-        requestJoin(model, roomId, username),
-      RequestedResetJoinForm: ({ username }) => resetJoinForm(model, username),
-      CompletedClearJoinDraft: () => ({ model }),
-    }),
-  ),
-  operations: {
-    requestJoin: (roomId: string, username: string) =>
-      Tuple.make(HomeMessage.RequestedJoin({ roomId, username })),
-    resetJoinForm: (username: string) =>
-      Tuple.make(HomeMessage.RequestedResetJoinForm({ username })),
-  },
-  EffectsLayer: ClearJoinDraft.layer,
-})
+const prepareHomeBlock = () =>
+  DeclarationReciprocalHomeComposition.prepareBlock({
+    init: DeclarationReciprocalHomeComposition.makeInit(() => ({
+      model: HomeModel.make({ username: '', resetCount: 0 }),
+    })),
+    update: DeclarationReciprocalHomeComposition.makeUpdate((model, message) =>
+      HomeMessage.match(message, {
+        SucceededJoinRoom: () => ({ model }),
+        RequestedJoin: ({ roomId, username }) =>
+          requestJoin(model, roomId, username),
+        RequestedResetJoinForm: ({ username }) =>
+          resetJoinForm(model, username),
+        CompletedClearJoinDraft: () => ({ model }),
+      }),
+    ),
+    operations: {
+      requestJoin: (roomId: string, username: string) =>
+        Tuple.make(HomeMessage.RequestedJoin({ roomId, username })),
+      resetJoinForm: (username: string) =>
+        Tuple.make(HomeMessage.RequestedResetJoinForm({ username })),
+    },
+    EffectsLayer: ClearJoinDraft.layer,
+  })
+export const HomeBlock: Block.FromAssemblyWithOutMessage<
+  typeof HomeModel,
+  typeof prepareHomeBlock
+> = Block.assemble(prepareHomeBlock)
 
 export const RoomModel = Schema.Struct({
   maybeUsername: Schema.Option(Schema.String),
@@ -156,36 +155,41 @@ const DeclarationReciprocalRoomDefinition = Block.makeDefinition(
 )
 const DeclarationReciprocalRoomComposition =
   DeclarationReciprocalRoomDefinition.makeComposition()
-const informJoined = DeclarationReciprocalRoomDefinition.step(
+const informJoined = DeclarationReciprocalRoomDefinition.makeStep(
   (model, username: string, _context: typeof RoomContext.Type) => ({
     model: Struct.modifyFields(model, {
       maybeUsername: () => Option.some(username),
     }),
   }),
 )
-export const RoomBlock = DeclarationReciprocalRoomComposition.assembleBlock({
-  init: DeclarationReciprocalRoomComposition.makeInit(
-    (maybeUsername: Option.Option<string>) => ({
-      model: RoomModel.make({ maybeUsername }),
-    }),
-  ),
-  update: DeclarationReciprocalRoomComposition.makeUpdate(
-    (model, message, context: typeof RoomContext.Type) =>
-      RoomMessage.match(message, {
-        InformedOfJoin: ({ username }) =>
-          informJoined(model, username, context),
-        CompletedLeaveRoom: () => ({
-          model,
-          outMessage: RoomOutMessage.LeftRoom({ roomId: context.roomId }),
-        }),
+const prepareRoomBlock = () =>
+  DeclarationReciprocalRoomComposition.prepareBlock({
+    init: DeclarationReciprocalRoomComposition.makeInit(
+      (maybeUsername: Option.Option<string>) => ({
+        model: RoomModel.make({ maybeUsername }),
       }),
-  ),
-  operations: {
-    informJoined: (username: string, context: typeof RoomContext.Type) =>
-      Tuple.make(RoomMessage.InformedOfJoin({ username }), context),
-  },
-  EffectsLayer: Layer.empty,
-})
+    ),
+    update: DeclarationReciprocalRoomComposition.makeUpdate(
+      (model, message, context: typeof RoomContext.Type) =>
+        RoomMessage.match(message, {
+          InformedOfJoin: ({ username }) =>
+            informJoined(model, username, context),
+          CompletedLeaveRoom: () => ({
+            model,
+            outMessage: RoomOutMessage.LeftRoom({ roomId: context.roomId }),
+          }),
+        }),
+    ),
+    operations: {
+      informJoined: (username: string, context: typeof RoomContext.Type) =>
+        Tuple.make(RoomMessage.InformedOfJoin({ username }), context),
+    },
+    EffectsLayer: Layer.empty,
+  })
+export const RoomBlock: Block.FromAssemblyWithOutMessage<
+  typeof RoomModel,
+  typeof prepareRoomBlock
+> = Block.assemble(prepareRoomBlock)
 
 export const ApplicationRoute = Route.defineRouteUnion({
   Home: {},
@@ -201,59 +205,54 @@ export const ApplicationModel = Schema.Struct({
   route: ApplicationRoute,
 })
 export const ApplicationMessage = Schema.Never
-export const ApplicationDefinition = makeApplicationDefinition({
+export const ApplicationDefinition = Block.makeDefinition('Application', {
   Model: ApplicationModel,
   Message: ApplicationMessage,
 })
 
-const foldRoomOutMessage = (
-  _roomId: string,
-  outMessage: typeof RoomOutMessage.Type,
-) =>
-  RoomOutMessage.match(outMessage, {
-    LeftRoom: () =>
-      Update.combine([
-        ApplicationDefinition.step(model => ({
-          model: Struct.modifyFields(model, {
-            route: () => ApplicationRoute.Home(),
-            maybeRoomInstance: () => Option.none(),
-          }),
-        })),
-        HomeBinding.resetJoinForm(''),
-      ]),
-  })
-
-export const HomeBinding = ApplicationDefinition.bindChild(HomeBlock, {
-  field: 'home',
-  presentWhen: model => model.route._tag === 'Home',
-  outMessage: {
-    fold: HomeOutMessage.match({
-      JoinedRoom: ({ roomId, username }) => {
-        return Update.combine([
-          ApplicationDefinition.step(model =>
-            RoomBinding.init({
-              key: roomId,
-              args: [Option.none()],
-              toParentModel: room =>
-                Struct.modifyFields(model, {
-                  maybeRoomInstance: () =>
-                    Option.some(RoomInstance.make({ roomId, model: room })),
-                }),
-            }),
-          ),
-          RoomBinding.informJoined(roomId, username, { roomId }),
-          ApplicationDefinition.step(model => ({
-            model: Struct.modifyFields(model, {
-              route: () => ApplicationRoute.Room({ roomId }),
-            }),
-          })),
-        ])
-      },
-    }),
-  },
+const foldRoomOutMessage = ApplicationDefinition.makeOutMessageFold(RoomBlock, {
+  LeftRoom: () =>
+    Update.combineSteps([
+      ApplicationDefinition.makeStep(model => ({
+        model: Struct.modifyFields(model, {
+          route: () => ApplicationRoute.Home(),
+          maybeRoomInstance: () => Option.none(),
+        }),
+      })),
+      HomeBinding.resetJoinForm(''),
+    ]),
 })
 
-export const RoomBinding = ApplicationDefinition.bindChild(RoomBlock, {
+export const HomeBinding = ApplicationDefinition.makeBinding(HomeBlock, {
+  field: 'home',
+  presentWhen: model => model.route._tag === 'Home',
+}).withOutMessagePolicy({
+  fold: ApplicationDefinition.makeOutMessageFold(HomeBlock, {
+    JoinedRoom: ({ roomId, username }) => {
+      return Update.combineSteps([
+        ApplicationDefinition.makeStep(model =>
+          RoomBinding.init({
+            key: roomId,
+            args: [Option.none()],
+            toParentModel: room =>
+              Struct.modifyFields(model, {
+                maybeRoomInstance: () =>
+                  Option.some(RoomInstance.make({ roomId, model: room })),
+              }),
+          }),
+        ),
+        RoomBinding.informJoined(roomId, username, { roomId }),
+        ApplicationDefinition.makeStep(model => ({
+          model: Struct.modifyFields(model, {
+            route: () => ApplicationRoute.Room({ roomId }),
+          }),
+        })),
+      ])
+    },
+  }),
+})
+
+export const RoomBinding = ApplicationDefinition.makeBinding(RoomBlock, {
   readAll: model => Option.toArray(model.maybeRoomInstance),
   key: instance => instance.roomId,
   keySchema: RoomInstance.fields.roomId,
@@ -271,7 +270,8 @@ export const RoomBinding = ApplicationDefinition.bindChild(RoomBlock, {
       model.route._tag === 'Room' && model.route.roomId === roomId,
     toUpdateContext: (_model, roomId) => [{ roomId }],
   },
-  outMessage: { fold: foldRoomOutMessage },
+}).withOutMessagePolicy({
+  fold: (_roomId, outMessage) => foldRoomOutMessage(outMessage),
 })
 
 export const ApplicationComposition = ApplicationDefinition.makeComposition({
@@ -426,34 +426,31 @@ const DirectReciprocalModel = Schema.Struct({
 })
 const DirectReciprocalMessage = Schema.Never
 // oxlint-disable-next-line foldkit/block-name-matches-variable -- This fixture compares independent Application graphs for direct sibling coordination.
-export const DirectReciprocalApplicationDefinition = makeApplicationDefinition({
-  Model: DirectReciprocalModel,
-  Message: DirectReciprocalMessage,
-})
-
-export const LeftHomeBinding = DirectReciprocalApplicationDefinition.bindChild(
-  HomeBlock,
+export const DirectReciprocalApplicationDefinition = Block.makeDefinition(
+  'Application',
   {
+    Model: DirectReciprocalModel,
+    Message: DirectReciprocalMessage,
+  },
+)
+
+export const LeftHomeBinding =
+  DirectReciprocalApplicationDefinition.makeBinding(HomeBlock, {
     field: 'leftHome',
-    outMessage: {
-      fold: HomeOutMessage.match({
-        JoinedRoom: () => RightHomeBinding.resetJoinForm('from-left'),
-      }),
-    },
-  },
-)
+  }).withOutMessagePolicy({
+    fold: HomeOutMessage.match({
+      JoinedRoom: () => RightHomeBinding.resetJoinForm('from-left'),
+    }),
+  })
 
-export const RightHomeBinding = DirectReciprocalApplicationDefinition.bindChild(
-  HomeBlock,
-  {
+export const RightHomeBinding =
+  DirectReciprocalApplicationDefinition.makeBinding(HomeBlock, {
     field: 'rightHome',
-    outMessage: {
-      fold: HomeOutMessage.match({
-        JoinedRoom: () => LeftHomeBinding.resetJoinForm('from-right'),
-      }),
-    },
-  },
-)
+  }).withOutMessagePolicy({
+    fold: HomeOutMessage.match({
+      JoinedRoom: () => LeftHomeBinding.resetJoinForm('from-right'),
+    }),
+  })
 
 // oxlint-disable-next-line foldkit/block-name-matches-variable -- This fixture keeps the direct sibling graph distinct from the keyed sibling graph.
 export const DirectReciprocalComposition =
@@ -494,28 +491,29 @@ const KeyedReciprocalModel = Schema.Struct({
 })
 const KeyedReciprocalMessage = Schema.Never
 // oxlint-disable-next-line foldkit/block-name-matches-variable -- This fixture compares independent Application graphs for keyed sibling coordination.
-export const KeyedReciprocalApplicationDefinition = makeApplicationDefinition({
-  Model: KeyedReciprocalModel,
-  Message: KeyedReciprocalMessage,
-})
+export const KeyedReciprocalApplicationDefinition = Block.makeDefinition(
+  'Application',
+  {
+    Model: KeyedReciprocalModel,
+    Message: KeyedReciprocalMessage,
+  },
+)
 
 export const LeftKeyedHomeBinding =
-  KeyedReciprocalApplicationDefinition.bindChild(HomeBlock, {
+  KeyedReciprocalApplicationDefinition.makeBinding(HomeBlock, {
     field: 'leftHomes',
     placement: 'leftHomes',
     key: 'id',
     childField: 'home',
-    outMessage: { fold: foldLeftKeyedHomeOutMessage },
-  })
+  }).withOutMessagePolicy({ fold: foldLeftKeyedHomeOutMessage })
 
 export const RightKeyedHomeBinding =
-  KeyedReciprocalApplicationDefinition.bindChild(HomeBlock, {
+  KeyedReciprocalApplicationDefinition.makeBinding(HomeBlock, {
     field: 'rightHomes',
     placement: 'rightHomes',
     key: 'id',
     childField: 'home',
-    outMessage: { fold: foldRightKeyedHomeOutMessage },
-  })
+  }).withOutMessagePolicy({ fold: foldRightKeyedHomeOutMessage })
 
 // oxlint-disable-next-line foldkit/block-name-matches-variable -- This fixture keeps the keyed sibling graph distinct from the direct sibling graph.
 export const KeyedReciprocalComposition =
@@ -588,24 +586,29 @@ export const NestedPolicy = (() => {
     OutMessage: HomeOutMessage,
   })
   const HomeComposition = HomeDefinition.makeComposition()
-  const requestRoomWork = HomeDefinition.step(model => ({
+  const requestRoomWork = HomeDefinition.makeStep(model => ({
     model,
     outMessage: HomeOutMessage.RequestedRoomWork(),
   }))
-  const HomeBlock = HomeComposition.assembleBlock({
-    init: HomeComposition.makeInit(() => ({
-      model: HomeModel.make({ value: '' }),
-    })),
-    update: HomeComposition.makeUpdate((model, message) =>
-      HomeMessage.match(message, {
-        CompletedHomeWork: () => ({ model }),
-        RequestedRoomWork: () => requestRoomWork(model),
-      }),
-    ),
-    operations: {
-      requestRoomWork: () => Tuple.make(HomeMessage.RequestedRoomWork()),
-    },
-  })
+  const prepareHomeBlock = () =>
+    HomeComposition.prepareBlock({
+      init: HomeComposition.makeInit(() => ({
+        model: HomeModel.make({ value: '' }),
+      })),
+      update: HomeComposition.makeUpdate((model, message) =>
+        HomeMessage.match(message, {
+          CompletedHomeWork: () => ({ model }),
+          RequestedRoomWork: () => requestRoomWork(model),
+        }),
+      ),
+      operations: {
+        requestRoomWork: () => Tuple.make(HomeMessage.RequestedRoomWork()),
+      },
+    })
+  const HomeBlock: Block.FromAssemblyWithOutMessage<
+    typeof HomeModel,
+    typeof prepareHomeBlock
+  > = Block.assemble(prepareHomeBlock)
 
   const RoomModel = Schema.Struct({ count: Schema.Number })
   const RoomMessage = Message.defineMessageUnion({
@@ -618,33 +621,38 @@ export const NestedPolicy = (() => {
     Message: RoomMessage,
     OutMessage: RoomOutMessage,
   })
-  const CompleteRoomWork = RoomDefinition.command('CompleteRoomWork', {
+  const CompleteRoomWork = RoomDefinition.makeCommand('CompleteRoomWork', {
     messages: [RoomMessage.CompletedRoomWork],
     handler: function* () {
       return () => Effect.succeed(RoomMessage.CompletedRoomWork())
     },
   })
   const RoomComposition = RoomDefinition.makeComposition()
-  const runRoomWork = RoomDefinition.step(model => ({
+  const runRoomWork = RoomDefinition.makeStep(model => ({
     model: RoomModel.make({ count: model.count + 1 }),
     commands: [CompleteRoomWork()],
     outMessage: RoomOutMessage.ChangedRoom(),
   }))
-  const RoomBlock = RoomComposition.assembleBlock({
-    init: RoomComposition.makeInit(() => ({
-      model: RoomModel.make({ count: 0 }),
-    })),
-    update: RoomComposition.makeUpdate((model, message) =>
-      RoomMessage.match(message, {
-        CompletedRoomWork: () => ({ model }),
-        RequestedRoomWork: () => runRoomWork(model),
-      }),
-    ),
-    operations: {
-      runRoomWork: () => Tuple.make(RoomMessage.RequestedRoomWork()),
-    },
-    EffectsLayer: CompleteRoomWork.layer,
-  })
+  const prepareRoomBlock = () =>
+    RoomComposition.prepareBlock({
+      init: RoomComposition.makeInit(() => ({
+        model: RoomModel.make({ count: 0 }),
+      })),
+      update: RoomComposition.makeUpdate((model, message) =>
+        RoomMessage.match(message, {
+          CompletedRoomWork: () => ({ model }),
+          RequestedRoomWork: () => runRoomWork(model),
+        }),
+      ),
+      operations: {
+        runRoomWork: () => Tuple.make(RoomMessage.RequestedRoomWork()),
+      },
+      EffectsLayer: CompleteRoomWork.layer,
+    })
+  const RoomBlock: Block.FromAssemblyWithOutMessage<
+    typeof RoomModel,
+    typeof prepareRoomBlock
+  > = Block.assemble(prepareRoomBlock)
 
   const ParentModel = Schema.Struct({ home: HomeModel, room: RoomModel })
   const ParentMessage = Schema.Never
@@ -655,25 +663,23 @@ export const NestedPolicy = (() => {
     OutMessage: ParentOutMessage,
   })
 
-  const HomeBinding = ParentDefinition.bindChild(HomeBlock, {
+  const HomeBinding = ParentDefinition.makeBinding(HomeBlock, {
     field: 'home',
-    outMessage: {
-      fold: HomeOutMessage.match({
-        RequestedRoomWork: () => RoomBinding.runRoomWork(),
-      }),
-    },
+  }).withOutMessagePolicy({
+    fold: HomeOutMessage.match({
+      RequestedRoomWork: () => RoomBinding.runRoomWork(),
+    }),
   })
-  const RoomBinding = ParentDefinition.bindChild(RoomBlock, {
+  const RoomBinding = ParentDefinition.makeBinding(RoomBlock, {
     field: 'room',
-    outMessage: {
-      fold: RoomOutMessage.match({
-        ChangedRoom: () =>
-          ParentDefinition.step(model => ({
-            model,
-            outMessage: ParentOutMessage.RoomChanged(),
-          })),
-      }),
-    },
+  }).withOutMessagePolicy({
+    fold: RoomOutMessage.match({
+      ChangedRoom: () =>
+        ParentDefinition.makeStep(model => ({
+          model,
+          outMessage: ParentOutMessage.RoomChanged(),
+        })),
+    }),
   })
 
   const ParentComposition = ParentDefinition.makeComposition({

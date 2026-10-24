@@ -26,7 +26,9 @@ const TypePerformanceBudget = Schema.Struct({
 })
 type TypePerformanceBudget = typeof TypePerformanceBudget.Type
 const BudgetsFile = Schema.Struct({
-  typescriptVersion: Schema.String.check(Schema.isPattern(/^\d+\.\d+\.\d+$/)),
+  typescriptVersion: Schema.String.check(
+    Schema.isPattern(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/),
+  ),
   fixtures: Schema.Record(Schema.String, TypePerformanceBudget),
 })
 type BudgetsFile = typeof BudgetsFile.Type
@@ -254,7 +256,7 @@ const printRows = (
 
 const assertBuiltDeclarations = (): void => {
   for (const path of [
-    'dist/runtime/applicationPublic.d.ts',
+    'dist/runtime/programPublic.d.ts',
     'dist/block/public.d.ts',
     'dist/command/public.d.ts',
     'dist/update/public.d.ts',
@@ -318,7 +320,7 @@ const main = (): void => {
 
   const versionMatch = versionResult.output
     .trim()
-    .match(/^Version (\d+\.\d+\.\d+)$/)
+    .match(/^Version (\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)$/)
   if (versionMatch === null) {
     return fail(
       `Unexpected TypeScript version output: ${versionResult.output.trim()}`,

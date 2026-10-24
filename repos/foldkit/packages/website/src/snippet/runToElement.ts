@@ -1,11 +1,9 @@
-import { Runtime } from 'foldkit'
+import { Program, Runtime } from 'foldkit'
 
-import { ApplicationComposition, init, update, view } from './application'
+import { ApplicationBlock } from './application'
 
-const element = ApplicationComposition.assembleElement({
-  init,
-  update,
-  view,
+const element = Program.makeElement({
+  block: ApplicationBlock,
   container: document.getElementById('widget'),
 })
 

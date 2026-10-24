@@ -1,7 +1,7 @@
 import { describe, it } from "@effect/vitest"
 import * as Menu from "@foldkit/ui/menu"
 import { Schema } from "effect"
-import { makeApplicationDefinition } from "foldkit"
+import { Block } from "foldkit"
 import type { HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
 import {
@@ -48,17 +48,16 @@ const Message = defineMessageUnion({
 })
 type Message = typeof Message.Type
 
-const Definition = makeApplicationDefinition({ Model, Message })
+const Definition = Block.makeDefinition("Application", { Model, Message })
 
-const AccountBinding = Definition.bindChild(AccountMenu, {
+const AccountBinding = Definition.makeBinding(AccountMenu, {
   field: "accountMenu",
-  init: { contextToArgs: () => [{ id: "rail-account" }] },
-  outMessage: {
-    fold: AccountMenu.OutMessage.match({
-      Selected: ({ value }) => Definition.stepFields(() => ({ chose: () => value })),
-      Closed: () => Definition.stepNoop()
-    })
-  }
+  init: { contextToArgs: () => [{ id: "rail-account" }] }
+}).withOutMessagePolicy({
+  fold: AccountMenu.OutMessage.match({
+    Selected: ({ value }) => Definition.makeFieldsStep(() => ({ chose: () => value })),
+    Closed: () => Definition.makeNoopStep()
+  })
 })
 
 const Composition = Definition.makeComposition({ bindings: [AccountBinding] })

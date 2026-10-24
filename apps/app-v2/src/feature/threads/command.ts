@@ -15,7 +15,7 @@ import { threadsListId, Message, ThreadsDefinition } from "./definition.ts"
 const failed = (error: string) => Message.FailedWriteAction({ error })
 
 /** Move focus to the composer of `groupId`, such as to write the task that New task asks for. */
-export const FocusComposer = ThreadsDefinition.command("FocusComposer", {
+export const FocusComposer = ThreadsDefinition.makeCommand("FocusComposer", {
   args: { groupId: GroupId.GroupId },
   messages: [Message.CompletedFocusComposer],
   handler: function* () {
@@ -32,7 +32,7 @@ export const FocusComposer = ThreadsDefinition.command("FocusComposer", {
  * only if the person was near their end, so that what is added stays in view while they are there and leaves them
  * where they scrolled to when they are not.
  */
-export const ScrollThreadsToEnd = ThreadsDefinition.command("ScrollThreadsToEnd", {
+export const ScrollThreadsToEnd = ThreadsDefinition.makeCommand("ScrollThreadsToEnd", {
   args: { groupId: GroupId.GroupId, onlyIfNearEnd: Schema.Boolean },
   messages: [Message.CompletedScrollThreadsToEnd],
   handler: function* () {
@@ -45,7 +45,7 @@ export const ScrollThreadsToEnd = ThreadsDefinition.command("ScrollThreadsToEnd"
 })
 
 /** Start a thread in `groupId` with `text` as its opening message, and its task, started as `task`, when it has one. */
-export const StartThread = ThreadsDefinition.command("StartThread", {
+export const StartThread = ThreadsDefinition.makeCommand("StartThread", {
   args: { ...Stores.AsMember, groupId: GroupId.GroupId, text: Schema.String, task: Schema.Option(Task.Options) },
   messages: [Message.WroteAction, Message.FailedWriteAction],
   handler: function* () {

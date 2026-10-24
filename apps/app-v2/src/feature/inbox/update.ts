@@ -18,7 +18,7 @@ import {
 
 /** Mark the notification `notificationId` seen, unless it already is. */
 const writeSeenWhenWaiting = (notificationId: Notification.NotificationId) =>
-  InboxDefinition.step((model: Model) => ({
+  InboxDefinition.makeStep((model: Model) => ({
     model,
     commands: isNotificationWaiting(model, notificationId)
       ? [MarkNotificationSeen({ workspaceId: model.workspaceId, memberId: model.memberId, notificationId })]
@@ -40,7 +40,7 @@ export const update = InboxComposition.makeUpdate((model, message) => {
     ChoseTab: ({ tab }) => ({ model: modifyFields(model, { tab: () => tab }), outMessage: OutMessage.ChangedTab() }),
     RequestedTab: ({ tab }) => ({ model: modifyFields(model, { tab: () => tab, selected: () => Option.none() }) }),
     RequestedSelection: ({ tab, notificationId, groupId, threadId }) =>
-      Update.combine(modifyFields(model, { tab: () => tab }), [
+      Update.combineSteps(modifyFields(model, { tab: () => tab }), [
         selectNotification(notificationId, groupId, threadId, messageOfNotification(model, notificationId))
       ]),
     ClickedShowOlder: () => ({ model: modifyFields(model, { shown: (shown) => shown + pageSize }) }),
@@ -49,14 +49,14 @@ export const update = InboxComposition.makeUpdate((model, message) => {
         onNone: () => ({ model }),
         onSome: ({ groupId, threadId }) =>
           Update.withOutMessage(
-            Update.combine(model, [
+            Update.combineSteps(model, [
               writeSeenWhenWaiting(notificationId),
               selectNotification(notificationId, groupId, threadId, messageOfNotification(model, notificationId))
             ]),
             OutMessage.OpenedThread()
           )
       }),
-    ClickedClose: () => Update.withOutMessage(Update.combine(model, [closeThread]), OutMessage.ClosedThread()),
+    ClickedClose: () => Update.withOutMessage(Update.combineSteps(model, [closeThread]), OutMessage.ClosedThread()),
     OpenedProfile: ({ memberId, triggerId }) => ({
       model,
       outMessage: OutMessage.OpenedProfile({ memberId, triggerId })
@@ -72,7 +72,7 @@ export const update = InboxComposition.makeUpdate((model, message) => {
                 commands: [MarkAllNotificationsSeen({ workspaceId, memberId, through: { recordedAt, id } })]
               }
       }),
-    RequestedCloseThread: () => Update.combine(model, [closeThread]),
+    RequestedCloseThread: () => Update.combineSteps(model, [closeThread]),
     WroteAction: () => ({ model: modifyFields(model, { notice: () => Option.none() }) }),
     FailedWriteAction: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
     WroteAllSeen: () => ({

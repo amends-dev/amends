@@ -15,6 +15,7 @@ import type * as Mount from '../mount/index.js'
 import type * as Subscription from '../subscription/public.js'
 import * as Update from '../update/index.js'
 import type { BindingBlockEvidence } from './binding.js'
+import { LocalMountsTypeId } from './identity.js'
 import { type OwnedName, makeOwnedName } from './ownerName.js'
 import type {
   HandlerOfHostDefinition,
@@ -24,8 +25,10 @@ import type {
   OperationRequirementsOfBlock,
   ProducerRequirements,
   RequirementsOfBlock,
+  RuntimeServicesOfBlock,
   SubscriptionRequirements,
   ValidateComposition,
+  ValidateImplementationComposition,
 } from './requirements.js'
 
 const Message = defineMessageUnion({
@@ -346,6 +349,25 @@ it('satisfies operation and Layer construction handles at runtime', () => {
   expectTypeOf<Exclude<Expected, Requirements>>().toEqualTypeOf<never>()
 })
 
+it('retains only runtime services installed by every Block alternative', () => {
+  type WithoutRegistration = Omit<RuntimeHandleBlock, 'managedResources'> &
+    Readonly<{ managedResources: EmptyRecord }>
+  type RenamedRegistration = Omit<RuntimeHandleBlock, 'managedResources'> &
+    Readonly<{
+      managedResources: Readonly<{ alternateRoom: ManageRoomConnection }>
+    }>
+
+  expectTypeOf<
+    RuntimeServicesOfBlock<RuntimeHandleBlock | WithoutRegistration>
+  >().toEqualTypeOf<never>()
+  expectTypeOf<
+    RuntimeServicesOfBlock<RuntimeHandleBlock | RenamedRegistration>
+  >().toEqualTypeOf<RoomConnectionService>()
+  expectTypeOf<
+    RequirementsOfBlock<RuntimeHandleBlock | WithoutRegistration>
+  >().toEqualTypeOf<ResourceHandler | RoomConnectionService>()
+})
+
 type RuntimeHandleBinding = BindingBlockEvidence<RuntimeHandleBlock> &
   Readonly<{
     fold: (model: Model) => Update.Return<Model, Message>
@@ -393,6 +415,15 @@ it('separates unchanged operation services from Layer completion residuals', () 
   >().toEqualTypeOf<never>()
   expectTypeOf<
     OperationRequirementsOfBlock<NearbyOrdinaryServiceBlock>
+  >().toEqualTypeOf<RoomsClient>()
+})
+
+it('satisfies ordinary requirements with the same Block alternative', () => {
+  type WithoutProvider = Omit<NearbyOrdinaryServiceBlock, 'EffectsLayer'> &
+    Readonly<{ EffectsLayer: Layer.Layer<never, never, never> }>
+
+  expectTypeOf<
+    RequirementsOfBlock<NearbyOrdinaryServiceBlock | WithoutProvider>
   >().toEqualTypeOf<RoomsClient>()
 })
 
@@ -527,4 +558,91 @@ it('reports policy Commands retained by an exposed operation binding', () => {
       ParentWithPolicyStep
     >['Block handler requirements must be provided locally or listed in hostHandlers']
   >().toEqualTypeOf<Command.HandlerOf<typeof Refresh>>()
+})
+
+type LocalValidationCompleteA = Readonly<{
+  [LocalMountsTypeId]: readonly []
+  bindings: readonly []
+  init: () => Readonly<{ model: 'A' }>
+  update: () => Readonly<{ model: 'A' }>
+  subscriptions: EmptyRecord
+  managedResources: EmptyRecord
+  EffectsLayer: never
+  hostHandlers: readonly ['InvalidA']
+}>
+
+type LocalValidationCompleteB = Readonly<{
+  [LocalMountsTypeId]: readonly []
+  bindings: readonly []
+  init: () => Readonly<{ model: 'B' }>
+  update: () => Readonly<{ model: 'B' }>
+  subscriptions: EmptyRecord
+  managedResources: EmptyRecord
+  EffectsLayer: never
+  hostHandlers: readonly ['InvalidB']
+}>
+
+type LocalValidationPartial = Readonly<{
+  init: () => Readonly<{ model: 'Partial' }>
+  hostHandlers: readonly ['InvalidPartial']
+}>
+
+type LocalValidationOptional = Omit<
+  LocalValidationCompleteA,
+  'bindings' | 'hostHandlers'
+> &
+  Readonly<{
+    bindings?: readonly []
+    hostHandlers: readonly ['InvalidOptional']
+  }>
+
+type LocalValidationDefinition = Readonly<{ kind: 'Fallback' }>
+
+it('retains validation evidence across complete and partial composition unions', () => {
+  type MixedEvidence = ValidateImplementationComposition<
+    LocalValidationDefinition,
+    LocalValidationCompleteA | LocalValidationPartial
+  >['Block hostHandlers must contain layered Foldkit definitions']
+  type CompleteUnionEvidence = ValidateImplementationComposition<
+    LocalValidationDefinition,
+    LocalValidationCompleteA | LocalValidationCompleteB
+  >['Block hostHandlers must contain layered Foldkit definitions']
+
+  expectTypeOf<MixedEvidence>().toEqualTypeOf<'InvalidA' | 'InvalidPartial'>()
+  expectTypeOf<CompleteUnionEvidence>().toEqualTypeOf<'InvalidA' | 'InvalidB'>()
+})
+
+it('keeps fallback validation exact for optional and top-level types', () => {
+  type OptionalEvidence = ValidateImplementationComposition<
+    LocalValidationDefinition,
+    LocalValidationOptional
+  >['Block hostHandlers must contain layered Foldkit definitions']
+
+  expectTypeOf<OptionalEvidence>().toEqualTypeOf<'InvalidOptional'>()
+  expectTypeOf<
+    ValidateImplementationComposition<LocalValidationDefinition, any>
+  >().toEqualTypeOf<
+    Readonly<{
+      'Block hostHandlers must contain layered Foldkit definitions': unknown
+    }>
+  >()
+  expectTypeOf<
+    ValidateImplementationComposition<LocalValidationDefinition, unknown>
+  >().toEqualTypeOf<unknown>()
+  expectTypeOf<
+    ValidateImplementationComposition<LocalValidationDefinition, never>
+  >().toEqualTypeOf<never>()
+})
+
+type AcceptedLocalValidation<Composition> = Omit<Composition, 'hostHandlers'> &
+  Readonly<{ hostHandlers: readonly [] }>
+
+it('accepts complete local composition unions', () => {
+  expectTypeOf<
+    ValidateImplementationComposition<
+      LocalValidationDefinition,
+      | AcceptedLocalValidation<LocalValidationCompleteA>
+      | AcceptedLocalValidation<LocalValidationCompleteB>
+    >
+  >().toEqualTypeOf<unknown>()
 })

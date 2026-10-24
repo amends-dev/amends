@@ -89,7 +89,7 @@ export const init = PlaygroundComposition.makeInit(
 // MANAGED RESOURCE
 
 const WebContainerPlayground =
-  PlaygroundDefinition.resource<PlaygroundWebContainer>()(
+  PlaygroundDefinition.makeResource<PlaygroundWebContainer>()(
     'WebContainerPlayground',
   )
 
@@ -108,7 +108,7 @@ const STYLES_CSS_PATH = 'src/styles.css'
 
 const WRITE_DEBOUNCE_MILLIS = 250
 
-export const WaitForPlaygroundServerFailure = PlaygroundDefinition.command(
+export const WaitForPlaygroundServerFailure = PlaygroundDefinition.makeCommand(
   'WaitForPlaygroundServerFailure',
   {
     messages: [Message.CompletedWaitForPlaygroundServerFailure],
@@ -130,7 +130,7 @@ export const WaitForPlaygroundServerFailure = PlaygroundDefinition.command(
   },
 )
 
-export const SchedulePlaygroundFileWrite = PlaygroundDefinition.command(
+export const SchedulePlaygroundFileWrite = PlaygroundDefinition.makeCommand(
   'SchedulePlaygroundFileWrite',
   {
     args: { path: Schema.String, content: Schema.String },
@@ -182,7 +182,7 @@ export const SchedulePlaygroundFileWrite = PlaygroundDefinition.command(
   },
 )
 
-export const managedResources = PlaygroundDefinition.managedResources(
+export const managedResources = PlaygroundDefinition.makeManagedResources(
   entry => ({
     webContainerPlayground: entry(
       'ManageWebContainerPlayground',
@@ -235,7 +235,7 @@ const appendDeduped = (
   Array.contains(paths, path) ? paths : [...paths, path]
 
 const flushDirtyPaths = (
-  model: Model,
+  model: typeof Model.Type,
 ): ReadonlyArray<ReturnType<typeof SchedulePlaygroundFileWrite>> =>
   model.dirtyPaths.flatMap(path =>
     pipe(
@@ -246,9 +246,9 @@ const flushDirtyPaths = (
   )
 
 const markPreviewLoaded = (
-  state: PlaygroundState,
+  state: typeof PlaygroundState.Type,
   previewUrl: string,
-): PlaygroundState =>
+): typeof PlaygroundState.Type =>
   Match.value(state).pipe(
     Match.tag('Booted', bootedState => {
       const nextPreview = PlaygroundPreview.load(
@@ -476,7 +476,7 @@ const editorPanelContent = (
   )
 
 const previewPaneView = (
-  state: PlaygroundState,
+  state: typeof PlaygroundState.Type,
   h: PlaygroundViewBuilder,
 ): Html =>
   h.div(
@@ -562,7 +562,10 @@ const tooNarrowMessageView = (): Html =>
     ],
   )
 
-const responsiveEditorView = (model: Model, h: PlaygroundViewBuilder): Html =>
+const responsiveEditorView = (
+  model: typeof Model.Type,
+  h: PlaygroundViewBuilder,
+): Html =>
   h.div(
     [h.Class('flex-1 min-h-0 flex flex-col')],
     [
@@ -574,7 +577,10 @@ const responsiveEditorView = (model: Model, h: PlaygroundViewBuilder): Html =>
     ],
   )
 
-const editorLayoutView = (model: Model, h: PlaygroundViewBuilder): Html => {
+const editorLayoutView = (
+  model: typeof Model.Type,
+  h: PlaygroundViewBuilder,
+): Html => {
   const paths = sortedPaths(model.files)
   return h.div(
     [h.Class('flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden')],

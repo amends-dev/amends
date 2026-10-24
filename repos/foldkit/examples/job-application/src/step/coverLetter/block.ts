@@ -9,9 +9,11 @@ import { Textarea } from '@foldkit/ui'
 const Model = Schema.Struct({
   content: Schema.String,
 })
+
 const Message = defineMessageUnion({
   UpdatedContent: { value: Schema.String },
 })
+
 const CoverLetterComposition = Block.makeDefinition('CoverLetter', {
   Model,
   Message,
@@ -91,8 +93,13 @@ export const view = CoverLetterComposition.makeView((model, h) => {
   )
 })
 
-export const CoverLetterBlock = CoverLetterComposition.assembleBlock({
-  init,
-  update,
-  view,
-})
+const prepare = () =>
+  CoverLetterComposition.prepareBlock({
+    init,
+    update,
+    view,
+  })
+export const CoverLetterBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

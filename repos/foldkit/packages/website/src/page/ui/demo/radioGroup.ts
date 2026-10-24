@@ -8,15 +8,19 @@ import { type Model } from '../model'
 
 // DEMO CONTENT
 
-const plans: ReadonlyArray<Plan> = ['Startup', 'Business', 'Enterprise']
+const plans: ReadonlyArray<typeof Plan.Type> = [
+  'Startup',
+  'Business',
+  'Enterprise',
+]
 
-const planDescriptions: Record<Plan, string> = {
+const planDescriptions: Record<typeof Plan.Type, string> = {
   Startup: '12GB / 6 CPUs. Perfect for small projects',
   Business: '16GB / 8 CPUs. For growing teams',
   Enterprise: '32GB / 12 CPUs. Dedicated infrastructure',
 }
 
-const planPrices: Record<Plan, string> = {
+const planPrices: Record<typeof Plan.Type, string> = {
   Startup: '$40/mo',
   Business: '$80/mo',
   Enterprise: '$160/mo',
@@ -39,7 +43,7 @@ const descriptionClassName = 'text-sm text-gray-700 dark:text-gray-300'
 const priceClassName =
   'text-sm font-semibold text-accent-700 dark:text-accent-400'
 
-export const verticalDemo = (model: Model, h: UiViewBuilder) => {
+export const verticalDemo = (model: typeof Model.Type, h: UiViewBuilder) => {
   const checkIcon = h.svg(
     [
       h.ViewBox('0 0 24 24'),
@@ -118,7 +122,7 @@ export const verticalDemo = (model: Model, h: UiViewBuilder) => {
   ]
 }
 
-export const horizontalDemo = (model: Model, h: UiViewBuilder) => {
+export const horizontalDemo = (model: typeof Model.Type, h: UiViewBuilder) => {
   const checkIcon = h.svg(
     [
       h.ViewBox('0 0 24 24'),

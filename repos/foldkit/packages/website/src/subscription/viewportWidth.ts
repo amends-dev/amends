@@ -4,7 +4,7 @@ import { ApplicationDefinition } from '../definition'
 import { Message } from '../message'
 import { NARROW_VIEWPORT_QUERY } from '../viewport'
 
-export const subscriptions = ApplicationDefinition.subscriptions(entry => ({
+export const subscriptions = ApplicationDefinition.makeSubscriptions(entry => ({
   viewportWidthChanges: entry('ViewportWidthChanges', {
     messages: [Message.ChangedViewportWidth],
     handler: function* () {

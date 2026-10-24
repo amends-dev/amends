@@ -12,19 +12,21 @@ export type Character = Readonly<{
   lastName: string
 }>
 
-export const ItemListboxBlock = Listbox.create<ListboxItem>()
-export const ItemMultiListboxBlock = Listbox.Multi.create<ListboxItem>()
+export const ItemListboxBlock = Listbox.create<typeof ListboxItem.Type>()
+export const ItemMultiListboxBlock =
+  Listbox.Multi.create<typeof ListboxItem.Type>()
 export const CharacterListboxBlock = Listbox.create<Character>()
 
 export type MenuItem = 'Edit' | 'Duplicate' | 'Archive' | 'Move' | 'Delete'
 
 export const DemoMenuBlock = Menu.create<MenuItem>()
 
-export const PlanRadioGroupBlock = RadioGroup.create<Plan>()
+export const PlanRadioGroupBlock = RadioGroup.create<typeof Plan.Type>()
 
-export const DemoTabsBlock = Tabs.create<DemoTab>()
+export const DemoTabsBlock = Tabs.create<typeof DemoTab.Type>()
 
 import type { Activity } from './virtualListData'
 
 export const ActivityVirtualListBlock = VirtualList.create<Activity>()
-export const ChatVirtualListBlock = VirtualList.create<VirtualListChatMessage>()
+export const ChatVirtualListBlock =
+  VirtualList.create<typeof VirtualListChatMessage.Type>()

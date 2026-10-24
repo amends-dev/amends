@@ -15,7 +15,7 @@ const written = [Message.WroteAction, Message.FailedWriteAction]
 const failed = (error: string) => Message.FailedWriteAction({ error })
 
 /** Rename the team `groupId` to `name`, from the name the person saw. */
-export const RenameGroup = GroupDefinition.command("RenameGroup", {
+export const RenameGroup = GroupDefinition.makeCommand("RenameGroup", {
   args: { ...Stores.AsMember, groupId: GroupId.GroupId, name: Schema.String, expectedName: Schema.String },
   messages: written,
   handler: function* () {
@@ -29,7 +29,7 @@ export const RenameGroup = GroupDefinition.command("RenameGroup", {
 })
 
 /** Follow `groupId`. */
-export const FollowGroup = GroupDefinition.command("FollowGroup", {
+export const FollowGroup = GroupDefinition.makeCommand("FollowGroup", {
   args: { ...Stores.AsMember, groupId: GroupId.GroupId },
   messages: written,
   handler: function* () {
@@ -40,7 +40,7 @@ export const FollowGroup = GroupDefinition.command("FollowGroup", {
 })
 
 /** Stop following `groupId`. */
-export const UnfollowGroup = GroupDefinition.command("UnfollowGroup", {
+export const UnfollowGroup = GroupDefinition.makeCommand("UnfollowGroup", {
   args: { ...Stores.AsMember, groupId: GroupId.GroupId },
   messages: written,
   handler: function* () {
@@ -51,7 +51,7 @@ export const UnfollowGroup = GroupDefinition.command("UnfollowGroup", {
 })
 
 /** Join `groupId`. */
-export const JoinGroup = GroupDefinition.command("JoinGroup", {
+export const JoinGroup = GroupDefinition.makeCommand("JoinGroup", {
   args: { ...Stores.AsMember, groupId: GroupId.GroupId },
   messages: written,
   handler: function* () {
@@ -61,7 +61,7 @@ export const JoinGroup = GroupDefinition.command("JoinGroup", {
 })
 
 /** Leave `groupId`, ending the person's admission `membershipId`. */
-export const LeaveGroup = GroupDefinition.command("LeaveGroup", {
+export const LeaveGroup = GroupDefinition.makeCommand("LeaveGroup", {
   args: { ...Stores.AsMember, groupId: GroupId.GroupId, membershipId: GroupMembership.GroupMembershipId },
   messages: written,
   handler: function* () {
@@ -72,7 +72,7 @@ export const LeaveGroup = GroupDefinition.command("LeaveGroup", {
 })
 
 /** Admit each of `admitMemberIds` to `groupId`, one action written for each, in the order given. */
-export const AdmitMembers = GroupDefinition.command("AdmitMembers", {
+export const AdmitMembers = GroupDefinition.makeCommand("AdmitMembers", {
   args: { ...Stores.AsMember, groupId: GroupId.GroupId, admitMemberIds: Schema.Array(MemberId.MemberId) },
   messages: written,
   handler: function* () {
@@ -87,7 +87,7 @@ export const AdmitMembers = GroupDefinition.command("AdmitMembers", {
 })
 
 /** Move focus to the input of the members picker of the Members section, which the chip the person removed held. */
-export const FocusAdmitMembers = GroupDefinition.command("FocusAdmitMembers", {
+export const FocusAdmitMembers = GroupDefinition.makeCommand("FocusAdmitMembers", {
   args: {},
   messages: [Message.CompletedFocusAdmitMembers],
   handler: function* () {
@@ -96,7 +96,7 @@ export const FocusAdmitMembers = GroupDefinition.command("FocusAdmitMembers", {
 })
 
 /** End the admission `membershipId` to `groupId`. */
-export const RemoveMember = GroupDefinition.command("RemoveMember", {
+export const RemoveMember = GroupDefinition.makeCommand("RemoveMember", {
   args: { ...Stores.AsMember, groupId: GroupId.GroupId, membershipId: GroupMembership.GroupMembershipId },
   messages: written,
   handler: function* () {

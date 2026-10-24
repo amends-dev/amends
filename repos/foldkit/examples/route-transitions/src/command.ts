@@ -9,7 +9,7 @@ const CATALOG_LATENCY = Duration.millis(600)
 const PAINTING_LATENCY = Duration.millis(400)
 const SAVE_LATENCY = Duration.millis(300)
 
-export const NavigateInternal = ApplicationDefinition.command(
+export const NavigateInternal = ApplicationDefinition.makeCommand(
   'NavigateInternal',
   {
     args: { url: Schema.String },
@@ -21,7 +21,7 @@ export const NavigateInternal = ApplicationDefinition.command(
   },
 )
 
-export const LoadExternal = ApplicationDefinition.command('LoadExternal', {
+export const LoadExternal = ApplicationDefinition.makeCommand('LoadExternal', {
   args: { href: Schema.String },
   messages: [Message.CompletedLoadExternal],
   handler: function* () {
@@ -30,7 +30,7 @@ export const LoadExternal = ApplicationDefinition.command('LoadExternal', {
   },
 })
 
-export const LoadCatalog = ApplicationDefinition.command('LoadCatalog', {
+export const LoadCatalog = ApplicationDefinition.makeCommand('LoadCatalog', {
   messages: [Message.CompletedLoadCatalog],
   handler: function* () {
     return () =>
@@ -40,7 +40,7 @@ export const LoadCatalog = ApplicationDefinition.command('LoadCatalog', {
   },
 })
 
-export const LoadPainting = ApplicationDefinition.command('LoadPainting', {
+export const LoadPainting = ApplicationDefinition.makeCommand('LoadPainting', {
   args: { paintingId: Schema.Number },
   messages: [Message.CompletedLoadPainting],
   handler: function* () {
@@ -51,7 +51,7 @@ export const LoadPainting = ApplicationDefinition.command('LoadPainting', {
   },
 })
 
-export const SaveDraft = ApplicationDefinition.command('SaveDraft', {
+export const SaveDraft = ApplicationDefinition.makeCommand('SaveDraft', {
   args: { draft: Schema.String },
   messages: [Message.CompletedSaveDraft],
   handler: function* () {

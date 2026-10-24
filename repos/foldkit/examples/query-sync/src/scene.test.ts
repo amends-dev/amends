@@ -8,7 +8,7 @@ import { ApplicationRoute, Sorting } from './route'
 import { update } from './update'
 import { view } from './view'
 
-const browseModel: Model = {
+const browseModel: typeof Model.Type = {
   route: ApplicationRoute.Browse({
     search: Option.none(),
     sorting: Sorting.Unsorted(),

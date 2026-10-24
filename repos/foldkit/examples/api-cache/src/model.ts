@@ -26,14 +26,9 @@ export const PostsData = AsyncData.Schema(FetchedPosts, Schema.String)
 export const PostDetailData = AsyncData.Schema(FetchedPostDetail, Schema.String)
 export const StatsData = AsyncData.Schema(FetchedStats, Schema.String)
 
-export type PostsData = typeof PostsData.schema.Type
-export type PostDetailData = typeof PostDetailData.schema.Type
-export type StatsData = typeof StatsData.schema.Type
-
 export const Tab = Schema.Literals(['Posts', 'Stats'])
-export type Tab = typeof Tab.Type
 
-export const ApplicationTabsBlock = Tabs.create<Tab>()
+export const ApplicationTabsBlock = Tabs.create<typeof Tab.Type>()
 
 export const Model = Schema.Struct({
   tabs: ApplicationTabsBlock.Model,
@@ -43,5 +38,3 @@ export const Model = Schema.Struct({
   maybeSelectedPostId: Schema.Option(Schema.String),
   stats: StatsData.schema,
 })
-
-export type Model = typeof Model.Type

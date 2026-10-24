@@ -65,7 +65,7 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-describe('ApplicationComposition.assembleElement', () => {
+describe('Program.makeElement runtime', () => {
   it('shares provided services with Flags and Commands for one embedded lifetime', async () => {
     let databaseBuildCount = 0
     let databaseReleaseCount = 0

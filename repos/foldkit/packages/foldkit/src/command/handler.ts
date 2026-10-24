@@ -2,24 +2,14 @@ import { Context, Effect, Layer, type Scope } from 'effect'
 
 import type { DefinitionIdentity } from '../block/identity.js'
 import type { ValidateConstructionRequirements } from '../block/scope.js'
+import type { Handler } from './public.js'
 
-declare const HandlerTypeId: unique symbol
+export type { Handler } from './public.js'
 
-type Invariant<Value> = (value: Value) => Value
-type AnyHandler = Readonly<{ readonly [HandlerTypeId]: unknown }>
-
-/**
- * The service required by a Command whose implementation is supplied by a
- * Layer. Its name, decoded arguments, and declared result Message identify the
- * handler contract.
- */
-export interface Handler<Name extends string, Args, Message> {
-  readonly [HandlerTypeId]: Readonly<{
-    name: Invariant<Name>
-    args: Invariant<Args>
-    message: Invariant<Message>
-  }>
-}
+type ExtractHandler<Requirements> =
+  Requirements extends Handler<infer _Name, infer _Args, infer _Message>
+    ? Requirements
+    : never
 
 /**
  * Extracts the exact handler requirement carried by a Command definition.
@@ -30,7 +20,7 @@ export type HandlerOf<
   Definition extends (...args: any) => { effect: Effect.Effect<any, any, any> },
 > =
   ReturnType<Definition>['effect'] extends Effect.Effect<any, any, infer R>
-    ? Extract<R, AnyHandler>
+    ? ExtractHandler<R>
     : never
 
 type HandlerService<Args, Message> = Readonly<{

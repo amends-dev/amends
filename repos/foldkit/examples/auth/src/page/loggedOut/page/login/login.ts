@@ -13,7 +13,7 @@ import { type Session } from '../../../../domain/session'
 import { LoginComposition } from './composition'
 import { LoginDefinition, Message, type Model, OutMessage } from './definition'
 
-export const initModel = (): Model => ({
+export const initModel = (): typeof Model.Type => ({
   email: NotValidated({ value: '' }),
   password: NotValidated({ value: '' }),
   isSubmitting: false,
@@ -33,13 +33,13 @@ const passwordRules = makeRules({
 const validateEmail = validate(emailRules)
 const validatePassword = validate(passwordRules)
 
-export const isFormValid = (model: Model): boolean =>
+export const isFormValid = (model: typeof Model.Type): boolean =>
   allValid([
     [model.email, emailRules],
     [model.password, passwordRules],
   ])
 
-export const SimulateAuthRequest = LoginDefinition.command(
+export const SimulateAuthRequest = LoginDefinition.makeCommand(
   'SimulateAuthRequest',
   {
     args: { email: Schema.String, password: Schema.String },
@@ -65,7 +65,7 @@ export const SimulateAuthRequest = LoginDefinition.command(
             Option.getOrElse(() => email),
           )
 
-          const session: Session = { userId: '1', email, name }
+          const session: typeof Session.Type = { userId: '1', email, name }
 
           return Message.SucceededSimulateAuthRequest({ session })
         })

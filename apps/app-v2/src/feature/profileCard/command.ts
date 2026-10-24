@@ -10,7 +10,7 @@ const gap = 8
 const inset = 16
 
 /** Move focus to the trigger `triggerId`, which a card that closes gives it back to. */
-export const FocusTrigger = ProfileCardDefinition.command("FocusTrigger", {
+export const FocusTrigger = ProfileCardDefinition.makeCommand("FocusTrigger", {
   args: { triggerId: Schema.String },
   messages: [Message.CompletedFocusTrigger],
   handler: function* () {
@@ -37,7 +37,7 @@ export const moveIntoDialogOfTrigger = (element: Element, triggerId: string): vo
  * it there while the page scrolls and resizes, then move focus into it, until the card goes. A card whose trigger is in
  * a dialog is placed in the dialog.
  */
-export const AnchorProfileCard = ProfileCardDefinition.mount("AnchorProfileCard", {
+export const AnchorProfileCard = ProfileCardDefinition.makeMount("AnchorProfileCard", {
   args: { triggerId: Schema.String },
   messages: [Message.CompletedAnchorProfileCard],
   handler: function* () {

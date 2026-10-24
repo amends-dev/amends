@@ -7,6 +7,19 @@ import {
 import type { NamedIdentity, ViewIdentity } from './identity.js'
 import { invocationContext } from './scope.js'
 
+const viewsWithInputs = new WeakSet<object>()
+
+/** @internal Retains whether an authored view requires caller-supplied inputs. */
+export const registerViewInputs = (view: object, isRequired: boolean): void => {
+  if (isRequired) {
+    viewsWithInputs.add(view)
+  }
+}
+
+/** @internal Reports whether an authored view requires caller-supplied inputs. */
+export const requiresViewInputs = (view: object): boolean =>
+  viewsWithInputs.has(view)
+
 /** @internal Keeps a canonical view's declared graph available during rendering. */
 export const withViewIdentity = <
   View extends (...args: ReadonlyArray<any>) => any,

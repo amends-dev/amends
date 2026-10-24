@@ -1,5 +1,5 @@
 import { Array, Effect, Number, Schema } from 'effect'
-import { makeDefinition } from 'foldkit/application'
+import { Block } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
 
@@ -11,14 +11,12 @@ const HeavyItem = Schema.Struct({
   category: Schema.String,
   isActive: Schema.Boolean,
 })
-type HeavyItem = typeof HeavyItem.Type
 
 export const Model = Schema.Struct({
   tickCount: Schema.Number,
   lastReceivedPayloadSize: Schema.Number,
   largeArray: Schema.Array(HeavyItem),
 })
-export type Model = typeof Model.Type
 
 // MESSAGE
 
@@ -30,9 +28,11 @@ export const Message = defineMessageUnion({
   ClickedFillHistory: {},
   CompletedFillHistoryStep: { remaining: Schema.Number },
 })
-export type Message = typeof Message.Type
 
-export const ApplicationDefinition = makeDefinition({ Model, Message })
+export const ApplicationDefinition = Block.makeDefinition('Application', {
+  Model,
+  Message,
+})
 export const ApplicationComposition = ApplicationDefinition.makeComposition()
 
 // CONSTANTS
@@ -40,7 +40,7 @@ export const ApplicationComposition = ApplicationDefinition.makeComposition()
 const HEAVY_ITEM_COUNT = 10_000
 const HISTORY_FILL_COUNT = 500
 
-const makeHeavyArray = (count: number): ReadonlyArray<HeavyItem> =>
+const makeHeavyArray = (count: number): ReadonlyArray<typeof HeavyItem.Type> =>
   Array.makeBy(count, index => ({
     id: index,
     label: `Item ${index}`,
@@ -52,7 +52,7 @@ const heavyPayload = makeHeavyArray(HEAVY_ITEM_COUNT)
 
 // COMMAND
 
-const FillHistoryStep = ApplicationDefinition.command('FillHistoryStep', {
+const FillHistoryStep = ApplicationDefinition.makeCommand('FillHistoryStep', {
   args: { remaining: Schema.Number },
   messages: [Message.CompletedFillHistoryStep],
   handler: function* () {
@@ -232,3 +232,15 @@ export const view = ApplicationComposition.makeView((model, h) => {
     ),
   }
 })
+
+const prepare = () =>
+  ApplicationComposition.prepareBlock({
+    init,
+    update,
+    view,
+    EffectsLayer,
+  })
+export const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

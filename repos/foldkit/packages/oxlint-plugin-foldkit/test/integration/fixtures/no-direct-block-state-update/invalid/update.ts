@@ -52,9 +52,9 @@ const Settings = {
 }
 
 export const update = (model: Model, message: unknown) => {
-  const settingsUpdate = Update.combine(model, [
+  const settingsUpdate = Update.combineSteps(model, [
     stepModel => {
-      const foldSettingsUpdate = Update.combine([foldSettings(message)])(
+      const foldSettingsUpdate = Update.combineSteps([foldSettings(message)])(
         stepModel,
       )
 
@@ -76,7 +76,7 @@ export const update = (model: Model, message: unknown) => {
 }
 
 export const updateNamedStep = (model: Model, message: unknown) => {
-  const foldSettingsStep = Update.combine([foldSettings(message)])
+  const foldSettingsStep = Update.combineSteps([foldSettings(message)])
   const settingsUpdate = foldSettingsStep(model)
 
   return {
@@ -99,7 +99,7 @@ export const updateFoldChildStep = (model: Model) => {
 }
 
 export const updateCombineFoldChildStep = (model: Model) => {
-  const settingsUpdate = Update.combine(model, [
+  const settingsUpdate = Update.combineSteps(model, [
     foldSettingsStep,
     stepModel => ({ model: stepModel }),
   ])

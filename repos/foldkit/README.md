@@ -24,7 +24,7 @@ React, Vue, Svelte, and Solid solve rendering and leave the architecture to you.
 
 Foldkit uses [The Elm Architecture](https://guide.elm-lang.org/architecture/). Application state does not live in component instances or hook lifecycles. The Model is the single source of truth, and every transition stays visible in update. That discipline is a real commitment. Foldkit works best when the team wants one architecture across the application and is ready to build on Effect throughout. [Coming from React?](https://foldkit.dev/react/coming-from-react)
 
-Each feature declares the effects it needs and bundles their handlers in [Effect Layers](https://foldkit.dev/core/layers). Parent Bindings carry those handlers to the application root, where you provide the shared services they require. TypeScript checks that the completed application is ready before it can run. Tests can provide controlled services while running the same effect handlers.
+Each feature declares the effects it needs and bundles their handlers in [Effect Layers](https://foldkit.dev/core/layers). Parent Bindings carry those handlers to the application root, where you provide the shared services they require. TypeScript checks that the completed root Block is ready before it enters a Program. Tests can provide controlled services while running the same effect handlers.
 
 A [Block](https://foldkit.dev/core/block) packages its Model and Message contracts, update, public operations, lifecycle registrations, view, and handler recipes. Its parent creates one Binding to a Model location. Composition derives child Message delivery and collects the child’s lifecycle entries and handlers; the parent decides when the child exists, where it renders, and how to handle its OutMessages.
 
@@ -43,12 +43,12 @@ The [Get Started guide](https://foldkit.dev/get-started) covers the generated pr
 
 ## Counter
 
-This complete program defines the Model, Messages, update, init, and view in `application.ts`. `entry.ts` starts the Runtime separately, so tests can import the program without booting it.
+This complete program defines the Model, Messages, update, init, view, and `ApplicationBlock` in `application.ts`. `entry.ts` creates and starts the Program separately, so tests can import the Block without booting it.
 
 ```ts
 // src/application.ts
 import { Schema } from 'effect'
-import { makeApplicationDefinition } from 'foldkit'
+import { Block } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
 
@@ -65,7 +65,7 @@ export const Message = defineMessageUnion({
 
 export type Message = typeof Message.Type
 
-export const ApplicationComposition = makeApplicationDefinition({
+export const ApplicationComposition = Block.makeDefinition('Application', {
   Model,
   Message,
 }).makeComposition()
@@ -121,27 +121,37 @@ export const view = ApplicationComposition.makeView((model, h) => ({
 }))
 
 const buttonStyle = 'bg-black text-white hover:bg-gray-700 px-4 py-2 transition'
+
+const prepare = () =>
+  ApplicationComposition.prepareBlock({
+    init,
+    update,
+    view,
+  })
+export const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)
 ```
 
 ```ts
 // src/entry.ts
-import { Runtime } from 'foldkit'
+import { Program, Runtime } from 'foldkit'
 
-import { ApplicationComposition, init, update, view } from './application'
+import { ApplicationBlock } from './application'
 
-const application = ApplicationComposition.assembleApplication({
-  init,
-  update,
-  view,
+const program = Program.make({
+  block: ApplicationBlock,
   container: document.getElementById('root'),
 })
 
-Runtime.run(application)
+Runtime.run(program)
 ```
 
-The `makeComposition`, `makeInit`, `makeUpdate`, `makeView`, and
-`assembleApplication` calls return passive configuration or authored functions.
-`Runtime.run` starts the completed application.
+The `makeComposition`, `makeInit`, `makeUpdate`, `makeView`, `prepareBlock`,
+`Block.assemble`, and `Program.make` calls return passive configuration or
+authored functions. `Block.assemble` evaluates `prepare` once while constructing
+the passive Block. `Runtime.run` starts the completed program.
 
 Try [Counter in the browser](https://foldkit.dev/example-apps/counter), follow the [walkthrough](https://foldkit.dev/core/counter-example), or explore the [source](https://github.com/foldkit/foldkit/tree/main/examples/counter).
 

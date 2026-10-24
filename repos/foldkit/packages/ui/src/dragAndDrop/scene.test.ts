@@ -2,33 +2,32 @@ import { Option, Schema } from 'effect'
 import { Block } from 'foldkit'
 import type { Attribute, ChildAttribute } from 'foldkit/html'
 import * as Scene from 'foldkit/scene'
-import * as Update from 'foldkit/update'
 import { expectTypeOf } from 'vitest'
 
 import { describe, it } from '@effect/vitest'
 
-import { DragAndDropBlock, type Model, type RenderInfo } from './block.js'
+import { DragAndDropBlock, type RenderInfo } from './block.js'
 
 const DragAndDropSceneDefinition = Block.makeDefinition('DragAndDropScene', {
   Model: DragAndDropBlock.Model,
   Message: Schema.Never,
 })
 
-const foldDragAndDropOutMessage = DragAndDropBlock.OutMessage.match<
-  Update.Step<Model, never>
->({
-  Reordered: () => DragAndDropSceneDefinition.step(model => ({ model })),
-  Cancelled: () => DragAndDropSceneDefinition.step(model => ({ model })),
-})
+const foldDragAndDropOutMessage = DragAndDropSceneDefinition.makeOutMessageFold(
+  DragAndDropBlock,
+  {
+    Reordered: () => model => ({ model }),
+    Cancelled: () => model => ({ model }),
+  },
+)
 
-const DragAndDropBinding = DragAndDropSceneDefinition.bindChild(
+const DragAndDropBinding = DragAndDropSceneDefinition.makeBinding(
   DragAndDropBlock,
   {
     read: model => Option.some(model),
     write: (_model, nextDragAndDrop) => nextDragAndDrop,
-    outMessage: { fold: foldDragAndDropOutMessage },
   },
-)
+).withOutMessagePolicy({ fold: foldDragAndDropOutMessage })
 
 const DragAndDropSceneComposition = DragAndDropSceneDefinition.makeComposition({
   bindings: [DragAndDropBinding],

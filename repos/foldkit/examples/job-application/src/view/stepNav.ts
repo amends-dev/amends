@@ -14,7 +14,10 @@ import * as Icon from './icon'
 
 type StepStatus = 'Current' | 'Completed' | 'Upcoming'
 
-const stepToStatus = (step: Step.Step, currentStep: Step.Step): StepStatus =>
+const stepToStatus = (
+  step: typeof Step.Step.Type,
+  currentStep: typeof Step.Step.Type,
+): StepStatus =>
   Match.value(step).pipe(
     Match.withReturnType<StepStatus>(),
     Match.when(Equal.equals(currentStep), () => 'Current'),
@@ -86,9 +89,9 @@ const stepButtonClass = (status: StepStatus, needsAttention: boolean): string =>
   )
 
 export const stepTabButton = (
-  tab: TabInfo<Step.Step>,
-  currentStep: Step.Step,
-  stepsNeedingAttention: HashSet.HashSet<Step.Step>,
+  tab: TabInfo<typeof Step.Step.Type>,
+  currentStep: typeof Step.Step.Type,
+  stepsNeedingAttention: HashSet.HashSet<typeof Step.Step.Type>,
   h: ApplicationViewBuilder,
 ): Html => {
   const status = stepToStatus(tab.value, currentStep)
@@ -104,7 +107,10 @@ export const stepTabButton = (
   )
 }
 
-const stepMenuTrigger = (currentStep: Step.Step, h: ApplicationViewBuilder) =>
+const stepMenuTrigger = (
+  currentStep: typeof Step.Step.Type,
+  h: ApplicationViewBuilder,
+) =>
   h.div(
     [h.Class('flex items-center justify-between w-full gap-3')],
     [
@@ -128,8 +134,8 @@ const stepMenuTrigger = (currentStep: Step.Step, h: ApplicationViewBuilder) =>
   )
 
 export const stepMenu = (
-  model: Model,
-  stepsNeedingAttention: HashSet.HashSet<Step.Step>,
+  model: typeof Model.Type,
+  stepsNeedingAttention: HashSet.HashSet<typeof Step.Step.Type>,
   h: ApplicationViewBuilder,
 ): Html =>
   h.block(

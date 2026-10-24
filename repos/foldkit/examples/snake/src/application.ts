@@ -9,8 +9,7 @@ import {
   Stream,
   pipe,
 } from 'effect'
-import { Dom, makeApplicationDefinition } from 'foldkit'
-import type { Block } from 'foldkit'
+import { Block, Dom } from 'foldkit'
 import { Html } from 'foldkit/html'
 import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
@@ -24,7 +23,6 @@ export const GameState = Schema.Literals([
   'Paused',
   'GameOver',
 ])
-export type GameState = typeof GameState.Type
 
 export const Model = Schema.Struct({
   snake: Snake.Snake,
@@ -35,7 +33,6 @@ export const Model = Schema.Struct({
   points: Schema.Number,
   highScore: Schema.Number,
 })
-export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
   TickedClock: {},
@@ -45,9 +42,7 @@ export const Message = defineMessageUnion({
   CompletedGenerateApplePosition: { position: Position.Position },
 })
 
-export type Message = typeof Message.Type
-
-export const ApplicationDefinition = makeApplicationDefinition({
+export const ApplicationDefinition = Block.makeDefinition('Application', {
   Model,
   Message,
 })
@@ -89,7 +84,7 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
           'd',
           moveKey => {
             const nextDirection = Match.value(moveKey).pipe(
-              Match.withReturnType<Direction.Direction>(),
+              Match.withReturnType<typeof Direction.Direction.Type>(),
               Match.whenOr('ArrowUp', 'w', () => 'Up'),
               Match.whenOr('ArrowDown', 's', () => 'Down'),
               Match.whenOr('ArrowLeft', 'a', () => 'Left'),
@@ -110,7 +105,7 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
         ),
         Match.when(' ', () => {
           const nextGameState = Match.value(model.gameState).pipe(
-            Match.withReturnType<GameState>(),
+            Match.withReturnType<typeof GameState.Type>(),
             Match.when('NotStarted', () => 'Playing'),
             Match.when('Playing', () => 'Paused'),
             Match.when('Paused', () => 'Playing'),
@@ -196,7 +191,7 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
     }),
 
     RestartedGame: () => {
-      const startPosition: Position.Position = { x: 10, y: 10 }
+      const startPosition: typeof Position.Position.Type = { x: 10, y: 10 }
       const nextSnake = Snake.create(startPosition)
 
       return {
@@ -219,7 +214,7 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
   }),
 )
 
-export const GenerateApplePosition = ApplicationDefinition.command(
+export const GenerateApplePosition = ApplicationDefinition.makeCommand(
   'GenerateApplePosition',
   {
     args: { snake: Snake.Snake },
@@ -235,7 +230,7 @@ export const GenerateApplePosition = ApplicationDefinition.command(
   },
 )
 
-export const subscriptions = ApplicationDefinition.subscriptions(entry => ({
+export const subscriptions = ApplicationDefinition.makeSubscriptions(entry => ({
   gameClockTicks: entry(
     'GameClockTicks',
     {
@@ -283,7 +278,7 @@ export const EffectsLayer = Layer.mergeAll(
   subscriptions.layer,
 )
 
-const cellClass = (x: number, y: number, model: Model): string => {
+const cellClass = (x: number, y: number, model: typeof Model.Type): string => {
   const isSnakeHead = Position.equivalence(
     { x, y },
     Array.headNonEmpty(model.snake),
@@ -303,7 +298,7 @@ const cellClass = (x: number, y: number, model: Model): string => {
   )
 }
 
-const gridView = (model: Model, h: ApplicationViewBuilder): Html =>
+const gridView = (model: typeof Model.Type, h: ApplicationViewBuilder): Html =>
   h.div(
     [h.Class('inline-block border-2 border-gray-600')],
     Array.makeBy(GAME.GRID_SIZE, y =>
@@ -316,7 +311,7 @@ const gridView = (model: Model, h: ApplicationViewBuilder): Html =>
     ),
   )
 
-const gameStateView = (gameState: GameState): string =>
+const gameStateView = (gameState: typeof GameState.Type): string =>
   Match.value(gameState).pipe(
     Match.when('NotStarted', () => 'Press SPACE to start'),
     Match.when('Playing', () => 'Playing - SPACE to pause'),
@@ -358,3 +353,16 @@ export const view = ApplicationComposition.makeView((model, h) => ({
     ],
   ),
 }))
+
+const prepare = () =>
+  ApplicationComposition.prepareBlock({
+    init,
+    update,
+    view,
+    subscriptions,
+    EffectsLayer,
+  })
+export const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

@@ -1,16 +1,15 @@
 import { Html, inertHtml as ih } from 'foldkit/html'
 
-import {
-  type PreviewRelease,
-  installCommand,
-  scaffoldCommand,
-} from '../previewRelease'
+import { type PreviewRelease, scaffoldCommand } from '../previewRelease'
+import { previewMigrationRouter, previewUpgradeRouter } from '../route'
 
 const packageLink = ([name, version]: readonly [string, string]): Html =>
   ih.a(
     [
       ih.Href(`https://www.npmjs.com/package/${name}/v/${version}`),
-      ih.Class('font-mono underline hover:no-underline'),
+      ih.Class(
+        'inline-flex min-h-6 items-center font-mono underline hover:no-underline',
+      ),
     ],
     [`${name}@${version}`],
   )
@@ -25,7 +24,7 @@ const command = (value: string): Html =>
     [value],
   )
 
-export const view = (release: PreviewRelease): Html => {
+export const view = (release: typeof PreviewRelease.Type): Html => {
   const shortCommit = release.sourceCommit.slice(0, 7)
   const packageLinks = Object.entries(release.packages)
     .sort(([left], [right]) => left.localeCompare(right))
@@ -58,9 +57,28 @@ export const view = (release: PreviewRelease): Html => {
         [ih.Class('mt-1 flex max-h-12 flex-wrap gap-x-2 overflow-y-auto')],
         packageLinks,
       ),
-      ih.div(
-        [ih.Class('mt-2 grid gap-1 md:grid-cols-2')],
-        [command(scaffoldCommand(release)), command(installCommand(release))],
+      ih.div([ih.Class('mt-2')], [command(scaffoldCommand(release))]),
+      ih.p(
+        [ih.Class('mt-2')],
+        [
+          'Existing project? ',
+          ih.a(
+            [
+              ih.Href(previewMigrationRouter()),
+              ih.Class('underline hover:no-underline'),
+            ],
+            ['Migrate from stable'],
+          ),
+          ' · ',
+          ih.a(
+            [
+              ih.Href(previewUpgradeRouter()),
+              ih.Class('underline hover:no-underline'),
+            ],
+            ['Upgrade an earlier preview'],
+          ),
+          '. Update only the packages your project uses, keeping development dependencies in place.',
+        ],
       ),
     ],
   )

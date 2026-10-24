@@ -1,5 +1,5 @@
 import { Layer } from 'effect'
-import { Block, Message, makeApplicationDefinition } from 'foldkit'
+import { Block, Message } from 'foldkit'
 
 import {
   ChildBinding,
@@ -14,14 +14,12 @@ import {
   childViewHelper,
 } from './plain-view-helper.accepted.js'
 
-const AlternativeChildBinding = DeclarationViewHelperParentDefinition.bindChild(
-  ChildBlock,
-  {
+const AlternativeChildBinding =
+  DeclarationViewHelperParentDefinition.makeBinding(ChildBlock, {
     field: 'child',
     placement: 'alternativeChild',
     init: false,
-  },
-)
+  })
 const OmittedParentComposition =
   DeclarationViewHelperParentDefinition.makeComposition({
     bindings: [AlternativeChildBinding],
@@ -56,7 +54,7 @@ const helperWithForeignMessage = (h: OmittedParentViewBuilder) =>
 // @ts-expect-error Composition no longer carries a render helper.
 OmittedParentComposition.render
 
-DeclarationViewHelperChildComposition.assembleBlock({
+DeclarationViewHelperChildComposition.prepareBlock({
   init: DeclarationViewHelperChildComposition.makeInit(() => ({
     model: ChildModel.make({ value: 'initial' }),
   })),
@@ -75,11 +73,11 @@ DeclarationViewHelperChildComposition.makeView((model, _h) =>
   invalidOutputHelper(model),
 )
 
-const ApplicationDefinition = makeApplicationDefinition({
+const ApplicationDefinition = Block.makeDefinition('Application', {
   Model: ParentModel,
   Message: ParentMessage,
 })
-const AlternativeApplicationChildBinding = ApplicationDefinition.bindChild(
+const AlternativeApplicationChildBinding = ApplicationDefinition.makeBinding(
   ChildBlock,
   {
     field: 'child',
@@ -116,15 +114,14 @@ const applicationHelperWithOmittedMount = (h: OmittedApplicationViewBuilder) =>
 // @ts-expect-error Application Composition no longer carries a render helper.
 ApplicationComposition.render
 
-// @ts-expect-error A plain view helper cannot complete an Application as its branded view.
-ApplicationComposition.assembleElement({
-  container: null,
+ApplicationComposition.prepareBlock({
   init: ApplicationComposition.makeInit(() => ({
     model: ParentModel.make({
       child: ChildModel.make({ value: 'initial' }),
     }),
   })),
   update: ApplicationComposition.makeUpdate(model => ({ model })),
+  // @ts-expect-error A plain view helper cannot complete a Block as its branded view.
   view: applicationViewHelper,
 })
 

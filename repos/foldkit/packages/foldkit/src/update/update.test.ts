@@ -32,7 +32,7 @@ import {
   type ReturnWithOutMessage,
   type Step,
   type StepWithOutMessage,
-  combine,
+  combineSteps,
   defineStep,
   foldChild,
   foldChildAt,
@@ -86,21 +86,24 @@ const incrementAndEmitLoadNotes: Step<TestModel, TestMessage> = model => ({
   commands: [loadNotes],
 })
 
-describe('combine', () => {
+describe('combineSteps', () => {
   it('threads the model through the steps in order', () => {
-    const combinedUpdate = combine([incrementCount, doubleCount])({
+    const combinedUpdate = combineSteps([incrementCount, doubleCount])({
       count: 1,
     })
     expect(combinedUpdate.model).toEqual({ count: 4 })
 
-    const doubleThenIncrement = combine([doubleCount, incrementCount])({
+    const doubleThenIncrement = combineSteps([doubleCount, incrementCount])({
       count: 1,
     })
     expect(doubleThenIncrement.model).toEqual({ count: 3 })
   })
 
   it('concatenates the commands of every step in step order', () => {
-    const combinedCommands = combine([emitLoadNotes, emitLoadTagsAndFolders])({
+    const combinedCommands = combineSteps([
+      emitLoadNotes,
+      emitLoadTagsAndFolders,
+    ])({
       count: 0,
     })
     expect(combinedCommands.model).toEqual({ count: 0 })
@@ -143,7 +146,7 @@ describe('combine', () => {
       [RegistrationEvidenceTypeId]: childEvidence,
     })
 
-    const result = combine({ count: 0 }, [
+    const result = combineSteps({ count: 0 }, [
       localStep,
       registeredStep,
       defineStep((model: TestModel) => ({ model })),
@@ -157,7 +160,7 @@ describe('combine', () => {
     >().toEqualTypeOf<'Child'>()
     expect(result.commands).toEqual([firstCommand, secondCommand])
 
-    const rawTupleResult = combine({ count: 0 }, [
+    const rawTupleResult = combineSteps({ count: 0 }, [
       model => ({ model, commands: [firstCommand] }),
       registeredStep,
       model => ({ model }),
@@ -173,7 +176,7 @@ describe('combine', () => {
     const dynamicRegisteredSteps: ReadonlyArray<typeof registeredStep> = [
       registeredStep,
     ]
-    const dynamicResult = combine({ count: 0 }, dynamicRegisteredSteps)
+    const dynamicResult = combineSteps({ count: 0 }, dynamicRegisteredSteps)
 
     expectTypeOf<
       RequirementsOf<() => typeof dynamicResult>
@@ -183,7 +186,7 @@ describe('combine', () => {
     >().toEqualTypeOf<'Child'>()
     expect(dynamicResult.commands).toEqual([secondCommand])
 
-    const dynamicCombinedStep = combine(dynamicRegisteredSteps)
+    const dynamicCombinedStep = combineSteps(dynamicRegisteredSteps)
     const dynamicStepResult = dynamicCombinedStep({ count: 0 })
 
     expectTypeOf<
@@ -196,29 +199,31 @@ describe('combine', () => {
 
   it('returns the model unchanged with no commands for an empty step list', () => {
     const model: TestModel = { count: 5 }
-    const emptyCombination = combine<TestModel, TestMessage>([])(model)
+    const emptyCombination = combineSteps<TestModel, TestMessage>([])(model)
     expect(emptyCombination.model).toBe(model)
     expect(emptyCombination.commands ?? []).toEqual([])
   })
 
   it('preserves a single step and returns its computed Commands collection', () => {
     const model: TestModel = { count: 2 }
-    const doubledCount = combine([doubleCount])(model)
+    const doubledCount = combineSteps([doubleCount])(model)
     expect(doubledCount.model).toEqual({ count: 4 })
     expect(doubledCount.commands).toEqual([])
-    expect(combine([emitLoadNotes])(model)).toEqual(emitLoadNotes(model))
+    expect(combineSteps([emitLoadNotes])(model)).toEqual(emitLoadNotes(model))
   })
 
   it('lets steps with no commands contribute nothing to the batch', () => {
-    const mixedCommands = combine([incrementCount, emitLoadNotes, doubleCount])(
-      { count: 1 },
-    )
+    const mixedCommands = combineSteps([
+      incrementCount,
+      emitLoadNotes,
+      doubleCount,
+    ])({ count: 1 })
     expect(mixedCommands.model).toEqual({ count: 4 })
     expect(mixedCommands.commands ?? []).toEqual([loadNotes])
   })
 
   it('collects a step that both edits the model and emits a command, threading the edit forward', () => {
-    const multiCommandUpdate = combine([
+    const multiCommandUpdate = combineSteps([
       incrementAndEmitLoadNotes,
       emitLoadTagsAndFolders,
       doubleCount,
@@ -238,7 +243,7 @@ describe('combine', () => {
       doubleCount,
     ]
     const model: TestModel = { count: 1 }
-    expect(combine(model, steps)).toEqual(combine(steps)(model))
+    expect(combineSteps(model, steps)).toEqual(combineSteps(steps)(model))
   })
 })
 
@@ -857,8 +862,8 @@ describe('foldChild', () => {
     )
   })
 
-  it('composes data-last with combine as an ordinary Step', () => {
-    const reportThenBump = combine([
+  it('composes data-last with combineSteps as an ordinary Step', () => {
+    const reportThenBump = combineSteps([
       foldReportingCounter(Message.BumpedValue()),
       foldCounter(Message.BumpedValue()),
     ])
@@ -1346,8 +1351,8 @@ describe('foldChildAt', () => {
     ])
   })
 
-  it('composes data-last with combine', () => {
-    const combined = combine([
+  it('composes data-last with combineSteps', () => {
+    const combined = combineSteps([
       foldRow('a', Message.BumpedValue()),
       foldRow('b', Message.BumpedValue()),
     ])(rowsModel)
@@ -1508,12 +1513,12 @@ describe('foldChildStep', () => {
     expect(derivingCounterReset.outMessage).toEqual(ResetDashboard())
   })
 
-  it('is an ordinary Step that composes with combine', () => {
+  it('is an ordinary Step that composes with combineSteps', () => {
     expectTypeOf(foldCounterReset).toEqualTypeOf<
       Step<DashboardModel, GotCounterMessage>
     >()
 
-    const combinedReset = combine(dashboardModel, [
+    const combinedReset = combineSteps(dashboardModel, [
       foldCounter(Message.BumpedValue()),
       foldCounterReset,
     ])
@@ -1785,15 +1790,15 @@ describe('types', () => {
     expect(wrongMessageCommands.model).toBe(baseModel)
   })
 
-  it('prevents an OutMessage Step from flowing into combine', () => {
+  it('prevents an OutMessage Step from flowing into combineSteps', () => {
     const emitOutMessage: StepWithOutMessage<
       TestModel,
       TestMessage,
       TestOutMessage
     > = model => ({ model, outMessage: { _tag: 'ClosedEditor' } })
 
-    // @ts-expect-error combine would lose this OutMessage.
-    combine([emitOutMessage])
+    // @ts-expect-error combineSteps would lose this OutMessage.
+    combineSteps([emitOutMessage])
   })
 
   it('Step maps a Model to a Return over the same Model', () => {
@@ -1802,14 +1807,14 @@ describe('types', () => {
     >()
   })
 
-  it('combine infers Model and Message from the steps array', () => {
-    const combined = combine([incrementCount, emitLoadNotes])
+  it('combineSteps infers Model and Message from the steps array', () => {
+    const combined = combineSteps([incrementCount, emitLoadNotes])
     expectTypeOf(combined).toEqualTypeOf<Step<TestModel, TestMessage>>()
   })
 
-  it('combine data-first returns a Return of the steps Model and Message', () => {
+  it('combineSteps data-first returns a Return of the steps Model and Message', () => {
     expectTypeOf(
-      combine(baseModel, [incrementCount, emitLoadNotes]),
+      combineSteps(baseModel, [incrementCount, emitLoadNotes]),
     ).toEqualTypeOf<Return<TestModel, TestMessage>>()
   })
 

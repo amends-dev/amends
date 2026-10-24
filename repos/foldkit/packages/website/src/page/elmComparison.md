@@ -41,7 +41,7 @@ The Foldkit application authors 19 local Message variants:
 
 ::Snippet{name="comparisonFoldkitMessage" label="Foldkit Messages"}
 
-The component and effect boundaries differ. Foldkit has `SucceededExportPng` and `CompletedSaveCanvas` for Command completion. Its Composition also derives six child delivery cases for two Dialogs, one Listbox, and three RadioGroups, bringing `ApplicationComposition.Message` to 25 variants. Those generated envelopes route to the child Blocks before the local update callback runs; the application does not declare or match them itself.
+The component and effect boundaries differ. Foldkit has `SucceededExportPng` and `CompletedSaveCanvas` for Command completion. Its Composition also derives six child delivery cases for two Dialogs, one Listbox, and three RadioGroups, bringing `ApplicationBlock.Message` to 25 variants. Those generated envelopes route to the child Blocks before the local update callback runs; the application does not declare or match them itself.
 
 The Elm version hand-rolls those controls and represents their application-facing events with four direct Msgs: `ToggledThemePicker`, `SelectedPaletteTheme`, `DismissedErrorDialog`, and `DismissedGridSizeDialog`. Elm’s `Msg` is the complete input to its update. Foldkit separates authored local facts from the complete Message Codec derived by Composition.
 

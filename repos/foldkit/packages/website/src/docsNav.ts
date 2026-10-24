@@ -56,6 +56,9 @@ import {
   patternsInformingBlocksRouter,
   patternsSubscriptionOrganizationRouter,
   performanceRouter,
+  previewDocumentationEnabled,
+  previewMigrationRouter,
+  previewUpgradeRouter,
   projectOrganizationRouter,
   reactComparisonRouter,
   roadmapRouter,
@@ -136,7 +139,7 @@ export const isNavPageActive = (
 // DOCS SECTIONS
 
 export type DocsSection = Readonly<{
-  key: GroupKey
+  key: typeof GroupKey.Type
   label: string
   pageGroups: ReadonlyArray<ReadonlyArray<NavPage>>
 }>
@@ -163,6 +166,20 @@ export const docsSections: ReadonlyArray<DocsSection> = [
           href: roadmapRouter(),
           label: 'Roadmap',
         },
+        ...(previewDocumentationEnabled
+          ? [
+              {
+                _tag: 'PreviewMigration',
+                href: previewMigrationRouter(),
+                label: 'Migrate to the Preview',
+              },
+              {
+                _tag: 'PreviewUpgrade',
+                href: previewUpgradeRouter(),
+                label: 'Upgrade a Preview',
+              },
+            ]
+          : []),
       ],
     ],
   },
@@ -749,7 +766,7 @@ export const pageNeighbors = (_tag: string): PageNeighbors =>
 export const findActiveSectionKey = (
   routeTag: string,
   maybeExampleSlug: Option.Option<string>,
-): Option.Option<GroupKey> => {
+): Option.Option<typeof GroupKey.Type> => {
   // NOTE: ApiModule and Blog pages aren't in docsSections. Their groups are
   // rendered separately, so map them explicitly.
   if (routeTag === 'ApiModule') {
@@ -775,6 +792,6 @@ export const findActiveSectionKey = (
 }
 
 export const findActiveSectionKeyForRoute = (
-  route: ApplicationRoute,
-): Option.Option<GroupKey> =>
+  route: typeof ApplicationRoute.Type,
+): Option.Option<typeof GroupKey.Type> =>
   findActiveSectionKey(route._tag, maybeExampleSlugForRoute(route))

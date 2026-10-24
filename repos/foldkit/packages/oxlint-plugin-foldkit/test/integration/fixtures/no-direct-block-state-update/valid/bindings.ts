@@ -1,5 +1,5 @@
 import { Option, Schema } from 'effect'
-import { makeApplicationDefinition } from 'foldkit'
+import { Block } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
 import * as BoundSettings from './boundSettings'
@@ -9,8 +9,11 @@ type Model = typeof Model.Type
 const Message = defineMessageUnion({
   ClickedApplyTheme: {},
 })
-const ApplicationDefinition = makeApplicationDefinition({ Model, Message })
-const SettingsBinding = ApplicationDefinition.bindChild(
+const ApplicationDefinition = Block.makeDefinition('Application', {
+  Model,
+  Message,
+})
+const SettingsBinding = ApplicationDefinition.makeBinding(
   BoundSettings.BoundSettingsBlock,
   {
     read: (model: Model) => Option.some(model.settings),

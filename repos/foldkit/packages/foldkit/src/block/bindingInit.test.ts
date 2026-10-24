@@ -6,6 +6,7 @@ import { modifyFields } from '../struct/index.js'
 import { runtimeBindingOf } from './composition.js'
 import { makeDefinition } from './define.js'
 import type { InitialEvidenceOfBinding } from './initialization.js'
+import * as Block from './public.js'
 
 const ChildModel = Schema.Struct({ count: Schema.Number })
 type ChildModel = typeof ChildModel.Type
@@ -18,18 +19,23 @@ const ChildComposition = makeDefinition('BindingInitChild', {
   Model: ChildModel,
   Message: ChildMessage,
 }).makeComposition()
-const ChildBlock = ChildComposition.assembleBlock({
-  init: ChildComposition.makeInit((config: Readonly<{ count: number }>) => ({
-    model: ChildModel.make({ count: config.count }),
-  })),
-  update: ChildComposition.makeUpdate((model, message) =>
-    ChildMessage.match(message, {
-      UpdatedCount: ({ count }) => ({
-        model: modifyFields(model, { count: () => count }),
+const prepareChildBlock = () =>
+  ChildComposition.prepareBlock({
+    init: ChildComposition.makeInit((config: Readonly<{ count: number }>) => ({
+      model: ChildModel.make({ count: config.count }),
+    })),
+    update: ChildComposition.makeUpdate((model, message) =>
+      ChildMessage.match(message, {
+        UpdatedCount: ({ count }) => ({
+          model: modifyFields(model, { count: () => count }),
+        }),
       }),
-    }),
-  ),
-})
+    ),
+  })
+const ChildBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ChildModel,
+  typeof prepareChildBlock
+> = Block.assemble(prepareChildBlock)
 
 const ParentModel = Schema.Struct({
   first: ChildModel,
@@ -44,7 +50,7 @@ const Parent = makeDefinition('BindingInitParent', {
   Message: Schema.Never,
 })
 
-const AccessorBinding = Parent.bindChild(ChildBlock, {
+const AccessorBinding = Parent.makeBinding(ChildBlock, {
   placement: 'accessor',
   read: model => Option.some(model.first),
   write: (model, nextChild) => modifyFields(model, { first: () => nextChild }),
@@ -65,12 +71,12 @@ expectTypeOf<
   AccessorInitialEvidence['childInitContext']
 >().toEqualTypeOf<never>()
 
-Parent.bindChild(ChildBlock, {
+Parent.makeBinding(ChildBlock, {
   field: 'first',
   init: { contextToArgs: () => [{ count: 3 }] },
 })
 
-Parent.bindChild(ChildBlock, {
+Parent.makeBinding(ChildBlock, {
   field: 'maybeChild',
   init: {
     contextToArgs: (context: Readonly<{ count: number }>) =>
@@ -78,7 +84,7 @@ Parent.bindChild(ChildBlock, {
   },
 })
 
-Parent.bindChild(ChildBlock, {
+Parent.makeBinding(ChildBlock, {
   // @ts-expect-error The invalid projection makes this accessor config ineligible.
   read: model => Option.some(model.first),
   // @ts-expect-error The invalid projection makes this accessor config ineligible.
@@ -90,7 +96,7 @@ Parent.bindChild(ChildBlock, {
   },
 })
 
-Parent.bindChild(ChildBlock, {
+Parent.makeBinding(ChildBlock, {
   // @ts-expect-error The invalid projection makes this accessor config ineligible.
   read: model => Option.some(model.first),
   // @ts-expect-error The invalid projection makes this accessor config ineligible.
@@ -102,7 +108,7 @@ Parent.bindChild(ChildBlock, {
   },
 })
 
-Parent.bindChild(ChildBlock, {
+Parent.makeBinding(ChildBlock, {
   // @ts-expect-error The invalid projection makes this accessor config ineligible.
   read: model => Option.some(model.first),
   // @ts-expect-error The invalid projection makes this accessor config ineligible.
@@ -114,7 +120,7 @@ Parent.bindChild(ChildBlock, {
   },
 })
 
-Parent.bindChild(ChildBlock, {
+Parent.makeBinding(ChildBlock, {
   // @ts-expect-error The invalid projection makes this accessor config ineligible.
   read: model => Option.some(model.first),
   // @ts-expect-error The invalid projection makes this accessor config ineligible.
@@ -129,7 +135,7 @@ Parent.bindChild(ChildBlock, {
   },
 })
 
-Parent.bindChild(ChildBlock, {
+Parent.makeBinding(ChildBlock, {
   // @ts-expect-error The invalid projection makes this accessor config ineligible.
   read: model => Option.some(model.first),
   // @ts-expect-error The invalid projection makes this accessor config ineligible.
@@ -147,7 +153,7 @@ Parent.bindChild(ChildBlock, {
 const runtimeAccessorBinding = (
   toParentFields: (childModel: ChildModel) => unknown,
 ) =>
-  Reflect.apply(Parent.bindChild, undefined, [
+  Reflect.apply(Parent.makeBinding, undefined, [
     ChildBlock,
     {
       placement: 'runtimeAccessor',
@@ -224,7 +230,7 @@ it('rejects invalid accessor child init projections at runtime', () => {
 
 it('rejects the removed initial configuration field at runtime', () => {
   expect(() =>
-    Reflect.apply(Parent.bindChild, undefined, [
+    Reflect.apply(Parent.makeBinding, undefined, [
       ChildBlock,
       {
         field: 'first',

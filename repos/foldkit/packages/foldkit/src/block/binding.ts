@@ -20,10 +20,12 @@ import {
   makeResultRecipe,
   resolveOperationOutput,
 } from '../update/operationRecipe.js'
+import type { CompletionProof } from './assemblyState.js'
 import {
   assertInitializedParentModel,
   registerBinding,
   runtimeBindingOf,
+  runtimeBindingsOf,
 } from './composition.js'
 import { type DefaultViewTypeId, defaultViewOf } from './defaultView.js'
 import type { DeferredBindingPolicy } from './deferredPolicy.js'
@@ -257,7 +259,12 @@ export type InspectionOfBinding<BindingValue> =
     ? Inspection
     : never
 
-type ReservedBindingMember = 'placement' | 'init' | 'fold' | 'embedView'
+type ReservedBindingMember =
+  | 'placement'
+  | 'init'
+  | 'fold'
+  | 'embedView'
+  | 'withOutMessagePolicy'
 
 /** @internal Rejects exposed operation names that overwrite Binding members. */
 export type ValidateBindingOperationNames<Operations> = [
@@ -276,6 +283,7 @@ const reservedBindingMembers = new Set<string>([
   'init',
   'fold',
   'embedView',
+  'withOutMessagePolicy',
 ])
 
 type RuntimeBindingInitConfig = Readonly<{
@@ -325,32 +333,33 @@ export const assertValidBindingOperationNames = (
 }
 
 /**
- * Structural portion of a complete Block accepted by `Definition.bindChild`.
+ * Structural portion of a complete Block accepted by `Definition.makeBinding`.
  * It preserves every channel collected by parents without introducing a
  * recursive complete Block constraint.
  */
-export type BindableBlock = Readonly<{
-  owner: Owner<any>
-  Model: Readonly<{ Type: any }>
-  Message: Readonly<{ Type: any }>
-  OutMessage?: Readonly<{ Type: any }>
-  mounts: ReadonlyArray<LayeredMountDefinition>
-  [LocalMountsTypeId]: ReadonlyArray<LayeredMountDefinition>
-  bindings: ReadonlyArray<AnyBinding>
-  init: AnyFunction
-  update: AnyFunction
-  operations: Readonly<Record<string, AnyFunction>>
-  subscriptions: Subscription.Subscriptions<any, any, any>
-  managedResources: Readonly<
-    Record<
-      string,
-      ManagedResource.Entry<any, any, any, any, any, any, any, any>
+export type BindableBlock = CompletionProof &
+  Readonly<{
+    owner: Owner<any>
+    Model: Readonly<{ Type: any }>
+    Message: Readonly<{ Type: any }>
+    OutMessage?: Readonly<{ Type: any }>
+    mounts: ReadonlyArray<LayeredMountDefinition>
+    [LocalMountsTypeId]: ReadonlyArray<LayeredMountDefinition>
+    bindings: ReadonlyArray<AnyBinding>
+    init: AnyFunction
+    update: AnyFunction
+    operations: Readonly<Record<string, AnyFunction>>
+    subscriptions: Subscription.Subscriptions<any, any, any>
+    managedResources: Readonly<
+      Record<
+        string,
+        ManagedResource.Entry<any, any, any, any, any, any, any, any>
+      >
     >
-  >
-  EffectsLayer: Layer.Any
-  __blockHandlerRequirements?: unknown
-  hostHandlers: ReadonlyArray<unknown>
-}>
+    EffectsLayer: Layer.Any
+    __blockHandlerRequirements?: unknown
+    hostHandlers: ReadonlyArray<unknown>
+  }>
 
 type DefinitionLocalMounts<BlockValue> =
   BlockValue extends Readonly<{ [LocalMountsTypeId]: infer Mounts }>
@@ -1369,7 +1378,7 @@ export const blockOf = (binding: AnyBinding): BindableBlock => {
   const block = runtimeBindingOf(binding).block
   if (block === undefined) {
     throw new Error(
-      '[foldkit] Block Binding metadata is unavailable. Create Bindings through the parent Definition.bindChild method.',
+      '[foldkit] Block Binding metadata is unavailable. Create Bindings through the parent Definition.makeBinding method.',
     )
   }
 
@@ -1584,7 +1593,9 @@ const bindRuntime = <
   )
   const update = (model: any, ...args: ReadonlyArray<any>) =>
     scopeReturn(
-      withOperationGraph(block.bindings, () => block.update(model, ...args)),
+      withOperationGraph(runtimeBindingsOf(block), () =>
+        block.update(model, ...args),
+      ),
       placement,
       block.owner,
       frame,
@@ -1595,7 +1606,9 @@ const bindRuntime = <
     operation =>
       (model: any, ...args: ReadonlyArray<any>) =>
         scopeReturn(
-          withOperationGraph(block.bindings, () => operation(model, ...args)),
+          withOperationGraph(runtimeBindingsOf(block), () =>
+            operation(model, ...args),
+          ),
           placement,
           block.owner,
           frame,
@@ -1663,7 +1676,7 @@ const bindRuntime = <
         identity: {
           owner: block.owner,
           mounts: block[LocalMountsTypeId],
-          bindings: block.bindings,
+          bindings: runtimeBindingsOf(block),
         },
       },
       toParentMessage: config.toParentMessage,
@@ -1692,7 +1705,7 @@ const bindRuntime = <
   const initialize = (...args: ReadonlyArray<any>) => {
     assertRegisteredInitialization(binding, placement)
     const childInit = scopeReturn(
-      withOperationGraph(block.bindings, () => block.init(...args)),
+      withOperationGraph(runtimeBindingsOf(block), () => block.init(...args)),
       placement,
       block.owner,
       { ...frame, isInitialization: true },
@@ -1712,7 +1725,7 @@ const bindRuntime = <
       const args = [...initial.args]
       const commands = [...(initial.commands ?? [])]
 
-      return makeBindingInitRecipe(() => {
+      return makeBindingInitRecipe(binding, () => {
         const childInit = initialize(...args)
         const model = toParentModel(childInit.model)
         assertInitializedParentModel(binding, placement, model)

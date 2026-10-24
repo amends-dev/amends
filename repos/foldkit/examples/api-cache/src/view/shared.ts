@@ -28,7 +28,7 @@ export const loadingPanel = (text: string, h: ApplicationViewBuilder) =>
 
 type ErrorPanelInput = Readonly<{
   error: string
-  retryMessage: Message
+  retryMessage: typeof Message.Type
 }>
 
 export const errorPanel = (

@@ -27,5 +27,3 @@ export const Message = defineMessageUnion({
   ClickedTogglePlay: {},
   ClickedReset: {},
 })
-
-export type Message = typeof Message.Type

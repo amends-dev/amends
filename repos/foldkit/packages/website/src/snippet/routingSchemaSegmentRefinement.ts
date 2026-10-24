@@ -10,7 +10,6 @@ const UUID_PATTERN =
 const ProductId = Schema.String.check(Schema.isPattern(UUID_PATTERN)).pipe(
   Schema.brand('ProductId'),
 )
-type ProductId = typeof ProductId.Type
 
 const ApplicationRoute = defineRouteUnion({
   Product: { productId: ProductId },

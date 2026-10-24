@@ -1,7 +1,6 @@
 import {
   Block,
   Block as AliasedBlock,
-  makeApplicationDefinition,
 } from 'foldkit'
 import * as Foldkit from 'foldkit'
 import {
@@ -31,8 +30,8 @@ const WrongIdentityFirst = Block.makeNamespace(
 const WrongIdentityComposition = Block.makeNamespace('IdentityComposition')
   .makeDefinition({ Model, Message })
   .makeComposition({})
-const WrongApplication = makeApplicationDefinition({ Model, Message })
-const WrongRegisteredApplication = makeApplicationDefinition({
+const WrongApplication = Block.makeDefinition('Application', { Model, Message })
+const WrongRegisteredApplication = Block.makeDefinition('Application', {
   Model,
   Message,
 }).makeComposition({})

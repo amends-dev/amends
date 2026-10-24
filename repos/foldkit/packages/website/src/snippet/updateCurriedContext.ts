@@ -10,10 +10,12 @@ const Model = Schema.Struct({
 })
 const Message = defineMessageUnion({ RequestedRefresh: {} })
 type DispatchContext = Readonly<{ requestId: string }>
-const ContextualRefreshComposition = Block.makeDefinition('ContextualRefresh', {
+const ContextualRefreshDefinition = Block.makeDefinition('ContextualRefresh', {
   Model,
   Message,
-}).makeComposition()
+})
+const ContextualRefreshComposition =
+  ContextualRefreshDefinition.makeComposition()
 const update = ContextualRefreshComposition.makeUpdate(
   (model, _message, { requestId }: DispatchContext) => ({
     model: modifyFields(model, { lastRequestId: () => requestId }),
@@ -23,14 +25,9 @@ const update = ContextualRefreshComposition.makeUpdate(
 const refresh = (model: typeof Model.Type) =>
   update(Message.RequestedRefresh())(model, { requestId: 'current' })
 
-const countRefresh: Update.Step<
-  typeof Model.Type,
-  typeof Message.Type
-> = model => ({
-  model: modifyFields(model, {
-    refreshCount: count => count + 1,
-  }),
-})
+const countRefresh = ContextualRefreshDefinition.makeFieldsStep(() => ({
+  refreshCount: count => count + 1,
+}))
 
 export const requestRefresh = (model: typeof Model.Type) =>
-  Update.combine(model, [refresh, countRefresh])
+  Update.combineSteps(model, [refresh, countRefresh])

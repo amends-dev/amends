@@ -140,23 +140,24 @@ export type EmittedBindingPolicyAssertions = [
 ]
 
 const impossibleOutMessagePolicy = {
-  fold: (_outMessage: never) => DirectParent.step(model => ({ model })),
+  fold: (_outMessage: never) => DirectParent.makeStep(model => ({ model })),
 }
 // @ts-expect-error A direct policy must accept every child OutMessage.
 // oxfmt-ignore
-DirectParent.bindChild(DirectChildBlock, { field: 'child',  outMessage: impossibleOutMessagePolicy })
+DirectParent.makeBinding(DirectChildBlock, { field: 'child', }).withOutMessagePolicy(impossibleOutMessagePolicy)
 
 const narrowKeyPolicy = {
   fold: (_key: 'Primary', _outMessage: typeof Choice.OutMessage.Type) =>
-    DeclarationWrappedKeyedFieldParentDefinition.step(model => ({ model })),
+    DeclarationWrappedKeyedFieldParentDefinition.makeStep(model => ({ model })),
 }
+const NarrowKeyPolicyBinding =
+  DeclarationWrappedKeyedFieldParentDefinition.makeBinding(Choice.block, {
+    field: 'literalChoices',
+    key: 'kind',
+    childField: 'choice',
+  })
 // @ts-expect-error A keyed shorthand policy must accept every collection key.
-DeclarationWrappedKeyedFieldParentDefinition.bindChild(Choice.block, {
-  field: 'literalChoices',
-  key: 'kind',
-  childField: 'choice',
-  outMessage: narrowKeyPolicy,
-})
+NarrowKeyPolicyBinding.withOutMessagePolicy(narrowKeyPolicy)
 
 type UnionWithEmptyCommands =
   | Readonly<{ model: ParentModel }>

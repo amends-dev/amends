@@ -15,15 +15,13 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { makeNamespace } from '../block/define.js'
+import * as Block from '../block/public.js'
 import { createKeyedLazy } from '../html/index.js'
 import { requireDispatch } from '../html/runtimeSingleton.js'
 import { defineMessageUnion } from '../message/index.js'
 import { modifyFields } from '../struct/index.js'
-import {
-  type ViewBuilderFor,
-  makeDefinition as makeApplicationDefinition,
-} from './applicationPublic.js'
 import * as ModelPreservationBridge from './modelPreservationBridge.js'
+import * as Program from './programPublic.js'
 import { embed } from './start.js'
 
 type Controls = Readonly<{
@@ -60,8 +58,8 @@ const ItemMessage = defineMessageUnion({
   FailedAcquireValue: {},
   EmittedPulse: { value: Schema.String },
 })
-const Value = ItemNamespace.resource<string>()('Value')
-const ReadValue = ItemNamespace.command('ReadValue', {
+const Value = ItemNamespace.makeResource<string>()('Value')
+const ReadValue = ItemNamespace.makeCommand('ReadValue', {
   messages: [ItemMessage.CompletedReadValue, ItemMessage.FailedReadValue],
   handler: function* () {
     const controls = yield* TestControls
@@ -75,7 +73,7 @@ const ReadValue = ItemNamespace.command('ReadValue', {
       )
   },
 })
-const ObserveValue = ItemNamespace.mountStream('ObserveValue', {
+const ObserveValue = ItemNamespace.makeMountStream('ObserveValue', {
   messages: [ItemMessage.EmittedPulse],
   handler: function* () {
     const controls = yield* TestControls
@@ -102,7 +100,7 @@ const ItemBaseDefinition = ItemNamespace.makeDefinition({
   Message: ItemMessage,
 })
 const item = ItemBaseDefinition.makeComposition({ mounts: [ObserveValue] })
-const subscriptions = ItemBaseDefinition.subscriptions(entry => ({
+const subscriptions = ItemBaseDefinition.makeSubscriptions(entry => ({
   activePulse: entry(
     'ActivePulse',
     { source: Schema.String },
@@ -128,7 +126,7 @@ const subscriptions = ItemBaseDefinition.subscriptions(entry => ({
     },
   ),
 }))
-const managedResources = ItemBaseDefinition.managedResources(entry => ({
+const managedResources = ItemBaseDefinition.makeManagedResources(entry => ({
   value: entry(
     'Value',
     Schema.Option(Schema.Struct({ source: Schema.String })),
@@ -204,7 +202,11 @@ const itemImplementation = {
   managedResources,
   EffectsLayer: ItemEffectsLayer,
 }
-const itemBlock = item.assembleBlock(itemImplementation)
+const prepareItemBlock = () => item.prepareBlock(itemImplementation)
+const itemBlock: Block.FromAssemblyWithView<
+  typeof ItemModel,
+  typeof prepareItemBlock
+> = Block.assemble(prepareItemBlock)
 
 const RootModel = Schema.Struct({ entries: Schema.Array(ItemModel) })
 const RootMessage = defineMessageUnion({
@@ -212,11 +214,11 @@ const RootMessage = defineMessageUnion({
   ClickedAddReplacement: {},
   ClickedRestoreFirst: {},
 })
-const RootBaseDefinition = makeApplicationDefinition({
+const RootBaseDefinition = Block.makeDefinition('Application', {
   Model: RootModel,
   Message: RootMessage,
 })
-const EntriesBinding = RootBaseDefinition.bindChild(itemBlock, {
+const EntriesBinding = RootBaseDefinition.makeBinding(itemBlock, {
   field: 'entries',
   key: 'id',
 })
@@ -256,7 +258,7 @@ const lazyEntries = createKeyedLazy()
 const entryRenderCounts = new Map<number, number>()
 const renderEntry = (
   entry: typeof ItemModel.Type,
-  h: ViewBuilderFor<typeof root>,
+  h: Block.ViewBuilderFor<typeof root>,
 ) => {
   entryRenderCounts.set(entry.id, (entryRenderCounts.get(entry.id) ?? 0) + 1)
   return h.block(
@@ -336,12 +338,21 @@ describe('keyed Block occurrences', () => {
     const container = document.createElement('div')
     container.id = 'memoized-keyed-composition'
     document.body.append(container)
-    const element = root.assembleElement({
+
+    const prepare = () =>
+      root.prepareBlock({
+        init: rootInit,
+        update: rootUpdate,
+        view: rootView,
+        EffectsLayer: Layer.empty,
+      })
+    const completedBlock: Block.FromAssemblyWithView<
+      typeof RootModel,
+      typeof prepare
+    > = Block.assemble(prepare)
+    const element = Program.makeElement({
+      block: completedBlock,
       container,
-      init: rootInit,
-      update: rootUpdate,
-      view: rootView,
-      EffectsLayer: Layer.empty,
     })
     const provideControls = element.provide
     const application = provideControls(Layer.succeed(TestControls, controls))
@@ -433,15 +444,22 @@ describe('keyed Block occurrences', () => {
     const container = document.createElement('div')
     container.id = 'keyed-composition'
     document.body.append(container)
-    const application = root
-      .assembleElement({
-        container,
+
+    const prepare = () =>
+      root.prepareBlock({
         init: rootInit,
         update: rootUpdate,
         view: rootView,
         EffectsLayer: Layer.empty,
       })
-      .provide(Layer.succeed(TestControls, controls))
+    const completedBlock: Block.FromAssemblyWithView<
+      typeof RootModel,
+      typeof prepare
+    > = Block.assemble(prepare)
+    const application = Program.makeElement({
+      block: completedBlock,
+      container,
+    }).provide(Layer.succeed(TestControls, controls))
     const handle = embed(application)
 
     try {
@@ -536,15 +554,22 @@ describe('keyed Block occurrences', () => {
     const container = document.createElement('div')
     container.id = 'keyed-mount-barrier'
     document.body.append(container)
-    const application = root
-      .assembleElement({
-        container,
+
+    const prepare = () =>
+      root.prepareBlock({
         init: rootInit,
         update: rootUpdate,
         view: rootView,
         EffectsLayer: Layer.empty,
       })
-      .provide(Layer.succeed(TestControls, controls))
+    const completedBlock: Block.FromAssemblyWithView<
+      typeof RootModel,
+      typeof prepare
+    > = Block.assemble(prepare)
+    const application = Program.makeElement({
+      block: completedBlock,
+      container,
+    }).provide(Layer.succeed(TestControls, controls))
     const handle = embed(application)
 
     try {

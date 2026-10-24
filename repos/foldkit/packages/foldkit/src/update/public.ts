@@ -1,5 +1,5 @@
 export {
-  combine,
+  combineSteps,
   foldChild,
   foldChildInit,
   foldChildInits,

@@ -9,7 +9,7 @@ import {
 import { Message } from './message'
 import { type Upload, type UploadStatus } from './model'
 
-const badgeClass = (status: UploadStatus): string =>
+const badgeClass = (status: typeof UploadStatus.Type): string =>
   Match.value(status).pipe(
     Match.when('Uploading', () => 'bg-blue-100 text-blue-700'),
     Match.when('Done', () => 'bg-green-100 text-green-700'),
@@ -20,7 +20,10 @@ const badgeClass = (status: UploadStatus): string =>
 const ACTION_BUTTON_CLASS =
   'px-3 py-1 text-sm font-medium rounded-md border transition'
 
-const uploadActionView = (upload: Upload, h: ApplicationViewBuilder): Html =>
+const uploadActionView = (
+  upload: typeof Upload.Type,
+  h: ApplicationViewBuilder,
+): Html =>
   Match.value(upload.status).pipe(
     Match.when('Uploading', () =>
       h.keyed('button')(
@@ -58,7 +61,10 @@ const uploadActionView = (upload: Upload, h: ApplicationViewBuilder): Html =>
     Match.exhaustive,
   )
 
-const uploadView = (upload: Upload, h: ApplicationViewBuilder): Html =>
+const uploadView = (
+  upload: typeof Upload.Type,
+  h: ApplicationViewBuilder,
+): Html =>
   h.keyed('li')(
     String(upload.id),
     [h.Class('p-4 bg-white rounded-lg shadow flex flex-col gap-2')],

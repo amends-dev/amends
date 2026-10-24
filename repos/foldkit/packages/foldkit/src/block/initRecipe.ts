@@ -1,6 +1,7 @@
 import { Predicate } from 'effect'
 
 import type * as Update from '../update/index.js'
+import { isRegisteredBinding } from './operationGraph.js'
 
 declare const BindingInitRecipeTypeId: unique symbol
 
@@ -44,7 +45,10 @@ export interface AnyBindingInitRecipe {
   ]
 }
 
-const executors = new WeakMap<object, () => unknown>()
+const entries = new WeakMap<
+  object,
+  Readonly<{ binding: object; execute: () => unknown }>
+>()
 
 /** @internal Recovers the update return produced by an initialization recipe. */
 export type BindingInitRecipeReturn<Recipe> =
@@ -62,10 +66,11 @@ export type BindingInitRecipeReturn<Recipe> =
 
 /** @internal Constructs a passive child initialization recipe. */
 export const makeBindingInitRecipe = (
+  binding: object,
   execute: () => unknown,
 ): AnyBindingInitRecipe => {
   const recipe: object = Object.freeze(Object.create(null))
-  executors.set(recipe, execute)
+  entries.set(recipe, { binding, execute })
   /* eslint-disable-next-line @typescript-eslint/consistent-type-assertions */
   return recipe as AnyBindingInitRecipe
 }
@@ -74,13 +79,21 @@ export const makeBindingInitRecipe = (
 export const isBindingInitRecipe = (
   value: unknown,
 ): value is AnyBindingInitRecipe =>
-  Predicate.isObject(value) && executors.has(value)
+  Predicate.isObject(value) && entries.has(value)
+
+/** @internal Checks whether an initialization recipe owns an active Binding. */
+export const isRegisteredBindingInitRecipe = (
+  recipe: AnyBindingInitRecipe,
+): boolean => {
+  const entry = entries.get(recipe)
+  return entry !== undefined && isRegisteredBinding(entry.binding)
+}
 
 /** @internal Executes a child initialization recipe in the active graph. */
 export const runBindingInitRecipe = (recipe: AnyBindingInitRecipe): unknown => {
-  const execute = executors.get(recipe)
-  if (execute === undefined) {
+  const entry = entries.get(recipe)
+  if (entry === undefined) {
     throw new Error('[foldkit] Child initialization recipe is unavailable.')
   }
-  return execute()
+  return entry.execute()
 }

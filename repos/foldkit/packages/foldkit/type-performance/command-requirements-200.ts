@@ -1,8 +1,8 @@
 import { Context, Effect, Layer, Option, Schema } from 'effect'
-import { makeApplicationDefinition } from 'foldkit'
-import type { Element as ElementProgram } from 'foldkit/application'
+import { Program } from 'foldkit'
 import * as Block from 'foldkit/block'
 import { defineMessageUnion } from 'foldkit/message'
+import type { Element as ElementProgram } from 'foldkit/program'
 import type * as Update from 'foldkit/update'
 
 const WarmupModel = Schema.Struct({ value: Schema.Number })
@@ -12,7 +12,10 @@ const WarmupMessage = defineMessageUnion({ CompletedWarmup: {} })
 Effect.void
 Layer.empty
 Option.none()
-makeApplicationDefinition({ Model: WarmupModel, Message: WarmupMessage })
+Block.makeDefinition('Application', {
+  Model: WarmupModel,
+  Message: WarmupMessage,
+})
 Context.Service
 Block.makeDefinition('TypePerformanceWarmup', {
   Model: WarmupModel,
@@ -45,7 +48,7 @@ const TypePerformanceWorkerDefinition = Block.makeDefinition(
   },
 )
 
-const Run001 = TypePerformanceWorkerDefinition.command('Run001', {
+const Run001 = TypePerformanceWorkerDefinition.makeCommand('Run001', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -54,7 +57,7 @@ const Run001 = TypePerformanceWorkerDefinition.command('Run001', {
   },
 })
 
-const Run002 = TypePerformanceWorkerDefinition.command('Run002', {
+const Run002 = TypePerformanceWorkerDefinition.makeCommand('Run002', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -63,7 +66,7 @@ const Run002 = TypePerformanceWorkerDefinition.command('Run002', {
   },
 })
 
-const Run003 = TypePerformanceWorkerDefinition.command('Run003', {
+const Run003 = TypePerformanceWorkerDefinition.makeCommand('Run003', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -72,7 +75,7 @@ const Run003 = TypePerformanceWorkerDefinition.command('Run003', {
   },
 })
 
-const Run004 = TypePerformanceWorkerDefinition.command('Run004', {
+const Run004 = TypePerformanceWorkerDefinition.makeCommand('Run004', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -81,7 +84,7 @@ const Run004 = TypePerformanceWorkerDefinition.command('Run004', {
   },
 })
 
-const Run005 = TypePerformanceWorkerDefinition.command('Run005', {
+const Run005 = TypePerformanceWorkerDefinition.makeCommand('Run005', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -90,7 +93,7 @@ const Run005 = TypePerformanceWorkerDefinition.command('Run005', {
   },
 })
 
-const Run006 = TypePerformanceWorkerDefinition.command('Run006', {
+const Run006 = TypePerformanceWorkerDefinition.makeCommand('Run006', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -99,7 +102,7 @@ const Run006 = TypePerformanceWorkerDefinition.command('Run006', {
   },
 })
 
-const Run007 = TypePerformanceWorkerDefinition.command('Run007', {
+const Run007 = TypePerformanceWorkerDefinition.makeCommand('Run007', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -108,7 +111,7 @@ const Run007 = TypePerformanceWorkerDefinition.command('Run007', {
   },
 })
 
-const Run008 = TypePerformanceWorkerDefinition.command('Run008', {
+const Run008 = TypePerformanceWorkerDefinition.makeCommand('Run008', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -117,7 +120,7 @@ const Run008 = TypePerformanceWorkerDefinition.command('Run008', {
   },
 })
 
-const Run009 = TypePerformanceWorkerDefinition.command('Run009', {
+const Run009 = TypePerformanceWorkerDefinition.makeCommand('Run009', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -126,7 +129,7 @@ const Run009 = TypePerformanceWorkerDefinition.command('Run009', {
   },
 })
 
-const Run010 = TypePerformanceWorkerDefinition.command('Run010', {
+const Run010 = TypePerformanceWorkerDefinition.makeCommand('Run010', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -135,7 +138,7 @@ const Run010 = TypePerformanceWorkerDefinition.command('Run010', {
   },
 })
 
-const Run011 = TypePerformanceWorkerDefinition.command('Run011', {
+const Run011 = TypePerformanceWorkerDefinition.makeCommand('Run011', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -144,7 +147,7 @@ const Run011 = TypePerformanceWorkerDefinition.command('Run011', {
   },
 })
 
-const Run012 = TypePerformanceWorkerDefinition.command('Run012', {
+const Run012 = TypePerformanceWorkerDefinition.makeCommand('Run012', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -153,7 +156,7 @@ const Run012 = TypePerformanceWorkerDefinition.command('Run012', {
   },
 })
 
-const Run013 = TypePerformanceWorkerDefinition.command('Run013', {
+const Run013 = TypePerformanceWorkerDefinition.makeCommand('Run013', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -162,7 +165,7 @@ const Run013 = TypePerformanceWorkerDefinition.command('Run013', {
   },
 })
 
-const Run014 = TypePerformanceWorkerDefinition.command('Run014', {
+const Run014 = TypePerformanceWorkerDefinition.makeCommand('Run014', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -171,7 +174,7 @@ const Run014 = TypePerformanceWorkerDefinition.command('Run014', {
   },
 })
 
-const Run015 = TypePerformanceWorkerDefinition.command('Run015', {
+const Run015 = TypePerformanceWorkerDefinition.makeCommand('Run015', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -180,7 +183,7 @@ const Run015 = TypePerformanceWorkerDefinition.command('Run015', {
   },
 })
 
-const Run016 = TypePerformanceWorkerDefinition.command('Run016', {
+const Run016 = TypePerformanceWorkerDefinition.makeCommand('Run016', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -189,7 +192,7 @@ const Run016 = TypePerformanceWorkerDefinition.command('Run016', {
   },
 })
 
-const Run017 = TypePerformanceWorkerDefinition.command('Run017', {
+const Run017 = TypePerformanceWorkerDefinition.makeCommand('Run017', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -198,7 +201,7 @@ const Run017 = TypePerformanceWorkerDefinition.command('Run017', {
   },
 })
 
-const Run018 = TypePerformanceWorkerDefinition.command('Run018', {
+const Run018 = TypePerformanceWorkerDefinition.makeCommand('Run018', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -207,7 +210,7 @@ const Run018 = TypePerformanceWorkerDefinition.command('Run018', {
   },
 })
 
-const Run019 = TypePerformanceWorkerDefinition.command('Run019', {
+const Run019 = TypePerformanceWorkerDefinition.makeCommand('Run019', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -216,7 +219,7 @@ const Run019 = TypePerformanceWorkerDefinition.command('Run019', {
   },
 })
 
-const Run020 = TypePerformanceWorkerDefinition.command('Run020', {
+const Run020 = TypePerformanceWorkerDefinition.makeCommand('Run020', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -225,7 +228,7 @@ const Run020 = TypePerformanceWorkerDefinition.command('Run020', {
   },
 })
 
-const Run021 = TypePerformanceWorkerDefinition.command('Run021', {
+const Run021 = TypePerformanceWorkerDefinition.makeCommand('Run021', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -234,7 +237,7 @@ const Run021 = TypePerformanceWorkerDefinition.command('Run021', {
   },
 })
 
-const Run022 = TypePerformanceWorkerDefinition.command('Run022', {
+const Run022 = TypePerformanceWorkerDefinition.makeCommand('Run022', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -243,7 +246,7 @@ const Run022 = TypePerformanceWorkerDefinition.command('Run022', {
   },
 })
 
-const Run023 = TypePerformanceWorkerDefinition.command('Run023', {
+const Run023 = TypePerformanceWorkerDefinition.makeCommand('Run023', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -252,7 +255,7 @@ const Run023 = TypePerformanceWorkerDefinition.command('Run023', {
   },
 })
 
-const Run024 = TypePerformanceWorkerDefinition.command('Run024', {
+const Run024 = TypePerformanceWorkerDefinition.makeCommand('Run024', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -261,7 +264,7 @@ const Run024 = TypePerformanceWorkerDefinition.command('Run024', {
   },
 })
 
-const Run025 = TypePerformanceWorkerDefinition.command('Run025', {
+const Run025 = TypePerformanceWorkerDefinition.makeCommand('Run025', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -270,7 +273,7 @@ const Run025 = TypePerformanceWorkerDefinition.command('Run025', {
   },
 })
 
-const Run026 = TypePerformanceWorkerDefinition.command('Run026', {
+const Run026 = TypePerformanceWorkerDefinition.makeCommand('Run026', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -279,7 +282,7 @@ const Run026 = TypePerformanceWorkerDefinition.command('Run026', {
   },
 })
 
-const Run027 = TypePerformanceWorkerDefinition.command('Run027', {
+const Run027 = TypePerformanceWorkerDefinition.makeCommand('Run027', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -288,7 +291,7 @@ const Run027 = TypePerformanceWorkerDefinition.command('Run027', {
   },
 })
 
-const Run028 = TypePerformanceWorkerDefinition.command('Run028', {
+const Run028 = TypePerformanceWorkerDefinition.makeCommand('Run028', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -297,7 +300,7 @@ const Run028 = TypePerformanceWorkerDefinition.command('Run028', {
   },
 })
 
-const Run029 = TypePerformanceWorkerDefinition.command('Run029', {
+const Run029 = TypePerformanceWorkerDefinition.makeCommand('Run029', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -306,7 +309,7 @@ const Run029 = TypePerformanceWorkerDefinition.command('Run029', {
   },
 })
 
-const Run030 = TypePerformanceWorkerDefinition.command('Run030', {
+const Run030 = TypePerformanceWorkerDefinition.makeCommand('Run030', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -315,7 +318,7 @@ const Run030 = TypePerformanceWorkerDefinition.command('Run030', {
   },
 })
 
-const Run031 = TypePerformanceWorkerDefinition.command('Run031', {
+const Run031 = TypePerformanceWorkerDefinition.makeCommand('Run031', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -324,7 +327,7 @@ const Run031 = TypePerformanceWorkerDefinition.command('Run031', {
   },
 })
 
-const Run032 = TypePerformanceWorkerDefinition.command('Run032', {
+const Run032 = TypePerformanceWorkerDefinition.makeCommand('Run032', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -333,7 +336,7 @@ const Run032 = TypePerformanceWorkerDefinition.command('Run032', {
   },
 })
 
-const Run033 = TypePerformanceWorkerDefinition.command('Run033', {
+const Run033 = TypePerformanceWorkerDefinition.makeCommand('Run033', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -342,7 +345,7 @@ const Run033 = TypePerformanceWorkerDefinition.command('Run033', {
   },
 })
 
-const Run034 = TypePerformanceWorkerDefinition.command('Run034', {
+const Run034 = TypePerformanceWorkerDefinition.makeCommand('Run034', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -351,7 +354,7 @@ const Run034 = TypePerformanceWorkerDefinition.command('Run034', {
   },
 })
 
-const Run035 = TypePerformanceWorkerDefinition.command('Run035', {
+const Run035 = TypePerformanceWorkerDefinition.makeCommand('Run035', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -360,7 +363,7 @@ const Run035 = TypePerformanceWorkerDefinition.command('Run035', {
   },
 })
 
-const Run036 = TypePerformanceWorkerDefinition.command('Run036', {
+const Run036 = TypePerformanceWorkerDefinition.makeCommand('Run036', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -369,7 +372,7 @@ const Run036 = TypePerformanceWorkerDefinition.command('Run036', {
   },
 })
 
-const Run037 = TypePerformanceWorkerDefinition.command('Run037', {
+const Run037 = TypePerformanceWorkerDefinition.makeCommand('Run037', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -378,7 +381,7 @@ const Run037 = TypePerformanceWorkerDefinition.command('Run037', {
   },
 })
 
-const Run038 = TypePerformanceWorkerDefinition.command('Run038', {
+const Run038 = TypePerformanceWorkerDefinition.makeCommand('Run038', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -387,7 +390,7 @@ const Run038 = TypePerformanceWorkerDefinition.command('Run038', {
   },
 })
 
-const Run039 = TypePerformanceWorkerDefinition.command('Run039', {
+const Run039 = TypePerformanceWorkerDefinition.makeCommand('Run039', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -396,7 +399,7 @@ const Run039 = TypePerformanceWorkerDefinition.command('Run039', {
   },
 })
 
-const Run040 = TypePerformanceWorkerDefinition.command('Run040', {
+const Run040 = TypePerformanceWorkerDefinition.makeCommand('Run040', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -405,7 +408,7 @@ const Run040 = TypePerformanceWorkerDefinition.command('Run040', {
   },
 })
 
-const Run041 = TypePerformanceWorkerDefinition.command('Run041', {
+const Run041 = TypePerformanceWorkerDefinition.makeCommand('Run041', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -414,7 +417,7 @@ const Run041 = TypePerformanceWorkerDefinition.command('Run041', {
   },
 })
 
-const Run042 = TypePerformanceWorkerDefinition.command('Run042', {
+const Run042 = TypePerformanceWorkerDefinition.makeCommand('Run042', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -423,7 +426,7 @@ const Run042 = TypePerformanceWorkerDefinition.command('Run042', {
   },
 })
 
-const Run043 = TypePerformanceWorkerDefinition.command('Run043', {
+const Run043 = TypePerformanceWorkerDefinition.makeCommand('Run043', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -432,7 +435,7 @@ const Run043 = TypePerformanceWorkerDefinition.command('Run043', {
   },
 })
 
-const Run044 = TypePerformanceWorkerDefinition.command('Run044', {
+const Run044 = TypePerformanceWorkerDefinition.makeCommand('Run044', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -441,7 +444,7 @@ const Run044 = TypePerformanceWorkerDefinition.command('Run044', {
   },
 })
 
-const Run045 = TypePerformanceWorkerDefinition.command('Run045', {
+const Run045 = TypePerformanceWorkerDefinition.makeCommand('Run045', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -450,7 +453,7 @@ const Run045 = TypePerformanceWorkerDefinition.command('Run045', {
   },
 })
 
-const Run046 = TypePerformanceWorkerDefinition.command('Run046', {
+const Run046 = TypePerformanceWorkerDefinition.makeCommand('Run046', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -459,7 +462,7 @@ const Run046 = TypePerformanceWorkerDefinition.command('Run046', {
   },
 })
 
-const Run047 = TypePerformanceWorkerDefinition.command('Run047', {
+const Run047 = TypePerformanceWorkerDefinition.makeCommand('Run047', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -468,7 +471,7 @@ const Run047 = TypePerformanceWorkerDefinition.command('Run047', {
   },
 })
 
-const Run048 = TypePerformanceWorkerDefinition.command('Run048', {
+const Run048 = TypePerformanceWorkerDefinition.makeCommand('Run048', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -477,7 +480,7 @@ const Run048 = TypePerformanceWorkerDefinition.command('Run048', {
   },
 })
 
-const Run049 = TypePerformanceWorkerDefinition.command('Run049', {
+const Run049 = TypePerformanceWorkerDefinition.makeCommand('Run049', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -486,7 +489,7 @@ const Run049 = TypePerformanceWorkerDefinition.command('Run049', {
   },
 })
 
-const Run050 = TypePerformanceWorkerDefinition.command('Run050', {
+const Run050 = TypePerformanceWorkerDefinition.makeCommand('Run050', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -495,7 +498,7 @@ const Run050 = TypePerformanceWorkerDefinition.command('Run050', {
   },
 })
 
-const Run051 = TypePerformanceWorkerDefinition.command('Run051', {
+const Run051 = TypePerformanceWorkerDefinition.makeCommand('Run051', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -504,7 +507,7 @@ const Run051 = TypePerformanceWorkerDefinition.command('Run051', {
   },
 })
 
-const Run052 = TypePerformanceWorkerDefinition.command('Run052', {
+const Run052 = TypePerformanceWorkerDefinition.makeCommand('Run052', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -513,7 +516,7 @@ const Run052 = TypePerformanceWorkerDefinition.command('Run052', {
   },
 })
 
-const Run053 = TypePerformanceWorkerDefinition.command('Run053', {
+const Run053 = TypePerformanceWorkerDefinition.makeCommand('Run053', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -522,7 +525,7 @@ const Run053 = TypePerformanceWorkerDefinition.command('Run053', {
   },
 })
 
-const Run054 = TypePerformanceWorkerDefinition.command('Run054', {
+const Run054 = TypePerformanceWorkerDefinition.makeCommand('Run054', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -531,7 +534,7 @@ const Run054 = TypePerformanceWorkerDefinition.command('Run054', {
   },
 })
 
-const Run055 = TypePerformanceWorkerDefinition.command('Run055', {
+const Run055 = TypePerformanceWorkerDefinition.makeCommand('Run055', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -540,7 +543,7 @@ const Run055 = TypePerformanceWorkerDefinition.command('Run055', {
   },
 })
 
-const Run056 = TypePerformanceWorkerDefinition.command('Run056', {
+const Run056 = TypePerformanceWorkerDefinition.makeCommand('Run056', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -549,7 +552,7 @@ const Run056 = TypePerformanceWorkerDefinition.command('Run056', {
   },
 })
 
-const Run057 = TypePerformanceWorkerDefinition.command('Run057', {
+const Run057 = TypePerformanceWorkerDefinition.makeCommand('Run057', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -558,7 +561,7 @@ const Run057 = TypePerformanceWorkerDefinition.command('Run057', {
   },
 })
 
-const Run058 = TypePerformanceWorkerDefinition.command('Run058', {
+const Run058 = TypePerformanceWorkerDefinition.makeCommand('Run058', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -567,7 +570,7 @@ const Run058 = TypePerformanceWorkerDefinition.command('Run058', {
   },
 })
 
-const Run059 = TypePerformanceWorkerDefinition.command('Run059', {
+const Run059 = TypePerformanceWorkerDefinition.makeCommand('Run059', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -576,7 +579,7 @@ const Run059 = TypePerformanceWorkerDefinition.command('Run059', {
   },
 })
 
-const Run060 = TypePerformanceWorkerDefinition.command('Run060', {
+const Run060 = TypePerformanceWorkerDefinition.makeCommand('Run060', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -585,7 +588,7 @@ const Run060 = TypePerformanceWorkerDefinition.command('Run060', {
   },
 })
 
-const Run061 = TypePerformanceWorkerDefinition.command('Run061', {
+const Run061 = TypePerformanceWorkerDefinition.makeCommand('Run061', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -594,7 +597,7 @@ const Run061 = TypePerformanceWorkerDefinition.command('Run061', {
   },
 })
 
-const Run062 = TypePerformanceWorkerDefinition.command('Run062', {
+const Run062 = TypePerformanceWorkerDefinition.makeCommand('Run062', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -603,7 +606,7 @@ const Run062 = TypePerformanceWorkerDefinition.command('Run062', {
   },
 })
 
-const Run063 = TypePerformanceWorkerDefinition.command('Run063', {
+const Run063 = TypePerformanceWorkerDefinition.makeCommand('Run063', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -612,7 +615,7 @@ const Run063 = TypePerformanceWorkerDefinition.command('Run063', {
   },
 })
 
-const Run064 = TypePerformanceWorkerDefinition.command('Run064', {
+const Run064 = TypePerformanceWorkerDefinition.makeCommand('Run064', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -621,7 +624,7 @@ const Run064 = TypePerformanceWorkerDefinition.command('Run064', {
   },
 })
 
-const Run065 = TypePerformanceWorkerDefinition.command('Run065', {
+const Run065 = TypePerformanceWorkerDefinition.makeCommand('Run065', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -630,7 +633,7 @@ const Run065 = TypePerformanceWorkerDefinition.command('Run065', {
   },
 })
 
-const Run066 = TypePerformanceWorkerDefinition.command('Run066', {
+const Run066 = TypePerformanceWorkerDefinition.makeCommand('Run066', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -639,7 +642,7 @@ const Run066 = TypePerformanceWorkerDefinition.command('Run066', {
   },
 })
 
-const Run067 = TypePerformanceWorkerDefinition.command('Run067', {
+const Run067 = TypePerformanceWorkerDefinition.makeCommand('Run067', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -648,7 +651,7 @@ const Run067 = TypePerformanceWorkerDefinition.command('Run067', {
   },
 })
 
-const Run068 = TypePerformanceWorkerDefinition.command('Run068', {
+const Run068 = TypePerformanceWorkerDefinition.makeCommand('Run068', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -657,7 +660,7 @@ const Run068 = TypePerformanceWorkerDefinition.command('Run068', {
   },
 })
 
-const Run069 = TypePerformanceWorkerDefinition.command('Run069', {
+const Run069 = TypePerformanceWorkerDefinition.makeCommand('Run069', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -666,7 +669,7 @@ const Run069 = TypePerformanceWorkerDefinition.command('Run069', {
   },
 })
 
-const Run070 = TypePerformanceWorkerDefinition.command('Run070', {
+const Run070 = TypePerformanceWorkerDefinition.makeCommand('Run070', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -675,7 +678,7 @@ const Run070 = TypePerformanceWorkerDefinition.command('Run070', {
   },
 })
 
-const Run071 = TypePerformanceWorkerDefinition.command('Run071', {
+const Run071 = TypePerformanceWorkerDefinition.makeCommand('Run071', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -684,7 +687,7 @@ const Run071 = TypePerformanceWorkerDefinition.command('Run071', {
   },
 })
 
-const Run072 = TypePerformanceWorkerDefinition.command('Run072', {
+const Run072 = TypePerformanceWorkerDefinition.makeCommand('Run072', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -693,7 +696,7 @@ const Run072 = TypePerformanceWorkerDefinition.command('Run072', {
   },
 })
 
-const Run073 = TypePerformanceWorkerDefinition.command('Run073', {
+const Run073 = TypePerformanceWorkerDefinition.makeCommand('Run073', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -702,7 +705,7 @@ const Run073 = TypePerformanceWorkerDefinition.command('Run073', {
   },
 })
 
-const Run074 = TypePerformanceWorkerDefinition.command('Run074', {
+const Run074 = TypePerformanceWorkerDefinition.makeCommand('Run074', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -711,7 +714,7 @@ const Run074 = TypePerformanceWorkerDefinition.command('Run074', {
   },
 })
 
-const Run075 = TypePerformanceWorkerDefinition.command('Run075', {
+const Run075 = TypePerformanceWorkerDefinition.makeCommand('Run075', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -720,7 +723,7 @@ const Run075 = TypePerformanceWorkerDefinition.command('Run075', {
   },
 })
 
-const Run076 = TypePerformanceWorkerDefinition.command('Run076', {
+const Run076 = TypePerformanceWorkerDefinition.makeCommand('Run076', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -729,7 +732,7 @@ const Run076 = TypePerformanceWorkerDefinition.command('Run076', {
   },
 })
 
-const Run077 = TypePerformanceWorkerDefinition.command('Run077', {
+const Run077 = TypePerformanceWorkerDefinition.makeCommand('Run077', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -738,7 +741,7 @@ const Run077 = TypePerformanceWorkerDefinition.command('Run077', {
   },
 })
 
-const Run078 = TypePerformanceWorkerDefinition.command('Run078', {
+const Run078 = TypePerformanceWorkerDefinition.makeCommand('Run078', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -747,7 +750,7 @@ const Run078 = TypePerformanceWorkerDefinition.command('Run078', {
   },
 })
 
-const Run079 = TypePerformanceWorkerDefinition.command('Run079', {
+const Run079 = TypePerformanceWorkerDefinition.makeCommand('Run079', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -756,7 +759,7 @@ const Run079 = TypePerformanceWorkerDefinition.command('Run079', {
   },
 })
 
-const Run080 = TypePerformanceWorkerDefinition.command('Run080', {
+const Run080 = TypePerformanceWorkerDefinition.makeCommand('Run080', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -765,7 +768,7 @@ const Run080 = TypePerformanceWorkerDefinition.command('Run080', {
   },
 })
 
-const Run081 = TypePerformanceWorkerDefinition.command('Run081', {
+const Run081 = TypePerformanceWorkerDefinition.makeCommand('Run081', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -774,7 +777,7 @@ const Run081 = TypePerformanceWorkerDefinition.command('Run081', {
   },
 })
 
-const Run082 = TypePerformanceWorkerDefinition.command('Run082', {
+const Run082 = TypePerformanceWorkerDefinition.makeCommand('Run082', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -783,7 +786,7 @@ const Run082 = TypePerformanceWorkerDefinition.command('Run082', {
   },
 })
 
-const Run083 = TypePerformanceWorkerDefinition.command('Run083', {
+const Run083 = TypePerformanceWorkerDefinition.makeCommand('Run083', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -792,7 +795,7 @@ const Run083 = TypePerformanceWorkerDefinition.command('Run083', {
   },
 })
 
-const Run084 = TypePerformanceWorkerDefinition.command('Run084', {
+const Run084 = TypePerformanceWorkerDefinition.makeCommand('Run084', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -801,7 +804,7 @@ const Run084 = TypePerformanceWorkerDefinition.command('Run084', {
   },
 })
 
-const Run085 = TypePerformanceWorkerDefinition.command('Run085', {
+const Run085 = TypePerformanceWorkerDefinition.makeCommand('Run085', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -810,7 +813,7 @@ const Run085 = TypePerformanceWorkerDefinition.command('Run085', {
   },
 })
 
-const Run086 = TypePerformanceWorkerDefinition.command('Run086', {
+const Run086 = TypePerformanceWorkerDefinition.makeCommand('Run086', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -819,7 +822,7 @@ const Run086 = TypePerformanceWorkerDefinition.command('Run086', {
   },
 })
 
-const Run087 = TypePerformanceWorkerDefinition.command('Run087', {
+const Run087 = TypePerformanceWorkerDefinition.makeCommand('Run087', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -828,7 +831,7 @@ const Run087 = TypePerformanceWorkerDefinition.command('Run087', {
   },
 })
 
-const Run088 = TypePerformanceWorkerDefinition.command('Run088', {
+const Run088 = TypePerformanceWorkerDefinition.makeCommand('Run088', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -837,7 +840,7 @@ const Run088 = TypePerformanceWorkerDefinition.command('Run088', {
   },
 })
 
-const Run089 = TypePerformanceWorkerDefinition.command('Run089', {
+const Run089 = TypePerformanceWorkerDefinition.makeCommand('Run089', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -846,7 +849,7 @@ const Run089 = TypePerformanceWorkerDefinition.command('Run089', {
   },
 })
 
-const Run090 = TypePerformanceWorkerDefinition.command('Run090', {
+const Run090 = TypePerformanceWorkerDefinition.makeCommand('Run090', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -855,7 +858,7 @@ const Run090 = TypePerformanceWorkerDefinition.command('Run090', {
   },
 })
 
-const Run091 = TypePerformanceWorkerDefinition.command('Run091', {
+const Run091 = TypePerformanceWorkerDefinition.makeCommand('Run091', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -864,7 +867,7 @@ const Run091 = TypePerformanceWorkerDefinition.command('Run091', {
   },
 })
 
-const Run092 = TypePerformanceWorkerDefinition.command('Run092', {
+const Run092 = TypePerformanceWorkerDefinition.makeCommand('Run092', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -873,7 +876,7 @@ const Run092 = TypePerformanceWorkerDefinition.command('Run092', {
   },
 })
 
-const Run093 = TypePerformanceWorkerDefinition.command('Run093', {
+const Run093 = TypePerformanceWorkerDefinition.makeCommand('Run093', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -882,7 +885,7 @@ const Run093 = TypePerformanceWorkerDefinition.command('Run093', {
   },
 })
 
-const Run094 = TypePerformanceWorkerDefinition.command('Run094', {
+const Run094 = TypePerformanceWorkerDefinition.makeCommand('Run094', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -891,7 +894,7 @@ const Run094 = TypePerformanceWorkerDefinition.command('Run094', {
   },
 })
 
-const Run095 = TypePerformanceWorkerDefinition.command('Run095', {
+const Run095 = TypePerformanceWorkerDefinition.makeCommand('Run095', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -900,7 +903,7 @@ const Run095 = TypePerformanceWorkerDefinition.command('Run095', {
   },
 })
 
-const Run096 = TypePerformanceWorkerDefinition.command('Run096', {
+const Run096 = TypePerformanceWorkerDefinition.makeCommand('Run096', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -909,7 +912,7 @@ const Run096 = TypePerformanceWorkerDefinition.command('Run096', {
   },
 })
 
-const Run097 = TypePerformanceWorkerDefinition.command('Run097', {
+const Run097 = TypePerformanceWorkerDefinition.makeCommand('Run097', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -918,7 +921,7 @@ const Run097 = TypePerformanceWorkerDefinition.command('Run097', {
   },
 })
 
-const Run098 = TypePerformanceWorkerDefinition.command('Run098', {
+const Run098 = TypePerformanceWorkerDefinition.makeCommand('Run098', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -927,7 +930,7 @@ const Run098 = TypePerformanceWorkerDefinition.command('Run098', {
   },
 })
 
-const Run099 = TypePerformanceWorkerDefinition.command('Run099', {
+const Run099 = TypePerformanceWorkerDefinition.makeCommand('Run099', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -936,7 +939,7 @@ const Run099 = TypePerformanceWorkerDefinition.command('Run099', {
   },
 })
 
-const Run100 = TypePerformanceWorkerDefinition.command('Run100', {
+const Run100 = TypePerformanceWorkerDefinition.makeCommand('Run100', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -945,7 +948,7 @@ const Run100 = TypePerformanceWorkerDefinition.command('Run100', {
   },
 })
 
-const Run101 = TypePerformanceWorkerDefinition.command('Run101', {
+const Run101 = TypePerformanceWorkerDefinition.makeCommand('Run101', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -954,7 +957,7 @@ const Run101 = TypePerformanceWorkerDefinition.command('Run101', {
   },
 })
 
-const Run102 = TypePerformanceWorkerDefinition.command('Run102', {
+const Run102 = TypePerformanceWorkerDefinition.makeCommand('Run102', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -963,7 +966,7 @@ const Run102 = TypePerformanceWorkerDefinition.command('Run102', {
   },
 })
 
-const Run103 = TypePerformanceWorkerDefinition.command('Run103', {
+const Run103 = TypePerformanceWorkerDefinition.makeCommand('Run103', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -972,7 +975,7 @@ const Run103 = TypePerformanceWorkerDefinition.command('Run103', {
   },
 })
 
-const Run104 = TypePerformanceWorkerDefinition.command('Run104', {
+const Run104 = TypePerformanceWorkerDefinition.makeCommand('Run104', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -981,7 +984,7 @@ const Run104 = TypePerformanceWorkerDefinition.command('Run104', {
   },
 })
 
-const Run105 = TypePerformanceWorkerDefinition.command('Run105', {
+const Run105 = TypePerformanceWorkerDefinition.makeCommand('Run105', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -990,7 +993,7 @@ const Run105 = TypePerformanceWorkerDefinition.command('Run105', {
   },
 })
 
-const Run106 = TypePerformanceWorkerDefinition.command('Run106', {
+const Run106 = TypePerformanceWorkerDefinition.makeCommand('Run106', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -999,7 +1002,7 @@ const Run106 = TypePerformanceWorkerDefinition.command('Run106', {
   },
 })
 
-const Run107 = TypePerformanceWorkerDefinition.command('Run107', {
+const Run107 = TypePerformanceWorkerDefinition.makeCommand('Run107', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1008,7 +1011,7 @@ const Run107 = TypePerformanceWorkerDefinition.command('Run107', {
   },
 })
 
-const Run108 = TypePerformanceWorkerDefinition.command('Run108', {
+const Run108 = TypePerformanceWorkerDefinition.makeCommand('Run108', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1017,7 +1020,7 @@ const Run108 = TypePerformanceWorkerDefinition.command('Run108', {
   },
 })
 
-const Run109 = TypePerformanceWorkerDefinition.command('Run109', {
+const Run109 = TypePerformanceWorkerDefinition.makeCommand('Run109', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1026,7 +1029,7 @@ const Run109 = TypePerformanceWorkerDefinition.command('Run109', {
   },
 })
 
-const Run110 = TypePerformanceWorkerDefinition.command('Run110', {
+const Run110 = TypePerformanceWorkerDefinition.makeCommand('Run110', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1035,7 +1038,7 @@ const Run110 = TypePerformanceWorkerDefinition.command('Run110', {
   },
 })
 
-const Run111 = TypePerformanceWorkerDefinition.command('Run111', {
+const Run111 = TypePerformanceWorkerDefinition.makeCommand('Run111', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1044,7 +1047,7 @@ const Run111 = TypePerformanceWorkerDefinition.command('Run111', {
   },
 })
 
-const Run112 = TypePerformanceWorkerDefinition.command('Run112', {
+const Run112 = TypePerformanceWorkerDefinition.makeCommand('Run112', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1053,7 +1056,7 @@ const Run112 = TypePerformanceWorkerDefinition.command('Run112', {
   },
 })
 
-const Run113 = TypePerformanceWorkerDefinition.command('Run113', {
+const Run113 = TypePerformanceWorkerDefinition.makeCommand('Run113', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1062,7 +1065,7 @@ const Run113 = TypePerformanceWorkerDefinition.command('Run113', {
   },
 })
 
-const Run114 = TypePerformanceWorkerDefinition.command('Run114', {
+const Run114 = TypePerformanceWorkerDefinition.makeCommand('Run114', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1071,7 +1074,7 @@ const Run114 = TypePerformanceWorkerDefinition.command('Run114', {
   },
 })
 
-const Run115 = TypePerformanceWorkerDefinition.command('Run115', {
+const Run115 = TypePerformanceWorkerDefinition.makeCommand('Run115', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1080,7 +1083,7 @@ const Run115 = TypePerformanceWorkerDefinition.command('Run115', {
   },
 })
 
-const Run116 = TypePerformanceWorkerDefinition.command('Run116', {
+const Run116 = TypePerformanceWorkerDefinition.makeCommand('Run116', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1089,7 +1092,7 @@ const Run116 = TypePerformanceWorkerDefinition.command('Run116', {
   },
 })
 
-const Run117 = TypePerformanceWorkerDefinition.command('Run117', {
+const Run117 = TypePerformanceWorkerDefinition.makeCommand('Run117', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1098,7 +1101,7 @@ const Run117 = TypePerformanceWorkerDefinition.command('Run117', {
   },
 })
 
-const Run118 = TypePerformanceWorkerDefinition.command('Run118', {
+const Run118 = TypePerformanceWorkerDefinition.makeCommand('Run118', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1107,7 +1110,7 @@ const Run118 = TypePerformanceWorkerDefinition.command('Run118', {
   },
 })
 
-const Run119 = TypePerformanceWorkerDefinition.command('Run119', {
+const Run119 = TypePerformanceWorkerDefinition.makeCommand('Run119', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1116,7 +1119,7 @@ const Run119 = TypePerformanceWorkerDefinition.command('Run119', {
   },
 })
 
-const Run120 = TypePerformanceWorkerDefinition.command('Run120', {
+const Run120 = TypePerformanceWorkerDefinition.makeCommand('Run120', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1125,7 +1128,7 @@ const Run120 = TypePerformanceWorkerDefinition.command('Run120', {
   },
 })
 
-const Run121 = TypePerformanceWorkerDefinition.command('Run121', {
+const Run121 = TypePerformanceWorkerDefinition.makeCommand('Run121', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1134,7 +1137,7 @@ const Run121 = TypePerformanceWorkerDefinition.command('Run121', {
   },
 })
 
-const Run122 = TypePerformanceWorkerDefinition.command('Run122', {
+const Run122 = TypePerformanceWorkerDefinition.makeCommand('Run122', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1143,7 +1146,7 @@ const Run122 = TypePerformanceWorkerDefinition.command('Run122', {
   },
 })
 
-const Run123 = TypePerformanceWorkerDefinition.command('Run123', {
+const Run123 = TypePerformanceWorkerDefinition.makeCommand('Run123', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1152,7 +1155,7 @@ const Run123 = TypePerformanceWorkerDefinition.command('Run123', {
   },
 })
 
-const Run124 = TypePerformanceWorkerDefinition.command('Run124', {
+const Run124 = TypePerformanceWorkerDefinition.makeCommand('Run124', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1161,7 +1164,7 @@ const Run124 = TypePerformanceWorkerDefinition.command('Run124', {
   },
 })
 
-const Run125 = TypePerformanceWorkerDefinition.command('Run125', {
+const Run125 = TypePerformanceWorkerDefinition.makeCommand('Run125', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1170,7 +1173,7 @@ const Run125 = TypePerformanceWorkerDefinition.command('Run125', {
   },
 })
 
-const Run126 = TypePerformanceWorkerDefinition.command('Run126', {
+const Run126 = TypePerformanceWorkerDefinition.makeCommand('Run126', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1179,7 +1182,7 @@ const Run126 = TypePerformanceWorkerDefinition.command('Run126', {
   },
 })
 
-const Run127 = TypePerformanceWorkerDefinition.command('Run127', {
+const Run127 = TypePerformanceWorkerDefinition.makeCommand('Run127', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1188,7 +1191,7 @@ const Run127 = TypePerformanceWorkerDefinition.command('Run127', {
   },
 })
 
-const Run128 = TypePerformanceWorkerDefinition.command('Run128', {
+const Run128 = TypePerformanceWorkerDefinition.makeCommand('Run128', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1197,7 +1200,7 @@ const Run128 = TypePerformanceWorkerDefinition.command('Run128', {
   },
 })
 
-const Run129 = TypePerformanceWorkerDefinition.command('Run129', {
+const Run129 = TypePerformanceWorkerDefinition.makeCommand('Run129', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1206,7 +1209,7 @@ const Run129 = TypePerformanceWorkerDefinition.command('Run129', {
   },
 })
 
-const Run130 = TypePerformanceWorkerDefinition.command('Run130', {
+const Run130 = TypePerformanceWorkerDefinition.makeCommand('Run130', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1215,7 +1218,7 @@ const Run130 = TypePerformanceWorkerDefinition.command('Run130', {
   },
 })
 
-const Run131 = TypePerformanceWorkerDefinition.command('Run131', {
+const Run131 = TypePerformanceWorkerDefinition.makeCommand('Run131', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1224,7 +1227,7 @@ const Run131 = TypePerformanceWorkerDefinition.command('Run131', {
   },
 })
 
-const Run132 = TypePerformanceWorkerDefinition.command('Run132', {
+const Run132 = TypePerformanceWorkerDefinition.makeCommand('Run132', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1233,7 +1236,7 @@ const Run132 = TypePerformanceWorkerDefinition.command('Run132', {
   },
 })
 
-const Run133 = TypePerformanceWorkerDefinition.command('Run133', {
+const Run133 = TypePerformanceWorkerDefinition.makeCommand('Run133', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1242,7 +1245,7 @@ const Run133 = TypePerformanceWorkerDefinition.command('Run133', {
   },
 })
 
-const Run134 = TypePerformanceWorkerDefinition.command('Run134', {
+const Run134 = TypePerformanceWorkerDefinition.makeCommand('Run134', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1251,7 +1254,7 @@ const Run134 = TypePerformanceWorkerDefinition.command('Run134', {
   },
 })
 
-const Run135 = TypePerformanceWorkerDefinition.command('Run135', {
+const Run135 = TypePerformanceWorkerDefinition.makeCommand('Run135', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1260,7 +1263,7 @@ const Run135 = TypePerformanceWorkerDefinition.command('Run135', {
   },
 })
 
-const Run136 = TypePerformanceWorkerDefinition.command('Run136', {
+const Run136 = TypePerformanceWorkerDefinition.makeCommand('Run136', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1269,7 +1272,7 @@ const Run136 = TypePerformanceWorkerDefinition.command('Run136', {
   },
 })
 
-const Run137 = TypePerformanceWorkerDefinition.command('Run137', {
+const Run137 = TypePerformanceWorkerDefinition.makeCommand('Run137', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1278,7 +1281,7 @@ const Run137 = TypePerformanceWorkerDefinition.command('Run137', {
   },
 })
 
-const Run138 = TypePerformanceWorkerDefinition.command('Run138', {
+const Run138 = TypePerformanceWorkerDefinition.makeCommand('Run138', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1287,7 +1290,7 @@ const Run138 = TypePerformanceWorkerDefinition.command('Run138', {
   },
 })
 
-const Run139 = TypePerformanceWorkerDefinition.command('Run139', {
+const Run139 = TypePerformanceWorkerDefinition.makeCommand('Run139', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1296,7 +1299,7 @@ const Run139 = TypePerformanceWorkerDefinition.command('Run139', {
   },
 })
 
-const Run140 = TypePerformanceWorkerDefinition.command('Run140', {
+const Run140 = TypePerformanceWorkerDefinition.makeCommand('Run140', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1305,7 +1308,7 @@ const Run140 = TypePerformanceWorkerDefinition.command('Run140', {
   },
 })
 
-const Run141 = TypePerformanceWorkerDefinition.command('Run141', {
+const Run141 = TypePerformanceWorkerDefinition.makeCommand('Run141', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1314,7 +1317,7 @@ const Run141 = TypePerformanceWorkerDefinition.command('Run141', {
   },
 })
 
-const Run142 = TypePerformanceWorkerDefinition.command('Run142', {
+const Run142 = TypePerformanceWorkerDefinition.makeCommand('Run142', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1323,7 +1326,7 @@ const Run142 = TypePerformanceWorkerDefinition.command('Run142', {
   },
 })
 
-const Run143 = TypePerformanceWorkerDefinition.command('Run143', {
+const Run143 = TypePerformanceWorkerDefinition.makeCommand('Run143', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1332,7 +1335,7 @@ const Run143 = TypePerformanceWorkerDefinition.command('Run143', {
   },
 })
 
-const Run144 = TypePerformanceWorkerDefinition.command('Run144', {
+const Run144 = TypePerformanceWorkerDefinition.makeCommand('Run144', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1341,7 +1344,7 @@ const Run144 = TypePerformanceWorkerDefinition.command('Run144', {
   },
 })
 
-const Run145 = TypePerformanceWorkerDefinition.command('Run145', {
+const Run145 = TypePerformanceWorkerDefinition.makeCommand('Run145', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1350,7 +1353,7 @@ const Run145 = TypePerformanceWorkerDefinition.command('Run145', {
   },
 })
 
-const Run146 = TypePerformanceWorkerDefinition.command('Run146', {
+const Run146 = TypePerformanceWorkerDefinition.makeCommand('Run146', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1359,7 +1362,7 @@ const Run146 = TypePerformanceWorkerDefinition.command('Run146', {
   },
 })
 
-const Run147 = TypePerformanceWorkerDefinition.command('Run147', {
+const Run147 = TypePerformanceWorkerDefinition.makeCommand('Run147', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1368,7 +1371,7 @@ const Run147 = TypePerformanceWorkerDefinition.command('Run147', {
   },
 })
 
-const Run148 = TypePerformanceWorkerDefinition.command('Run148', {
+const Run148 = TypePerformanceWorkerDefinition.makeCommand('Run148', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1377,7 +1380,7 @@ const Run148 = TypePerformanceWorkerDefinition.command('Run148', {
   },
 })
 
-const Run149 = TypePerformanceWorkerDefinition.command('Run149', {
+const Run149 = TypePerformanceWorkerDefinition.makeCommand('Run149', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1386,7 +1389,7 @@ const Run149 = TypePerformanceWorkerDefinition.command('Run149', {
   },
 })
 
-const Run150 = TypePerformanceWorkerDefinition.command('Run150', {
+const Run150 = TypePerformanceWorkerDefinition.makeCommand('Run150', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1395,7 +1398,7 @@ const Run150 = TypePerformanceWorkerDefinition.command('Run150', {
   },
 })
 
-const Run151 = TypePerformanceWorkerDefinition.command('Run151', {
+const Run151 = TypePerformanceWorkerDefinition.makeCommand('Run151', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1404,7 +1407,7 @@ const Run151 = TypePerformanceWorkerDefinition.command('Run151', {
   },
 })
 
-const Run152 = TypePerformanceWorkerDefinition.command('Run152', {
+const Run152 = TypePerformanceWorkerDefinition.makeCommand('Run152', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1413,7 +1416,7 @@ const Run152 = TypePerformanceWorkerDefinition.command('Run152', {
   },
 })
 
-const Run153 = TypePerformanceWorkerDefinition.command('Run153', {
+const Run153 = TypePerformanceWorkerDefinition.makeCommand('Run153', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1422,7 +1425,7 @@ const Run153 = TypePerformanceWorkerDefinition.command('Run153', {
   },
 })
 
-const Run154 = TypePerformanceWorkerDefinition.command('Run154', {
+const Run154 = TypePerformanceWorkerDefinition.makeCommand('Run154', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1431,7 +1434,7 @@ const Run154 = TypePerformanceWorkerDefinition.command('Run154', {
   },
 })
 
-const Run155 = TypePerformanceWorkerDefinition.command('Run155', {
+const Run155 = TypePerformanceWorkerDefinition.makeCommand('Run155', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1440,7 +1443,7 @@ const Run155 = TypePerformanceWorkerDefinition.command('Run155', {
   },
 })
 
-const Run156 = TypePerformanceWorkerDefinition.command('Run156', {
+const Run156 = TypePerformanceWorkerDefinition.makeCommand('Run156', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1449,7 +1452,7 @@ const Run156 = TypePerformanceWorkerDefinition.command('Run156', {
   },
 })
 
-const Run157 = TypePerformanceWorkerDefinition.command('Run157', {
+const Run157 = TypePerformanceWorkerDefinition.makeCommand('Run157', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1458,7 +1461,7 @@ const Run157 = TypePerformanceWorkerDefinition.command('Run157', {
   },
 })
 
-const Run158 = TypePerformanceWorkerDefinition.command('Run158', {
+const Run158 = TypePerformanceWorkerDefinition.makeCommand('Run158', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1467,7 +1470,7 @@ const Run158 = TypePerformanceWorkerDefinition.command('Run158', {
   },
 })
 
-const Run159 = TypePerformanceWorkerDefinition.command('Run159', {
+const Run159 = TypePerformanceWorkerDefinition.makeCommand('Run159', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1476,7 +1479,7 @@ const Run159 = TypePerformanceWorkerDefinition.command('Run159', {
   },
 })
 
-const Run160 = TypePerformanceWorkerDefinition.command('Run160', {
+const Run160 = TypePerformanceWorkerDefinition.makeCommand('Run160', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1485,7 +1488,7 @@ const Run160 = TypePerformanceWorkerDefinition.command('Run160', {
   },
 })
 
-const Run161 = TypePerformanceWorkerDefinition.command('Run161', {
+const Run161 = TypePerformanceWorkerDefinition.makeCommand('Run161', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1494,7 +1497,7 @@ const Run161 = TypePerformanceWorkerDefinition.command('Run161', {
   },
 })
 
-const Run162 = TypePerformanceWorkerDefinition.command('Run162', {
+const Run162 = TypePerformanceWorkerDefinition.makeCommand('Run162', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1503,7 +1506,7 @@ const Run162 = TypePerformanceWorkerDefinition.command('Run162', {
   },
 })
 
-const Run163 = TypePerformanceWorkerDefinition.command('Run163', {
+const Run163 = TypePerformanceWorkerDefinition.makeCommand('Run163', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1512,7 +1515,7 @@ const Run163 = TypePerformanceWorkerDefinition.command('Run163', {
   },
 })
 
-const Run164 = TypePerformanceWorkerDefinition.command('Run164', {
+const Run164 = TypePerformanceWorkerDefinition.makeCommand('Run164', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1521,7 +1524,7 @@ const Run164 = TypePerformanceWorkerDefinition.command('Run164', {
   },
 })
 
-const Run165 = TypePerformanceWorkerDefinition.command('Run165', {
+const Run165 = TypePerformanceWorkerDefinition.makeCommand('Run165', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1530,7 +1533,7 @@ const Run165 = TypePerformanceWorkerDefinition.command('Run165', {
   },
 })
 
-const Run166 = TypePerformanceWorkerDefinition.command('Run166', {
+const Run166 = TypePerformanceWorkerDefinition.makeCommand('Run166', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1539,7 +1542,7 @@ const Run166 = TypePerformanceWorkerDefinition.command('Run166', {
   },
 })
 
-const Run167 = TypePerformanceWorkerDefinition.command('Run167', {
+const Run167 = TypePerformanceWorkerDefinition.makeCommand('Run167', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1548,7 +1551,7 @@ const Run167 = TypePerformanceWorkerDefinition.command('Run167', {
   },
 })
 
-const Run168 = TypePerformanceWorkerDefinition.command('Run168', {
+const Run168 = TypePerformanceWorkerDefinition.makeCommand('Run168', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1557,7 +1560,7 @@ const Run168 = TypePerformanceWorkerDefinition.command('Run168', {
   },
 })
 
-const Run169 = TypePerformanceWorkerDefinition.command('Run169', {
+const Run169 = TypePerformanceWorkerDefinition.makeCommand('Run169', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1566,7 +1569,7 @@ const Run169 = TypePerformanceWorkerDefinition.command('Run169', {
   },
 })
 
-const Run170 = TypePerformanceWorkerDefinition.command('Run170', {
+const Run170 = TypePerformanceWorkerDefinition.makeCommand('Run170', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1575,7 +1578,7 @@ const Run170 = TypePerformanceWorkerDefinition.command('Run170', {
   },
 })
 
-const Run171 = TypePerformanceWorkerDefinition.command('Run171', {
+const Run171 = TypePerformanceWorkerDefinition.makeCommand('Run171', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1584,7 +1587,7 @@ const Run171 = TypePerformanceWorkerDefinition.command('Run171', {
   },
 })
 
-const Run172 = TypePerformanceWorkerDefinition.command('Run172', {
+const Run172 = TypePerformanceWorkerDefinition.makeCommand('Run172', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1593,7 +1596,7 @@ const Run172 = TypePerformanceWorkerDefinition.command('Run172', {
   },
 })
 
-const Run173 = TypePerformanceWorkerDefinition.command('Run173', {
+const Run173 = TypePerformanceWorkerDefinition.makeCommand('Run173', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1602,7 +1605,7 @@ const Run173 = TypePerformanceWorkerDefinition.command('Run173', {
   },
 })
 
-const Run174 = TypePerformanceWorkerDefinition.command('Run174', {
+const Run174 = TypePerformanceWorkerDefinition.makeCommand('Run174', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1611,7 +1614,7 @@ const Run174 = TypePerformanceWorkerDefinition.command('Run174', {
   },
 })
 
-const Run175 = TypePerformanceWorkerDefinition.command('Run175', {
+const Run175 = TypePerformanceWorkerDefinition.makeCommand('Run175', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1620,7 +1623,7 @@ const Run175 = TypePerformanceWorkerDefinition.command('Run175', {
   },
 })
 
-const Run176 = TypePerformanceWorkerDefinition.command('Run176', {
+const Run176 = TypePerformanceWorkerDefinition.makeCommand('Run176', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1629,7 +1632,7 @@ const Run176 = TypePerformanceWorkerDefinition.command('Run176', {
   },
 })
 
-const Run177 = TypePerformanceWorkerDefinition.command('Run177', {
+const Run177 = TypePerformanceWorkerDefinition.makeCommand('Run177', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1638,7 +1641,7 @@ const Run177 = TypePerformanceWorkerDefinition.command('Run177', {
   },
 })
 
-const Run178 = TypePerformanceWorkerDefinition.command('Run178', {
+const Run178 = TypePerformanceWorkerDefinition.makeCommand('Run178', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1647,7 +1650,7 @@ const Run178 = TypePerformanceWorkerDefinition.command('Run178', {
   },
 })
 
-const Run179 = TypePerformanceWorkerDefinition.command('Run179', {
+const Run179 = TypePerformanceWorkerDefinition.makeCommand('Run179', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1656,7 +1659,7 @@ const Run179 = TypePerformanceWorkerDefinition.command('Run179', {
   },
 })
 
-const Run180 = TypePerformanceWorkerDefinition.command('Run180', {
+const Run180 = TypePerformanceWorkerDefinition.makeCommand('Run180', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1665,7 +1668,7 @@ const Run180 = TypePerformanceWorkerDefinition.command('Run180', {
   },
 })
 
-const Run181 = TypePerformanceWorkerDefinition.command('Run181', {
+const Run181 = TypePerformanceWorkerDefinition.makeCommand('Run181', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1674,7 +1677,7 @@ const Run181 = TypePerformanceWorkerDefinition.command('Run181', {
   },
 })
 
-const Run182 = TypePerformanceWorkerDefinition.command('Run182', {
+const Run182 = TypePerformanceWorkerDefinition.makeCommand('Run182', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1683,7 +1686,7 @@ const Run182 = TypePerformanceWorkerDefinition.command('Run182', {
   },
 })
 
-const Run183 = TypePerformanceWorkerDefinition.command('Run183', {
+const Run183 = TypePerformanceWorkerDefinition.makeCommand('Run183', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1692,7 +1695,7 @@ const Run183 = TypePerformanceWorkerDefinition.command('Run183', {
   },
 })
 
-const Run184 = TypePerformanceWorkerDefinition.command('Run184', {
+const Run184 = TypePerformanceWorkerDefinition.makeCommand('Run184', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1701,7 +1704,7 @@ const Run184 = TypePerformanceWorkerDefinition.command('Run184', {
   },
 })
 
-const Run185 = TypePerformanceWorkerDefinition.command('Run185', {
+const Run185 = TypePerformanceWorkerDefinition.makeCommand('Run185', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1710,7 +1713,7 @@ const Run185 = TypePerformanceWorkerDefinition.command('Run185', {
   },
 })
 
-const Run186 = TypePerformanceWorkerDefinition.command('Run186', {
+const Run186 = TypePerformanceWorkerDefinition.makeCommand('Run186', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1719,7 +1722,7 @@ const Run186 = TypePerformanceWorkerDefinition.command('Run186', {
   },
 })
 
-const Run187 = TypePerformanceWorkerDefinition.command('Run187', {
+const Run187 = TypePerformanceWorkerDefinition.makeCommand('Run187', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1728,7 +1731,7 @@ const Run187 = TypePerformanceWorkerDefinition.command('Run187', {
   },
 })
 
-const Run188 = TypePerformanceWorkerDefinition.command('Run188', {
+const Run188 = TypePerformanceWorkerDefinition.makeCommand('Run188', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1737,7 +1740,7 @@ const Run188 = TypePerformanceWorkerDefinition.command('Run188', {
   },
 })
 
-const Run189 = TypePerformanceWorkerDefinition.command('Run189', {
+const Run189 = TypePerformanceWorkerDefinition.makeCommand('Run189', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1746,7 +1749,7 @@ const Run189 = TypePerformanceWorkerDefinition.command('Run189', {
   },
 })
 
-const Run190 = TypePerformanceWorkerDefinition.command('Run190', {
+const Run190 = TypePerformanceWorkerDefinition.makeCommand('Run190', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1755,7 +1758,7 @@ const Run190 = TypePerformanceWorkerDefinition.command('Run190', {
   },
 })
 
-const Run191 = TypePerformanceWorkerDefinition.command('Run191', {
+const Run191 = TypePerformanceWorkerDefinition.makeCommand('Run191', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1764,7 +1767,7 @@ const Run191 = TypePerformanceWorkerDefinition.command('Run191', {
   },
 })
 
-const Run192 = TypePerformanceWorkerDefinition.command('Run192', {
+const Run192 = TypePerformanceWorkerDefinition.makeCommand('Run192', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1773,7 +1776,7 @@ const Run192 = TypePerformanceWorkerDefinition.command('Run192', {
   },
 })
 
-const Run193 = TypePerformanceWorkerDefinition.command('Run193', {
+const Run193 = TypePerformanceWorkerDefinition.makeCommand('Run193', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1782,7 +1785,7 @@ const Run193 = TypePerformanceWorkerDefinition.command('Run193', {
   },
 })
 
-const Run194 = TypePerformanceWorkerDefinition.command('Run194', {
+const Run194 = TypePerformanceWorkerDefinition.makeCommand('Run194', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1791,7 +1794,7 @@ const Run194 = TypePerformanceWorkerDefinition.command('Run194', {
   },
 })
 
-const Run195 = TypePerformanceWorkerDefinition.command('Run195', {
+const Run195 = TypePerformanceWorkerDefinition.makeCommand('Run195', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1800,7 +1803,7 @@ const Run195 = TypePerformanceWorkerDefinition.command('Run195', {
   },
 })
 
-const Run196 = TypePerformanceWorkerDefinition.command('Run196', {
+const Run196 = TypePerformanceWorkerDefinition.makeCommand('Run196', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1809,7 +1812,7 @@ const Run196 = TypePerformanceWorkerDefinition.command('Run196', {
   },
 })
 
-const Run197 = TypePerformanceWorkerDefinition.command('Run197', {
+const Run197 = TypePerformanceWorkerDefinition.makeCommand('Run197', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1818,7 +1821,7 @@ const Run197 = TypePerformanceWorkerDefinition.command('Run197', {
   },
 })
 
-const Run198 = TypePerformanceWorkerDefinition.command('Run198', {
+const Run198 = TypePerformanceWorkerDefinition.makeCommand('Run198', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1827,7 +1830,7 @@ const Run198 = TypePerformanceWorkerDefinition.command('Run198', {
   },
 })
 
-const Run199 = TypePerformanceWorkerDefinition.command('Run199', {
+const Run199 = TypePerformanceWorkerDefinition.makeCommand('Run199', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1836,7 +1839,7 @@ const Run199 = TypePerformanceWorkerDefinition.command('Run199', {
   },
 })
 
-const Run200 = TypePerformanceWorkerDefinition.command('Run200', {
+const Run200 = TypePerformanceWorkerDefinition.makeCommand('Run200', {
   messages: [WorkerMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -1845,7 +1848,7 @@ const Run200 = TypePerformanceWorkerDefinition.command('Run200', {
   },
 })
 
-const runAll = TypePerformanceWorkerDefinition.step(model => ({
+const runAll = TypePerformanceWorkerDefinition.makeStep(model => ({
   model,
   commands: [
     Run001(),
@@ -2052,228 +2055,233 @@ const runAll = TypePerformanceWorkerDefinition.step(model => ({
 }))
 const TypePerformanceWorkerComposition =
   TypePerformanceWorkerDefinition.makeComposition()
-const Worker = TypePerformanceWorkerComposition.assembleBlock({
-  init: TypePerformanceWorkerComposition.makeInit(() => ({
-    model: WorkerModel.make({ value: 0 }),
-  })),
-  update: TypePerformanceWorkerComposition.makeUpdate((model, message) =>
-    WorkerMessage.match(message, {
-      RequestedRun: () => runAll(model),
-      CompletedRun: () => ({ model }),
-    }),
-  ),
-  operations: {
-    runAll: WorkerMessage.RequestedRun,
-  },
-  EffectsLayer: Layer.mergeAll(
-    Run001.layer,
-    Run002.layer,
-    Run003.layer,
-    Run004.layer,
-    Run005.layer,
-    Run006.layer,
-    Run007.layer,
-    Run008.layer,
-    Run009.layer,
-    Run010.layer,
-    Run011.layer,
-    Run012.layer,
-    Run013.layer,
-    Run014.layer,
-    Run015.layer,
-    Run016.layer,
-    Run017.layer,
-    Run018.layer,
-    Run019.layer,
-    Run020.layer,
-    Run021.layer,
-    Run022.layer,
-    Run023.layer,
-    Run024.layer,
-    Run025.layer,
-    Run026.layer,
-    Run027.layer,
-    Run028.layer,
-    Run029.layer,
-    Run030.layer,
-    Run031.layer,
-    Run032.layer,
-    Run033.layer,
-    Run034.layer,
-    Run035.layer,
-    Run036.layer,
-    Run037.layer,
-    Run038.layer,
-    Run039.layer,
-    Run040.layer,
-    Run041.layer,
-    Run042.layer,
-    Run043.layer,
-    Run044.layer,
-    Run045.layer,
-    Run046.layer,
-    Run047.layer,
-    Run048.layer,
-    Run049.layer,
-    Run050.layer,
-    Run051.layer,
-    Run052.layer,
-    Run053.layer,
-    Run054.layer,
-    Run055.layer,
-    Run056.layer,
-    Run057.layer,
-    Run058.layer,
-    Run059.layer,
-    Run060.layer,
-    Run061.layer,
-    Run062.layer,
-    Run063.layer,
-    Run064.layer,
-    Run065.layer,
-    Run066.layer,
-    Run067.layer,
-    Run068.layer,
-    Run069.layer,
-    Run070.layer,
-    Run071.layer,
-    Run072.layer,
-    Run073.layer,
-    Run074.layer,
-    Run075.layer,
-    Run076.layer,
-    Run077.layer,
-    Run078.layer,
-    Run079.layer,
-    Run080.layer,
-    Run081.layer,
-    Run082.layer,
-    Run083.layer,
-    Run084.layer,
-    Run085.layer,
-    Run086.layer,
-    Run087.layer,
-    Run088.layer,
-    Run089.layer,
-    Run090.layer,
-    Run091.layer,
-    Run092.layer,
-    Run093.layer,
-    Run094.layer,
-    Run095.layer,
-    Run096.layer,
-    Run097.layer,
-    Run098.layer,
-    Run099.layer,
-    Run100.layer,
-    Run101.layer,
-    Run102.layer,
-    Run103.layer,
-    Run104.layer,
-    Run105.layer,
-    Run106.layer,
-    Run107.layer,
-    Run108.layer,
-    Run109.layer,
-    Run110.layer,
-    Run111.layer,
-    Run112.layer,
-    Run113.layer,
-    Run114.layer,
-    Run115.layer,
-    Run116.layer,
-    Run117.layer,
-    Run118.layer,
-    Run119.layer,
-    Run120.layer,
-    Run121.layer,
-    Run122.layer,
-    Run123.layer,
-    Run124.layer,
-    Run125.layer,
-    Run126.layer,
-    Run127.layer,
-    Run128.layer,
-    Run129.layer,
-    Run130.layer,
-    Run131.layer,
-    Run132.layer,
-    Run133.layer,
-    Run134.layer,
-    Run135.layer,
-    Run136.layer,
-    Run137.layer,
-    Run138.layer,
-    Run139.layer,
-    Run140.layer,
-    Run141.layer,
-    Run142.layer,
-    Run143.layer,
-    Run144.layer,
-    Run145.layer,
-    Run146.layer,
-    Run147.layer,
-    Run148.layer,
-    Run149.layer,
-    Run150.layer,
-    Run151.layer,
-    Run152.layer,
-    Run153.layer,
-    Run154.layer,
-    Run155.layer,
-    Run156.layer,
-    Run157.layer,
-    Run158.layer,
-    Run159.layer,
-    Run160.layer,
-    Run161.layer,
-    Run162.layer,
-    Run163.layer,
-    Run164.layer,
-    Run165.layer,
-    Run166.layer,
-    Run167.layer,
-    Run168.layer,
-    Run169.layer,
-    Run170.layer,
-    Run171.layer,
-    Run172.layer,
-    Run173.layer,
-    Run174.layer,
-    Run175.layer,
-    Run176.layer,
-    Run177.layer,
-    Run178.layer,
-    Run179.layer,
-    Run180.layer,
-    Run181.layer,
-    Run182.layer,
-    Run183.layer,
-    Run184.layer,
-    Run185.layer,
-    Run186.layer,
-    Run187.layer,
-    Run188.layer,
-    Run189.layer,
-    Run190.layer,
-    Run191.layer,
-    Run192.layer,
-    Run193.layer,
-    Run194.layer,
-    Run195.layer,
-    Run196.layer,
-    Run197.layer,
-    Run198.layer,
-    Run199.layer,
-    Run200.layer,
-  ),
-})
+const prepareWorker = () =>
+  TypePerformanceWorkerComposition.prepareBlock({
+    init: TypePerformanceWorkerComposition.makeInit(() => ({
+      model: WorkerModel.make({ value: 0 }),
+    })),
+    update: TypePerformanceWorkerComposition.makeUpdate((model, message) =>
+      WorkerMessage.match(message, {
+        RequestedRun: () => runAll(model),
+        CompletedRun: () => ({ model }),
+      }),
+    ),
+    operations: {
+      runAll: WorkerMessage.RequestedRun,
+    },
+    EffectsLayer: Layer.mergeAll(
+      Run001.layer,
+      Run002.layer,
+      Run003.layer,
+      Run004.layer,
+      Run005.layer,
+      Run006.layer,
+      Run007.layer,
+      Run008.layer,
+      Run009.layer,
+      Run010.layer,
+      Run011.layer,
+      Run012.layer,
+      Run013.layer,
+      Run014.layer,
+      Run015.layer,
+      Run016.layer,
+      Run017.layer,
+      Run018.layer,
+      Run019.layer,
+      Run020.layer,
+      Run021.layer,
+      Run022.layer,
+      Run023.layer,
+      Run024.layer,
+      Run025.layer,
+      Run026.layer,
+      Run027.layer,
+      Run028.layer,
+      Run029.layer,
+      Run030.layer,
+      Run031.layer,
+      Run032.layer,
+      Run033.layer,
+      Run034.layer,
+      Run035.layer,
+      Run036.layer,
+      Run037.layer,
+      Run038.layer,
+      Run039.layer,
+      Run040.layer,
+      Run041.layer,
+      Run042.layer,
+      Run043.layer,
+      Run044.layer,
+      Run045.layer,
+      Run046.layer,
+      Run047.layer,
+      Run048.layer,
+      Run049.layer,
+      Run050.layer,
+      Run051.layer,
+      Run052.layer,
+      Run053.layer,
+      Run054.layer,
+      Run055.layer,
+      Run056.layer,
+      Run057.layer,
+      Run058.layer,
+      Run059.layer,
+      Run060.layer,
+      Run061.layer,
+      Run062.layer,
+      Run063.layer,
+      Run064.layer,
+      Run065.layer,
+      Run066.layer,
+      Run067.layer,
+      Run068.layer,
+      Run069.layer,
+      Run070.layer,
+      Run071.layer,
+      Run072.layer,
+      Run073.layer,
+      Run074.layer,
+      Run075.layer,
+      Run076.layer,
+      Run077.layer,
+      Run078.layer,
+      Run079.layer,
+      Run080.layer,
+      Run081.layer,
+      Run082.layer,
+      Run083.layer,
+      Run084.layer,
+      Run085.layer,
+      Run086.layer,
+      Run087.layer,
+      Run088.layer,
+      Run089.layer,
+      Run090.layer,
+      Run091.layer,
+      Run092.layer,
+      Run093.layer,
+      Run094.layer,
+      Run095.layer,
+      Run096.layer,
+      Run097.layer,
+      Run098.layer,
+      Run099.layer,
+      Run100.layer,
+      Run101.layer,
+      Run102.layer,
+      Run103.layer,
+      Run104.layer,
+      Run105.layer,
+      Run106.layer,
+      Run107.layer,
+      Run108.layer,
+      Run109.layer,
+      Run110.layer,
+      Run111.layer,
+      Run112.layer,
+      Run113.layer,
+      Run114.layer,
+      Run115.layer,
+      Run116.layer,
+      Run117.layer,
+      Run118.layer,
+      Run119.layer,
+      Run120.layer,
+      Run121.layer,
+      Run122.layer,
+      Run123.layer,
+      Run124.layer,
+      Run125.layer,
+      Run126.layer,
+      Run127.layer,
+      Run128.layer,
+      Run129.layer,
+      Run130.layer,
+      Run131.layer,
+      Run132.layer,
+      Run133.layer,
+      Run134.layer,
+      Run135.layer,
+      Run136.layer,
+      Run137.layer,
+      Run138.layer,
+      Run139.layer,
+      Run140.layer,
+      Run141.layer,
+      Run142.layer,
+      Run143.layer,
+      Run144.layer,
+      Run145.layer,
+      Run146.layer,
+      Run147.layer,
+      Run148.layer,
+      Run149.layer,
+      Run150.layer,
+      Run151.layer,
+      Run152.layer,
+      Run153.layer,
+      Run154.layer,
+      Run155.layer,
+      Run156.layer,
+      Run157.layer,
+      Run158.layer,
+      Run159.layer,
+      Run160.layer,
+      Run161.layer,
+      Run162.layer,
+      Run163.layer,
+      Run164.layer,
+      Run165.layer,
+      Run166.layer,
+      Run167.layer,
+      Run168.layer,
+      Run169.layer,
+      Run170.layer,
+      Run171.layer,
+      Run172.layer,
+      Run173.layer,
+      Run174.layer,
+      Run175.layer,
+      Run176.layer,
+      Run177.layer,
+      Run178.layer,
+      Run179.layer,
+      Run180.layer,
+      Run181.layer,
+      Run182.layer,
+      Run183.layer,
+      Run184.layer,
+      Run185.layer,
+      Run186.layer,
+      Run187.layer,
+      Run188.layer,
+      Run189.layer,
+      Run190.layer,
+      Run191.layer,
+      Run192.layer,
+      Run193.layer,
+      Run194.layer,
+      Run195.layer,
+      Run196.layer,
+      Run197.layer,
+      Run198.layer,
+      Run199.layer,
+      Run200.layer,
+    ),
+  })
+const Worker: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof WorkerModel,
+  typeof prepareWorker
+> = Block.assemble(prepareWorker)
 const ApplicationMessage = Schema.Never
-const ApplicationDefinition = makeApplicationDefinition({
+const ApplicationDefinition = Block.makeDefinition('Application', {
   Model: WorkerModel,
   Message: ApplicationMessage,
 })
-const WorkerBinding = ApplicationDefinition.bindChild(Worker, {
+const WorkerBinding = ApplicationDefinition.makeBinding(Worker, {
   placement: 'worker',
   read: model => Option.some(model),
   write: (_model, nextWorker) => nextWorker,
@@ -2284,14 +2292,23 @@ const ApplicationComposition = ApplicationDefinition.makeComposition({
 const update = ApplicationComposition.makeUpdate()
 const view = ApplicationComposition.makeView((_model, h) => h.main([]))
 
-export const program = ApplicationComposition.assembleElement({
+const prepareApplicationBlock = () =>
+  ApplicationComposition.prepareBlock({
+    init: ApplicationComposition.makeInit(() =>
+      WorkerBinding.init({ args: [], toParentModel: model => model }),
+    ),
+    update,
+    view,
+    EffectsLayer: Layer.empty,
+  })
+export const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof WorkerModel,
+  typeof prepareApplicationBlock
+> = Block.assemble(prepareApplicationBlock)
+
+export const program = Program.makeElement({
+  block: ApplicationBlock,
   container: null,
-  init: ApplicationComposition.makeInit(() =>
-    WorkerBinding.init({ args: [], toParentModel: model => model }),
-  ),
-  update,
-  view,
-  EffectsLayer: Layer.empty,
 })
 export const providedProgram = program.provide(ClockLayer)
 

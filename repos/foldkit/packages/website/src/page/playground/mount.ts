@@ -266,7 +266,7 @@ const streamPlaygroundEditorMessages = (
     ),
   )
 
-export const MountPlaygroundEditor = PlaygroundDefinition.mountStream(
+export const MountPlaygroundEditor = PlaygroundDefinition.makeMountStream(
   'MountPlaygroundEditor',
   {
     args: {

@@ -9,7 +9,7 @@ import { Icon } from '../icon'
 import { type ThemePreference } from '../themePreference'
 import { ThemeMenuBlock } from './themeMenu'
 
-const THEME_PREFERENCES: ReadonlyArray<ThemePreference> = [
+const THEME_PREFERENCES: ReadonlyArray<typeof ThemePreference.Type> = [
   'Dark',
   'Light',
   'System',
@@ -23,7 +23,10 @@ const THEME_MENU_ANCHOR: MenuAnchorConfig = {
 
 export { ThemeMenuBlock } from './themeMenu'
 
-const preferenceIcon = (preference: ThemePreference, className: string): Html =>
+const preferenceIcon = (
+  preference: typeof ThemePreference.Type,
+  className: string,
+): Html =>
   Match.value(preference).pipe(
     Match.when('Light', () => Icon.sun(className)),
     Match.when('System', () => Icon.computer(className)),
@@ -33,10 +36,10 @@ const preferenceIcon = (preference: ThemePreference, className: string): Html =>
 
 export const view = (
   menu: typeof ThemeMenuBlock.Model.Type,
-  maybeActivePreference: Option.Option<ThemePreference>,
+  maybeActivePreference: Option.Option<typeof ThemePreference.Type>,
   h: ApplicationViewBuilder,
 ): Html => {
-  const activePreference: ThemePreference = Option.getOrElse(
+  const activePreference: typeof ThemePreference.Type = Option.getOrElse(
     maybeActivePreference,
     () => 'System',
   )

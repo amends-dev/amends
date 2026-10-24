@@ -7,7 +7,6 @@ export const Flags = Schema.Struct({
   initialEducationEntryId: Schema.String,
   initialSkillsEntryId: Schema.String,
 })
-export type Flags = typeof Flags.Type
 
 export const flags = Effect.gen(function* () {
   const crypto = yield* Crypto.Crypto

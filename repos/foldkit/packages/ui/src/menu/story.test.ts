@@ -1,7 +1,6 @@
 import { Option, Schema } from 'effect'
 import { Block, Scene, Story } from 'foldkit'
 import { modifyFields } from 'foldkit/struct'
-import type * as Update from 'foldkit/update'
 import { expect } from 'vitest'
 
 import { describe, it } from '@effect/vitest'
@@ -39,16 +38,15 @@ const MenuStoryDefinition = Block.makeDefinition('MenuStory', {
   Message: Schema.Never,
 })
 
-const foldMenuOutMessage = OutMessage.match<Update.Step<Model, never>>({
-  Selected: () => MenuStoryDefinition.step(model => ({ model })),
-  Closed: () => MenuStoryDefinition.step(model => ({ model })),
+const foldMenuOutMessage = MenuStoryDefinition.makeOutMessageFold(TestMenu, {
+  Selected: () => model => ({ model }),
+  Closed: () => model => ({ model }),
 })
 
-const MenuBinding = MenuStoryDefinition.bindChild(TestMenu, {
+const MenuBinding = MenuStoryDefinition.makeBinding(TestMenu, {
   read: model => Option.some(model),
   write: (_model, nextMenu) => nextMenu,
-  outMessage: { fold: foldMenuOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldMenuOutMessage })
 
 const MenuStoryComposition = MenuStoryDefinition.makeComposition({
   bindings: [MenuBinding],
@@ -62,15 +60,14 @@ const RefinedMenuStoryDefinition = Block.makeDefinition('RefinedMenuStory', {
   Message: Schema.Never,
 })
 
-const RefinedMenuBinding = RefinedMenuStoryDefinition.bindChild(RefinedMenu, {
+const RefinedMenuBinding = RefinedMenuStoryDefinition.makeBinding(RefinedMenu, {
   read: model => Option.some(model),
   write: (_model, nextMenu) => nextMenu,
-  outMessage: {
-    fold: RefinedMenu.OutMessage.match<Update.Step<Model, never>>({
-      Selected: () => RefinedMenuStoryDefinition.step(model => ({ model })),
-      Closed: () => RefinedMenuStoryDefinition.step(model => ({ model })),
-    }),
-  },
+}).withOutMessagePolicy({
+  fold: RefinedMenuStoryDefinition.makeOutMessageFold(RefinedMenu, {
+    Selected: () => model => ({ model }),
+    Closed: () => model => ({ model }),
+  }),
 })
 
 const RefinedMenuStoryComposition = RefinedMenuStoryDefinition.makeComposition({
@@ -600,6 +597,60 @@ describe('Menu', () => {
             expect(model.maybeLastButtonPointerType).toStrictEqual(
               Option.none(),
             )
+          }),
+        )
+      })
+    })
+
+    describe('ClickedButton', () => {
+      const mousePress = Message.PressedPointerOnButton({
+        pointerType: 'mouse',
+        button: 0,
+        screenX: 100,
+        screenY: 200,
+        timeStamp: 1000,
+      })
+
+      it('keeps the menu open after the click that follows a mouse press', () => {
+        Story.story(
+          update,
+          givenClosed,
+          Story.message(mousePress),
+          acknowledgeFocusItems,
+          Story.message(Message.ClickedButton()),
+          Story.model(model => {
+            expect(model.isOpen).toBe(true)
+            expect(model.maybeLastButtonPointerType).toStrictEqual(
+              Option.none(),
+            )
+          }),
+        )
+      })
+
+      it('opens when the click did not follow a mouse press', () => {
+        Story.story(
+          update,
+          givenClosed,
+          Story.message(Message.ClickedButton()),
+          acknowledgeFocusItems,
+          Story.model(model => {
+            expect(model.isOpen).toBe(true)
+            expect(model.activationTrigger).toBe('Pointer')
+          }),
+        )
+      })
+
+      it('closes an open menu when the click did not follow a mouse press', () => {
+        Story.story(
+          update,
+          givenOpen,
+          Story.message(Message.ClickedButton()),
+          Story.Command.resolve(
+            FocusMenuButton,
+            Message.CompletedFocusMenuButton(),
+          ),
+          Story.model(model => {
+            expect(model.isOpen).toBe(false)
           }),
         )
       })
@@ -1615,6 +1666,35 @@ describe('Menu', () => {
           expect(model.isOpen).toBe(false)
         }),
       )
+    })
+
+    it('emits no Commands when requestOpen receives an open modal Model', () => {
+      const openModal = modifyFields(
+        init({ id: 'test', isModal: true }).model,
+        {
+          isOpen: () => true,
+          maybeActiveItemIndex: () => Option.some(1),
+          searchQuery: () => 'ed',
+          searchVersion: () => 2,
+        },
+      )
+
+      for (const reopened of [
+        TestMenu.operations.requestOpen(openModal),
+        update(
+          openModal,
+          Message.Opened({ maybeActiveItemIndex: Option.none() }),
+        ),
+      ]) {
+        expect(reopened.commands ?? []).toEqual([])
+        expect(reopened.outMessage).toBeUndefined()
+        expect(reopened.model.isOpen).toBe(true)
+        expect(reopened.model.maybeActiveItemIndex).toStrictEqual(
+          Option.some(1),
+        )
+        expect(reopened.model.searchQuery).toBe('ed')
+        expect(reopened.model.searchVersion).toBe(2)
+      }
     })
 
     it('emits unlockScroll and restoreInert commands when the items container blurs in modal mode', () => {

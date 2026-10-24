@@ -1,25 +1,17 @@
-import { Runtime } from 'foldkit'
+import { Program, Runtime } from 'foldkit'
 
-import { EffectsLayer } from './command'
-import { ApplicationComposition } from './composition'
+import { ApplicationBlock } from './block'
 import { Flags, flags } from './flags'
-import { init } from './init'
-import { Message } from './message'
-import { update } from './update'
-import { view } from './view'
 
-const application = ApplicationComposition.assembleApplication({
-  init,
-  update,
-  view,
-  EffectsLayer,
+const program = Program.make({
+  block: ApplicationBlock,
   Flags,
   container: document.getElementById('root'),
   routing: {
-    onUrlRequest: request => Message.ClickedLink({ request }),
-    onUrlChange: url => Message.ChangedUrl({ url }),
+    onUrlRequest: ApplicationBlock.Message.ClickedLink,
+    onUrlChange: ApplicationBlock.Message.ChangedUrl,
   },
-  devTools: { Message: ApplicationComposition.Message },
+  devTools: { dispatch: true },
 })
 
-Runtime.run(application, { flags })
+Runtime.run(program, { flags })

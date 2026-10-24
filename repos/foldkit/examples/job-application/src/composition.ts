@@ -1,9 +1,6 @@
-import { type Block, Update } from 'foldkit'
-import { modifyFields } from 'foldkit/struct'
+import type { Block } from 'foldkit'
 
 import { ApplicationDefinition } from './definition'
-import { Message } from './message'
-import { Model } from './model'
 import { StepMenuBlock, StepTabsBlock } from './navigationComponents'
 import {
   AttachmentsBlock,
@@ -14,7 +11,7 @@ import {
   WorkHistoryBlock,
 } from './step'
 
-export const PersonalInfoBinding = ApplicationDefinition.bindChild(
+export const PersonalInfoBinding = ApplicationDefinition.makeBinding(
   PersonalInfoBlock,
   {
     field: 'personalInfo',
@@ -22,7 +19,7 @@ export const PersonalInfoBinding = ApplicationDefinition.bindChild(
   },
 )
 
-export const WorkHistoryBinding = ApplicationDefinition.bindChild(
+export const WorkHistoryBinding = ApplicationDefinition.makeBinding(
   WorkHistoryBlock,
   {
     field: 'workHistory',
@@ -35,7 +32,7 @@ export const WorkHistoryBinding = ApplicationDefinition.bindChild(
   },
 )
 
-export const EducationBinding = ApplicationDefinition.bindChild(
+export const EducationBinding = ApplicationDefinition.makeBinding(
   EducationBlock,
   {
     field: 'education',
@@ -48,60 +45,56 @@ export const EducationBinding = ApplicationDefinition.bindChild(
   },
 )
 
-export const SkillsBinding = ApplicationDefinition.bindChild(SkillsBlock, {
+export const SkillsBinding = ApplicationDefinition.makeBinding(SkillsBlock, {
   field: 'skills',
   init: {
     contextToArgs: ({ initialSkillsEntryId }) => [initialSkillsEntryId],
   },
 })
 
-export const CoverLetterBinding = ApplicationDefinition.bindChild(
+export const CoverLetterBinding = ApplicationDefinition.makeBinding(
   CoverLetterBlock,
   {
     field: 'coverLetter',
   },
 )
 
-export const AttachmentsBinding = ApplicationDefinition.bindChild(
+export const AttachmentsBinding = ApplicationDefinition.makeBinding(
   AttachmentsBlock,
   {
     field: 'attachments',
   },
 )
 
-const foldStepMenuOutMessage = StepMenuBlock.OutMessage.match<
-  Update.Step<Model, Message>,
-  typeof StepMenuBlock.OutMessage.Type
->({
-  Selected:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, { currentStep: () => value }),
-    }),
-  Closed: () => ApplicationDefinition.stepNoop(),
+export const StepMenuBinding = ApplicationDefinition.makeBinding(
+  StepMenuBlock,
+  {
+    field: 'stepMenu',
+    init: { contextToArgs: () => [{ id: 'step-menu' }] },
+  },
+).withOutMessagePolicy({
+  fold: ApplicationDefinition.makeOutMessageFold(StepMenuBlock, {
+    Selected: ({ value }) =>
+      ApplicationDefinition.makeFieldsStep(() => ({
+        currentStep: () => value,
+      })),
+    Closed: ApplicationDefinition.makeNoopStep,
+  }),
 })
 
-export const StepMenuBinding = ApplicationDefinition.bindChild(StepMenuBlock, {
-  field: 'stepMenu',
-  outMessage: { fold: foldStepMenuOutMessage },
-  init: { contextToArgs: () => [{ id: 'step-menu' }] },
-})
-
-const foldStepTabsOutMessage = StepTabsBlock.OutMessage.match<
-  Update.Step<Model, Message>,
-  typeof StepTabsBlock.OutMessage.Type
->({
-  Selected:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, { currentStep: () => value }),
-    }),
-})
-
-export const StepTabsBinding = ApplicationDefinition.bindChild(StepTabsBlock, {
-  field: 'stepTabs',
-  outMessage: { fold: foldStepTabsOutMessage },
-  init: { contextToArgs: () => [{ id: 'step-tabs' }] },
+export const StepTabsBinding = ApplicationDefinition.makeBinding(
+  StepTabsBlock,
+  {
+    field: 'stepTabs',
+    init: { contextToArgs: () => [{ id: 'step-tabs' }] },
+  },
+).withOutMessagePolicy({
+  fold: ApplicationDefinition.makeOutMessageFold(StepTabsBlock, {
+    Selected: ({ value }) =>
+      ApplicationDefinition.makeFieldsStep(() => ({
+        currentStep: () => value,
+      })),
+  }),
 })
 
 export const ApplicationComposition = ApplicationDefinition.makeComposition({

@@ -35,14 +35,17 @@ import {
 import { Message } from './message'
 import type { Model, Particle, Point } from './model'
 
-const fadeAlpha = (particle: Particle): number => {
+const fadeAlpha = (particle: typeof Particle.Type): number => {
   const remainingMs = particle.lifespanMs - particle.ageMs
   const fadeIn = Math.min(1, particle.ageMs / FADE_IN_MS)
   const fadeOut = Math.min(1, remainingMs / FADE_OUT_MS)
   return Math.max(0, Math.min(fadeIn, fadeOut))
 }
 
-const currentHue = (particle: Particle, elapsedSeconds: number): number => {
+const currentHue = (
+  particle: typeof Particle.Type,
+  elapsedSeconds: number,
+): number => {
   const drift =
     particle.hueDriftPerSecond * (elapsedSeconds - particle.bornAtSeconds)
   const raw = particle.baseHue + drift
@@ -50,7 +53,7 @@ const currentHue = (particle: Particle, elapsedSeconds: number): number => {
 }
 
 const trailToInstructions = (
-  trail: ReadonlyArray<Point>,
+  trail: ReadonlyArray<typeof Point.Type>,
 ): ReadonlyArray<Canvas.PathInstruction> =>
   Array.matchLeft(trail, {
     onEmpty: () => [],
@@ -65,7 +68,7 @@ const trailToInstructions = (
 const ALPHA_VISIBILITY_EPSILON = 0.01
 
 const particleShapes = (
-  particle: Particle,
+  particle: typeof Particle.Type,
   elapsedSeconds: number,
 ): ReadonlyArray<Canvas.Shape> => {
   if (particle.trail.length < 2) {
@@ -219,7 +222,7 @@ const vignetteStrips: ReadonlyArray<Canvas.Shape> = Array.flatMap(
 )
 
 const particleHeadShape = (
-  particle: Particle,
+  particle: typeof Particle.Type,
   elapsedSeconds: number,
 ): Option.Option<Canvas.Shape> =>
   Option.map(Array.last(particle.trail), head => {
@@ -236,7 +239,7 @@ const particleHeadShape = (
   })
 
 const mouseIndicator = (
-  maybeMousePosition: Option.Option<Point>,
+  maybeMousePosition: Option.Option<typeof Point.Type>,
 ): ReadonlyArray<Canvas.Shape> =>
   Option.match(maybeMousePosition, {
     onNone: () => [],
@@ -250,7 +253,7 @@ const mouseIndicator = (
     ],
   })
 
-const sceneShapes = (model: Model): ReadonlyArray<Canvas.Shape> => [
+const sceneShapes = (model: typeof Model.Type): ReadonlyArray<Canvas.Shape> => [
   backgroundShape,
   ...nebulaShapes(model.elapsedSeconds),
   ...Array.flatMap(model.particles, particle =>
@@ -336,7 +339,7 @@ const slider = (
 
 const controlButton = (
   label: string,
-  onClick: Message,
+  onClick: typeof Message.Type,
   h: ApplicationViewBuilder,
 ): Html =>
   Button.view(
@@ -348,7 +351,10 @@ const controlButton = (
     h,
   )
 
-const controlsView = (model: Model, h: ApplicationViewBuilder): Html =>
+const controlsView = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+): Html =>
   h.div(
     [
       h.Class(

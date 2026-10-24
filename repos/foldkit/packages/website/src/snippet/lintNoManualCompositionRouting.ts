@@ -1,6 +1,6 @@
 // ❌ Bad
 // The authored update receives a wrapper that belongs to the child Binding.
-const BadDialogBinding = ApplicationDefinition.bindChild(Dialog.block, {
+const BadDialogBinding = ApplicationDefinition.makeBinding(Dialog.block, {
   field: 'dialog',
   toParentMessage: message => Message.GotDialogMessage({ message }),
   fromParentMessage: false,
@@ -15,7 +15,7 @@ const badUpdate = ApplicationComposition.makeUpdate((model, message) =>
 
 // ✅ Good
 // Composition derives delivery from the registered Binding.
-const DialogBinding = ApplicationDefinition.bindChild(Dialog.DialogBlock, {
+const DialogBinding = ApplicationDefinition.makeBinding(Dialog.DialogBlock, {
   field: 'dialog',
 })
 

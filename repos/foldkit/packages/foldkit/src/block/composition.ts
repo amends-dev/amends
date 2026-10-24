@@ -1,6 +1,6 @@
 import { type Option, Schema } from 'effect'
 
-import type { BindableBlock } from './binding.js'
+import type { AnyBinding, BindableBlock } from './binding.js'
 import type { NamedIdentity } from './identity.js'
 import type { InstanceKey } from './instanceContext.js'
 
@@ -81,7 +81,52 @@ export type RuntimeBinding = Readonly<{
   ) => boolean
 }>
 
+const blockGraphs = new WeakMap<object, ReadonlyArray<AnyBinding>>()
+
+/** @internal Retains the canonical execution graph behind a completed Block. */
+export const registerRuntimeBindings = (
+  block: object,
+  bindings: ReadonlyArray<AnyBinding>,
+): void => {
+  blockGraphs.set(block, bindings)
+}
+
+/** @internal Reads canonical child occurrences without replacing the public selected Bindings. */
+export function runtimeBindingsOf(
+  block: BindableBlock,
+): ReadonlyArray<AnyBinding>
+export function runtimeBindingsOf(
+  block: Readonly<{ bindings: ReadonlyArray<object> }>,
+): ReadonlyArray<object>
+export function runtimeBindingsOf(
+  block: Readonly<{ bindings: ReadonlyArray<object> }>,
+): ReadonlyArray<object> {
+  return blockGraphs.get(block) ?? block.bindings
+}
+
 const bindings = new WeakMap<object, RuntimeBinding>()
+const bindingAliases = new WeakMap<object, object>()
+
+/** @internal Resolves a policy-equipped Binding to its original child occurrence. */
+export const canonicalBindingOf = (binding: object): object =>
+  bindingAliases.get(binding) ?? binding
+
+/** @internal Associates an immutable policy-equipped value with an existing Binding. */
+export const registerBindingAlias = (alias: object, binding: object): void => {
+  const canonical = canonicalBindingOf(binding)
+
+  if (
+    !bindings.has(canonical) ||
+    bindings.has(alias) ||
+    bindingAliases.has(alias)
+  ) {
+    throw new Error(
+      '[foldkit] A policy-equipped Binding must identify one existing child Binding.',
+    )
+  }
+
+  bindingAliases.set(alias, canonical)
+}
 
 /** @internal Associates a public binding with its Model enumeration and policies. */
 export const registerBinding = (
@@ -93,10 +138,10 @@ export const registerBinding = (
 
 /** @internal Reads the declared composition behavior of one child placement. */
 export const runtimeBindingOf = (binding: object): RuntimeBinding => {
-  const runtime = bindings.get(binding)
+  const runtime = bindings.get(canonicalBindingOf(binding))
   if (runtime === undefined) {
     throw new Error(
-      '[foldkit] Child Binding metadata is unavailable. Create Bindings through the parent Definition.bindChild method.',
+      '[foldkit] Child Binding metadata is unavailable. Create Bindings through the parent Definition.makeBinding method.',
     )
   }
   return runtime
@@ -179,7 +224,7 @@ export const assertBindingParentContracts = (
         bindingParent.ChildInitContext !== parentContract.ChildInitContext)
     ) {
       throw new Error(
-        `[foldkit] Child Binding "${childBinding.placement}" belongs to a different parent Definition contract. Create it through the exact "${parentId}" Definition.bindChild method.`,
+        `[foldkit] Child Binding "${childBinding.placement}" belongs to a different parent Definition contract. Create it through the exact "${parentId}" Definition.makeBinding method.`,
       )
     }
   }
@@ -195,7 +240,7 @@ export const descendantOwnersOf = (
     const { block } = runtimeBindingOf(binding)
     owners.add(block.owner)
 
-    for (const childBinding of block.bindings) {
+    for (const childBinding of runtimeBindingsOf(block)) {
       visit(childBinding)
     }
   }

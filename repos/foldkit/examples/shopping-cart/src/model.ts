@@ -1,7 +1,7 @@
 import { Schema } from 'effect'
 
 import { Cart } from './domain'
-import { ProductsBlock } from './page'
+import * as Products from './page/products'
 import { ApplicationRoute } from './route'
 
 export const Model = Schema.Struct({
@@ -9,6 +9,5 @@ export const Model = Schema.Struct({
   cart: Cart.Cart,
   deliveryInstructions: Schema.String,
   orderPlaced: Schema.Boolean,
-  productsPage: ProductsBlock.Model,
+  productsPage: Products.ProductsBlock.Model,
 })
-export type Model = typeof Model.Type

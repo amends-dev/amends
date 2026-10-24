@@ -1,10 +1,18 @@
-import { Duration, Layer, Option, Schema, SchemaTransformation } from 'effect'
-import { Block, Message, Struct, makeApplicationDefinition } from 'foldkit'
-import type * as Application from 'foldkit/application'
+import {
+  Array,
+  Duration,
+  Layer,
+  Option,
+  Schema,
+  SchemaTransformation,
+} from 'effect'
+import { Block, Message, Program, Struct } from 'foldkit'
 import { childAttributes } from 'foldkit/html'
 
+import * as Animation from '@foldkit/ui/animation'
 import * as Combobox from '@foldkit/ui/combobox'
 import * as Dialog from '@foldkit/ui/dialog'
+import * as DragAndDrop from '@foldkit/ui/dragAndDrop'
 import * as Listbox from '@foldkit/ui/listbox'
 import * as Menu from '@foldkit/ui/menu'
 import * as Popover from '@foldkit/ui/popover'
@@ -36,6 +44,31 @@ export const MultiPicker = Combobox.Multi.create(Item)
 export const ListPicker = Listbox.create<'Apple' | 'Pear'>()
 export const MultiListPicker = Listbox.Multi.create<'Apple' | 'Pear'>()
 export const MenuPicker = Menu.create<'Apple' | 'Pear'>()
+const MenuFoldModel = Schema.Struct({ selected: Item })
+export const MenuFoldFixtureDefinition = Block.makeDefinition(
+  'MenuFoldFixture',
+  {
+    Model: MenuFoldModel,
+    Message: Schema.Never,
+  },
+)
+export const foldMenuChoice = MenuFoldFixtureDefinition.makeOutMessageFold(
+  MenuPicker,
+  {
+    Selected:
+      ({ value }) =>
+      model => ({
+        model: Struct.modifyFields(model, { selected: () => value }),
+      }),
+    Closed: () => MenuFoldFixtureDefinition.makeNoopStep(),
+  },
+)
+export type FoldedMenuModel = Expect<
+  Equal<
+    ReturnType<ReturnType<typeof foldMenuChoice>>['model']['selected'],
+    'Apple' | 'Pear'
+  >
+>
 export const matchMenuOutMessage = MenuPicker.OutMessage.match<
   'Apple' | 'Pear' | 'Closed'
 >({
@@ -65,7 +98,201 @@ export const ToastPayload = Schema.Struct({
   kind: Schema.Literals(['Saved', 'Failed']),
 })
 export const ToastBlock = Toast.make(ToastPayload)
+export const OtherToastBlock = Toast.make(
+  Schema.Struct({ count: Schema.Number }),
+)
+const ToastFixtureModel = Schema.Struct({
+  toast: ToastBlock.Model,
+  otherToast: OtherToastBlock.Model,
+})
+const ToastFixtureDefinition = Block.makeDefinition('ToastFixture', {
+  Model: ToastFixtureModel,
+  Message: Schema.Never,
+})
+export const ToastBinding = ToastFixtureDefinition.makeBinding(ToastBlock, {
+  placement: 'Toast',
+  read: model => Option.some(model.toast),
+  write: (model, toast) => Struct.modifyFields(model, { toast: () => toast }),
+}).withOutMessagePolicy({
+  fold: ToastFixtureDefinition.makeOutMessageFold(ToastBlock, {
+    DismissedToast: () => ToastFixtureDefinition.makeNoopStep(),
+  }),
+})
+export const OtherToastBinding = ToastFixtureDefinition.makeBinding(
+  OtherToastBlock,
+  {
+    placement: 'OtherToast',
+    read: model => Option.some(model.otherToast),
+    write: (model, otherToast) =>
+      Struct.modifyFields(model, { otherToast: () => otherToast }),
+  },
+).withOutMessagePolicy({
+  fold: ToastFixtureDefinition.makeOutMessageFold(OtherToastBlock, {
+    DismissedToast: () => ToastFixtureDefinition.makeNoopStep(),
+  }),
+})
+export const drainToastEntry = ToastBlock.test.drainEntry({
+  binding: ToastBinding,
+  entryId: 'toast-entry-0',
+})
+const ToastInstance = Schema.Struct({
+  id: Schema.Literal('Primary'),
+  model: ToastBlock.Model,
+})
+const KeyedToastFixtureDefinition = Block.makeDefinition('KeyedToastFixture', {
+  Model: Schema.Struct({ toasts: Schema.Array(ToastInstance) }),
+  Message: Schema.Never,
+})
+const foldKeyedToastOutMessage = KeyedToastFixtureDefinition.makeOutMessageFold(
+  ToastBlock,
+  {
+    DismissedToast: () => KeyedToastFixtureDefinition.makeNoopStep(),
+  },
+)
+export const KeyedToastBinding = KeyedToastFixtureDefinition.makeBinding(
+  ToastBlock,
+  {
+    field: 'toasts',
+    key: 'id',
+    childField: 'model',
+  },
+).withOutMessagePolicy({
+  fold: (_key, outMessage) => foldKeyedToastOutMessage(outMessage),
+})
+export const drainKeyedToastEntry = ToastBlock.test.drainEntry({
+  binding: KeyedToastBinding,
+  key: 'Primary',
+  entryId: 'toast-entry-0',
+})
+const DragAndDropFixtureModel = Schema.Struct({
+  dragAndDrop: DragAndDrop.DragAndDropBlock.Model,
+})
+const DragAndDropFixtureDefinition = Block.makeDefinition(
+  'DragAndDropFixture',
+  {
+    Model: DragAndDropFixtureModel,
+    Message: Schema.Never,
+  },
+)
+const foldDragAndDropOutMessage =
+  DragAndDropFixtureDefinition.makeOutMessageFold(
+    DragAndDrop.DragAndDropBlock,
+    {
+      Reordered: () => DragAndDropFixtureDefinition.makeNoopStep(),
+      Cancelled: () => DragAndDropFixtureDefinition.makeNoopStep(),
+    },
+  )
+export const DragAndDropBinding = DragAndDropFixtureDefinition.makeBinding(
+  DragAndDrop.DragAndDropBlock,
+  {
+    placement: 'DragAndDrop',
+    read: model => Option.some(model.dragAndDrop),
+    write: (model, dragAndDrop) =>
+      Struct.modifyFields(model, { dragAndDrop: () => dragAndDrop }),
+  },
+).withOutMessagePolicy({ fold: foldDragAndDropOutMessage })
+export const settleEmbeddedDragAndDropFocus = DragAndDrop.test.settleFocus({
+  binding: DragAndDropBinding,
+  itemId: 'card-1',
+})
+export const resolveEmbeddedKeyboardMove = DragAndDrop.test.resolveKeyboardMove(
+  {
+    binding: DragAndDropBinding,
+    itemId: 'card-1',
+    targetContainerId: 'done',
+    targetIndex: 0,
+  },
+)
+const DragAndDropInstance = Schema.Struct({
+  id: Schema.Literal('Primary'),
+  model: DragAndDrop.DragAndDropBlock.Model,
+})
+const KeyedDragAndDropFixtureDefinition = Block.makeDefinition(
+  'KeyedDragAndDropFixture',
+  {
+    Model: Schema.Struct({
+      dragAndDrops: Schema.Array(DragAndDropInstance),
+    }),
+    Message: Schema.Never,
+  },
+)
+const foldKeyedDragAndDropOutMessage =
+  KeyedDragAndDropFixtureDefinition.makeOutMessageFold(
+    DragAndDrop.DragAndDropBlock,
+    {
+      Reordered: () => KeyedDragAndDropFixtureDefinition.makeNoopStep(),
+      Cancelled: () => KeyedDragAndDropFixtureDefinition.makeNoopStep(),
+    },
+  )
+export const KeyedDragAndDropBinding =
+  KeyedDragAndDropFixtureDefinition.makeBinding(DragAndDrop.DragAndDropBlock, {
+    placement: 'DragAndDrops',
+    keySchema: Schema.Literal('Primary'),
+    readAll: model => model.dragAndDrops,
+    key: instance => instance.id,
+    read: instance => instance.model,
+    writeAt: (model, key, nextDragAndDrop) =>
+      Struct.modifyFields(model, {
+        dragAndDrops: Array.map(instance =>
+          instance.id === key
+            ? DragAndDropInstance.make({ id: key, model: nextDragAndDrop })
+            : instance,
+        ),
+      }),
+  }).withOutMessagePolicy({
+    fold: (_key, outMessage) => foldKeyedDragAndDropOutMessage(outMessage),
+  })
+export const settleKeyedDragAndDropFocus = DragAndDrop.test.settleFocus({
+  binding: KeyedDragAndDropBinding,
+  key: 'Primary',
+  itemId: 'card-1',
+})
+export const resolveKeyedKeyboardMove = DragAndDrop.test.resolveKeyboardMove({
+  binding: KeyedDragAndDropBinding,
+  key: 'Primary',
+  itemId: 'card-1',
+  targetContainerId: 'done',
+  targetIndex: 0,
+})
+export const animationViewInputs: Animation.ViewInputs = {
+  toView: () => null,
+}
+const AnimationInstance = Schema.Struct({
+  id: Schema.Literal('Primary'),
+  model: Animation.AnimationBlock.Model,
+})
+const KeyedAnimationFixtureDefinition = Block.makeDefinition(
+  'KeyedAnimationFixture',
+  {
+    Model: Schema.Struct({ animations: Schema.Array(AnimationInstance) }),
+    Message: Schema.Never,
+  },
+)
+export const KeyedAnimationBinding =
+  KeyedAnimationFixtureDefinition.makeBinding(Animation.AnimationBlock, {
+    field: 'animations',
+    key: 'id',
+    childField: 'model',
+  })
+const makeKeyedAnimationOutMessageFold = (key: 'Primary') =>
+  KeyedAnimationFixtureDefinition.makeOutMessageFold(Animation.AnimationBlock, {
+    StartedLeaveAnimating: () =>
+      KeyedAnimationBinding.requestWaitForLeaveSettlement(key),
+    TransitionedOut: KeyedAnimationFixtureDefinition.makeNoopStep,
+  })
+export const KeyedAnimationFixtureComposition =
+  KeyedAnimationFixtureDefinition.makeComposition({
+    bindings: [
+      KeyedAnimationBinding.withOutMessagePolicy({
+        fold: (key, outMessage) =>
+          makeKeyedAnimationOutMessageFold(key)(outMessage),
+      }),
+    ],
+  })
+export const keyedAnimationLeaveWait =
+  KeyedAnimationBinding.requestWaitForLeaveSettlement('Primary')
 export const Model = Schema.Struct({
+  animation: Animation.AnimationBlock.Model,
   dialog: Dialog.DialogBlock.Model,
   picker: Picker.Model,
   popover: Popover.PopoverBlock.Model,
@@ -74,71 +301,98 @@ export const Model = Schema.Struct({
 export const ParentMessage = Message.defineMessageUnion({
   ClickedClear: {},
 })
-export const ApplicationDefinition = makeApplicationDefinition({
+export const ApplicationDefinition = Block.makeDefinition('Application', {
   Model,
   Message: ParentMessage,
 })
 
-export const DialogBinding = ApplicationDefinition.bindChild(
+export const AnimationBinding = ApplicationDefinition.makeBinding(
+  Animation.AnimationBlock,
+  {
+    field: 'animation',
+    init: { contextToArgs: () => [{ id: 'details-animation' }] },
+  },
+)
+const foldAnimationOutMessage = ApplicationDefinition.makeOutMessageFold(
+  Animation.AnimationBlock,
+  {
+    StartedLeaveAnimating: () =>
+      AnimationBinding.requestWaitForLeaveSettlement(),
+    TransitionedOut: ApplicationDefinition.makeNoopStep,
+  },
+)
+export const AnimationBindingWithOutMessagePolicy =
+  AnimationBinding.withOutMessagePolicy({ fold: foldAnimationOutMessage })
+
+export const DialogBinding = ApplicationDefinition.makeBinding(
   Dialog.DialogBlock,
   {
     field: 'dialog',
     init: { contextToArgs: () => [{ id: 'details' }] },
-    outMessage: {
-      fold: Dialog.DialogBlock.OutMessage.match({
-        Opened: () => ApplicationDefinition.step(model => ({ model })),
-        Closed: () => ApplicationDefinition.step(model => ({ model })),
-        CompletedClose: () => ApplicationDefinition.step(model => ({ model })),
-      }),
-    },
   },
-)
-
-export const PickerBinding = ApplicationDefinition.bindChild(Picker, {
-  field: 'picker',
-  init: { contextToArgs: () => [{ id: 'fruit' }] },
-  outMessage: {
-    fold: Picker.OutMessage.match({
-      Selected: ({ value }) =>
-        ApplicationDefinition.step(model => ({
-          model: Struct.modifyFields(model, {
-            maybeSelected: () => Option.some(value),
-          }),
-        })),
-      ClearedSelection: () =>
-        ApplicationDefinition.step(model => ({
-          model: Struct.modifyFields(model, {
-            maybeSelected: () => Option.none(),
-          }),
-        })),
-    }),
-  },
+).withOutMessagePolicy({
+  fold: ApplicationDefinition.makeOutMessageFold(Dialog.DialogBlock, {
+    Opened: () => ApplicationDefinition.makeNoopStep(),
+    Closed: () => ApplicationDefinition.makeNoopStep(),
+    CompletedClose: () => ApplicationDefinition.makeNoopStep(),
+  }),
 })
 
-export const PopoverBinding = ApplicationDefinition.bindChild(
+export const PickerBinding = ApplicationDefinition.makeBinding(Picker, {
+  field: 'picker',
+  init: { contextToArgs: () => [{ id: 'fruit' }] },
+}).withOutMessagePolicy({
+  fold: ApplicationDefinition.makeOutMessageFold(Picker, {
+    Selected: ({ value }) =>
+      ApplicationDefinition.makeStep(model => ({
+        model: Struct.modifyFields(model, {
+          maybeSelected: () => Option.some(value),
+        }),
+      })),
+    ClearedSelection: () =>
+      ApplicationDefinition.makeStep(model => ({
+        model: Struct.modifyFields(model, {
+          maybeSelected: () => Option.none(),
+        }),
+      })),
+  }),
+})
+
+export const PopoverBinding = ApplicationDefinition.makeBinding(
   Popover.PopoverBlock,
   {
     field: 'popover',
     init: { contextToArgs: () => [{ id: 'help' }] },
-    outMessage: {
-      fold: Popover.PopoverBlock.OutMessage.match({
-        Opened: () => ApplicationDefinition.step(model => ({ model })),
-        Closed: () => ApplicationDefinition.step(model => ({ model })),
-      }),
-    },
   },
-)
+).withOutMessagePolicy({
+  fold: ApplicationDefinition.makeOutMessageFold(Popover.PopoverBlock, {
+    Opened: () => ApplicationDefinition.makeNoopStep(),
+    Closed: () => ApplicationDefinition.makeNoopStep(),
+  }),
+})
 
-export type Composition = Application.Composition<
+export type Composition = Block.Composition<
+  typeof ApplicationDefinition.owner,
   typeof Model,
   typeof ParentMessage,
+  undefined,
   readonly [],
-  readonly [typeof DialogBinding, typeof PickerBinding, typeof PopoverBinding]
+  readonly [
+    typeof AnimationBindingWithOutMessagePolicy,
+    typeof DialogBinding,
+    typeof PickerBinding,
+    typeof PopoverBinding,
+  ]
 >
 
 export const createComposition = (): Composition =>
   ApplicationDefinition.makeComposition({
-    bindings: [DialogBinding, PickerBinding, PopoverBinding],
+    bindings: [
+      AnimationBindingWithOutMessagePolicy,
+      DialogBinding,
+      PickerBinding,
+      PopoverBinding,
+    ],
     mounts: [],
   })
 export type Builder = Block.ViewBuilderFor<Composition>
@@ -194,16 +448,46 @@ export const author = (composition: Composition) => {
   const update = composition.makeUpdate((model, _message) => ({ model }))
   const view = composition.makeView((model, h) => helper(model, h))
 
-  return composition.assembleElement({ init, update, view, container: null })
+  const prepare = () => composition.prepareBlock({ init, update, view })
+  const completedBlock: Block.FromAssemblyWithView<
+    typeof Model,
+    typeof prepare
+  > = Block.assemble(prepare)
+  return completedBlock
 }
 
-export const application = author(createComposition())
+export const ElementBlock = author(createComposition())
+export const application = Program.makeElement({
+  block: ElementBlock,
+  container: null,
+})
 
 export type GenericAssertions = [
   Expect<
     Equal<ReturnType<typeof matchMenuOutMessage>, 'Apple' | 'Pear' | 'Closed'>
   >,
   Expect<Equal<Parameters<typeof DialogBinding.requestOpen>, []>>,
+  Expect<
+    Equal<Parameters<typeof AnimationBinding.requestWaitForLeaveSettlement>, []>
+  >,
+  Expect<
+    Equal<
+      ReturnType<typeof AnimationBinding.requestWaitForLeaveSettlement>,
+      ReturnType<typeof AnimationBinding.requestResume>
+    >
+  >,
+  Expect<
+    Equal<
+      Parameters<typeof KeyedAnimationBinding.requestWaitForLeaveSettlement>,
+      [key: 'Primary']
+    >
+  >,
+  Expect<
+    Equal<
+      ReturnType<typeof KeyedAnimationBinding.requestWaitForLeaveSettlement>,
+      ReturnType<typeof KeyedAnimationBinding.requestResume>
+    >
+  >,
   Expect<
     Equal<
       Parameters<typeof PickerBinding.requestSelectItem>,
@@ -331,29 +615,45 @@ const withViewAndOutMessageImplementation = {
   view,
   EffectsLayer: Layer.empty,
 }
-export const WithViewAndOutMessage =
-  DeclarationWithOutMessageComposition.assembleBlock(
+const prepareWithViewAndOutMessage = () =>
+  DeclarationWithOutMessageComposition.prepareBlock(
     withViewAndOutMessageImplementation,
   )
-export const WithOutMessageOnly =
-  DeclarationWithOutMessageComposition.assembleBlock({
+export const WithViewAndOutMessage: Block.FromAssemblyWithViewAndOutMessage<
+  typeof ShapeModel,
+  typeof prepareWithViewAndOutMessage
+> = Block.assemble(prepareWithViewAndOutMessage)
+const prepareWithOutMessageOnly = () =>
+  DeclarationWithOutMessageComposition.prepareBlock({
     init: withOutMessageInit,
     update,
     EffectsLayer: Layer.empty,
   })
-export const WithViewOnly =
-  DeclarationWithoutOutMessageComposition.assembleBlock({
+export const WithOutMessageOnly: Block.FromAssemblyWithOutMessage<
+  typeof ShapeModel,
+  typeof prepareWithOutMessageOnly
+> = Block.assemble(prepareWithOutMessageOnly)
+const prepareWithViewOnly = () =>
+  DeclarationWithoutOutMessageComposition.prepareBlock({
     init: withoutOutMessageInit,
     update,
     view: plainView,
     EffectsLayer: Layer.empty,
   })
-export const WithoutViewOrOutMessage =
-  DeclarationWithoutOutMessageComposition.assembleBlock({
+export const WithViewOnly: Block.FromAssemblyWithView<
+  typeof ShapeModel,
+  typeof prepareWithViewOnly
+> = Block.assemble(prepareWithViewOnly)
+const prepareWithoutViewOrOutMessage = () =>
+  DeclarationWithoutOutMessageComposition.prepareBlock({
     init: withoutOutMessageInit,
     update,
     EffectsLayer: Layer.empty,
   })
+export const WithoutViewOrOutMessage: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ShapeModel,
+  typeof prepareWithoutViewOrOutMessage
+> = Block.assemble(prepareWithoutViewOrOutMessage)
 
 type BroadOutMessageBlock = Block.Block<
   typeof DeclarationWithOutMessageDefinition.owner,

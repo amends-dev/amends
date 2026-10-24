@@ -6,18 +6,13 @@ import { modifyFields } from 'foldkit/struct'
 import { describe, it } from '@effect/vitest'
 
 import * as Animation from '../animation/block.js'
-import {
-  type EntryHandlers,
-  SwipeState,
-  type Variant,
-  test as toastTest,
-} from './toast.js'
+import { type EntryHandlers, SwipeState, type Variant } from './toast.js'
 import { makeFixture } from './toast.js'
 
 const TestPayload = Schema.Struct({ body: Schema.String })
-type TestPayload = typeof TestPayload.Type
 
 const ToastFixture = makeFixture(TestPayload)
+const toastTest = ToastFixture.test
 const block = ToastFixture.block
 const toastInit = ToastFixture.init
 
@@ -181,6 +176,45 @@ describe('Toast', () => {
         Scene.given(withEntry()),
         Scene.expect(entryZero).toHaveHandler('mouseenter'),
         Scene.expect(entryZero).toHaveHandler('mouseleave'),
+      )
+    })
+
+    it('dispatches dismiss from interactive entry content', () => {
+      const view = (model: Model, h: TestHtmlBuilder) =>
+        ToastFixture.view(
+          model,
+          {
+            position: 'BottomRight',
+            entryToView: (_entry, handlers) =>
+              h.button(handlers.dismiss, ['Dismiss']),
+          },
+          h,
+        )
+
+      Scene.scene(
+        { update: block.update, view },
+        Scene.given(withEntry()),
+        Scene.click(Scene.role('button', { name: 'Dismiss' })),
+        Scene.expect(entryZero).toHaveAttr('data-leave', ''),
+        Scene.Command.resolve(
+          toastTest.matchWaitForPaint(
+            'test-entry-0',
+            LEAVE_TRANSITION_GENERATION,
+          ),
+          Animation.Message.CompletedWaitForPaint({
+            generation: LEAVE_TRANSITION_GENERATION,
+          }),
+        ),
+        Scene.Command.resolve(
+          toastTest.matchWaitForAnimationSettled(
+            'test-entry-0',
+            LEAVE_TRANSITION_GENERATION,
+          ),
+          Animation.Message.EndedAnimation({
+            generation: LEAVE_TRANSITION_GENERATION,
+          }),
+        ),
+        Scene.expect(entryZero).toBeAbsent(),
       )
     })
 

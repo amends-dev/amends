@@ -1,6 +1,5 @@
 import { Array, Option } from 'effect'
-import { type Block, Calendar as FoldkitCalendar, Update } from 'foldkit'
-import { modifyFields } from 'foldkit/struct'
+import { type Block, Calendar as FoldkitCalendar } from 'foldkit'
 
 import {
   CalendarBlock,
@@ -21,122 +20,87 @@ import {
   ItemMultiListboxBlock,
 } from '../listbox'
 import { DemoMenuBlock } from '../menu'
-import { Message } from '../message'
-import { Model } from '../model'
 import { PlanRadioGroupBlock } from '../radioGroup'
 import { DemoTabsBlock } from '../tabs'
 import { ToastBlock } from '../toast'
 import { ActivityVirtualListBlock } from '../virtualList'
-import { AnimationDemoBinding } from './animation'
+import { AnimationDemoBindingWithOutMessagePolicy } from './animation'
 import { DragAndDropDemoBinding } from './dragAndDrop'
 
-const foldDialogOutMessage = DialogBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Opened: () => UiDefinition.stepNoop(),
-  Closed: () => UiDefinition.stepNoop(),
-  CompletedClose: () => UiDefinition.stepNoop(),
+const foldDialogOutMessage = UiDefinition.makeOutMessageFold(DialogBlock, {
+  Opened: UiDefinition.makeNoopStep,
+  Closed: UiDefinition.makeNoopStep,
+  CompletedClose: UiDefinition.makeNoopStep,
 })
 
-const foldMenuOutMessage = DemoMenuBlock.OutMessage.match<
-  Update.Step<Model, Message>,
-  typeof DemoMenuBlock.OutMessage.Type
->({
-  Selected: () => UiDefinition.stepNoop(),
-  Closed: () => UiDefinition.stepNoop(),
+const foldMenuOutMessage = UiDefinition.makeOutMessageFold(DemoMenuBlock, {
+  Selected: UiDefinition.makeNoopStep,
+  Closed: UiDefinition.makeNoopStep,
 })
 
-const foldPopoverOutMessage = PopoverBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Opened: () => UiDefinition.stepNoop(),
-  Closed: () => UiDefinition.stepNoop(),
+const foldPopoverOutMessage = UiDefinition.makeOutMessageFold(PopoverBlock, {
+  Opened: UiDefinition.makeNoopStep,
+  Closed: UiDefinition.makeNoopStep,
 })
 
-const foldToastOutMessage = ToastBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  DismissedToast: () => UiDefinition.stepNoop(),
+const foldTooltipOutMessage = UiDefinition.makeOutMessageFold(TooltipBlock, {
+  Shown: UiDefinition.makeNoopStep,
+  Hidden: UiDefinition.makeNoopStep,
 })
 
-const foldTooltipOutMessage = TooltipBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Shown: () => UiDefinition.stepNoop(),
-  Hidden: () => UiDefinition.stepNoop(),
-})
-
-const foldHoverIntentOutMessage = HoverIntentBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Opened: () => UiDefinition.stepNoop(),
-  Closed: () => UiDefinition.stepNoop(),
-})
-
-export const MobileMenuDialogBinding = UiDefinition.bindChild(DialogBlock, {
+export const MobileMenuDialogBinding = UiDefinition.makeBinding(DialogBlock, {
   field: 'mobileMenuDialog',
   init: { contextToArgs: () => [{ id: 'mobile-menu' }] },
-  outMessage: { fold: foldDialogOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
-const foldComboboxDemoOutMessage = CityComboboxBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Selected:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, {
-        maybeComboboxDemoSelectedCity: () => Option.some(value),
-      }),
-    }),
-  ClearedSelection: () => UiDefinition.stepNoop(),
-})
-
-export const ComboboxDemoBinding = UiDefinition.bindChild(CityComboboxBlock, {
+export const ComboboxDemoBinding = UiDefinition.makeBinding(CityComboboxBlock, {
   field: 'comboboxDemo',
   init: { contextToArgs: () => [{ id: 'combobox-demo' }] },
-  outMessage: { fold: foldComboboxDemoOutMessage },
-})
-
-const foldComboboxNullableDemoOutMessage = CityComboboxBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Selected:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, {
-        maybeComboboxNullableDemoSelectedCity:
-          maybeComboboxNullableDemoSelectedCity =>
-            Option.contains(maybeComboboxNullableDemoSelectedCity, value)
-              ? Option.none()
-              : Option.some(value),
-      }),
-    }),
-  ClearedSelection: () => model => ({
-    model: modifyFields(model, {
-      maybeComboboxNullableDemoSelectedCity: () => Option.none(),
-    }),
+}).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(CityComboboxBlock, {
+    Selected: ({ value }) =>
+      UiDefinition.makeFieldsStep(() => ({
+        maybeComboboxDemoSelectedCity: () => Option.some(value),
+      })),
+    ClearedSelection: UiDefinition.makeNoopStep,
   }),
 })
 
-export const ComboboxNullableDemoBinding = UiDefinition.bindChild(
+export const ComboboxNullableDemoBinding = UiDefinition.makeBinding(
   CityComboboxBlock,
   {
     field: 'comboboxNullableDemo',
     init: {
       contextToArgs: () => [{ id: 'combobox-nullable-demo', nullable: true }],
     },
-    outMessage: { fold: foldComboboxNullableDemoOutMessage },
   },
-)
+).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(CityComboboxBlock, {
+    Selected: ({ value }) =>
+      UiDefinition.makeFieldsStep(() => ({
+        maybeComboboxNullableDemoSelectedCity:
+          maybeComboboxNullableDemoSelectedCity =>
+            Option.contains(maybeComboboxNullableDemoSelectedCity, value)
+              ? Option.none()
+              : Option.some(value),
+      })),
+    ClearedSelection: () =>
+      UiDefinition.makeFieldsStep(() => ({
+        maybeComboboxNullableDemoSelectedCity: () => Option.none(),
+      })),
+  }),
+})
 
-const foldComboboxMultiDemoOutMessage = CityMultiComboboxBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Selected:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, {
+export const ComboboxMultiDemoBinding = UiDefinition.makeBinding(
+  CityMultiComboboxBlock,
+  {
+    field: 'comboboxMultiDemo',
+    init: { contextToArgs: () => [{ id: 'combobox-multi-demo' }] },
+  },
+).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(CityMultiComboboxBlock, {
+    Selected: ({ value }) =>
+      UiDefinition.makeFieldsStep(() => ({
         comboboxMultiDemoSelectedCities: comboboxMultiDemoSelectedCities =>
           Array.contains(comboboxMultiDemoSelectedCities, value)
             ? Array.filter(
@@ -144,54 +108,28 @@ const foldComboboxMultiDemoOutMessage = CityMultiComboboxBlock.OutMessage.match<
                 city => city !== value,
               )
             : Array.append(comboboxMultiDemoSelectedCities, value),
-      }),
-    }),
-  ClearedSelection: () => UiDefinition.stepNoop(),
+      })),
+    ClearedSelection: UiDefinition.makeNoopStep,
+  }),
 })
 
-export const ComboboxMultiDemoBinding = UiDefinition.bindChild(
-  CityMultiComboboxBlock,
-  {
-    field: 'comboboxMultiDemo',
-    init: { contextToArgs: () => [{ id: 'combobox-multi-demo' }] },
-    outMessage: { fold: foldComboboxMultiDemoOutMessage },
-  },
-)
-
-const foldComboboxPlacementLockDemoOutMessage =
-  CityComboboxBlock.OutMessage.match<Update.Step<Model, Message>>({
-    Selected:
-      ({ value }) =>
-      model => ({
-        model: modifyFields(model, {
-          maybeComboboxPlacementLockDemoSelectedCity: () => Option.some(value),
-        }),
-      }),
-    ClearedSelection: () => UiDefinition.stepNoop(),
-  })
-
-export const ComboboxPlacementLockDemoBinding = UiDefinition.bindChild(
+export const ComboboxPlacementLockDemoBinding = UiDefinition.makeBinding(
   CityComboboxBlock,
   {
     field: 'comboboxPlacementLockDemo',
     init: { contextToArgs: () => [{ id: 'combobox-placement-lock-demo' }] },
-    outMessage: { fold: foldComboboxPlacementLockDemoOutMessage },
   },
-)
+).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(CityComboboxBlock, {
+    Selected: ({ value }) =>
+      UiDefinition.makeFieldsStep(() => ({
+        maybeComboboxPlacementLockDemoSelectedCity: () => Option.some(value),
+      })),
+    ClearedSelection: UiDefinition.makeNoopStep,
+  }),
+})
 
-const foldComboboxSelectOnFocusDemoOutMessage =
-  CityComboboxBlock.OutMessage.match<Update.Step<Model, Message>>({
-    Selected:
-      ({ value }) =>
-      model => ({
-        model: modifyFields(model, {
-          maybeComboboxSelectOnFocusDemoSelectedCity: () => Option.some(value),
-        }),
-      }),
-    ClearedSelection: () => UiDefinition.stepNoop(),
-  })
-
-export const ComboboxSelectOnFocusDemoBinding = UiDefinition.bindChild(
+export const ComboboxSelectOnFocusDemoBinding = UiDefinition.makeBinding(
   CityComboboxBlock,
   {
     field: 'comboboxSelectOnFocusDemo',
@@ -200,117 +138,92 @@ export const ComboboxSelectOnFocusDemoBinding = UiDefinition.bindChild(
         { id: 'combobox-select-on-focus-demo', selectInputOnFocus: true },
       ],
     },
-    outMessage: { fold: foldComboboxSelectOnFocusDemoOutMessage },
   },
-)
-
-export const DialogDemoBinding = UiDefinition.bindChild(DialogBlock, {
-  field: 'dialogDemo',
-  init: { contextToArgs: () => [{ id: 'dialog-demo' }] },
-  outMessage: { fold: foldDialogOutMessage },
+).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(CityComboboxBlock, {
+    Selected: ({ value }) =>
+      UiDefinition.makeFieldsStep(() => ({
+        maybeComboboxSelectOnFocusDemoSelectedCity: () => Option.some(value),
+      })),
+    ClearedSelection: UiDefinition.makeNoopStep,
+  }),
 })
 
-export const DialogAnimatedDemoBinding = UiDefinition.bindChild(DialogBlock, {
+export const DialogDemoBinding = UiDefinition.makeBinding(DialogBlock, {
+  field: 'dialogDemo',
+  init: { contextToArgs: () => [{ id: 'dialog-demo' }] },
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
+
+export const DialogAnimatedDemoBinding = UiDefinition.makeBinding(DialogBlock, {
   field: 'dialogAnimatedDemo',
   init: {
     contextToArgs: () => [{ id: 'dialog-animated-demo', isAnimated: true }],
   },
-  outMessage: { fold: foldDialogOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
-export const OverlayDialogDemoBinding = UiDefinition.bindChild(DialogBlock, {
+export const OverlayDialogDemoBinding = UiDefinition.makeBinding(DialogBlock, {
   field: 'overlayDialogDemo',
   init: { contextToArgs: () => [{ id: 'overlay-dialog-demo' }] },
-  outMessage: { fold: foldDialogOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
-const foldOverlayComboboxDemoOutMessage = CityComboboxBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Selected:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, {
-        maybeOverlayComboboxDemoSelectedCity: () => Option.some(value),
-      }),
-    }),
-  ClearedSelection: () => UiDefinition.stepNoop(),
-})
-
-export const OverlayComboboxDemoBinding = UiDefinition.bindChild(
+export const OverlayComboboxDemoBinding = UiDefinition.makeBinding(
   CityComboboxBlock,
   {
     field: 'overlayComboboxDemo',
     init: { contextToArgs: () => [{ id: 'overlay-combobox-demo' }] },
-    outMessage: { fold: foldOverlayComboboxDemoOutMessage },
   },
-)
+).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(CityComboboxBlock, {
+    Selected: ({ value }) =>
+      UiDefinition.makeFieldsStep(() => ({
+        maybeOverlayComboboxDemoSelectedCity: () => Option.some(value),
+      })),
+    ClearedSelection: UiDefinition.makeNoopStep,
+  }),
+})
 
-export const NestedDialogParentDemoBinding = UiDefinition.bindChild(
+export const NestedDialogParentDemoBinding = UiDefinition.makeBinding(
   DialogBlock,
   {
     field: 'nestedDialogParentDemo',
     init: { contextToArgs: () => [{ id: 'nested-dialog-parent-demo' }] },
-    outMessage: { fold: foldDialogOutMessage },
   },
-)
+).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
-export const NestedDialogChildDemoBinding = UiDefinition.bindChild(
+export const NestedDialogChildDemoBinding = UiDefinition.makeBinding(
   DialogBlock,
   {
     field: 'nestedDialogChildDemo',
     init: { contextToArgs: () => [{ id: 'nested-dialog-child-demo' }] },
-    outMessage: { fold: foldDialogOutMessage },
   },
-)
+).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
-const foldCalendarBasicDemoOutMessage = CalendarBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  SelectedDate:
-    ({ date }) =>
-    model => ({
-      model: modifyFields(model, {
+export const CalendarBasicDemoBinding = UiDefinition.makeBinding(
+  CalendarBlock,
+  {
+    field: 'calendarBasicDemo',
+    init: {
+      contextToArgs: today => [
+        {
+          id: 'calendar-basic-demo',
+          today,
+          minDate: FoldkitCalendar.subtractYears(today, 1),
+          maxDate: FoldkitCalendar.addYears(today, 1),
+        },
+      ],
+    },
+  },
+).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(CalendarBlock, {
+    SelectedDate: ({ date }) =>
+      UiDefinition.makeFieldsStep(() => ({
         maybeCalendarBasicDemoSelectedDate: () => Option.some(date),
-      }),
-    }),
-  ChangedViewMonth: () => UiDefinition.stepNoop(),
-})
-
-export const CalendarBasicDemoBinding = UiDefinition.bindChild(CalendarBlock, {
-  field: 'calendarBasicDemo',
-  init: {
-    contextToArgs: today => [
-      {
-        id: 'calendar-basic-demo',
-        today,
-        minDate: FoldkitCalendar.subtractYears(today, 1),
-        maxDate: FoldkitCalendar.addYears(today, 1),
-      },
-    ],
-  },
-  outMessage: { fold: foldCalendarBasicDemoOutMessage },
-})
-
-const foldDatePickerBasicDemoOutMessage = DatePickerBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  SelectedDate:
-    ({ date }) =>
-    model => ({
-      model: modifyFields(model, {
-        maybeDatePickerBasicDemoSelectedDate: () => Option.some(date),
-      }),
-    }),
-  ClearedDate: () => model => ({
-    model: modifyFields(model, {
-      maybeDatePickerBasicDemoSelectedDate: () => Option.none(),
-    }),
+      })),
+    ChangedViewMonth: UiDefinition.makeNoopStep,
   }),
-  ChangedViewMonth: () => UiDefinition.stepNoop(),
 })
 
-export const DatePickerBasicDemoBinding = UiDefinition.bindChild(
+export const DatePickerBasicDemoBinding = UiDefinition.makeBinding(
   DatePickerBlock,
   {
     field: 'datePickerBasicDemo',
@@ -324,56 +237,59 @@ export const DatePickerBasicDemoBinding = UiDefinition.bindChild(
         },
       ],
     },
-    outMessage: { fold: foldDatePickerBasicDemoOutMessage },
   },
-)
+).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(DatePickerBlock, {
+    SelectedDate: ({ date }) =>
+      UiDefinition.makeFieldsStep(() => ({
+        maybeDatePickerBasicDemoSelectedDate: () => Option.some(date),
+      })),
+    ClearedDate: () =>
+      UiDefinition.makeFieldsStep(() => ({
+        maybeDatePickerBasicDemoSelectedDate: () => Option.none(),
+      })),
+    ChangedViewMonth: UiDefinition.makeNoopStep,
+  }),
+})
 
-const foldFileDropBasicDemoOutMessage = FileDropBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  ReceivedFiles:
-    ({ files }) =>
-    model => ({
-      model: modifyFields(model, {
+export const FileDropBasicDemoBinding = UiDefinition.makeBinding(
+  FileDropBlock,
+  {
+    field: 'fileDropBasicDemo',
+    init: { contextToArgs: () => [{ id: 'file-drop-basic-demo' }] },
+  },
+).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(FileDropBlock, {
+    ReceivedFiles: ({ files }) =>
+      UiDefinition.makeFieldsStep(() => ({
         fileDropBasicDemoFiles: Array.appendAll(files),
-      }),
-    }),
-  RejectedNonFiles: () => UiDefinition.stepNoop(),
+      })),
+    RejectedNonFiles: UiDefinition.makeNoopStep,
+  }),
 })
 
-export const FileDropBasicDemoBinding = UiDefinition.bindChild(FileDropBlock, {
-  field: 'fileDropBasicDemo',
-  init: { contextToArgs: () => [{ id: 'file-drop-basic-demo' }] },
-  outMessage: { fold: foldFileDropBasicDemoOutMessage },
-})
-
-const foldListboxDemoOutMessage = ItemListboxBlock.OutMessage.match<
-  Update.Step<Model, Message>,
-  typeof ItemListboxBlock.OutMessage.Type
->({
-  Selected:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, {
-        maybeListboxDemoSelectedItem: () => Option.some(value),
-      }),
-    }),
-})
-
-export const ListboxDemoBinding = UiDefinition.bindChild(ItemListboxBlock, {
+export const ListboxDemoBinding = UiDefinition.makeBinding(ItemListboxBlock, {
   field: 'listboxDemo',
   init: { contextToArgs: () => [{ id: 'listbox-demo' }] },
-  outMessage: { fold: foldListboxDemoOutMessage },
+}).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(ItemListboxBlock, {
+    Selected: ({ value }) =>
+      UiDefinition.makeFieldsStep(() => ({
+        maybeListboxDemoSelectedItem: () => Option.some(value),
+      })),
+  }),
 })
 
-const foldListboxMultiDemoOutMessage = ItemMultiListboxBlock.OutMessage.match<
-  Update.Step<Model, Message>,
-  typeof ItemMultiListboxBlock.OutMessage.Type
->({
-  Selected:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, {
+export const ListboxMultiDemoBinding = UiDefinition.makeBinding(
+  ItemMultiListboxBlock,
+  {
+    field: 'listboxMultiDemo',
+    init: { contextToArgs: () => [{ id: 'listbox-multi-demo' }] },
+  },
+).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(ItemMultiListboxBlock, {
+    Selected: ({ value }) =>
+      UiDefinition.makeFieldsStep(() => ({
         listboxMultiDemoSelectedItems: listboxMultiDemoSelectedItems =>
           Array.contains(listboxMultiDemoSelectedItems, value)
             ? Array.filter(
@@ -381,69 +297,53 @@ const foldListboxMultiDemoOutMessage = ItemMultiListboxBlock.OutMessage.match<
                 item => item !== value,
               )
             : Array.append(listboxMultiDemoSelectedItems, value),
-      }),
-    }),
+      })),
+  }),
 })
 
-export const ListboxMultiDemoBinding = UiDefinition.bindChild(
-  ItemMultiListboxBlock,
-  {
-    field: 'listboxMultiDemo',
-    init: { contextToArgs: () => [{ id: 'listbox-multi-demo' }] },
-    outMessage: { fold: foldListboxMultiDemoOutMessage },
-  },
-)
-
-const foldListboxGroupedDemoOutMessage = CharacterListboxBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  Selected:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, {
-        maybeListboxGroupedDemoSelectedItem: () => Option.some(value),
-      }),
-    }),
-})
-
-export const ListboxGroupedDemoBinding = UiDefinition.bindChild(
+export const ListboxGroupedDemoBinding = UiDefinition.makeBinding(
   CharacterListboxBlock,
   {
     field: 'listboxGroupedDemo',
     init: { contextToArgs: () => [{ id: 'listbox-grouped-demo' }] },
-    outMessage: { fold: foldListboxGroupedDemoOutMessage },
   },
-)
-
-export const MenuBasicDemoBinding = UiDefinition.bindChild(DemoMenuBlock, {
-  field: 'menuBasicDemo',
-  init: { contextToArgs: () => [{ id: 'menu-basic-demo' }] },
-  outMessage: { fold: foldMenuOutMessage },
+).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(CharacterListboxBlock, {
+    Selected: ({ value }) =>
+      UiDefinition.makeFieldsStep(() => ({
+        maybeListboxGroupedDemoSelectedItem: () => Option.some(value),
+      })),
+  }),
 })
 
-export const MenuAnimatedDemoBinding = UiDefinition.bindChild(DemoMenuBlock, {
+export const MenuBasicDemoBinding = UiDefinition.makeBinding(DemoMenuBlock, {
+  field: 'menuBasicDemo',
+  init: { contextToArgs: () => [{ id: 'menu-basic-demo' }] },
+}).withOutMessagePolicy({ fold: foldMenuOutMessage })
+
+export const MenuAnimatedDemoBinding = UiDefinition.makeBinding(DemoMenuBlock, {
   field: 'menuAnimatedDemo',
   init: {
     contextToArgs: () => [{ id: 'menu-animated-demo', isAnimated: true }],
   },
-  outMessage: { fold: foldMenuOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldMenuOutMessage })
 
-export const PopoverBasicDemoBinding = UiDefinition.bindChild(PopoverBlock, {
+export const PopoverBasicDemoBinding = UiDefinition.makeBinding(PopoverBlock, {
   field: 'popoverBasicDemo',
   init: { contextToArgs: () => [{ id: 'popover-basic-demo' }] },
-  outMessage: { fold: foldPopoverOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldPopoverOutMessage })
 
-export const PopoverAnimatedDemoBinding = UiDefinition.bindChild(PopoverBlock, {
-  field: 'popoverAnimatedDemo',
-  init: {
-    contextToArgs: () => [{ id: 'popover-animated-demo', isAnimated: true }],
+export const PopoverAnimatedDemoBinding = UiDefinition.makeBinding(
+  PopoverBlock,
+  {
+    field: 'popoverAnimatedDemo',
+    init: {
+      contextToArgs: () => [{ id: 'popover-animated-demo', isAnimated: true }],
+    },
   },
-  outMessage: { fold: foldPopoverOutMessage },
-})
+).withOutMessagePolicy({ fold: foldPopoverOutMessage })
 
-export const PopoverNestedParentDemoBinding = UiDefinition.bindChild(
+export const PopoverNestedParentDemoBinding = UiDefinition.makeBinding(
   PopoverBlock,
   {
     field: 'popoverNestedParentDemo',
@@ -452,193 +352,164 @@ export const PopoverNestedParentDemoBinding = UiDefinition.bindChild(
         { id: 'popover-nested-parent-demo', contentFocus: true },
       ],
     },
-    outMessage: { fold: foldPopoverOutMessage },
   },
-)
+).withOutMessagePolicy({ fold: foldPopoverOutMessage })
 
-export const PopoverNestedChildDemoBinding = UiDefinition.bindChild(
+export const PopoverNestedChildDemoBinding = UiDefinition.makeBinding(
   PopoverBlock,
   {
     field: 'popoverNestedChildDemo',
     init: { contextToArgs: () => [{ id: 'popover-nested-child-demo' }] },
-    outMessage: { fold: foldPopoverOutMessage },
   },
-)
+).withOutMessagePolicy({ fold: foldPopoverOutMessage })
 
-const foldVerticalRadioGroupDemoOutMessage =
-  PlanRadioGroupBlock.OutMessage.match<
-    Update.Step<Model, Message>,
-    typeof PlanRadioGroupBlock.OutMessage.Type
-  >({
-    Selected:
-      ({ value }) =>
-      model => ({
-        model: modifyFields(model, {
-          verticalRadioGroupDemoValue: () => Option.some(value),
-        }),
-      }),
-  })
-
-export const VerticalRadioGroupDemoBinding = UiDefinition.bindChild(
+export const VerticalRadioGroupDemoBinding = UiDefinition.makeBinding(
   PlanRadioGroupBlock,
   {
     field: 'verticalRadioGroupDemo',
     init: { contextToArgs: () => [{ id: 'vertical-radio-group-demo' }] },
-    outMessage: { fold: foldVerticalRadioGroupDemoOutMessage },
   },
-)
+).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(PlanRadioGroupBlock, {
+    Selected: ({ value }) =>
+      UiDefinition.makeFieldsStep(() => ({
+        verticalRadioGroupDemoValue: () => Option.some(value),
+      })),
+  }),
+})
 
-const foldHorizontalRadioGroupDemoOutMessage =
-  PlanRadioGroupBlock.OutMessage.match<
-    Update.Step<Model, Message>,
-    typeof PlanRadioGroupBlock.OutMessage.Type
-  >({
-    Selected:
-      ({ value }) =>
-      model => ({
-        model: modifyFields(model, {
-          horizontalRadioGroupDemoValue: () => Option.some(value),
-        }),
-      }),
-  })
-
-export const HorizontalRadioGroupDemoBinding = UiDefinition.bindChild(
+export const HorizontalRadioGroupDemoBinding = UiDefinition.makeBinding(
   PlanRadioGroupBlock,
   {
     field: 'horizontalRadioGroupDemo',
     init: { contextToArgs: () => [{ id: 'horizontal-radio-group-demo' }] },
-    outMessage: { fold: foldHorizontalRadioGroupDemoOutMessage },
   },
-)
-
-const foldSliderRatingDemoOutMessage = SliderBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  ChangedValue:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, { sliderRatingValue: () => value }),
-    }),
+).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(PlanRadioGroupBlock, {
+    Selected: ({ value }) =>
+      UiDefinition.makeFieldsStep(() => ({
+        horizontalRadioGroupDemoValue: () => Option.some(value),
+      })),
+  }),
 })
 
-export const SliderRatingDemoBinding = UiDefinition.bindChild(SliderBlock, {
+export const SliderRatingDemoBinding = UiDefinition.makeBinding(SliderBlock, {
   field: 'sliderRatingDemo',
   init: {
     contextToArgs: () => [
       { id: 'slider-rating-demo', min: 0, max: 10, step: 1 },
     ],
   },
-  outMessage: { fold: foldSliderRatingDemoOutMessage },
+}).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(SliderBlock, {
+    ChangedValue: ({ value }) =>
+      UiDefinition.makeFieldsStep(() => ({ sliderRatingValue: () => value })),
+  }),
 })
 
-const foldSliderVolumeDemoOutMessage = SliderBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  ChangedValue:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, { sliderVolumeValue: () => value }),
-    }),
-})
-
-export const SliderVolumeDemoBinding = UiDefinition.bindChild(SliderBlock, {
+export const SliderVolumeDemoBinding = UiDefinition.makeBinding(SliderBlock, {
   field: 'sliderVolumeDemo',
   init: {
     contextToArgs: () => [
       { id: 'slider-volume-demo', min: 0, max: 1, step: 0.05 },
     ],
   },
-  outMessage: { fold: foldSliderVolumeDemoOutMessage },
+}).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(SliderBlock, {
+    ChangedValue: ({ value }) =>
+      UiDefinition.makeFieldsStep(() => ({ sliderVolumeValue: () => value })),
+  }),
 })
 
-const foldHorizontalTabsDemoOutMessage = DemoTabsBlock.OutMessage.match<
-  Update.Step<Model, Message>,
-  typeof DemoTabsBlock.OutMessage.Type
->({
-  Selected:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, { horizontalTabsDemoTab: () => value }),
-    }),
+export const HorizontalTabsDemoBinding = UiDefinition.makeBinding(
+  DemoTabsBlock,
+  {
+    field: 'horizontalTabsDemo',
+    init: { contextToArgs: () => [{ id: 'horizontal-tabs-demo' }] },
+  },
+).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(DemoTabsBlock, {
+    Selected: ({ value }) =>
+      UiDefinition.makeFieldsStep(() => ({
+        horizontalTabsDemoTab: () => value,
+      })),
+  }),
 })
 
-export const HorizontalTabsDemoBinding = UiDefinition.bindChild(DemoTabsBlock, {
-  field: 'horizontalTabsDemo',
-  init: { contextToArgs: () => [{ id: 'horizontal-tabs-demo' }] },
-  outMessage: { fold: foldHorizontalTabsDemoOutMessage },
-})
-
-const foldVerticalTabsDemoOutMessage = DemoTabsBlock.OutMessage.match<
-  Update.Step<Model, Message>,
-  typeof DemoTabsBlock.OutMessage.Type
->({
-  Selected:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, { verticalTabsDemoTab: () => value }),
-    }),
-})
-
-export const VerticalTabsDemoBinding = UiDefinition.bindChild(DemoTabsBlock, {
+export const VerticalTabsDemoBinding = UiDefinition.makeBinding(DemoTabsBlock, {
   field: 'verticalTabsDemo',
   init: { contextToArgs: () => [{ id: 'vertical-tabs-demo' }] },
-  outMessage: { fold: foldVerticalTabsDemoOutMessage },
+}).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(DemoTabsBlock, {
+    Selected: ({ value }) =>
+      UiDefinition.makeFieldsStep(() => ({ verticalTabsDemoTab: () => value })),
+  }),
 })
 
-export const ToastDemoBinding = UiDefinition.bindChild(ToastBlock, {
+export const ToastDemoBinding = UiDefinition.makeBinding(ToastBlock, {
   field: 'toastDemo',
   init: { contextToArgs: () => [{ id: 'toast-demo', swipeToDismiss: {} }] },
-  outMessage: { fold: foldToastOutMessage },
+}).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(ToastBlock, {
+    DismissedToast: UiDefinition.makeNoopStep,
+  }),
 })
 
-export const TooltipBasicDemoBinding = UiDefinition.bindChild(TooltipBlock, {
+export const TooltipBasicDemoBinding = UiDefinition.makeBinding(TooltipBlock, {
   field: 'tooltipBasicDemo',
   init: { contextToArgs: () => [{ id: 'tooltip-basic-demo' }] },
-  outMessage: { fold: foldTooltipOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldTooltipOutMessage })
 
-export const TooltipNoDelayDemoBinding = UiDefinition.bindChild(TooltipBlock, {
-  field: 'tooltipNoDelayDemo',
-  init: {
-    contextToArgs: () => [{ id: 'tooltip-no-delay-demo', showDelay: 0 }],
+export const TooltipNoDelayDemoBinding = UiDefinition.makeBinding(
+  TooltipBlock,
+  {
+    field: 'tooltipNoDelayDemo',
+    init: {
+      contextToArgs: () => [{ id: 'tooltip-no-delay-demo', showDelay: 0 }],
+    },
   },
-  outMessage: { fold: foldTooltipOutMessage },
+).withOutMessagePolicy({ fold: foldTooltipOutMessage })
+
+export const HoverIntentDemoBinding = UiDefinition.makeBinding(
+  HoverIntentBlock,
+  {
+    field: 'hoverIntentDemo',
+  },
+).withOutMessagePolicy({
+  fold: UiDefinition.makeOutMessageFold(HoverIntentBlock, {
+    Opened: UiDefinition.makeNoopStep,
+    Closed: UiDefinition.makeNoopStep,
+  }),
 })
 
-export const HoverIntentDemoBinding = UiDefinition.bindChild(HoverIntentBlock, {
-  field: 'hoverIntentDemo',
-  outMessage: { fold: foldHoverIntentOutMessage },
-})
+const foldVirtualListOutMessage = UiDefinition.makeOutMessageFold(
+  ActivityVirtualListBlock,
+  {
+    ObservedContainerScroll: UiDefinition.makeNoopStep,
+  },
+)
 
-const foldVirtualListOutMessage = ActivityVirtualListBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  ObservedContainerScroll: () => UiDefinition.stepNoop(),
-})
-
-export const VirtualListDemoBinding = UiDefinition.bindChild(
+export const VirtualListDemoBinding = UiDefinition.makeBinding(
   ActivityVirtualListBlock,
   {
     field: 'virtualListDemo',
-    outMessage: { fold: foldVirtualListOutMessage },
     init: {
       contextToArgs: () => [{ id: 'virtual-list-demo', rowHeightPx: 56 }],
     },
   },
-)
+).withOutMessagePolicy({ fold: foldVirtualListOutMessage })
 
-export const VirtualListVariableDemoBinding = UiDefinition.bindChild(
+export const VirtualListVariableDemoBinding = UiDefinition.makeBinding(
   ActivityVirtualListBlock,
   {
     field: 'virtualListVariableDemo',
-    outMessage: { fold: foldVirtualListOutMessage },
     init: {
       contextToArgs: () => [
         { id: 'virtual-list-variable-demo', rowHeightPx: 56 },
       ],
     },
   },
-)
+).withOutMessagePolicy({ fold: foldVirtualListOutMessage })
 
 export const UiComposition = UiDefinition.makeComposition({
   bindings: [
@@ -677,10 +548,9 @@ export const UiComposition = UiDefinition.makeComposition({
     TooltipBasicDemoBinding,
     TooltipNoDelayDemoBinding,
     HoverIntentDemoBinding,
-    AnimationDemoBinding,
+    AnimationDemoBindingWithOutMessagePolicy,
     VirtualListDemoBinding,
     VirtualListVariableDemoBinding,
   ],
 })
 export type UiViewBuilder = Block.ViewBuilderFor<typeof UiComposition>
-export type UiMessage = typeof UiComposition.Message.Type

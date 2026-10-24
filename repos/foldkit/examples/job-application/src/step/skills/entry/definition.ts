@@ -8,7 +8,7 @@ import { RadioGroup } from '@foldkit/ui'
 import { ProficiencyLevel } from '../../../domain'
 
 export const ProficiencyRadioGroup =
-  RadioGroup.create<ProficiencyLevel.ProficiencyLevel>()
+  RadioGroup.create<typeof ProficiencyLevel.ProficiencyLevel.Type>()
 
 export const Model = Schema.Struct({
   id: Schema.String,
@@ -16,7 +16,6 @@ export const Model = Schema.Struct({
   proficiency: ProficiencyLevel.ProficiencyLevel,
   proficiencyRadioGroup: ProficiencyRadioGroup.Model,
 })
-export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
   UpdatedName: { value: Schema.String },
@@ -24,15 +23,9 @@ export const Message = defineMessageUnion({
   ClickedRemoveSelf: {},
 })
 
-export type Message = typeof Message.Type
-
 export const OutMessage = defineMessageUnion({
   Removed: {},
 })
-
-export type OutMessage = typeof OutMessage.Type
-
-export type Removed = typeof OutMessage.Removed.Type
 
 export const SkillsEntryDefinition = Block.makeDefinition('SkillsEntry', {
   Model,

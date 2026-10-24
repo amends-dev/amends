@@ -9,7 +9,7 @@ import { Grid, PaletteIndex } from './model'
 import { SavedCanvasJsonString } from './model'
 import { PALETTE_THEMES, resolveColor } from './palette'
 
-export const SaveCanvas = ApplicationDefinition.command('SaveCanvas', {
+export const SaveCanvas = ApplicationDefinition.makeCommand('SaveCanvas', {
   args: {
     grid: Grid,
     gridSize: Schema.Number,
@@ -22,7 +22,7 @@ export const SaveCanvas = ApplicationDefinition.command('SaveCanvas', {
 
     return ({ grid, gridSize, paletteThemeIndex, selectedColorIndex }) =>
       Effect.gen(function* () {
-        const data: SavedCanvas = {
+        const data: typeof SavedCanvas.Type = {
           grid,
           gridSize,
           paletteThemeIndex,
@@ -37,7 +37,7 @@ export const SaveCanvas = ApplicationDefinition.command('SaveCanvas', {
   },
 })
 
-export const saveCanvas = (model: Model) =>
+export const saveCanvas = (model: typeof Model.Type) =>
   SaveCanvas({
     grid: model.grid,
     gridSize: model.gridSize,
@@ -45,7 +45,7 @@ export const saveCanvas = (model: Model) =>
     selectedColorIndex: model.selectedColorIndex,
   })
 
-export const ExportPng = ApplicationDefinition.command('ExportPng', {
+export const ExportPng = ApplicationDefinition.makeCommand('ExportPng', {
   args: {
     grid: Grid,
     gridSize: Schema.Number,

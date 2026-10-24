@@ -1,13 +1,14 @@
 import { Array, Option, Schema, pipe } from 'effect'
 import { type Block, Command, Update } from 'foldkit'
-import { describe, expect, expectTypeOf, test } from 'vitest'
+import { describe, expect, expectTypeOf, test, vi } from 'vitest'
 
 import { ExampleDetailBlock } from './block'
 import { ExampleDetailComposition } from './composition'
 import { LoadExampleSources, Message, init, update } from './example'
 import { SourceFileTabsBlock } from './fileTabs'
 import type { ExampleSources } from './sources'
-const sources: ExampleSources = {
+
+const sources: typeof ExampleSources.Type = {
   files: [
     {
       path: 'src/application.ts',
@@ -16,43 +17,102 @@ const sources: ExampleSources = {
     },
   ],
 }
-const initialModel = () => init().model
+
 const commandNames = (
-  commands: ReturnType<
-    typeof ExampleDetailBlock.operations.requestLoadInitialSources
-  >['commands'],
+  commands: ReturnType<typeof init>['commands'],
 ): ReadonlyArray<string> =>
   pipe(
     commands ?? [],
     Array.map(command => command.name),
   )
+
 describe('example detail initial sources', () => {
-  test('preserves the initialized Model when there is no initial slug', () => {
-    const model = initialModel()
-    const unseededSourcesLoad =
-      ExampleDetailBlock.operations.requestLoadInitialSources(
-        model,
-        Option.none(),
-        Option.none(),
-      )
-    const seededSourcesLoad =
-      ExampleDetailBlock.operations.requestLoadInitialSources(
-        model,
-        Option.none(),
-        Option.some(sources),
-      )
-    expect(unseededSourcesLoad.model).toBe(model)
-    expect(unseededSourcesLoad.commands).toBeUndefined()
-    expect(seededSourcesLoad.model).toBe(model)
-    expect(seededSourcesLoad.commands).toBeUndefined()
+  test('initializes idle when there is no initial slug, ignoring supplied sources', () => {
+    const unseededInit = init()
+    const seededInit = init(Option.none(), Option.some(sources))
+
+    expect(unseededInit.model.currentSources._tag).toBe('Idle')
+    expect(unseededInit.model.maybeActiveSourceFilePath).toEqual(Option.none())
+    expect(unseededInit.commands).toEqual([])
+    expect(seededInit.model).toEqual(unseededInit.model)
+    expect(seededInit.commands).toEqual([])
   })
-  test('starts loading an available unseeded example from clean child state', () => {
-    const loaded = update(
-      initialModel(),
-      Message.SucceededLoadExampleSources({ sources }),
+
+  test('initializes an available unseeded example in Loading with its Command', () => {
+    const exampleInit = init(Option.some('counter'))
+
+    expect(exampleInit.model.currentSources._tag).toBe('Loading')
+    expect(exampleInit.model.maybeActiveSourceFilePath).toEqual(Option.none())
+    expect(exampleInit.model.maybeExampleUrl).toEqual(Option.none())
+    expect(exampleInit.model.sourceFileTabs).toEqual(
+      SourceFileTabsBlock.init({ id: 'source-file-tabs' }).model,
     )
+    expect(commandNames(exampleInit.commands)).toEqual([
+      LoadExampleSources.name,
+    ])
+    expectTypeOf<Update.RequirementsOf<typeof init>>().toEqualTypeOf<
+      | Command.HandlerOf<typeof LoadExampleSources>
+      | Block.Qualify<
+          'sourceFileTabs',
+          Update.RequirementsOf<typeof SourceFileTabsBlock.init>
+        >
+    >()
+  })
+
+  test('initializes its Tabs child once when loading initial sources', () => {
+    const tabsInit = vi.spyOn(SourceFileTabsBlock, 'init')
+
+    try {
+      init(Option.some('counter'))
+
+      expect(tabsInit).toHaveBeenCalledExactlyOnceWith({
+        id: 'source-file-tabs',
+      })
+    } finally {
+      tabsInit.mockRestore()
+    }
+  })
+
+  test('initializes supplied sources as Success without fetching them', () => {
+    const exampleInit = init(Option.some('counter'), Option.some(sources))
+
+    expect(exampleInit.model.currentSources).toEqual({
+      _tag: 'Success',
+      data: sources,
+    })
+    expect(exampleInit.model.maybeActiveSourceFilePath).toEqual(
+      Option.some('src/application.ts'),
+    )
+    expect(exampleInit.commands).toEqual([])
+  })
+
+  test('initializes an empty supplied source list without a selected file', () => {
+    const emptySources: typeof ExampleSources.Type = { files: [] }
+    const exampleInit = init(Option.some('counter'), Option.some(emptySources))
+
+    expect(exampleInit.model.currentSources).toEqual({
+      _tag: 'Success',
+      data: emptySources,
+    })
+    expect(exampleInit.model.maybeActiveSourceFilePath).toEqual(Option.none())
+    expect(exampleInit.commands).toEqual([])
+  })
+
+  test('initializes unavailable examples as idle with or without supplied sources', () => {
+    const baseline = init()
+    const unseededInit = init(Option.some('livestore'))
+    const seededInit = init(Option.some('livestore'), Option.some(sources))
+
+    expect(unseededInit.model).toEqual(baseline.model)
+    expect(unseededInit.commands).toEqual([])
+    expect(seededInit.model).toEqual(baseline.model)
+    expect(seededInit.commands).toEqual([])
+  })
+
+  test('route changes reset existing source and child state before loading', () => {
+    const exampleInit = init(Option.some('counter'), Option.some(sources))
     const focused = update(
-      loaded.model,
+      exampleInit.model,
       Schema.decodeSync(ExampleDetailComposition.Message)({
         _tag: 'GotSourceFileTabsMessage',
         placement: 'sourceFileTabs',
@@ -64,84 +124,33 @@ describe('example detail initial sources', () => {
       focused.model,
       Message.ChangedExampleUrl({ url: 'https://example.test' }),
     )
-    const unseededSourcesLoad =
-      ExampleDetailBlock.operations.requestLoadInitialSources(
-        withExampleUrl.model,
-        Option.some('counter'),
-        Option.none(),
-      )
-    expect(unseededSourcesLoad.model.currentSources._tag).toBe('Loading')
-    expect(unseededSourcesLoad.model.maybeActiveSourceFilePath).toEqual(
-      Option.none(),
+    const routeChange = ExampleDetailBlock.operations.informRouteChanged(
+      withExampleUrl.model,
+      { slug: 'counters' },
     )
-    expect(unseededSourcesLoad.model.maybeExampleUrl).toEqual(Option.none())
-    expect(unseededSourcesLoad.model.sourceFileTabs).toEqual(
+
+    expect(routeChange.model.currentSources._tag).toBe('Loading')
+    expect(routeChange.model.maybeActiveSourceFilePath).toEqual(Option.none())
+    expect(routeChange.model.maybeExampleUrl).toEqual(Option.none())
+    expect(routeChange.model.sourceFileTabs).toEqual(
       SourceFileTabsBlock.init({ id: 'source-file-tabs' }).model,
     )
-    expect(commandNames(unseededSourcesLoad.commands)).toEqual([
-      'ExampleDetail/LoadExampleSources',
+    expect(routeChange.commands?.map(command => command.name)).toEqual([
+      LoadExampleSources.name,
     ])
-    expectTypeOf<
-      Update.RequirementsOf<
-        typeof ExampleDetailBlock.operations.requestLoadInitialSources
-      >
-    >().toEqualTypeOf<
-      | Command.HandlerOf<typeof LoadExampleSources>
-      | Block.Scoped<
-          'sourceFileTabs',
-          Update.RequirementsOf<typeof SourceFileTabsBlock.update>
-        >
-    >()
   })
-  test('shows supplied sources without fetching them', () => {
-    const seededSourcesLoad =
-      ExampleDetailBlock.operations.requestLoadInitialSources(
-        initialModel(),
-        Option.some('counter'),
-        Option.some(sources),
-      )
-    expect(seededSourcesLoad.model.currentSources).toEqual({
-      _tag: 'Success',
-      data: sources,
-    })
-    expect(seededSourcesLoad.model.maybeActiveSourceFilePath).toEqual(
-      Option.some('src/application.ts'),
-    )
-    expect(seededSourcesLoad.commands).toBeUndefined()
-  })
-  test('leaves unavailable examples unchanged with or without supplied sources', () => {
-    const model = initialModel()
-    const unseededSourcesLoad =
-      ExampleDetailBlock.operations.requestLoadInitialSources(
-        model,
-        Option.some('livestore'),
-        Option.none(),
-      )
-    const seededSourcesLoad =
-      ExampleDetailBlock.operations.requestLoadInitialSources(
-        model,
-        Option.some('livestore'),
-        Option.some(sources),
-      )
-    expect(unseededSourcesLoad.model).toBe(model)
-    expect(unseededSourcesLoad.commands).toBeUndefined()
-    expect(seededSourcesLoad.model).toBe(model)
-    expect(seededSourcesLoad.commands).toBeUndefined()
-  })
+
   test('clears existing sources when routing to an unavailable example', () => {
-    const loaded = ExampleDetailBlock.operations.requestLoadInitialSources(
-      initialModel(),
-      Option.some('counter'),
-      Option.some(sources),
-    )
+    const exampleInit = init(Option.some('counter'), Option.some(sources))
     const withExampleUrl = update(
-      loaded.model,
+      exampleInit.model,
       Message.ChangedExampleUrl({ url: 'https://example.test' }),
     )
     const routeChange = ExampleDetailBlock.operations.informRouteChanged(
       withExampleUrl.model,
       { slug: 'livestore' },
     )
+
     expect(routeChange.model.currentSources._tag).toBe('Idle')
     expect(routeChange.model.maybeActiveSourceFilePath).toEqual(Option.none())
     expect(routeChange.model.maybeExampleUrl).toEqual(Option.none())

@@ -173,6 +173,24 @@ it('retains exact collision checks within literal and generic handler keys', () 
   >()
   expectTypeOf<
     ValidHandlerContracts<
+      | Command.Handler<'Read', string, string>
+      | Command.Handler<'Read', number, string>
+      | Command.Handler<string, string, string>
+    >
+  >().toEqualTypeOf<
+    Readonly<{ 'Conflicting Foldkit handler contracts': 'Command/Read' }>
+  >()
+  expectTypeOf<
+    ValidHandlerContracts<
+      | Command.Handler<'Read', Readonly<{ text: string }>, string>
+      | Command.Handler<'Read', { text: string }, string>
+      | Command.Handler<'Write', number, string>
+    >
+  >().toEqualTypeOf<
+    Readonly<{ 'Conflicting Foldkit handler contracts': 'Command/Read' }>
+  >()
+  expectTypeOf<
+    ValidHandlerContracts<
       | Scoped<'First', Command.Handler<'Read', string, string>>
       | Scoped<'Second', Command.Handler<'Read', number, string>>
     >
@@ -240,3 +258,25 @@ const checkAssemblyTypes = (): void => {
 }
 
 void checkAssemblyTypes
+
+const checkGenericHandlerContracts = <Item extends string>(): void => {
+  type ExactHandler = Command.Handler<
+    'Echo',
+    Readonly<{ value: Item }>,
+    Readonly<{ value: Item }>
+  >
+  type StringHandler = Command.Handler<
+    'Echo',
+    Readonly<{ value: string }>,
+    Readonly<{ value: string }>
+  >
+
+  const exact: ValidHandlerContracts<ExactHandler> = {}
+  // @ts-expect-error A possible same-name generic contract conflict cannot count as validated.
+  const conflicting: ValidHandlerContracts<ExactHandler | StringHandler> = {}
+
+  void exact
+  void conflicting
+}
+
+void checkGenericHandlerContracts

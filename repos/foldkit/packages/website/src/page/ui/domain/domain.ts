@@ -2,10 +2,8 @@ import { Schema } from 'effect'
 import { defineTaggedUnion } from 'foldkit/schema'
 
 export const Plan = Schema.Literals(['Startup', 'Business', 'Enterprise'])
-export type Plan = typeof Plan.Type
 
 export const DemoTab = Schema.Literals(['Foldkit', 'React', 'Elm'])
-export type DemoTab = typeof DemoTab.Type
 
 export const City = Schema.Literals([
   'Johannesburg',
@@ -16,7 +14,6 @@ export const City = Schema.Literals([
   'Wellington',
   'Zurich',
 ])
-export type City = typeof City.Type
 
 export const ListboxItem = Schema.Literals([
   'Michael Bluth',
@@ -28,7 +25,6 @@ export const ListboxItem = Schema.Literals([
   'Tobias Funke',
   'Lucille Bluth',
 ])
-export type ListboxItem = typeof ListboxItem.Type
 
 export const DemoCard = Schema.Struct({
   id: Schema.String,
@@ -46,8 +42,6 @@ export const VirtualListChatMessage = Schema.Struct({
   body: Schema.String,
   isExpanded: Schema.Boolean,
 })
-
-export type VirtualListChatMessage = typeof VirtualListChatMessage.Type
 
 export const VirtualListChatStartProximity = defineTaggedUnion({
   Away: {},
@@ -87,4 +81,3 @@ export const Page = Schema.Literals([
   'Tooltip',
   'VirtualList',
 ])
-export type Page = typeof Page.Type

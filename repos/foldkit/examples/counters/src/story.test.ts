@@ -11,9 +11,7 @@ import {
 } from './application'
 import { CounterBlock } from './counter'
 
-type Model = typeof ModelSchema.Type
-
-const initialModel: Model = {
+const initialModel: typeof ModelSchema.Type = {
   counters: [
     { id: 'counter-0', counter: { count: 0 } },
     { id: 'counter-1', counter: { count: 0 } },

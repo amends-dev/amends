@@ -747,7 +747,7 @@ const makeHostKeyedQuery = <
     Model,
     Message,
   })
-  const Fetch = QueryDefinition.command('Fetch', {
+  const Fetch = QueryDefinition.makeCommand('Fetch', {
     args: {
       args: Args,
       generation: Schema.Number,
@@ -758,16 +758,21 @@ const makeHostKeyedQuery = <
   const api = makeKeyedQueryApi(config, Args, Model, Message, Fetch)
   const QueryComposition = QueryDefinition.makeComposition()
   const init = QueryComposition.makeInit(api.init)
-  const block = QueryComposition.assembleBlock({
-    init,
-    update: QueryComposition.makeUpdate(api.update),
-    operations: {
-      ...api.operations,
-      requestReset: Message.RequestedReset,
-    },
-    EffectsLayer: Layer.empty,
-    hostHandlers: [Fetch],
-  })
+  const prepare = () =>
+    QueryComposition.prepareBlock({
+      init,
+      update: QueryComposition.makeUpdate(api.update),
+      operations: {
+        ...api.operations,
+        requestReset: Message.RequestedReset,
+      },
+      EffectsLayer: Layer.empty,
+      hostHandlers: [Fetch],
+    })
+  const block: Block.FromAssemblyWithoutViewOrOutMessage<
+    typeof Model,
+    typeof prepare
+  > = Block.assemble(prepare)
 
   return enrichKeyedQuery(block, {
     Fetch,
@@ -829,7 +834,7 @@ const makeCanonicalKeyedQuery = <
     Model,
     Message,
   })
-  const Fetch = QueryDefinition.command('Fetch', {
+  const Fetch = QueryDefinition.makeCommand('Fetch', {
     args: {
       args: Args,
       generation: Schema.Number,
@@ -840,15 +845,20 @@ const makeCanonicalKeyedQuery = <
   const api = makeKeyedQueryApi(config, Args, Model, Message, Fetch)
   const QueryComposition = QueryDefinition.makeComposition()
   const init = QueryComposition.makeInit(api.init)
-  const block = QueryComposition.assembleBlock({
-    init,
-    update: QueryComposition.makeUpdate(api.update),
-    operations: {
-      ...api.operations,
-      requestReset: Message.RequestedReset,
-    },
-    EffectsLayer: api.toLayer(handler),
-  })
+  const prepare = () =>
+    QueryComposition.prepareBlock({
+      init,
+      update: QueryComposition.makeUpdate(api.update),
+      operations: {
+        ...api.operations,
+        requestReset: Message.RequestedReset,
+      },
+      EffectsLayer: api.toLayer(handler),
+    })
+  const block: Block.FromAssemblyWithoutViewOrOutMessage<
+    typeof Model,
+    typeof prepare
+  > = Block.assemble(prepare)
 
   return enrichKeyedQuery(block, {
     Fetch,

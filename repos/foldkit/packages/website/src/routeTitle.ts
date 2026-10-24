@@ -9,7 +9,7 @@ import { type ApplicationRoute } from './route'
 const SITE_NAME = 'Foldkit'
 
 const resolveApiModuleName = (
-  apiData: ApiReference.ApiDataAsyncData,
+  apiData: typeof ApiReference.ApiDataAsyncData.schema.Type,
   moduleSlug: string,
 ): string =>
   Option.match(AsyncData.getData(apiData), {
@@ -22,8 +22,8 @@ const resolveApiModuleName = (
   })
 
 export const routeTitle = (
-  route: ApplicationRoute,
-  apiData: ApiReference.ApiDataAsyncData,
+  route: typeof ApplicationRoute.Type,
+  apiData: typeof ApiReference.ApiDataAsyncData.schema.Type,
 ): string =>
   Match.value(route).pipe(
     Match.tag('Home', () => SITE_NAME),

@@ -9,9 +9,9 @@ import { type Model, UnsentConversationDefinition } from "./definition.ts"
  * offers no commands before the conversation exists.
  */
 const foldComposerOutMessage = ComposerBlock.OutMessage.match({
-  ChangedText: () => UnsentConversationDefinition.stepNoop(),
+  ChangedText: () => UnsentConversationDefinition.makeNoopStep(),
   SubmittedText: ({ text }) =>
-    UnsentConversationDefinition.step((model: Model) => ({
+    UnsentConversationDefinition.makeStep((model: Model) => ({
       model,
       commands: [
         StartConversation({
@@ -22,10 +22,10 @@ const foldComposerOutMessage = ComposerBlock.OutMessage.match({
         })
       ]
     })),
-  RanSlashCommand: () => UnsentConversationDefinition.stepNoop()
+  RanSlashCommand: () => UnsentConversationDefinition.makeNoopStep()
 })
 
-export const ComposerBinding = UnsentConversationDefinition.bindChild(ComposerBlock, {
+export const ComposerBinding = UnsentConversationDefinition.makeBinding(ComposerBlock, {
   field: "composer",
   init: {
     contextToArgs: ({ workspaceId, memberId, memberIds }) => [
@@ -33,9 +33,8 @@ export const ComposerBinding = UnsentConversationDefinition.bindChild(ComposerBl
       memberId,
       Drafts.Place.cases.Conversation.make({ memberIds })
     ]
-  },
-  outMessage: { fold: foldComposerOutMessage }
-})
+  }
+}).withOutMessagePolicy({ fold: foldComposerOutMessage })
 
 export const UnsentConversationComposition = UnsentConversationDefinition.makeComposition({
   bindings: [ComposerBinding]

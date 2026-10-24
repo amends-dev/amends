@@ -5,9 +5,7 @@ import { modifyFields } from 'foldkit/struct'
 
 // definition.ts
 export const Model = Schema.Struct({ count: Schema.Number })
-export type Model = typeof Model.Type
 export const Message = defineMessageUnion({ ClickedIncrement: {} })
-export type Message = typeof Message.Type
 
 // composition.ts
 export const CounterComposition = Block.makeDefinition('Counter', {
@@ -30,8 +28,13 @@ const view = CounterComposition.makeView((model, h) =>
   h.button([h.OnClick(Message.ClickedIncrement())], [`Count: ${model.count}`]),
 )
 
-export const CounterBlock = CounterComposition.assembleBlock({
-  init,
-  update,
-  view,
-})
+const prepare = () =>
+  CounterComposition.prepareBlock({
+    init,
+    update,
+    view,
+  })
+export const CounterBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

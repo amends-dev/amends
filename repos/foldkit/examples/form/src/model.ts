@@ -9,12 +9,9 @@ export const Submission = defineTaggedUnion({
   SubmitError: { error: Schema.String },
 })
 
-export type Submission = typeof Submission.Type
-
 export const Model = Schema.Struct({
   name: Field(Schema.String),
   email: Field(Schema.String),
   messageText: Field(Schema.String),
   submission: Submission,
 })
-export type Model = typeof Model.Type

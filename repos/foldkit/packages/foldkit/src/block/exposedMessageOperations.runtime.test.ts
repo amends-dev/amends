@@ -6,6 +6,7 @@ import { defineMessageUnion } from '../message/index.js'
 import { modifyFields } from '../struct/index.js'
 import * as Update from '../update/index.js'
 import { makeDefinition } from './define.js'
+import * as Block from './public.js'
 
 const ChildModel = Schema.Struct({ value: Schema.String })
 type ChildModel = typeof ChildModel.Type
@@ -25,7 +26,7 @@ const Child = makeDefinition('ExposedMessageRuntimeChild', {
   Message: ChildMessage,
   OutMessage: ChildOutMessage,
 })
-const RecordValue = Child.command('RecordValue', {
+const RecordValue = Child.makeCommand('RecordValue', {
   args: { value: Schema.String },
   messages: [ChildMessage.CompletedRecordValue],
   handler: function* () {
@@ -54,16 +55,21 @@ const childUpdate = ChildComposition.makeUpdate((model, message) =>
     CompletedRecordValue: () => ({ model }),
   }),
 )
-const ChildBlock = ChildComposition.assembleBlock({
-  init: () => ({ model: ChildModel.make({ value: 'initial' }) }),
-  update: childUpdate,
-  operations: {
-    reset: () => Tuple.make(ChildMessage.RequestedReset()),
-    setValue: (value: string) =>
-      Tuple.make(ChildMessage.UpdatedValue({ value })),
-  },
-  EffectsLayer: RecordValue.layer,
-})
+const prepareChildBlock = () =>
+  ChildComposition.prepareBlock({
+    init: () => ({ model: ChildModel.make({ value: 'initial' }) }),
+    update: childUpdate,
+    operations: {
+      reset: () => Tuple.make(ChildMessage.RequestedReset()),
+      setValue: (value: string) =>
+        Tuple.make(ChildMessage.UpdatedValue({ value })),
+    },
+    EffectsLayer: RecordValue.layer,
+  })
+const ChildBlock: Block.FromAssemblyWithOutMessage<
+  typeof ChildModel,
+  typeof prepareChildBlock
+> = Block.assemble(prepareChildBlock)
 
 const ContextModel = Schema.Struct({ value: Schema.String })
 type ContextModel = typeof ContextModel.Type
@@ -91,26 +97,31 @@ const contextUpdate = ContextComposition.makeUpdate(
     }),
   }),
 )
-const ContextBlock = ContextComposition.assembleBlock({
-  init: () => ({ model: ContextModel.make({ value: '' }) }),
-  update: contextUpdate,
-  operations: {
-    setAll: (
-      value: string,
-      required: DispatchContext,
-      maybeCount: number | undefined,
-      label: string | undefined,
-      ...flags: ReadonlyArray<boolean>
-    ) =>
-      Tuple.make(
-        ContextMessage.UpdatedValue({ value }),
-        required,
-        maybeCount,
-        label,
-        ...flags,
-      ),
-  },
-})
+const prepareContextBlock = () =>
+  ContextComposition.prepareBlock({
+    init: () => ({ model: ContextModel.make({ value: '' }) }),
+    update: contextUpdate,
+    operations: {
+      setAll: (
+        value: string,
+        required: DispatchContext,
+        maybeCount: number | undefined,
+        label: string | undefined,
+        ...flags: ReadonlyArray<boolean>
+      ) =>
+        Tuple.make(
+          ContextMessage.UpdatedValue({ value }),
+          required,
+          maybeCount,
+          label,
+          ...flags,
+        ),
+    },
+  })
+const ContextBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ContextModel,
+  typeof prepareContextBlock
+> = Block.assemble(prepareContextBlock)
 
 const Entry = Schema.Struct({ id: Schema.String, child: ChildModel })
 const ParentModel = Schema.Struct({
@@ -133,11 +144,10 @@ const foldChildOutMessage = ChildOutMessage.match<
 >({
   ChangedValue: () => model => ({ model }),
 })
-const ChildBinding = Parent.bindChild(ChildBlock, {
+const ChildBinding = Parent.makeBinding(ChildBlock, {
   field: 'maybeChild',
-  outMessage: { fold: foldChildOutMessage },
-})
-const EntryBinding = Parent.bindChild(ChildBlock, {
+}).withOutMessagePolicy({ fold: foldChildOutMessage })
+const EntryBinding = Parent.makeBinding(ChildBlock, {
   placement: 'entries',
   readAll: model => model.entries,
   key: entry => entry.id,
@@ -149,9 +159,8 @@ const EntryBinding = Parent.bindChild(ChildBlock, {
       ),
     }),
   keySchema: Schema.String,
-  outMessage: {
-    fold: (_id, outMessage) => foldChildOutMessage(outMessage),
-  },
+}).withOutMessagePolicy({
+  fold: (_id, outMessage) => foldChildOutMessage(outMessage),
 })
 const ParentComposition = Parent.makeComposition({
   bindings: [ChildBinding, EntryBinding],
@@ -170,17 +179,22 @@ const parentModel = ParentModel.make({
     Entry.make({ id: 'first', child: ChildModel.make({ value: 'entry' }) }),
   ],
 })
-const ParentBlock = ParentComposition.assembleBlock({
-  init: () => ({ model: parentModel }),
-  update: parentUpdate,
-  operations: {
-    setChild: (value: string) =>
-      Tuple.make(ParentMessage.RequestedSetChild({ value })),
-    setEntry: (id: string, value: string) =>
-      Tuple.make(ParentMessage.RequestedSetEntry({ id, value })),
-  },
-  EffectsLayer: Layer.empty,
-})
+const prepareParentBlock = () =>
+  ParentComposition.prepareBlock({
+    init: () => ({ model: parentModel }),
+    update: parentUpdate,
+    operations: {
+      setChild: (value: string) =>
+        Tuple.make(ParentMessage.RequestedSetChild({ value })),
+      setEntry: (id: string, value: string) =>
+        Tuple.make(ParentMessage.RequestedSetEntry({ id, value })),
+    },
+    EffectsLayer: Layer.empty,
+  })
+const ParentBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ParentModel,
+  typeof prepareParentBlock
+> = Block.assemble(prepareParentBlock)
 
 describe('exposed Message operations', () => {
   it('dispatches through update with the exact required, optional, default, and rest Context', () => {
@@ -284,13 +298,20 @@ describe('exposed Message operations', () => {
       secondUpdateCalls += 1
       return { model }
     })
-    const makeBlock = (update: typeof firstUpdate) =>
-      ParentComposition.assembleBlock({
-        init: () => ({ model: parentModel }),
-        update,
-        operations: sharedExpose,
-        EffectsLayer: Layer.empty,
-      })
+    const makeBlock = (update: typeof firstUpdate) => {
+      const prepare = () =>
+        ParentComposition.prepareBlock({
+          init: () => ({ model: parentModel }),
+          update,
+          operations: sharedExpose,
+          EffectsLayer: Layer.empty,
+        })
+      const completedBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+        typeof ParentModel,
+        typeof prepare
+      > = Block.assemble(prepare)
+      return completedBlock
+    }
     const FirstBlock = makeBlock(firstUpdate)
     const SamePairBlock = makeBlock(firstUpdate)
     const SecondBlock = makeBlock(secondUpdate)
@@ -311,22 +332,17 @@ describe('exposed Message operations', () => {
   })
 
   it('rejects malformed tuples and foreign Messages at the erased runtime boundary', () => {
-    const invalidTupleBlock = Reflect.apply(
-      ParentComposition.assembleBlock,
-      undefined,
-      [
+    const prepareInvalidTupleBlock = () =>
+      Reflect.apply(ParentComposition.prepareBlock, undefined, [
         {
           init: () => ({ model: parentModel }),
           update: parentUpdate,
           operations: { invalidTuple: () => ({ model: parentModel }) },
           EffectsLayer: Layer.empty,
         },
-      ],
-    )
-    const invalidMessageBlock = Reflect.apply(
-      ParentComposition.assembleBlock,
-      undefined,
-      [
+      ])
+    const prepareInvalidMessageBlock = () =>
+      Reflect.apply(ParentComposition.prepareBlock, undefined, [
         {
           init: () => ({ model: parentModel }),
           update: parentUpdate,
@@ -335,8 +351,15 @@ describe('exposed Message operations', () => {
           },
           EffectsLayer: Layer.empty,
         },
-      ],
-    )
+      ])
+
+    const invalidTupleBlock = Reflect.apply(Block.assemble, undefined, [
+      prepareInvalidTupleBlock,
+    ])
+
+    const invalidMessageBlock = Reflect.apply(Block.assemble, undefined, [
+      prepareInvalidMessageBlock,
+    ])
 
     expect(() =>
       invalidTupleBlock.operations.invalidTuple(parentModel),
@@ -359,12 +382,12 @@ if (false) {
     EffectsLayer: Layer.empty,
   }
   // @ts-expect-error Exposed tuples must begin with this Block's authored Message.
-  ContextComposition.assembleBlock(foreignMessageConfig)
+  ContextComposition.prepareBlock(foreignMessageConfig)
 
   const erasedExpose: any = {
     setValue: () => Tuple.make(ContextMessage.UpdatedValue({ value: '' })),
   }
-  ContextComposition.assembleBlock({
+  ContextComposition.prepareBlock({
     init: () => ({ model: ContextModel.make({ value: '' }) }),
     update: contextUpdate,
     // @ts-expect-error A whole operations record typed as any cannot bypass producer validation.

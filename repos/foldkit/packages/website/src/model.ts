@@ -5,20 +5,20 @@ import { DialogBlock } from '@foldkit/ui'
 
 import { Deployment } from './deployment'
 import { ResolvedTheme } from './message'
-import {
-  ApiReferenceBlock,
-  BlockPageBlock,
-  ComingFromReactBlock,
-  ExampleDetailBlock,
-  HomeBlock,
-  PlaygroundBlock,
-  UiBlock,
-} from './page'
+// codex: these should all come through a page/index barrel export not
+// individual * as exports. should be like import { Foo, .. } from './page'
+import * as ApiReference from './page/apiReference'
+import * as ComingFromReact from './page/comingFromReact'
+import * as BlockPage from './page/core/blockPage'
+import * as ExampleDetail from './page/example'
+import * as Home from './page/home'
+import * as Playground from './page/playground'
+import * as Ui from './page/ui'
 import { ApplicationRoute } from './route'
-import { SearchBlock } from './search'
+import * as Search from './search'
 import { SidebarGroups } from './sidebarStorage'
-import { SnippetCopyBlock } from './snippetCopy'
-import { SnippetDisclosureBlock } from './snippetDisclosure'
+import * as SnippetCopy from './snippetCopy'
+import * as SnippetDisclosure from './snippetDisclosure'
 import { ThemePreference } from './themePreference'
 import { ThemeMenuBlock } from './view/themeMenu'
 
@@ -26,8 +26,8 @@ export const Model = Schema.Struct({
   route: ApplicationRoute,
   url: Url,
   deployment: Deployment,
-  snippetCopy: SnippetCopyBlock.Model,
-  snippetDisclosure: SnippetDisclosureBlock.Model,
+  snippetCopy: SnippetCopy.SnippetCopyBlock.Model,
+  snippetDisclosure: SnippetDisclosure.SnippetDisclosureBlock.Model,
   maybeGitHubStarCount: Schema.Option(Schema.Number),
   currentYear: Schema.Number,
   newsletterEmail: Schema.String,
@@ -36,18 +36,17 @@ export const Model = Schema.Struct({
   activeSection: Schema.Option(Schema.String),
   isNarrowViewport: Schema.Boolean,
   maybeIsPlaygroundSupported: Schema.Option(Schema.Boolean),
-  playground: Schema.Option(PlaygroundBlock.Model),
+  playground: Schema.Option(Playground.PlaygroundBlock.Model),
   sidebarGroups: SidebarGroups,
-  coreBlockPage: BlockPageBlock.Model,
-  maybeHome: Schema.Option(HomeBlock.Model),
+  coreBlockPage: BlockPage.BlockPageBlock.Model,
+  maybeHome: Schema.Option(Home.HomeBlock.Model),
   themeMenu: ThemeMenuBlock.Model,
   maybeThemePreference: Schema.Option(ThemePreference),
   systemTheme: ResolvedTheme,
   resolvedTheme: ResolvedTheme,
-  uiPages: UiBlock.Model,
-  comingFromReact: ComingFromReactBlock.Model,
-  apiReference: ApiReferenceBlock.Model,
-  exampleDetail: ExampleDetailBlock.Model,
-  search: SearchBlock.Model,
+  uiPages: Ui.UiBlock.Model,
+  comingFromReact: ComingFromReact.ComingFromReactBlock.Model,
+  apiReference: ApiReference.ApiReferenceBlock.Model,
+  exampleDetail: ExampleDetail.ExampleDetailBlock.Model,
+  search: Search.SearchBlock.Model,
 })
-export type Model = typeof Model.Type

@@ -10,7 +10,7 @@ export const MINIMUM_EXPANSION_HEIGHT_PX = 48
 const COLLAPSIBLE_HEIGHT_PX =
   COLLAPSED_PREVIEW_HEIGHT_PX + MINIMUM_EXPANSION_HEIGHT_PX
 
-export const MeasureSnippetHeight = SnippetDisclosureDefinition.mount(
+export const MeasureSnippetHeight = SnippetDisclosureDefinition.makeMount(
   'MeasureSnippetHeight',
   {
     args: { snippetId: Schema.String },

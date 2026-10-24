@@ -1,5 +1,5 @@
 import { Option, Schema } from 'effect'
-import { Update, makeApplicationDefinition } from 'foldkit'
+import { Block, Update } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 
 import * as BoundSettings from './boundSettings'
@@ -13,12 +13,15 @@ type Model = typeof Model.Type
 const Message = defineMessageUnion({
   ClickedApplyThemes: {},
 })
-const ApplicationDefinition = makeApplicationDefinition({ Model, Message })
-const EntriesBinding = ApplicationDefinition.bindChild(KeyedEntry.KeyedEntryBlock, {
+const ApplicationDefinition = Block.makeDefinition('Application', {
+  Model,
+  Message,
+})
+const EntriesBinding = ApplicationDefinition.makeBinding(KeyedEntry.KeyedEntryBlock, {
   field: 'entries',
   key: 'id',
 })
-const MaybeSettingsBinding = ApplicationDefinition.bindChild(
+const MaybeSettingsBinding = ApplicationDefinition.makeBinding(
   BoundSettings.BoundSettingsBlock,
   { field: 'maybeSettings' },
 )
@@ -32,7 +35,7 @@ export const initial: Model = Model.make({
 })
 
 export const updateWithNamedOperations = ApplicationComposition.makeUpdate(model =>
-  Update.combine(model, [
+  Update.combineSteps(model, [
     EntriesBinding.informThemeChanged('initial', { theme: 'Light' }),
     MaybeSettingsBinding.informThemeChanged({ theme: 'Dark' }),
   ])

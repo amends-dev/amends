@@ -38,7 +38,7 @@ export const ChildDefinition = Block.makeDefinition('ExposeMessageProofChild', {
   Message: ChildMessage,
   OutMessage: ChildOutMessage,
 })
-export const RecordValue = ChildDefinition.command('RecordValue', {
+export const RecordValue = ChildDefinition.makeCommand('RecordValue', {
   args: { value: Schema.String },
   messages: [ChildMessage.CompletedRecord],
 })
@@ -65,16 +65,24 @@ export const childUpdate = ChildComposition.makeUpdate((model, message) =>
   }),
 )
 
-export const ChildBlock = ChildComposition.assembleBlock({
-  init: () => ({ model: ChildModel.make({ value: 'initial' }) }),
-  update: childUpdate,
-  operations: {
-    reset: () => [ChildMessage.RequestedReset()],
-    setValue: (value: string) => [ChildMessage.UpdatedValue({ value })],
-  },
-  EffectsLayer: Layer.empty,
-  hostHandlers: [RecordValue],
-})
+export const prepareChildBlock = () =>
+  ChildComposition.prepareBlock({
+    init: () => ({ model: ChildModel.make({ value: 'initial' }) }),
+    update: childUpdate,
+    operations: {
+      reset: () => [ChildMessage.RequestedReset()],
+      setValue: (value: string) => [ChildMessage.UpdatedValue({ value })],
+    },
+    EffectsLayer: Layer.empty,
+    hostHandlers: [RecordValue],
+  })
+
+export const RawChildBlock: CompletedAssembly<typeof prepareChildBlock> =
+  Block.assemble(prepareChildBlock)
+export const ChildBlock: Block.FromAssemblyWithOutMessage<
+  typeof ChildComposition.Model,
+  typeof prepareChildBlock
+> = Block.assemble(prepareChildBlock)
 
 export const ContextModel = Schema.Struct({ value: Schema.String })
 export const ContextMessage = defineMessageUnion({
@@ -106,29 +114,37 @@ export const contextUpdate = ContextComposition.makeUpdate(
     }),
   }),
 )
-export const ContextBlock = ContextComposition.assembleBlock({
-  init: () => ({ model: ContextModel.make({ value: '' }) }),
-  update: contextUpdate,
-  operations: {
-    setRequired: (value: string, required: RequiredContext) => [
-      ContextMessage.UpdatedValue({ value }),
-      required,
-    ],
-    setAll: (
-      value: string,
-      required: RequiredContext,
-      maybeCount: number | undefined,
-      label: string | undefined,
-      ...flags: ReadonlyArray<boolean>
-    ) => [
-      ContextMessage.UpdatedValue({ value }),
-      required,
-      maybeCount,
-      label,
-      ...flags,
-    ],
-  },
-})
+export const prepareContextBlock = () =>
+  ContextComposition.prepareBlock({
+    init: () => ({ model: ContextModel.make({ value: '' }) }),
+    update: contextUpdate,
+    operations: {
+      setRequired: (value: string, required: RequiredContext) => [
+        ContextMessage.UpdatedValue({ value }),
+        required,
+      ],
+      setAll: (
+        value: string,
+        required: RequiredContext,
+        maybeCount: number | undefined,
+        label: string | undefined,
+        ...flags: ReadonlyArray<boolean>
+      ) => [
+        ContextMessage.UpdatedValue({ value }),
+        required,
+        maybeCount,
+        label,
+        ...flags,
+      ],
+    },
+  })
+
+export const RawContextBlock: CompletedAssembly<typeof prepareContextBlock> =
+  Block.assemble(prepareContextBlock)
+export const ContextBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ContextComposition.Model,
+  typeof prepareContextBlock
+> = Block.assemble(prepareContextBlock)
 
 export const ParentModel = Schema.Struct({
   child: ChildModel,
@@ -151,27 +167,23 @@ export const ParentDefinition = Block.makeDefinition(
     Message: ParentMessage,
   },
 )
-export const ChildBinding = ParentDefinition.bindChild(ChildBlock, {
+export const ChildBinding = ParentDefinition.makeBinding(ChildBlock, {
   field: 'child',
-
-  outMessage: {
-    fold: ChildOutMessage.match<Update.Step<ParentModel, ParentMessage>>({
-      ChangedValue: () => model => ({ model }),
-    }),
-  },
+}).withOutMessagePolicy({
+  fold: ChildOutMessage.match<Update.Step<ParentModel, ParentMessage>>({
+    ChangedValue: () => model => ({ model }),
+  }),
 })
-export const EntryBinding = ParentDefinition.bindChild(ChildBlock, {
+export const EntryBinding = ParentDefinition.makeBinding(ChildBlock, {
   placement: 'entries',
   field: 'entries',
   key: 'id',
   childField: 'child',
-  outMessage: {
-    fold: (_id, outMessage) =>
-      ChildOutMessage.match<Update.Step<ParentModel, ParentMessage>>(
-        outMessage,
-        { ChangedValue: () => model => ({ model }) },
-      ),
-  },
+}).withOutMessagePolicy({
+  fold: (_id, outMessage) =>
+    ChildOutMessage.match<Update.Step<ParentModel, ParentMessage>>(outMessage, {
+      ChangedValue: () => model => ({ model }),
+    }),
 })
 
 // oxlint-disable-next-line foldkit/block-name-matches-variable -- This fixture deliberately uses a distinct literal Block identity for type coverage.
@@ -187,19 +199,27 @@ export const parentUpdate = ParentComposition.makeUpdate((model, message) =>
   }),
 )
 
-export const ParentBlock = ParentComposition.assembleBlock({
-  init: ParentComposition.makeInit(() => ({
-    model: { entries: [{ id: 'first', child: { value: 'entry' } }] },
-  })),
-  update: parentUpdate,
-  operations: {
-    setChild: (value: string) => [ParentMessage.RequestedSetChild({ value })],
-    setEntry: (id: string, value: string) => [
-      ParentMessage.RequestedSetEntry({ id, value }),
-    ],
-  },
-  EffectsLayer: Layer.empty,
-})
+export const prepareParentBlock = () =>
+  ParentComposition.prepareBlock({
+    init: ParentComposition.makeInit(() => ({
+      model: { entries: [{ id: 'first', child: { value: 'entry' } }] },
+    })),
+    update: parentUpdate,
+    operations: {
+      setChild: (value: string) => [ParentMessage.RequestedSetChild({ value })],
+      setEntry: (id: string, value: string) => [
+        ParentMessage.RequestedSetEntry({ id, value }),
+      ],
+    },
+    EffectsLayer: Layer.empty,
+  })
+
+export const RawParentBlock: CompletedAssembly<typeof prepareParentBlock> =
+  Block.assemble(prepareParentBlock)
+export const ParentBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ParentComposition.Model,
+  typeof prepareParentBlock
+> = Block.assemble(prepareParentBlock)
 
 export function makeChoice<
   const Values extends readonly [string, ...Array<string>],
@@ -212,7 +232,7 @@ export function makeChoice<
   })
   // oxlint-disable-next-line foldkit/block-name-matches-variable -- This fixture deliberately uses a distinct literal Block identity for type coverage.
   const ChoiceOwnerNamespace = Block.makeNamespace('ExposeMessageProofChoice')
-  const Observe = ChoiceOwnerNamespace.mount('Observe', {
+  const Observe = ChoiceOwnerNamespace.makeMount('Observe', {
     messages: [Message.CompletedObserve],
   })
   // oxlint-disable-next-line foldkit/block-name-matches-variable -- This fixture deliberately uses a distinct literal Block identity for type coverage.
@@ -241,21 +261,29 @@ export function makeChoice<
   const select = (value: Values[number], required: RequiredContext) =>
     Tuple.make(Message.UpdatedValue({ value }), required)
 
-  const block = Composition.assembleBlock({
-    init: (selected: Values[number]) => ({ model: Model.make({ selected }) }),
-    update,
-    view,
-    operations: { select },
-    EffectsLayer: Layer.empty,
-    hostHandlers: [Observe],
-  })
+  const prepareBlock = () =>
+    Composition.prepareBlock({
+      init: (selected: Values[number]) => ({ model: Model.make({ selected }) }),
+      update,
+      view,
+      operations: { select },
+      EffectsLayer: Layer.empty,
+      hostHandlers: [Observe],
+    })
+
+  const rawBlock: CompletedAssembly<typeof prepareBlock> =
+    Block.assemble(prepareBlock)
+  const block: Block.FromAssemblyWithView<
+    typeof Composition.Model,
+    typeof prepareBlock
+  > = Block.assemble(prepareBlock)
   const provided = block.provideHandlers(
     Observe.toLayer(
       Effect.succeed(() => Effect.succeed(Message.CompletedObserve())),
     ),
   )
 
-  return { block, provided, Observe }
+  return { block, rawBlock, provided, Observe }
 }
 
 export const FruitChoiceResult = makeChoice(['Apple', 'Pear'])
@@ -271,7 +299,7 @@ export const MountedChoiceDefinition = Block.makeDefinition('MountedChoice', {
   Model: MountedChoiceModel,
   Message: MountedChoiceMessage,
 })
-export const ObserveSelection = MountedChoiceDefinition.mount(
+export const ObserveSelection = MountedChoiceDefinition.makeMount(
   'ObserveSelection',
   {
     messages: [MountedChoiceMessage.CompletedObserveSelection],
@@ -296,20 +324,29 @@ export const mountedChoiceUpdate = MountedChoiceComposition.makeUpdate(
       CompletedObserveSelection: () => ({ model }),
     }),
 )
-export const MountedChoiceBlock = MountedChoiceComposition.assembleBlock({
-  init: (selected: string) => ({
-    model: MountedChoiceModel.make({ selected }),
-  }),
-  update: mountedChoiceUpdate,
-  view: mountedChoiceView,
-  operations: {
-    select: (value: string) =>
-      Tuple.make(MountedChoiceMessage.UpdatedSelection({ value })),
-  },
-  EffectsLayer: ObserveSelection.layer,
-})
-export const ManagedMountedChoiceBlock = MountedChoiceComposition.assembleBlock(
-  {
+export const prepareMountedChoiceBlock = () =>
+  MountedChoiceComposition.prepareBlock({
+    init: (selected: string) => ({
+      model: MountedChoiceModel.make({ selected }),
+    }),
+    update: mountedChoiceUpdate,
+    view: mountedChoiceView,
+    operations: {
+      select: (value: string) =>
+        Tuple.make(MountedChoiceMessage.UpdatedSelection({ value })),
+    },
+    EffectsLayer: ObserveSelection.layer,
+  })
+
+export const RawMountedChoiceBlock: CompletedAssembly<
+  typeof prepareMountedChoiceBlock
+> = Block.assemble(prepareMountedChoiceBlock)
+export const MountedChoiceBlock: Block.FromAssemblyWithView<
+  typeof MountedChoiceComposition.Model,
+  typeof prepareMountedChoiceBlock
+> = Block.assemble(prepareMountedChoiceBlock)
+export const prepareManagedMountedChoiceBlock = () =>
+  MountedChoiceComposition.prepareBlock({
     init: (selected: string) => ({
       model: MountedChoiceModel.make({ selected }),
     }),
@@ -321,8 +358,15 @@ export const ManagedMountedChoiceBlock = MountedChoiceComposition.assembleBlock(
         Tuple.make(MountedChoiceMessage.UpdatedSelection({ value })),
     },
     EffectsLayer: ObserveSelection.layer,
-  },
-)
+  })
+
+export const RawManagedMountedChoiceBlock: CompletedAssembly<
+  typeof prepareManagedMountedChoiceBlock
+> = Block.assemble(prepareManagedMountedChoiceBlock)
+export const ManagedMountedChoiceBlock: Block.FromAssemblyWithView<
+  typeof MountedChoiceComposition.Model,
+  typeof prepareManagedMountedChoiceBlock
+> = Block.assemble(prepareManagedMountedChoiceBlock)
 
 export const ExactModel = Schema.Struct({ value: Schema.String })
 export const ExactMessage = defineMessageUnion({ RequestedPing: {} })
@@ -339,18 +383,26 @@ export function exactUpdate(
 }
 // oxlint-disable-next-line foldkit/block-name-matches-variable -- This fixture deliberately uses a distinct literal Block identity for type coverage.
 export const ExactComposition = ExactDefinition.makeComposition()
-export const ExactBlock = ExactComposition.assembleBlock({
-  init: () => ({ model: ExactModel.make({ value: '' }) }),
-  update: exactUpdate,
-  operations: {
-    ping: () => [ExactMessage.RequestedPing()],
-    pingWithMetadata: () =>
-      Object.assign(Tuple.make(ExactMessage.RequestedPing()), {
-        model: 'TupleMetadata',
-      }),
-  },
-  EffectsLayer: Layer.empty,
-})
+export const prepareExactBlock = () =>
+  ExactComposition.prepareBlock({
+    init: () => ({ model: ExactModel.make({ value: '' }) }),
+    update: exactUpdate,
+    operations: {
+      ping: () => [ExactMessage.RequestedPing()],
+      pingWithMetadata: () =>
+        Object.assign(Tuple.make(ExactMessage.RequestedPing()), {
+          model: 'TupleMetadata',
+        }),
+    },
+    EffectsLayer: Layer.empty,
+  })
+
+export const RawExactBlock: CompletedAssembly<typeof prepareExactBlock> =
+  Block.assemble(prepareExactBlock)
+export const ExactBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ExactComposition.Model,
+  typeof prepareExactBlock
+> = Block.assemble(prepareExactBlock)
 
 type SetValueArguments = Expect<
   Equal<Parameters<typeof ChildBinding.setValue>, [value: string]>
@@ -461,3 +513,8 @@ export type TupleMetadataAssertions = [
   TupleMetadataStillReceivesModel,
   TupleMetadataPreservesReturn,
 ]
+
+type CompletedAssembly<Producer extends () => Block.AssemblyDraft<object>> =
+  ReturnType<Producer> extends Block.AssemblyDraft<infer Completed>
+    ? Completed
+    : never

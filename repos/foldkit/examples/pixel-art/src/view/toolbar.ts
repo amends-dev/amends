@@ -23,12 +23,12 @@ import { Message } from '../message'
 import { type MirrorMode, type PaletteIndex, type Tool } from '../model'
 import { PALETTE_THEMES, type PaletteTheme } from '../palette'
 
-const TOOLS: ReadonlyArray<Tool> = ['Brush', 'Fill', 'Eraser']
+const TOOLS: ReadonlyArray<typeof Tool.Type> = ['Brush', 'Fill', 'Eraser']
 
 export const MIRROR_HORIZONTAL_SWITCH_ID = 'mirror-horizontal'
 export const MIRROR_VERTICAL_SWITCH_ID = 'mirror-vertical'
 
-const TOOL_SHORTCUTS: Record<Tool, string> = {
+const TOOL_SHORTCUTS: Record<typeof Tool.Type, string> = {
   Brush: 'B',
   Fill: 'F',
   Eraser: 'E',
@@ -95,10 +95,10 @@ const chevronDownIcon = (className: string, h: ApplicationViewBuilder): Html =>
   )
 
 export const toolPanelView = (
-  mirrorMode: MirrorMode,
-  tool: Tool,
+  mirrorMode: typeof MirrorMode.Type,
+  tool: typeof Tool.Type,
   gridSize: number,
-  selectedColorIndex: PaletteIndex,
+  selectedColorIndex: typeof PaletteIndex.Type,
   isCanvasEmpty: boolean,
   theme: PaletteTheme,
   paletteThemeIndex: number,
@@ -127,7 +127,7 @@ export const toolPanelView = (
   )
 
 const toolSectionView = (
-  selectedTool: Tool,
+  selectedTool: typeof Tool.Type,
   toolRadioGroup: typeof ToolRadioGroupBlock.Model.Type,
   h: ApplicationViewBuilder,
 ): Html =>
@@ -179,7 +179,7 @@ const toolSectionView = (
   )
 
 const mirrorSectionView = (
-  mirrorMode: MirrorMode,
+  mirrorMode: typeof MirrorMode.Type,
   h: ApplicationViewBuilder,
 ): Html => {
   const isMirrorHorizontal =
@@ -311,7 +311,7 @@ const sizeSectionView = (
   )
 
 const paletteSectionView = (
-  selectedColorIndex: PaletteIndex,
+  selectedColorIndex: typeof PaletteIndex.Type,
   theme: PaletteTheme,
   paletteThemeIndex: number,
   themeListbox: typeof ThemeListboxBlock.Model.Type,

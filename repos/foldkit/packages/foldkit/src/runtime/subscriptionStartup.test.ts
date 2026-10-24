@@ -2,10 +2,11 @@ import { Effect, Option, Schema, Stream } from 'effect'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { makeDefinition } from '../block/define.js'
+import * as Block from '../block/public.js'
 import { defineMessageUnion } from '../message/index.js'
 import { modifyFields } from '../struct/index.js'
-import { makeDefinition as makeApplicationDefinition } from './applicationPublic.js'
 import * as ModelPreservationBridge from './modelPreservationBridge.js'
+import * as Program from './programPublic.js'
 import { embed } from './start.js'
 
 const DEPENDENCY_FAILURE = 'Cannot derive Subscription dependencies'
@@ -31,10 +32,13 @@ describe('Subscription startup supervision', () => {
   it('reports initial root dependency defects and keeps the crash view until disposal', async () => {
     const Model = Schema.Struct({ count: Schema.Number })
     const Message = defineMessageUnion({ EmittedPulse: {} })
-    const ApplicationDefinition = makeApplicationDefinition({ Model, Message })
+    const ApplicationDefinition = Block.makeDefinition('Application', {
+      Model,
+      Message,
+    })
     const streamStarted = vi.fn()
     const report = vi.fn()
-    const subscriptions = ApplicationDefinition.subscriptions(entry => ({
+    const subscriptions = ApplicationDefinition.makeSubscriptions(entry => ({
       pulses: entry(
         'Pulses',
         { count: Schema.Number },
@@ -53,15 +57,24 @@ describe('Subscription startup supervision', () => {
       ),
     }))
     const ApplicationComposition = ApplicationDefinition.makeComposition()
-    const application = ApplicationComposition.assembleElement({
+
+    const prepare = () =>
+      ApplicationComposition.prepareBlock({
+        init: () => ({ model: { count: 0 } }),
+        update: ApplicationComposition.makeUpdate(model => ({ model })),
+        view: ApplicationComposition.makeView((_model, h) =>
+          h.div([], ['Running']),
+        ),
+        subscriptions,
+        EffectsLayer: subscriptions.pulses.layer,
+      })
+    const completedBlock: Block.FromAssemblyWithView<
+      typeof Model,
+      typeof prepare
+    > = Block.assemble(prepare)
+    const application = Program.makeElement({
+      block: completedBlock,
       container,
-      init: () => ({ model: { count: 0 } }),
-      update: ApplicationComposition.makeUpdate(model => ({ model })),
-      view: ApplicationComposition.makeView((_model, h) =>
-        h.div([], ['Running']),
-      ),
-      subscriptions,
-      EffectsLayer: subscriptions.pulses.layer,
       crash: {
         view: ({ error }, h) => h.div([], [error.message]),
         report,
@@ -92,7 +105,7 @@ describe('Subscription startup supervision', () => {
       Message: ChildMessage,
     })
     const streamStarted = vi.fn()
-    const subscriptions = ChildDefinition.subscriptions(entry => ({
+    const subscriptions = ChildDefinition.makeSubscriptions(entry => ({
       pulses: entry(
         'Pulses',
         { count: Schema.Number },
@@ -111,18 +124,26 @@ describe('Subscription startup supervision', () => {
       ),
     }))
     const ChildComposition = ChildDefinition.makeComposition()
-    const block = ChildComposition.assembleBlock({
-      init: () => ({ model: { count: 0 } }),
-      update: ChildComposition.makeUpdate(model => ({ model })),
-      subscriptions,
-      EffectsLayer: subscriptions.pulses.layer,
-    })
+    const prepareBlock = () =>
+      ChildComposition.prepareBlock({
+        init: () => ({ model: { count: 0 } }),
+        update: ChildComposition.makeUpdate(model => ({ model })),
+        subscriptions,
+        EffectsLayer: subscriptions.pulses.layer,
+      })
+    const block: Block.FromAssemblyWithoutViewOrOutMessage<
+      typeof ChildModel,
+      typeof prepareBlock
+    > = Block.assemble(prepareBlock)
     const Model = Schema.Struct({ maybeChild: Schema.Option(ChildModel) })
     const Message = defineMessageUnion({
       ClickedActivateChild: {},
     })
-    const ApplicationDefinition = makeApplicationDefinition({ Model, Message })
-    const ChildBinding = ApplicationDefinition.bindChild(block, {
+    const ApplicationDefinition = Block.makeDefinition('Application', {
+      Model,
+      Message,
+    })
+    const ChildBinding = ApplicationDefinition.makeBinding(block, {
       read: model => model.maybeChild,
       write: (model, nextChild) =>
         modifyFields(model, { maybeChild: () => Option.some(nextChild) }),
@@ -131,27 +152,36 @@ describe('Subscription startup supervision', () => {
       bindings: [ChildBinding],
     })
     const report = vi.fn()
-    const application = ApplicationComposition.assembleElement({
-      container,
-      init: () => ({ model: { maybeChild: Option.none() } }),
-      update: ApplicationComposition.makeUpdate((model, message) =>
-        Message.match(message, {
-          ClickedActivateChild: () =>
-            ChildBinding.init({
-              args: [],
-              toParentModel: child =>
-                modifyFields(model, {
-                  maybeChild: () => Option.some(child),
-                }),
-            }),
-        }),
-      ),
-      view: ApplicationComposition.makeView((_model, h) =>
-        h.button(
-          [h.Id('activate-child'), h.OnClick(Message.ClickedActivateChild())],
-          ['Activate child'],
+
+    const prepare = () =>
+      ApplicationComposition.prepareBlock({
+        init: () => ({ model: { maybeChild: Option.none() } }),
+        update: ApplicationComposition.makeUpdate((model, message) =>
+          Message.match(message, {
+            ClickedActivateChild: () =>
+              ChildBinding.init({
+                args: [],
+                toParentModel: child =>
+                  modifyFields(model, {
+                    maybeChild: () => Option.some(child),
+                  }),
+              }),
+          }),
         ),
-      ),
+        view: ApplicationComposition.makeView((_model, h) =>
+          h.button(
+            [h.Id('activate-child'), h.OnClick(Message.ClickedActivateChild())],
+            ['Activate child'],
+          ),
+        ),
+      })
+    const completedBlock: Block.FromAssemblyWithView<
+      typeof Model,
+      typeof prepare
+    > = Block.assemble(prepare)
+    const application = Program.makeElement({
+      block: completedBlock,
+      container,
       crash: {
         view: ({ error }, h) => h.div([], [error.message]),
         report,

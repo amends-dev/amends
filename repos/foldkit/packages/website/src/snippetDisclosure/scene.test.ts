@@ -30,9 +30,9 @@ const longCode = pipe(
 const testView =
   (rawCode: string) =>
   (
-    model: Model,
+    model: typeof Model.Type,
     h: HtmlBuilder<
-      Message,
+      typeof Message.Type,
       MountDefinition.RequirementsOf<typeof MeasureSnippetHeight>
     >,
   ) =>
@@ -50,9 +50,9 @@ const testView =
     )
 
 const groupedView = (
-  model: Model,
+  model: typeof Model.Type,
   h: HtmlBuilder<
-    Message,
+    typeof Message.Type,
     MountDefinition.RequirementsOf<typeof MeasureSnippetHeight>
   >,
 ) => {

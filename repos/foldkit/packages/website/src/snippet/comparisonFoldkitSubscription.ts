@@ -5,7 +5,7 @@ import { toToolMessage, toUndoRedoMessage } from './keyboard'
 import { Message } from './message'
 import { pixelArt } from './update'
 
-export const subscriptions = pixelArt.subscriptions(entry => ({
+export const subscriptions = pixelArt.makeSubscriptions(entry => ({
   undoRedoKeyPresses: entry('UndoRedoKeyPresses', {
     messages: [Message.ClickedUndo, Message.ClickedRedo],
     handler: function* () {

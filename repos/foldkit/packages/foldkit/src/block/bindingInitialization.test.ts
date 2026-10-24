@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { defineMessageUnion } from '../message/index.js'
 import { modifyFields } from '../struct/index.js'
+import * as Update from '../update/index.js'
 import { makeDefinition } from './define.js'
 import {
   assertRegisteredBinding,
   withOperationGraph,
 } from './operationGraph.js'
+import * as Block from './public.js'
 
 const ChildModel = Schema.Struct({ count: Schema.Number })
 const ChildMessage = defineMessageUnion({
@@ -17,7 +19,7 @@ const Child = makeDefinition('InitializedChild', {
   Model: ChildModel,
   Message: ChildMessage,
 })
-const Read = Child.command('Read', {
+const Read = Child.makeCommand('Read', {
   args: { value: Schema.Number },
   messages: [ChildMessage.CompletedRead],
   handler: function* () {
@@ -26,15 +28,20 @@ const Read = Child.command('Read', {
 })
 const initialized = vi.fn<(count: number) => void>()
 const ChildComposition = Child.makeComposition()
-const child = ChildComposition.assembleBlock({
-  init: ChildComposition.makeInit((count: number) => {
-    initialized(count)
+const prepareChild = () =>
+  ChildComposition.prepareBlock({
+    init: ChildComposition.makeInit((count: number) => {
+      initialized(count)
 
-    return { model: { count }, commands: [Read({ value: count })] }
-  }),
-  update: ChildComposition.makeUpdate(model => ({ model })),
-  EffectsLayer: Read.layer,
-})
+      return { model: { count }, commands: [Read({ value: count })] }
+    }),
+    update: ChildComposition.makeUpdate(model => ({ model })),
+    EffectsLayer: Read.layer,
+  })
+const child: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ChildModel,
+  typeof prepareChild
+> = Block.assemble(prepareChild)
 
 const ParentModel = Schema.Struct({
   items: Schema.Array(Schema.Struct({ id: Schema.String, child: ChildModel })),
@@ -49,13 +56,13 @@ const Parent = makeDefinition('InitializationParent', {
   Model: ParentModel,
   Message: ParentMessage,
 })
-const Record = Parent.command('Record', {
+const Record = Parent.makeCommand('Record', {
   messages: [ParentMessage.CompletedRecord],
   handler: function* () {
     return () => Effect.succeed(ParentMessage.CompletedRecord())
   },
 })
-const ItemsBinding = Parent.bindChild(child, {
+const ItemsBinding = Parent.makeBinding(child, {
   field: 'items',
   key: 'id',
   childField: 'child',
@@ -72,11 +79,16 @@ const init = ParentComposition.makeInit(() =>
     commands: [Record()],
   }),
 )
-const parent = ParentComposition.assembleBlock({
-  init,
-  update: ParentComposition.makeUpdate(model => ({ model })),
-  EffectsLayer: Record.layer,
-})
+const prepareParent = () =>
+  ParentComposition.prepareBlock({
+    init,
+    update: ParentComposition.makeUpdate(model => ({ model })),
+    EffectsLayer: Record.layer,
+  })
+const parent: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ParentModel,
+  typeof prepareParent
+> = Block.assemble(prepareParent)
 
 beforeEach(() => initialized.mockClear())
 
@@ -104,7 +116,7 @@ describe('connected initialization', () => {
       args: [4],
       toParentModel: child => ({ items: [{ id: 'first', child }] }),
     })
-    const ForeignItemsBinding = Parent.bindChild(child, {
+    const ForeignItemsBinding = Parent.makeBinding(child, {
       placement: 'foreign-items',
       field: 'items',
       key: 'id',
@@ -184,7 +196,7 @@ describe('connected initialization', () => {
   it('preserves other occurrences when inserting a child', () => {
     const existing = { id: 'other', child: ChildModel.make({ count: 8 }) }
     const initialModel = { items: [existing] }
-    const createChild = Parent.step(model =>
+    const createChild = Parent.makeStep(model =>
       ItemsBinding.init({
         key: 'first',
         args: [4],
@@ -192,20 +204,25 @@ describe('connected initialization', () => {
           modifyFields(model, { items: Array.append({ id: 'first', child }) }),
       }),
     )
-    const completed = ParentComposition.assembleBlock({
-      init: () => ({ model: initialModel }),
-      update: ParentComposition.makeUpdate((model, message) =>
-        ParentMessage.match(message, {
-          RequestedCreateChild: () => createChild(model),
-          CompletedRecord: () => ({ model }),
-          RequestedCreateKeyedChild: () => ({ model }),
-          RequestedCreateIncompleteKeyedChild: () => ({ model }),
-        }),
-      ),
-      operations: {
-        createChild: () => Tuple.make(ParentMessage.RequestedCreateChild()),
-      },
-    })
+    const prepareCompleted = () =>
+      ParentComposition.prepareBlock({
+        init: () => ({ model: initialModel }),
+        update: ParentComposition.makeUpdate((model, message) =>
+          ParentMessage.match(message, {
+            RequestedCreateChild: () => createChild(model),
+            CompletedRecord: () => ({ model }),
+            RequestedCreateKeyedChild: () => ({ model }),
+            RequestedCreateIncompleteKeyedChild: () => ({ model }),
+          }),
+        ),
+        operations: {
+          createChild: () => Tuple.make(ParentMessage.RequestedCreateChild()),
+        },
+      })
+    const completed: Block.FromAssemblyWithoutViewOrOutMessage<
+      typeof ParentModel,
+      typeof prepareCompleted
+    > = Block.assemble(prepareCompleted)
     const created = completed.operations.createChild(initialModel)
 
     expect(Option.getOrThrow(Array.head(created.model.items))).toBe(existing)
@@ -213,6 +230,71 @@ describe('connected initialization', () => {
       existing,
       { id: 'first', child: { count: 4 } },
     ])
+  })
+
+  it('threads a derived Model through registered keyed initialization Steps', () => {
+    const initializeFirst = Parent.makeStep(model =>
+      ItemsBinding.init({
+        key: 'first',
+        args: [1],
+        toParentModel: child =>
+          modifyFields(model, {
+            items: Array.append({ id: 'first', child }),
+          }),
+      }),
+    )
+    const initializeSecond = Parent.makeStep(model =>
+      ItemsBinding.init({
+        key: 'second',
+        args: [2],
+        toParentModel: child =>
+          modifyFields(model, {
+            items: Array.append({ id: 'second', child }),
+          }),
+      }),
+    )
+    const prepareCompleted = () =>
+      ParentComposition.prepareBlock({
+        init: () => ({ model: ParentModel.make({ items: [] }) }),
+        update: ParentComposition.makeUpdate((model, message) =>
+          ParentMessage.match(message, {
+            RequestedCreateChild: () => {
+              const nextModel = modifyFields(model, {
+                items: Array.append({
+                  id: 'existing',
+                  child: ChildModel.make({ count: 8 }),
+                }),
+              })
+
+              return Update.combineSteps(nextModel, [
+                initializeFirst,
+                initializeSecond,
+              ])
+            },
+            CompletedRecord: () => ({ model }),
+            RequestedCreateKeyedChild: () => ({ model }),
+            RequestedCreateIncompleteKeyedChild: () => ({ model }),
+          }),
+        ),
+        operations: {
+          createChildren: () =>
+            Tuple.make(ParentMessage.RequestedCreateChild()),
+        },
+      })
+    const completed: Block.FromAssemblyWithoutViewOrOutMessage<
+      typeof ParentModel,
+      typeof prepareCompleted
+    > = Block.assemble(prepareCompleted)
+    const created = completed.operations.createChildren(
+      ParentModel.make({ items: [] }),
+    )
+
+    expect(created.model.items).toEqual([
+      { id: 'existing', child: { count: 8 } },
+      { id: 'first', child: { count: 1 } },
+      { id: 'second', child: { count: 2 } },
+    ])
+    expect(created.commands).toHaveLength(2)
   })
 
   it.each([undefined, NaN, Infinity, {}, false])(
@@ -301,19 +383,19 @@ const Direct = makeDefinition('DirectInitializationParent', {
   Model: DirectModel,
   Message: DirectMessage,
 })
-const DirectBinding = Direct.bindChild(child, {
+const DirectBinding = Direct.makeBinding(child, {
   field: 'child',
 })
 const DirectComposition = Direct.makeComposition({
   bindings: [DirectBinding],
 })
-const createDirectChild = Direct.step((_model, label: string) =>
+const createDirectChild = Direct.makeStep((_model, label: string) =>
   DirectBinding.init({
     args: [5],
     toParentModel: child => ({ child: Option.some(child), label }),
   }),
 )
-const createIncompleteDirectChild = Direct.step(
+const createIncompleteDirectChild = Direct.makeStep(
   (_model): ReturnType<typeof createDirectChild> =>
     Reflect.apply(DirectBinding.init, undefined, [
       {
@@ -324,23 +406,29 @@ const createIncompleteDirectChild = Direct.step(
       },
     ]),
 )
-const dynamicDirect = DirectComposition.assembleBlock({
-  init: DirectComposition.makeInit(() => ({
-    model: DirectModel.make({ child: Option.none(), label: 'initial' }),
-  })),
-  update: DirectComposition.makeUpdate((model, message) =>
-    DirectMessage.match(message, {
-      RequestedCreateChild: ({ label }) => createDirectChild(model, label),
-      RequestedCreateIncompleteChild: () => createIncompleteDirectChild(model),
-    }),
-  ),
-  operations: {
-    createDirectChild: (label: string) =>
-      Tuple.make(DirectMessage.RequestedCreateChild({ label })),
-    createIncompleteDirectChild: () =>
-      Tuple.make(DirectMessage.RequestedCreateIncompleteChild()),
-  },
-})
+const prepareDynamicDirect = () =>
+  DirectComposition.prepareBlock({
+    init: DirectComposition.makeInit(() => ({
+      model: DirectModel.make({ child: Option.none(), label: 'initial' }),
+    })),
+    update: DirectComposition.makeUpdate((model, message) =>
+      DirectMessage.match(message, {
+        RequestedCreateChild: ({ label }) => createDirectChild(model, label),
+        RequestedCreateIncompleteChild: () =>
+          createIncompleteDirectChild(model),
+      }),
+    ),
+    operations: {
+      createDirectChild: (label: string) =>
+        Tuple.make(DirectMessage.RequestedCreateChild({ label })),
+      createIncompleteDirectChild: () =>
+        Tuple.make(DirectMessage.RequestedCreateIncompleteChild()),
+    },
+  })
+const dynamicDirect: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof DirectModel,
+  typeof prepareDynamicDirect
+> = Block.assemble(prepareDynamicDirect)
 
 describe('direct connected initialization', () => {
   it('constructs an optional child and retains its lifted Commands', async () => {
@@ -351,11 +439,16 @@ describe('direct connected initialization', () => {
           DirectModel.make({ child: Option.some(child), label: 'parent' }),
       }),
     )
-    const direct = DirectComposition.assembleBlock({
-      init: directInit,
-      update: dynamicDirect.update,
-      operations: {},
-    })
+    const prepareDirect = () =>
+      DirectComposition.prepareBlock({
+        init: directInit,
+        update: dynamicDirect.update,
+        operations: {},
+      })
+    const direct: Block.FromAssemblyWithoutViewOrOutMessage<
+      typeof DirectModel,
+      typeof prepareDirect
+    > = Block.assemble(prepareDirect)
     const initialized = directInit()
     const command = Option.getOrThrow(Array.head(initialized.commands ?? []))
     const message = await Effect.runPromise(
@@ -429,6 +522,126 @@ describe('direct connected initialization', () => {
   })
 })
 
+const SequencedParentModel = Schema.Struct({
+  route: Schema.Literals(['Home', 'Play']),
+  first: Schema.Option(ChildModel),
+  second: Schema.Option(ChildModel),
+  didSecondSeeFirst: Schema.Boolean,
+})
+const SequencedParentMessage = defineMessageUnion({
+  RequestedOpen: {},
+  CompletedRecord: {},
+})
+const SequencedParent = makeDefinition('SequencedInitializationParent', {
+  Model: SequencedParentModel,
+  Message: SequencedParentMessage,
+})
+const RecordSequencedInitialization = SequencedParent.makeCommand(
+  'RecordSequencedInitialization',
+  {
+    messages: [SequencedParentMessage.CompletedRecord],
+    handler: function* () {
+      return () => Effect.succeed(SequencedParentMessage.CompletedRecord())
+    },
+  },
+)
+const FirstSequencedBinding = SequencedParent.makeBinding(child, {
+  placement: 'first',
+  field: 'first',
+})
+const SecondSequencedBinding = SequencedParent.makeBinding(child, {
+  placement: 'second',
+  field: 'second',
+})
+const initializeFirstSequencedChild = SequencedParent.makeStep(model =>
+  FirstSequencedBinding.init({
+    args: [1],
+    toParentModel: child =>
+      modifyFields(model, { first: () => Option.some(child) }),
+    commands: [RecordSequencedInitialization()],
+  }),
+)
+const initializeSecondSequencedChild = SequencedParent.makeStep(model =>
+  SecondSequencedBinding.init({
+    args: [2],
+    toParentModel: child =>
+      modifyFields(model, {
+        second: () => Option.some(child),
+        didSecondSeeFirst: () => Option.isSome(model.first),
+      }),
+  }),
+)
+const SequencedParentComposition = SequencedParent.makeComposition({
+  bindings: [FirstSequencedBinding, SecondSequencedBinding],
+})
+const sequencedInitialModel = SequencedParentModel.make({
+  route: 'Home',
+  first: Option.none(),
+  second: Option.none(),
+  didSecondSeeFirst: false,
+})
+const prepareSequencedParent = () =>
+  SequencedParentComposition.prepareBlock({
+    init: SequencedParentComposition.makeInit(() => ({
+      model: sequencedInitialModel,
+    })),
+    update: SequencedParentComposition.makeUpdate((model, message) =>
+      SequencedParentMessage.match(message, {
+        RequestedOpen: () => {
+          const nextModel = modifyFields(model, { route: () => 'Play' })
+
+          return Update.combineSteps(nextModel, [
+            initializeFirstSequencedChild,
+            initializeSecondSequencedChild,
+          ])
+        },
+        CompletedRecord: () => ({ model }),
+      }),
+    ),
+    operations: {
+      open: () => Tuple.make(SequencedParentMessage.RequestedOpen()),
+    },
+    EffectsLayer: RecordSequencedInitialization.layer,
+  })
+const sequencedParent: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof SequencedParentModel,
+  typeof prepareSequencedParent
+> = Block.assemble(prepareSequencedParent)
+
+it('threads a derived Model through registered connected initialization Steps', async () => {
+  const opened = sequencedParent.operations.open(sequencedInitialModel)
+  const messages = await Effect.runPromise(
+    pipe(
+      opened.commands ?? [],
+      Array.map(command => command.effect),
+      Effect.all,
+      Effect.provide(sequencedParent.EffectsLayer),
+    ),
+  )
+
+  expect(opened.model).toEqual({
+    route: 'Play',
+    first: Option.some({ count: 1 }),
+    second: Option.some({ count: 2 }),
+    didSecondSeeFirst: true,
+  })
+  expect(messages).toEqual([
+    {
+      _tag: 'GotFirstMessage',
+      generation: 0,
+      message: ChildMessage.CompletedRead({ value: 1 }),
+      placement: 'first',
+    },
+    SequencedParentMessage.CompletedRecord(),
+    {
+      _tag: 'GotSecondMessage',
+      generation: 0,
+      message: ChildMessage.CompletedRead({ value: 2 }),
+      placement: 'second',
+    },
+  ])
+})
+
 const CompleteKeyedModel = Schema.Struct({
   items: Schema.Array(Schema.Struct({ id: Schema.String, child: ChildModel })),
   label: Schema.String,
@@ -437,7 +650,7 @@ const CompleteKeyed = makeDefinition('CompleteKeyedInitializationParent', {
   Model: CompleteKeyedModel,
   Message: ParentMessage,
 })
-const CompleteItemsBinding = CompleteKeyed.bindChild(child, {
+const CompleteItemsBinding = CompleteKeyed.makeBinding(child, {
   field: 'items',
   key: 'id',
   childField: 'child',
@@ -445,7 +658,7 @@ const CompleteItemsBinding = CompleteKeyed.bindChild(child, {
 const CompleteKeyedComposition = CompleteKeyed.makeComposition({
   bindings: [CompleteItemsBinding],
 })
-const createKeyedChild = CompleteKeyed.step((_model, label: string) =>
+const createKeyedChild = CompleteKeyed.makeStep((_model, label: string) =>
   CompleteItemsBinding.init({
     key: 'first',
     args: [6],
@@ -455,7 +668,7 @@ const createKeyedChild = CompleteKeyed.step((_model, label: string) =>
     }),
   }),
 )
-const createIncompleteKeyedChild = CompleteKeyed.step(
+const createIncompleteKeyedChild = CompleteKeyed.makeStep(
   (_model): ReturnType<typeof createKeyedChild> =>
     Reflect.apply(CompleteItemsBinding.init, undefined, [
       {
@@ -467,26 +680,32 @@ const createIncompleteKeyedChild = CompleteKeyed.step(
       },
     ]),
 )
-const dynamicKeyed = CompleteKeyedComposition.assembleBlock({
-  init: CompleteKeyedComposition.makeInit(() => ({
-    model: CompleteKeyedModel.make({ items: [], label: 'initial' }),
-  })),
-  update: CompleteKeyedComposition.makeUpdate((model, message) =>
-    ParentMessage.match(message, {
-      RequestedCreateKeyedChild: ({ label }) => createKeyedChild(model, label),
-      RequestedCreateIncompleteKeyedChild: () =>
-        createIncompleteKeyedChild(model),
-      CompletedRecord: () => ({ model }),
-      RequestedCreateChild: () => ({ model }),
-    }),
-  ),
-  operations: {
-    createKeyedChild: (label: string) =>
-      Tuple.make(ParentMessage.RequestedCreateKeyedChild({ label })),
-    createIncompleteKeyedChild: () =>
-      Tuple.make(ParentMessage.RequestedCreateIncompleteKeyedChild()),
-  },
-})
+const prepareDynamicKeyed = () =>
+  CompleteKeyedComposition.prepareBlock({
+    init: CompleteKeyedComposition.makeInit(() => ({
+      model: CompleteKeyedModel.make({ items: [], label: 'initial' }),
+    })),
+    update: CompleteKeyedComposition.makeUpdate((model, message) =>
+      ParentMessage.match(message, {
+        RequestedCreateKeyedChild: ({ label }) =>
+          createKeyedChild(model, label),
+        RequestedCreateIncompleteKeyedChild: () =>
+          createIncompleteKeyedChild(model),
+        CompletedRecord: () => ({ model }),
+        RequestedCreateChild: () => ({ model }),
+      }),
+    ),
+    operations: {
+      createKeyedChild: (label: string) =>
+        Tuple.make(ParentMessage.RequestedCreateKeyedChild({ label })),
+      createIncompleteKeyedChild: () =>
+        Tuple.make(ParentMessage.RequestedCreateIncompleteKeyedChild()),
+    },
+  })
+const dynamicKeyed: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof CompleteKeyedModel,
+  typeof prepareDynamicKeyed
+> = Block.assemble(prepareDynamicKeyed)
 
 describe('keyed complete parent validation', () => {
   it('accepts a complete parent Model from a completed exposed operation', () => {

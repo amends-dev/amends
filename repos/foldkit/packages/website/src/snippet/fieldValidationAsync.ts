@@ -4,7 +4,7 @@ import { modifyFields } from 'foldkit/struct'
 
 const validateEmail = validate(emailRules)
 
-const CheckEmailAvailable = ApplicationDefinition.command(
+const CheckEmailAvailable = ApplicationDefinition.makeCommand(
   'CheckEmailAvailable',
   {
     args: { email: Schema.String, validationId: Schema.Number },

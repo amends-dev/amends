@@ -1,10 +1,9 @@
 import { Effect, Number, Schema } from 'effect'
-import { makeApplicationDefinition } from 'foldkit'
+import { Block } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
 
 export const Model = Schema.Struct({ count: Schema.Int })
-export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
   ClickedIncrement: {},
@@ -12,15 +11,14 @@ export const Message = defineMessageUnion({
   CompletedWaitBeforeReset: {},
 })
 
-export const ApplicationDefinition = makeApplicationDefinition({
+export const ApplicationDefinition = Block.makeDefinition('Application', {
   Model,
   Message,
 })
 
 export const ApplicationComposition = ApplicationDefinition.makeComposition()
-export type Message = typeof Message.Type
 
-export const WaitBeforeReset = ApplicationDefinition.command(
+export const WaitBeforeReset = ApplicationDefinition.makeCommand(
   'WaitBeforeReset',
   {
     messages: [Message.CompletedWaitBeforeReset],
@@ -68,3 +66,15 @@ export const view = ApplicationComposition.makeView((model, h) => ({
     ],
   ),
 }))
+
+const prepare = () =>
+  ApplicationComposition.prepareBlock({
+    init,
+    update,
+    view,
+    EffectsLayer,
+  })
+export const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

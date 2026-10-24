@@ -6,7 +6,7 @@ import { Message } from './message'
 
 const STATS_REFETCH_INTERVAL = Duration.seconds(5)
 
-export const subscriptions = ApplicationDefinition.subscriptions(entry => ({
+export const subscriptions = ApplicationDefinition.makeSubscriptions(entry => ({
   statsRevalidationTicks: entry(
     'StatsRevalidationTicks',
     { isObservingStats: Schema.Boolean },

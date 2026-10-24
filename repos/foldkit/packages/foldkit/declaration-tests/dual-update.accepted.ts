@@ -1,11 +1,9 @@
 import { Context, Effect, Layer, Option, Schema } from 'effect'
-import {
-  type Application as ApplicationProgram,
-  makeDefinition as makeApplicationDefinition,
-} from 'foldkit/application'
+import { Program } from 'foldkit'
 import * as Block from 'foldkit/block'
 import * as Command from 'foldkit/command'
 import { defineMessageUnion } from 'foldkit/message'
+import { type Program as ProgramType } from 'foldkit/program'
 import { modifyFields } from 'foldkit/struct'
 import * as Update from 'foldkit/update'
 
@@ -44,7 +42,7 @@ const CounterDefinition = Block.makeDefinition('DualUpdatePrototypeCounter', {
   OutMessage,
 })
 
-const Save = CounterDefinition.command('Save', {
+const Save = CounterDefinition.makeCommand('Save', {
   messages: [Message.CompletedSave],
 })
 
@@ -85,6 +83,54 @@ const reportUpdate = CounterComposition.makeUpdate((model, message) =>
   ),
 )
 
+const ternaryUpdate = CounterComposition.makeUpdate((model, message) =>
+  message._tag === 'ChangedCount'
+    ? {
+        model,
+        commands: [Save()],
+        outMessage: OutMessage.ReportedCount({ count: model.count }),
+      }
+    : { model },
+)
+const earlyReturnUpdate = CounterComposition.makeUpdate((model, message) => {
+  if (message._tag === 'ChangedCount') {
+    return {
+      model,
+      commands: [Save()],
+      outMessage: OutMessage.ReportedCount({ count: model.count }),
+    }
+  }
+
+  return { model }
+})
+
+type TernaryReturn = Expect<
+  Equal<
+    ReturnType<typeof ternaryUpdate>,
+    Update.ReturnWithOutMessage<
+      Model,
+      Message,
+      OutMessage,
+      Command.HandlerOf<typeof Save>
+    >
+  >
+>
+type EarlyReturn = Expect<
+  Equal<ReturnType<typeof earlyReturnUpdate>, ReturnType<typeof ternaryUpdate>>
+>
+type TernaryRequirements = Expect<
+  Equal<
+    Update.RequirementsOf<typeof ternaryUpdate>,
+    Command.HandlerOf<typeof Save>
+  >
+>
+type EarlyReturnRequirements = Expect<
+  Equal<
+    Update.RequirementsOf<typeof earlyReturnUpdate>,
+    Command.HandlerOf<typeof Save>
+  >
+>
+
 type CanonicalParameters = Expect<
   Equal<Parameters<typeof update>, [model: Model, message: Message]>
 >
@@ -111,20 +157,54 @@ type CurriedStepReturn = Expect<
   Equal<ReturnType<typeof changedCountStep>, ReturnType<typeof update>>
 >
 
-const CounterBlock = CounterComposition.assembleBlock({
-  init: CounterComposition.makeInit(() => ({
-    model: Model.make({ count: 0 }),
-  })),
-  update,
-  EffectsLayer: SaveLayer,
-})
+const prepareCounterBlock = () =>
+  CounterComposition.prepareBlock({
+    init: CounterComposition.makeInit(() => ({
+      model: Model.make({ count: 0 }),
+    })),
+    update,
+    EffectsLayer: SaveLayer,
+  })
+const CounterBlock: Block.FromAssemblyWithOutMessage<
+  typeof Model,
+  typeof prepareCounterBlock
+> = Block.assemble(prepareCounterBlock)
+const prepareTernaryBlock = () =>
+  CounterComposition.prepareBlock({
+    init: CounterComposition.makeInit(() => ({
+      model: Model.make({ count: 0 }),
+    })),
+    update: ternaryUpdate,
+    EffectsLayer: SaveLayer,
+  })
+const TernaryBlock: Block.FromAssemblyWithOutMessage<
+  typeof Model,
+  typeof prepareTernaryBlock
+> = Block.assemble(prepareTernaryBlock)
+const prepareEarlyReturnBlock = () =>
+  CounterComposition.prepareBlock({
+    init: CounterComposition.makeInit(() => ({
+      model: Model.make({ count: 0 }),
+    })),
+    update: earlyReturnUpdate,
+    EffectsLayer: SaveLayer,
+  })
+const EarlyReturnBlock: Block.FromAssemblyWithOutMessage<
+  typeof Model,
+  typeof prepareEarlyReturnBlock
+> = Block.assemble(prepareEarlyReturnBlock)
 const plainUpdate = (model: Model, _message: Message) => ({ model })
-const PlainUpdateBlock = CounterComposition.assembleBlock({
-  init: CounterComposition.makeInit(() => ({
-    model: Model.make({ count: 0 }),
-  })),
-  update: plainUpdate,
-})
+const preparePlainUpdateBlock = () =>
+  CounterComposition.prepareBlock({
+    init: CounterComposition.makeInit(() => ({
+      model: Model.make({ count: 0 }),
+    })),
+    update: plainUpdate,
+  })
+const PlainUpdateBlock: Block.FromAssemblyWithOutMessage<
+  typeof Model,
+  typeof preparePlainUpdateBlock
+> = Block.assemble(preparePlainUpdateBlock)
 function handAuthoredDualUpdate(
   message: Message,
 ): (model: Model) => Readonly<{ model: Model; audit: 'preserved' }>
@@ -144,12 +224,17 @@ function handAuthoredDualUpdate(
 
   return (model: Model) => ({ model, audit: 'preserved' })
 }
-const HandAuthoredDualBlock = CounterComposition.assembleBlock({
-  init: CounterComposition.makeInit(() => ({
-    model: Model.make({ count: 0 }),
-  })),
-  update: handAuthoredDualUpdate,
-})
+const prepareHandAuthoredDualBlock = () =>
+  CounterComposition.prepareBlock({
+    init: CounterComposition.makeInit(() => ({
+      model: Model.make({ count: 0 }),
+    })),
+    update: handAuthoredDualUpdate,
+  })
+const HandAuthoredDualBlock: Block.FromAssemblyWithOutMessage<
+  typeof Model,
+  typeof prepareHandAuthoredDualBlock
+> = Block.assemble(prepareHandAuthoredDualBlock)
 
 type PlainUpdateRemainsPlain = Expect<
   Equal<typeof PlainUpdateBlock.update, typeof plainUpdate>
@@ -177,14 +262,19 @@ type UpdateRequirements = Expect<
   Equal<Update.RequirementsOf<typeof update>, Command.HandlerOf<typeof Save>>
 >
 
-const incrementAgain = CounterDefinition.step((model, amount: number) => ({
+const incrementAgain = CounterDefinition.makeStep((model, amount: number) => ({
   model: modifyFields(model, { count: count => count + amount }),
 }))
 
-const combined = Update.combine(Model.make({ count: 0 }), [
+const combined = Update.combineSteps(Model.make({ count: 0 }), [
   changedCountStep,
   stepModel => incrementAgain(stepModel, 3),
 ])
+
+const combineGenericSteps = <Model, Message, R>(
+  model: Model,
+  steps: ReadonlyArray<Update.Step<Model, Message, R>>,
+) => Update.combineSteps<Model, Message, R>(model, steps)
 
 type CombinedModel = Expect<Equal<typeof combined.model, Model>>
 
@@ -202,13 +292,18 @@ const fullChannelUpdate = CounterComposition.makeUpdate(
     outMessage: OutMessage.ReportedCount({ count: model.count }),
   }),
 )
-const FullChannelBlock = CounterComposition.assembleBlock({
-  init: CounterComposition.makeInit(() => ({
-    model: Model.make({ count: 0 }),
-  })),
-  update: fullChannelUpdate,
-  EffectsLayer: SaveLayer,
-})
+const prepareFullChannelBlock = () =>
+  CounterComposition.prepareBlock({
+    init: CounterComposition.makeInit(() => ({
+      model: Model.make({ count: 0 }),
+    })),
+    update: fullChannelUpdate,
+    EffectsLayer: SaveLayer,
+  })
+const FullChannelBlock: Block.FromAssemblyWithOutMessage<
+  typeof Model,
+  typeof prepareFullChannelBlock
+> = Block.assemble(prepareFullChannelBlock)
 const fullChannelStep = FullChannelBlock.update(changedCount)
 
 type FullChannelParameters = Expect<
@@ -273,7 +368,7 @@ type RequiredCurriedParameters = Expect<
   >
 >
 
-const requiredCombined = Update.combine(Model.make({ count: 0 }), [
+const requiredCombined = Update.combineSteps(Model.make({ count: 0 }), [
   stepModel =>
     requiredContextUpdate(changedCount)(stepModel, { multiplier: 2 }),
   stepModel => incrementAgain(stepModel, 1),
@@ -320,20 +415,29 @@ const requiredRestContextUpdate = ContextualComposition.makeUpdate(
   }),
 )
 
-Update.combine(Model.make({ count: 0 }), [optionalContextUpdate(changedCount)])
-Update.combine(Model.make({ count: 0 }), [defaultContextUpdate(changedCount)])
-Update.combine(Model.make({ count: 0 }), [restContextUpdate(changedCount)])
+Update.combineSteps(Model.make({ count: 0 }), [
+  optionalContextUpdate(changedCount),
+])
+Update.combineSteps(Model.make({ count: 0 }), [
+  defaultContextUpdate(changedCount),
+])
+Update.combineSteps(Model.make({ count: 0 }), [restContextUpdate(changedCount)])
 
 requiredRestContextUpdate(changedCount)(Model.make({ count: 0 }), {
   multiplier: 2,
 })
 
-const RequiredRestBlock = ContextualComposition.assembleBlock({
-  init: ContextualComposition.makeInit(() => ({
-    model: Model.make({ count: 0 }),
-  })),
-  update: requiredRestContextUpdate,
-})
+const prepareRequiredRestBlock = () =>
+  ContextualComposition.prepareBlock({
+    init: ContextualComposition.makeInit(() => ({
+      model: Model.make({ count: 0 }),
+    })),
+    update: requiredRestContextUpdate,
+  })
+const RequiredRestBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof Model,
+  typeof prepareRequiredRestBlock
+> = Block.assemble(prepareRequiredRestBlock)
 const RequiredRestParentModel = Schema.Struct({ child: Model })
 const RequiredRestParentMessage = defineMessageUnion({
   ClickedParent: {},
@@ -358,16 +462,21 @@ const ChildComposition = Block.makeDefinition('DualUpdatePrototypeChild', {
   Model: ChildModel,
   Message: ChildMessage,
 }).makeComposition()
-const ChildBlock = ChildComposition.assembleBlock({
-  init: ChildComposition.makeInit(() => ({
-    model: ChildModel.make({ count: 0 }),
-  })),
-  update: ChildComposition.makeUpdate((model, message) => ({
-    model: modifyFields(model, {
-      count: count => count + message.amount,
-    }),
-  })),
-})
+const prepareChildBlock = () =>
+  ChildComposition.prepareBlock({
+    init: ChildComposition.makeInit(() => ({
+      model: ChildModel.make({ count: 0 }),
+    })),
+    update: ChildComposition.makeUpdate((model, message) => ({
+      model: modifyFields(model, {
+        count: count => count + message.amount,
+      }),
+    })),
+  })
+const ChildBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ChildModel,
+  typeof prepareChildBlock
+> = Block.assemble(prepareChildBlock)
 
 const GraphFullModel = Schema.Struct({
   child: ChildModel,
@@ -378,7 +487,6 @@ const GraphFullMessage = defineMessageUnion({
   ChangedCount: { amount: Schema.Number },
   CompletedSave: {},
 })
-type GraphFullMessage = typeof GraphFullMessage.Type
 const GraphFullOutMessage = defineMessageUnion({
   ReportedCount: { count: Schema.Number },
 })
@@ -390,7 +498,7 @@ const GraphFullDefinition = Block.makeDefinition('DualUpdateGraphFull', {
   OutMessage: GraphFullOutMessage,
 })
 // oxlint-disable-next-line foldkit/command-binding-matches-name -- This fixture distinguishes this Command from another owner with the same local name.
-const GraphFullSave = GraphFullDefinition.command('Save', {
+const GraphFullSave = GraphFullDefinition.makeCommand('Save', {
   messages: [GraphFullMessage.CompletedSave],
 })
 const GraphFullSaveLayer = GraphFullSave.toLayer<
@@ -405,7 +513,7 @@ const GraphFullSaveLayer = GraphFullSave.toLayer<
     )
   }),
 )
-const GraphFullChildBinding = GraphFullDefinition.bindChild(ChildBlock, {
+const GraphFullChildBinding = GraphFullDefinition.makeBinding(ChildBlock, {
   field: 'child',
 })
 // oxlint-disable-next-line foldkit/block-name-matches-variable -- This fixture deliberately uses a distinct literal Block identity for type coverage.
@@ -428,13 +536,18 @@ const graphFullUpdate = GraphFullComposition.makeUpdate(
     }
   },
 )
-const GraphFullBlock = GraphFullComposition.assembleBlock({
-  init: GraphFullComposition.makeInit(() => ({
-    model: { count: 0 },
-  })),
-  update: graphFullUpdate,
-  EffectsLayer: GraphFullSaveLayer,
-})
+const prepareGraphFullBlock = () =>
+  GraphFullComposition.prepareBlock({
+    init: GraphFullComposition.makeInit(() => ({
+      model: { count: 0 },
+    })),
+    update: graphFullUpdate,
+    EffectsLayer: GraphFullSaveLayer,
+  })
+const GraphFullBlock: Block.FromAssemblyWithOutMessage<
+  typeof GraphFullModel,
+  typeof prepareGraphFullBlock
+> = Block.assemble(prepareGraphFullBlock)
 const graphFullMessage = GraphFullMessage.ChangedCount({ amount: 2 })
 const graphFullStep = GraphFullBlock.update(graphFullMessage)
 
@@ -492,13 +605,12 @@ type ParentModel = typeof ParentModel.Type
 const ParentMessage = defineMessageUnion({
   ChangedLabel: { label: Schema.Literals(['Primary', 'Secondary']) },
 })
-type ParentMessage = typeof ParentMessage.Type
 // oxlint-disable-next-line foldkit/block-name-matches-variable -- This fixture deliberately uses a distinct literal Block identity for type coverage.
 const ParentDefinition = Block.makeDefinition('DualUpdatePrototypeParent', {
   Model: ParentModel,
   Message: ParentMessage,
 })
-const ChildBinding = ParentDefinition.bindChild(ChildBlock, {
+const ChildBinding = ParentDefinition.makeBinding(ChildBlock, {
   field: 'child',
 })
 // oxlint-disable-next-line foldkit/block-name-matches-variable -- This fixture deliberately uses a distinct literal Block identity for type coverage.
@@ -519,21 +631,26 @@ const parentModel = ParentModel.make({
   updates: 0,
 })
 const parentMessage = ParentMessage.ChangedLabel({ label: 'Primary' })
-const countParentUpdate = ParentDefinition.step(model => ({
+const countParentUpdate = ParentDefinition.makeStep(model => ({
   model: modifyFields(model, { updates: updates => updates + 1 }),
 }))
 
-const graphCombined = Update.combine(parentModel, [
+const graphCombined = Update.combineSteps(parentModel, [
   parentUpdate(parentMessage),
   countParentUpdate,
 ])
 
-const ParentBlock = ParentComposition.assembleBlock({
-  init: ParentComposition.makeInit(() => ({ model: { updates: 0 } })),
-  update: parentUpdate,
-})
+const prepareParentBlock = () =>
+  ParentComposition.prepareBlock({
+    init: ParentComposition.makeInit(() => ({ model: { updates: 0 } })),
+    update: parentUpdate,
+  })
+const ParentBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ParentModel,
+  typeof prepareParentBlock
+> = Block.assemble(prepareParentBlock)
 const completedParentStep = ParentBlock.update(parentMessage)
-const completedGraphCombined = Update.combine(parentModel, [
+const completedGraphCombined = Update.combineSteps(parentModel, [
   completedParentStep,
   countParentUpdate,
 ])
@@ -568,8 +685,11 @@ type GraphCombinedRegistration = Expect<
 >
 
 // oxlint-disable-next-line foldkit/block-name-matches-variable -- This fixture deliberately uses a distinct literal Block identity for type coverage.
-const RootApplicationDefinition = makeApplicationDefinition({ Model, Message })
-const Persist = RootApplicationDefinition.command('Persist', {
+const RootApplicationDefinition = Block.makeDefinition('Application', {
+  Model,
+  Message,
+})
+const Persist = RootApplicationDefinition.makeCommand('Persist', {
   messages: [Message.CompletedSave],
 })
 const PersistLayer = Persist.toLayer<
@@ -597,17 +717,24 @@ const rootView = RootComposition.makeView((model, h) => ({
   title: globalThis.String(model.count),
   body: h.empty,
 }))
-const makePendingApplication = () =>
-  RootComposition.assembleApplication({
-    container: document.body,
+
+const prepare = () =>
+  RootComposition.prepareBlock({
     init: rootInit,
     update: rootUpdate,
     view: rootView,
     EffectsLayer: PersistLayer,
   })
+const completedBlock: Block.FromAssemblyWithView<typeof Model, typeof prepare> =
+  Block.assemble(prepare)
+const makePendingApplication = () =>
+  Program.make({
+    block: completedBlock,
+    container: document.body,
+  })
 
 if (false) {
-  const typedPendingApplication: ApplicationProgram<
+  const typedPendingApplication: ProgramType<
     undefined,
     void,
     SaveClient,
@@ -659,13 +786,20 @@ void Option.none()
 
 export {
   ChildBlock,
+  CounterComposition,
+  EarlyReturnBlock,
   Model,
   Message,
+  OutMessage,
+  Save,
+  TernaryBlock,
   changedCount,
   combined,
+  combineGenericSteps,
   completedGraphCombined,
   completedParentStep,
   defaultContextUpdate,
+  earlyReturnUpdate,
   FullChannelBlock,
   fullChannelStep,
   graphCombined,
@@ -697,6 +831,7 @@ export {
   requiredContextUpdate,
   requiredRestContextUpdate,
   restContextUpdate,
+  ternaryUpdate,
   update,
 }
 
@@ -704,6 +839,10 @@ export type Assertions = [
   CanonicalParameters,
   CanonicalReturn,
   OutMessageReturn,
+  TernaryReturn,
+  EarlyReturn,
+  TernaryRequirements,
+  EarlyReturnRequirements,
   CurriedStepParameters,
   CurriedStepReturn,
   ConstructorError,

@@ -45,7 +45,7 @@ const statusIndicator = (
 
 const descriptionView = (
   field: Field<string>,
-  descriptionAttributes: ReadonlyArray<Attribute<Message>>,
+  descriptionAttributes: ReadonlyArray<Attribute<typeof Message.Type>>,
   h: ApplicationViewBuilder,
 ): Html =>
   FieldValidation.match(field, {
@@ -73,7 +73,7 @@ const inputFieldView = (
   id: string,
   labelText: string,
   field: Field<string>,
-  onUpdate: (value: string) => Message,
+  onUpdate: (value: string) => typeof Message.Type,
   type: string,
   h: ApplicationViewBuilder,
 ): Html =>
@@ -111,7 +111,7 @@ const textareaFieldView = (
   id: string,
   labelText: string,
   field: Field<string>,
-  onUpdate: (value: string) => Message,
+  onUpdate: (value: string) => typeof Message.Type,
   h: ApplicationViewBuilder,
 ): Html =>
   Textarea.view(

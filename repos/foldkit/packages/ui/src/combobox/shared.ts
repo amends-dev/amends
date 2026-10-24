@@ -307,14 +307,14 @@ type HandlerReturn<Model, Item extends string> = Readonly<{
 }>
 
 /** Prevents page scrolling while the combobox popup is open in modal mode. */
-export const LockScroll = ComboboxNamespace.command('LockScroll', {
+export const LockScroll = ComboboxNamespace.makeCommand('LockScroll', {
   messages: [Message.CompletedLockScroll],
   handler: function* () {
     return () => Dom.lockScroll.pipe(Effect.as(Message.CompletedLockScroll()))
   },
 })
 /** Re-enables page scrolling after the combobox popup closes. */
-export const UnlockScroll = ComboboxNamespace.command('UnlockScroll', {
+export const UnlockScroll = ComboboxNamespace.makeCommand('UnlockScroll', {
   messages: [Message.CompletedUnlockScroll],
   handler: function* () {
     return () =>
@@ -322,7 +322,7 @@ export const UnlockScroll = ComboboxNamespace.command('UnlockScroll', {
   },
 })
 /** Marks all elements outside the combobox as inert for modal behavior. */
-export const InertOthers = ComboboxNamespace.command('InertOthers', {
+export const InertOthers = ComboboxNamespace.makeCommand('InertOthers', {
   args: { id: Schema.String },
   messages: [Message.CompletedInertOthers],
   handler: function* () {
@@ -335,7 +335,7 @@ export const InertOthers = ComboboxNamespace.command('InertOthers', {
   },
 })
 /** Removes the inert attribute from elements outside the combobox. */
-export const RestoreInert = ComboboxNamespace.command('RestoreInert', {
+export const RestoreInert = ComboboxNamespace.makeCommand('RestoreInert', {
   args: { id: Schema.String },
   messages: [Message.CompletedRestoreInert],
   handler: function* () {
@@ -344,7 +344,7 @@ export const RestoreInert = ComboboxNamespace.command('RestoreInert', {
   },
 })
 /** Moves focus to the combobox input after selection or close. */
-export const FocusInput = ComboboxNamespace.command('FocusInput', {
+export const FocusInput = ComboboxNamespace.makeCommand('FocusInput', {
   args: { id: Schema.String },
   messages: [Message.CompletedFocusInput],
   handler: function* () {
@@ -356,7 +356,7 @@ export const FocusInput = ComboboxNamespace.command('FocusInput', {
   },
 })
 /** Scrolls the active combobox item into view after keyboard navigation. */
-export const ScrollItemIntoView = ComboboxNamespace.command(
+export const ScrollItemIntoView = ComboboxNamespace.makeCommand(
   'ScrollItemIntoView',
   {
     args: { id: Schema.String, index: Schema.Number },
@@ -371,7 +371,7 @@ export const ScrollItemIntoView = ComboboxNamespace.command(
   },
 )
 /** Programmatically clicks the active combobox item's DOM element. */
-export const ClickItem = ComboboxNamespace.command('ClickItem', {
+export const ClickItem = ComboboxNamespace.makeCommand('ClickItem', {
   args: { id: Schema.String, index: Schema.Number },
   messages: [Message.CompletedClickItem],
   handler: function* () {
@@ -383,7 +383,7 @@ export const ClickItem = ComboboxNamespace.command('ClickItem', {
   },
 })
 /** Detects whether the combobox input wrapper moved or the leave animation ended. Whichever comes first; both outcomes signal the Animation block that leave is complete. */
-export const DetectMovementOrAnimationEnd = ComboboxNamespace.command(
+export const DetectMovementOrAnimationEnd = ComboboxNamespace.makeCommand(
   'DetectMovementOrAnimationEnd',
   {
     args: { id: Schema.String, generation: Schema.Number },
@@ -417,7 +417,15 @@ export const makeUpdate = <
     MessageSchema<Item, ItemEncoded>,
     ParentOutMessageSchema
   >,
+  makeOutMessageFold: Block.MakeOutMessageFold<
+    BaseModel,
+    Message<Item>,
+    OutMessage<Item>
+  >,
   step: Block.DefineStep<BaseModel, Message<Item>, OutMessage<Item>>,
+  stepFields: Block.DefineStepFields<BaseModel>,
+  stepNoop: Block.DefineStepNoop<BaseModel>,
+  commandsStep: Block.MakeCommandsStep<BaseModel, Message<Item>>,
   selectionBehavior: 'CloseWithFocus' | 'KeepOpen',
   handlers: Readonly<{
     handleClose: (
@@ -445,23 +453,16 @@ export const makeUpdate = <
       commands: [DetectMovementOrAnimationEnd({ id: model.id, generation })],
     }))
 
-  type AnimationOutMessageStep = ReturnType<typeof detectMovementOrAnimationEnd>
-
-  const ignoreTransitionedOut = step(model => ({ model }))
-
-  const foldAnimationOutMessage = Animation.AnimationBlock.OutMessage.match<
-    AnimationOutMessageStep | typeof ignoreTransitionedOut
-  >({
+  const foldAnimationOutMessage = makeOutMessageFold(Animation.AnimationBlock, {
     StartedLeaveAnimating: ({ generation }) =>
       detectMovementOrAnimationEnd(generation),
-    TransitionedOut: () => ignoreTransitionedOut,
+    TransitionedOut: stepNoop,
   })
 
   const AnimationBinding = bindChild(Animation.AnimationBlock, {
     field: 'animation',
     init: false,
-    outMessage: { fold: foldAnimationOutMessage },
-  })
+  }).withOutMessagePolicy({ fold: foldAnimationOutMessage })
 
   type AuthoredMessage = Message<Item>
 
@@ -490,8 +491,8 @@ export const makeUpdate = <
       if (didClose && model.isAnimated) {
         return step(() =>
           Function.compose(
-            Update.combine([
-              () => ({ model: nextModel, commands }),
+            Update.combineSteps([
+              step(() => ({ model: nextModel, commands })),
               AnimationBinding.requestHide(),
             ]),
             Update.withOutMessage(outMessage),
@@ -508,12 +509,10 @@ export const makeUpdate = <
 
     const openCombobox = (baseModel: Model) => {
       if (model.isAnimated) {
-        return Update.combine([
-          () => ({ model: baseModel, commands: openCommands }),
+        return Update.combineSteps([
+          step(() => ({ model: baseModel, commands: openCommands })),
           AnimationBinding.requestShow(),
-          stepModel => ({
-            model: modifyBaseFields(stepModel, { isOpen: () => true }),
-          }),
+          stepFields(() => ({ isOpen: () => true })),
         ])
       }
 
@@ -538,8 +537,8 @@ export const makeUpdate = <
       if (model.isAnimated) {
         return step(() =>
           Function.compose(
-            Update.combine([
-              () => ({ model: comboboxClose.model, commands }),
+            Update.combineSteps([
+              step(() => ({ model: comboboxClose.model, commands })),
               AnimationBinding.requestHide(),
             ]),
             Update.withOutMessage(comboboxClose.outMessage),
@@ -558,8 +557,14 @@ export const makeUpdate = <
       }
     }
 
-    const openWithActiveItem = (maybeActiveItemIndex: Option.Option<number>) =>
-      openCombobox(
+    const openWithActiveItem = (
+      maybeActiveItemIndex: Option.Option<number>,
+    ) => {
+      if (model.isOpen) {
+        return { model }
+      }
+
+      return openCombobox(
         modifyBaseFields(model, {
           maybeActiveItemIndex: () => maybeActiveItemIndex,
           activationTrigger: () =>
@@ -570,6 +575,7 @@ export const makeUpdate = <
           maybeLastPointerPosition: () => Option.none(),
         }),
       )
+    }
 
     const closeIfOpen = (
       commands: typeof closeWithFocusCommands,
@@ -746,13 +752,11 @@ export const makeUpdate = <
           })
 
           if (model.isAnimated) {
-            return Update.combine([
-              () => ({ model: toggledModel, commands: [focusInput] }),
-              stepModel => ({ model: stepModel, commands: openCommands }),
+            return Update.combineSteps([
+              step(() => ({ model: toggledModel, commands: [focusInput] })),
+              commandsStep(openCommands),
               AnimationBinding.requestShow(),
-              stepModel => ({
-                model: modifyBaseFields(stepModel, { isOpen: () => true }),
-              }),
+              stepFields(() => ({ isOpen: () => true })),
             ])
           }
 
@@ -779,7 +783,7 @@ export const makeUpdate = <
  *  installs the `pointerdown`-cancelling capture listener that prevents
  *  input blur on item presses. Exposed so Scene tests can call
  *  `Scene.Mount.resolve(Anchor, CompletedAnchor())`. */
-export const Anchor = ComboboxNamespace.mount('Anchor', {
+export const Anchor = ComboboxNamespace.makeMount('Anchor', {
   args: { buttonId: Schema.String, anchor: AnchorConfig },
   messages: [Message.CompletedAnchor],
   handler: function* () {
@@ -816,37 +820,40 @@ export const Anchor = ComboboxNamespace.mount('Anchor', {
  *  capture listener that prevents blur on item presses. Exposed so Scene
  *  tests can call
  *  `Scene.Mount.resolve(AttachPreventBlur, CompletedAttachPreventBlur())`. */
-export const AttachPreventBlur = ComboboxNamespace.mount('AttachPreventBlur', {
-  messages: [Message.CompletedAttachPreventBlur],
-  handler: function* () {
-    return ({ element }) =>
-      Effect.gen(function* () {
-        yield* Effect.acquireRelease(
-          Effect.sync(() => {
-            const handler = (event: Event) => {
-              event.preventDefault()
-            }
-            element.addEventListener('pointerdown', handler, {
-              capture: true,
-            })
-            return handler
-          }),
-          handler =>
-            Effect.sync(() =>
-              element.removeEventListener('pointerdown', handler, {
+export const AttachPreventBlur = ComboboxNamespace.makeMount(
+  'AttachPreventBlur',
+  {
+    messages: [Message.CompletedAttachPreventBlur],
+    handler: function* () {
+      return ({ element }) =>
+        Effect.gen(function* () {
+          yield* Effect.acquireRelease(
+            Effect.sync(() => {
+              const handler = (event: Event) => {
+                event.preventDefault()
+              }
+              element.addEventListener('pointerdown', handler, {
                 capture: true,
-              }),
-            ),
-        )
-        return Message.CompletedAttachPreventBlur()
-      })
+              })
+              return handler
+            }),
+            handler =>
+              Effect.sync(() =>
+                element.removeEventListener('pointerdown', handler, {
+                  capture: true,
+                }),
+              ),
+          )
+          return Message.CompletedAttachPreventBlur()
+        })
+    },
   },
-})
+)
 
 /** The Mount this Combobox renders to install the input's select-on-focus
  *  behavior. Exposed so Scene tests can call
  *  `Scene.Mount.resolve(AttachSelectOnFocus, CompletedAttachSelectOnFocus())`. */
-export const AttachSelectOnFocus = ComboboxNamespace.mount(
+export const AttachSelectOnFocus = ComboboxNamespace.makeMount(
   'AttachSelectOnFocus',
   {
     messages: [Message.CompletedAttachSelectOnFocus],
@@ -875,7 +882,7 @@ export const AttachSelectOnFocus = ComboboxNamespace.mount(
 /** The backdrop-portaling Mount this Combobox renders. Exposed so Scene tests can
  *  call `Scene.Mount.resolve(PortalBackdrop, CompletedPortalBackdrop())` to
  *  acknowledge the mount produced by the rendered backdrop. */
-export const PortalBackdrop = ComboboxNamespace.mount('PortalBackdrop', {
+export const PortalBackdrop = ComboboxNamespace.makeMount('PortalBackdrop', {
   messages: [Message.CompletedPortalBackdrop],
   handler: function* () {
     return ({ element }) =>

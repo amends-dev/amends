@@ -17,7 +17,7 @@ import { update } from './update'
 
 const GRID_SIZE = 16
 
-const initialModel: Model = {
+const initialModel: typeof Model.Type = {
   grid: createEmptyGrid(GRID_SIZE),
   undoStack: [],
   redoStack: [],
@@ -42,15 +42,15 @@ const initialModel: Model = {
 }
 
 const dispatch = (
-  model: Model,
+  model: typeof Model.Type,
   ...messages: ReadonlyArray<Parameters<typeof update>[1]>
-): Model =>
-  messages.reduce<Model>(
+): typeof Model.Type =>
+  messages.reduce<typeof Model.Type>(
     (currentModel, message) => update(currentModel, message).model,
     model,
   )
 
-const buildHistoryModel = (steps: number): Model => {
+const buildHistoryModel = (steps: number): typeof Model.Type => {
   let model = initialModel
   for (let i = 0; i < steps; i++) {
     const x = i % GRID_SIZE
@@ -91,7 +91,7 @@ describe('update: single operations', () => {
 
   test('flood fill (empty grid)', async ({ bench }) => {
     await bench('flood fill (empty grid)', () => {
-      const fillModel: Model = modifyFields(initialModel, {
+      const fillModel: typeof Model.Type = modifyFields(initialModel, {
         tool: () => 'Fill',
       })
       dispatch(fillModel, Message.PressedCell({ x: 0, y: 0 }))
@@ -146,7 +146,7 @@ describe('update: paint sequence (16x16 grid)', () => {
 
   test('paint 50 cells with mirror mode', async ({ bench }) => {
     await bench('paint 50 cells with mirror mode', () => {
-      let model: Model = modifyFields(initialModel, {
+      let model: typeof Model.Type = modifyFields(initialModel, {
         mirrorMode: () => 'Both',
       })
       for (let i = 0; i < 50; i++) {

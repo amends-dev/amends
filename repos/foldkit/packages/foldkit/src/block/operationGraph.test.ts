@@ -6,6 +6,7 @@ import { modifyFields } from '../struct/index.js'
 import * as Update from '../update/index.js'
 import { makeDefinition, makeNamespace } from './define.js'
 import { lowerBlock } from './lowering.js'
+import * as Block from './public.js'
 
 const ChildModel = Schema.Struct({ count: Schema.Number })
 type ChildModel = typeof ChildModel.Type
@@ -40,32 +41,37 @@ const ChildDefinition = ChildNamespace.makeDefinition({
   Message,
 })
 const resetInvocation = vi.fn()
-const reset = ChildDefinition.step(_model => {
+const reset = ChildDefinition.makeStep(_model => {
   resetInvocation()
 
   return { model: ChildModel.make({ count: 0 }) }
 })
 const ChildComposition = ChildDefinition.makeComposition()
-const ChildBlock = ChildComposition.assembleBlock({
-  view: ChildComposition.makeView((_model, h) => h.div([])),
-  init: () => ({ model: ChildModel.make({ count: 0 }) }),
-  update: ChildComposition.makeUpdate((model, message) =>
-    Message.match(message, {
-      RequestedReset: () => reset(model),
-      Advanced: () => ({
-        model: modifyFields(model, { count: count => count + 1 }),
+const prepareChildBlock = () =>
+  ChildComposition.prepareBlock({
+    view: ChildComposition.makeView((_model, h) => h.div([])),
+    init: () => ({ model: ChildModel.make({ count: 0 }) }),
+    update: ChildComposition.makeUpdate((model, message) =>
+      Message.match(message, {
+        RequestedReset: () => reset(model),
+        Advanced: () => ({
+          model: modifyFields(model, { count: count => count + 1 }),
+        }),
+        CompletedRecordBeforeReplay: () => ({
+          model: modifyFields(model, { count: count => count + 1 }),
+        }),
+        CompletedRecordAfterReplay: () => ({
+          model: modifyFields(model, { count: count => count + 1 }),
+        }),
       }),
-      CompletedRecordBeforeReplay: () => ({
-        model: modifyFields(model, { count: count => count + 1 }),
-      }),
-      CompletedRecordAfterReplay: () => ({
-        model: modifyFields(model, { count: count => count + 1 }),
-      }),
-    }),
-  ),
-  operations: { reset: () => Tuple.make(Message.RequestedReset()) },
-  EffectsLayer: Layer.empty,
-})
+    ),
+    operations: { reset: () => Tuple.make(Message.RequestedReset()) },
+    EffectsLayer: Layer.empty,
+  })
+const ChildBlock: Block.FromAssemblyWithView<
+  typeof ChildModel,
+  typeof prepareChildBlock
+> = Block.assemble(prepareChildBlock)
 
 const OmittedParentDefinition = makeNamespace(
   'OperationGraphOmittedParent',
@@ -73,14 +79,14 @@ const OmittedParentDefinition = makeNamespace(
   Model: ParentModel,
   Message: ParentMessage,
 })
-const OmittedChildBinding = OmittedParentDefinition.bindChild(ChildBlock, {
+const OmittedChildBinding = OmittedParentDefinition.makeBinding(ChildBlock, {
   placement: 'omitted-child',
   read: (model: ParentModel) => Option.some(model.primary),
   write: (model, nextChild) =>
     modifyFields(model, { primary: () => nextChild }),
 })
 
-const initializeOmittedChild = OmittedParentDefinition.step(model =>
+const initializeOmittedChild = OmittedParentDefinition.makeStep(model =>
   OmittedChildBinding.init({
     args: [],
     toParentModel: child => modifyFields(model, { primary: () => child }),
@@ -89,25 +95,30 @@ const initializeOmittedChild = OmittedParentDefinition.step(model =>
 const omittedParentComposition = OmittedParentDefinition.makeComposition({
   bindings: [OmittedChildBinding],
 })
-const OmittedParent = omittedParentComposition.assembleBlock({
-  view: omittedParentComposition.makeView((_model, h) => h.div([])),
-  init: () => ({ model: initialModel }),
-  update: omittedParentComposition.makeUpdate((model, message) =>
-    ParentMessage.match(message, {
-      RequestedInitializeChild: () => initializeOmittedChild(model),
-      Advanced: () => ({ model }),
-      CompletedRecordBeforeReplay: () => ({ model }),
-      CompletedRecordAfterReplay: () => ({ model }),
-    }),
-  ),
-  operations: {
-    initializeOmittedChild: () =>
-      Tuple.make(ParentMessage.RequestedInitializeChild()),
-  },
-  EffectsLayer: Layer.empty,
-})
+const prepareOmittedParent = () =>
+  omittedParentComposition.prepareBlock({
+    view: omittedParentComposition.makeView((_model, h) => h.div([])),
+    init: () => ({ model: initialModel }),
+    update: omittedParentComposition.makeUpdate((model, message) =>
+      ParentMessage.match(message, {
+        RequestedInitializeChild: () => initializeOmittedChild(model),
+        Advanced: () => ({ model }),
+        CompletedRecordBeforeReplay: () => ({ model }),
+        CompletedRecordAfterReplay: () => ({ model }),
+      }),
+    ),
+    operations: {
+      initializeOmittedChild: () =>
+        Tuple.make(ParentMessage.RequestedInitializeChild()),
+    },
+    EffectsLayer: Layer.empty,
+  })
+const OmittedParent: Block.FromAssemblyWithView<
+  typeof ParentModel,
+  typeof prepareOmittedParent
+> = Block.assemble(prepareOmittedParent)
 
-const ForeignOmittedChildBinding = OmittedParentDefinition.bindChild(
+const ForeignOmittedChildBinding = OmittedParentDefinition.makeBinding(
   ChildBlock,
   {
     placement: 'foreign-child',
@@ -239,7 +250,7 @@ const ExactParentBaseDefinition = makeNamespace(
   Model: ParentModel,
   Message: ParentMessage,
 })
-const RegisteredPlacementBinding = ExactParentBaseDefinition.bindChild(
+const RegisteredPlacementBinding = ExactParentBaseDefinition.makeBinding(
   ChildBlock,
   {
     placement: 'same-placement',
@@ -251,43 +262,51 @@ const RegisteredPlacementBinding = ExactParentBaseDefinition.bindChild(
       modifyFields(model, { primary: () => nextChild }),
   },
 )
-const WrongPlacementBinding = ExactParentBaseDefinition.bindChild(ChildBlock, {
-  placement: 'same-placement',
-  readAll: readAllWrongPlacement,
-  key: () => 'only',
-  keySchema: Schema.Literal('only'),
-  read: readWrongPlacement,
-  writeAt: (model, _key, nextChild) => writeWrongPlacement(model, nextChild),
-})
+const WrongPlacementBinding = ExactParentBaseDefinition.makeBinding(
+  ChildBlock,
+  {
+    placement: 'same-placement',
+    readAll: readAllWrongPlacement,
+    key: () => 'only',
+    keySchema: Schema.Literal('only'),
+    read: readWrongPlacement,
+    writeAt: (model, _key, nextChild) => writeWrongPlacement(model, nextChild),
+  },
+)
 
 const exactParentComposition = ExactParentBaseDefinition.makeComposition({
   bindings: [RegisteredPlacementBinding],
 })
-const initializeWrongPlacement = ExactParentBaseDefinition.step(model =>
+const initializeWrongPlacement = ExactParentBaseDefinition.makeStep(model =>
   WrongPlacementBinding.init({
     key: 'only',
     args: [],
     toParentModel: child => modifyFields(model, { primary: () => child }),
   }),
 )
-const ExactParent = exactParentComposition.assembleBlock({
-  view: exactParentComposition.makeView((_model, h) => h.div([])),
-  init: () => ({ model: initialModel }),
-  update: exactParentComposition.makeUpdate((model, message) =>
-    ParentMessage.match(message, {
-      RequestedInitializeChild: () => initializeWrongPlacement(model),
-      Advanced: () =>
-        WrongPlacementBinding.fold(model, 'only', Message.Advanced()),
-      CompletedRecordBeforeReplay: () => ({ model }),
-      CompletedRecordAfterReplay: () => ({ model }),
-    }),
-  ),
-  operations: {
-    initializeWrongPlacement: () =>
-      Tuple.make(ParentMessage.RequestedInitializeChild()),
-  },
-  EffectsLayer: Layer.empty,
-})
+const prepareExactParent = () =>
+  exactParentComposition.prepareBlock({
+    view: exactParentComposition.makeView((_model, h) => h.div([])),
+    init: () => ({ model: initialModel }),
+    update: exactParentComposition.makeUpdate((model, message) =>
+      ParentMessage.match(message, {
+        RequestedInitializeChild: () => initializeWrongPlacement(model),
+        Advanced: () =>
+          WrongPlacementBinding.fold(model, 'only', Message.Advanced()),
+        CompletedRecordBeforeReplay: () => ({ model }),
+        CompletedRecordAfterReplay: () => ({ model }),
+      }),
+    ),
+    operations: {
+      initializeWrongPlacement: () =>
+        Tuple.make(ParentMessage.RequestedInitializeChild()),
+    },
+    EffectsLayer: Layer.empty,
+  })
+const ExactParent: Block.FromAssemblyWithView<
+  typeof ParentModel,
+  typeof prepareExactParent
+> = Block.assemble(prepareExactParent)
 
 it('checks exact binding identity before reading or writing the parent Model', () => {
   const lowered = lowerBlock(ExactParent)
@@ -320,7 +339,7 @@ const PendingParent = makeDefinition('PendingParent', {
   Model: PendingParentModel,
   Message: ParentMessage,
 })
-const PendingChildBinding = PendingParent.bindChild(ChildBlock, {
+const PendingChildBinding = PendingParent.makeBinding(ChildBlock, {
   field: 'entries',
   key: 'id',
   childField: 'child',
@@ -365,15 +384,15 @@ it('resolves a pending keyed operation against the active Model after its key is
   expect(resetInvocation).toHaveBeenCalledTimes(previousInvocationCount)
 })
 
-const RecordBeforeReplay = PendingParent.command('RecordBeforeReplay', {
+const RecordBeforeReplay = PendingParent.makeCommand('RecordBeforeReplay', {
   messages: [ParentMessage.CompletedRecordBeforeReplay],
 })
-const RecordAfterReplay = PendingParent.command('RecordAfterReplay', {
+const RecordAfterReplay = PendingParent.makeCommand('RecordAfterReplay', {
   messages: [ParentMessage.CompletedRecordAfterReplay],
 })
 
 it('replays a deferred combined operation from the active Model without restoring removed keys', () => {
-  const pending = Reflect.apply(Update.combine, undefined, [
+  const pending = Reflect.apply(Update.combineSteps, undefined, [
     capturedPendingModel,
     [
       (model: typeof PendingParentModel.Type) => ({
@@ -417,15 +436,20 @@ const policyComposition = PolicyNamespace.makeDefinition({
   Message,
   OutMessage: PolicyOutMessage,
 }).makeComposition()
-const PolicyChild = policyComposition.assembleBlock({
-  view: policyComposition.makeView((_model, h) => h.div([])),
-  init: () => ({ model: ChildModel.make({ count: 0 }) }),
-  update: model => ({
-    model,
-    outMessage: PolicyOutMessage.RequestedSiblingReset(),
-  }),
-  EffectsLayer: Layer.empty,
-})
+const preparePolicyChild = () =>
+  policyComposition.prepareBlock({
+    view: policyComposition.makeView((_model, h) => h.div([])),
+    init: () => ({ model: ChildModel.make({ count: 0 }) }),
+    update: model => ({
+      model,
+      outMessage: PolicyOutMessage.RequestedSiblingReset(),
+    }),
+    EffectsLayer: Layer.empty,
+  })
+const PolicyChild: Block.FromAssemblyWithViewAndOutMessage<
+  typeof ChildModel,
+  typeof preparePolicyChild
+> = Block.assemble(preparePolicyChild)
 
 const PolicyParentMessage = Schema.Never
 const PolicyParentBaseDefinition = makeNamespace(
@@ -434,31 +458,35 @@ const PolicyParentBaseDefinition = makeNamespace(
   Model: ParentModel,
   Message: PolicyParentMessage,
 })
-const SiblingChildBinding = PolicyParentBaseDefinition.bindChild(ChildBlock, {
+const SiblingChildBinding = PolicyParentBaseDefinition.makeBinding(ChildBlock, {
   placement: 'sibling-child',
   read: (model: ParentModel) => Option.some(model.sibling),
   write: (model, nextChild) =>
     modifyFields(model, { sibling: () => nextChild }),
 })
-const PolicyChildBinding = PolicyParentBaseDefinition.bindChild(PolicyChild, {
+const PolicyChildBinding = PolicyParentBaseDefinition.makeBinding(PolicyChild, {
   placement: 'policy-child',
   read: (model: ParentModel) => Option.some(model.primary),
   write: (model, nextChild) =>
     modifyFields(model, { primary: () => nextChild }),
-  outMessage: {
-    fold: (_outMessage: PolicyOutMessage) => SiblingChildBinding.reset(),
-  },
+}).withOutMessagePolicy({
+  fold: (_outMessage: PolicyOutMessage) => SiblingChildBinding.reset(),
 })
 
 const policyParentComposition = PolicyParentBaseDefinition.makeComposition({
   bindings: [PolicyChildBinding, SiblingChildBinding],
 })
-const PolicyParent = policyParentComposition.assembleBlock({
-  view: policyParentComposition.makeView((_model, h) => h.div([])),
-  init: () => ({ model: initialModel }),
-  update: policyParentComposition.makeUpdate(),
-  EffectsLayer: Layer.empty,
-})
+const preparePolicyParent = () =>
+  policyParentComposition.prepareBlock({
+    view: policyParentComposition.makeView((_model, h) => h.div([])),
+    init: () => ({ model: initialModel }),
+    update: policyParentComposition.makeUpdate(),
+    EffectsLayer: Layer.empty,
+  })
+const PolicyParent: Block.FromAssemblyWithView<
+  typeof ParentModel,
+  typeof preparePolicyParent
+> = Block.assemble(preparePolicyParent)
 
 it('restores the parent graph before folding a child OutMessage', () => {
   const lowered = lowerBlock(PolicyParent)

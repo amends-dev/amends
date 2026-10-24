@@ -88,16 +88,16 @@ describe('rendering templates', () => {
     expect(ssgViteConfig).toContain('build: { prerender: true }')
     const ssgServerEntry = readTemplateFile('rendering/ssg/src/entry.server.ts')
     expect(ssgServerEntry).toContain('export const prerenderPaths')
-    expect(ssgServerEntry).toContain('ApplicationComposition,')
+    expect(ssgServerEntry).toContain('ApplicationBlock')
     expect(ssgServerEntry).not.toMatch(/\bApplication\s*,/)
     expect(readTemplateFile('rendering/ssg/src/entry.ts')).toContain(
       'Runtime.hydrate',
     )
     expect(readTemplateFile('rendering/ssg/src/application.ts')).toContain(
-      'ApplicationDefinition = makeApplicationDefinition({',
+      "ApplicationDefinition = Block.makeDefinition('Application', {",
     )
     expect(readTemplateFile('rendering/ssg/src/entry.ts')).toContain(
-      'ApplicationComposition.assembleApplication({',
+      'Program.make({',
     )
     expect(readTemplateFile('rendering/ssg/src/application.ts')).toContain(
       'ApplicationComposition = ApplicationDefinition.makeComposition()',
@@ -131,16 +131,16 @@ describe('rendering templates', () => {
     expect(ssrViteConfig).toContain('build: true')
     const ssrServerEntry = readTemplateFile('rendering/ssr/src/entry.server.ts')
     expect(ssrServerEntry).toContain('flags: flagsForRequest(')
-    expect(ssrServerEntry).toContain('ApplicationComposition,')
+    expect(ssrServerEntry).toContain('ApplicationBlock')
     expect(ssrServerEntry).not.toMatch(/\bApplication\s*,/)
     expect(readTemplateFile('rendering/ssr/src/entry.ts')).toContain(
       'Runtime.hydrate',
     )
     expect(readTemplateFile('rendering/ssr/src/application.ts')).toContain(
-      'ApplicationDefinition = makeApplicationDefinition({',
+      "ApplicationDefinition = Block.makeDefinition('Application', {",
     )
     expect(readTemplateFile('rendering/ssr/src/entry.ts')).toContain(
-      'ApplicationComposition.assembleApplication({',
+      'Program.make({',
     )
     expect(readTemplateFile('rendering/ssr/src/application.ts')).toContain(
       'ApplicationComposition = ApplicationDefinition.makeComposition()',

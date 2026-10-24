@@ -259,6 +259,27 @@ describe('update', () => {
         }),
       )
     })
+
+    test('a hash-only URL change keeps the People page in sync', () => {
+      story(
+        update,
+        given(onPeople('designer')),
+        message(
+          Message.ChangedUrl({
+            url: urlOrThrow(
+              'http://localhost/people?searchText=designer#results',
+            ),
+          }),
+        ),
+        model(model => {
+          expect(model.peoplePage.searchInput).toBe('designer')
+          expect(model.peoplePage.searchHistory).toStrictEqual(['designer'])
+          expect(model.peoplePage.results._tag).toBe('Loading')
+        }),
+        Command.expectHas(FetchPeople),
+        resolveFetch('designer'),
+      )
+    })
   })
 
   describe('generated People Message', () => {

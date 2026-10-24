@@ -5,7 +5,7 @@ import { HomeDefinition } from './definition'
 import { Message } from './message'
 import { capturesKeyboard } from './model'
 
-export const subscriptions = HomeDefinition.subscriptions(entry => ({
+export const subscriptions = HomeDefinition.makeSubscriptions(entry => ({
   homeKeyPresses: entry(
     'HomeKeyPresses',
     { shouldCaptureKeyboard: Schema.Boolean },

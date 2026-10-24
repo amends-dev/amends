@@ -11,9 +11,8 @@ export const FakeFile = Schema.Struct({
   name: Schema.String,
   sizeMegabytes: Schema.Number,
 })
-export type FakeFile = typeof FakeFile.Type
 
-export const FAKE_FILES: Array.NonEmptyReadonlyArray<FakeFile> = [
+export const FAKE_FILES: Array.NonEmptyReadonlyArray<typeof FakeFile.Type> = [
   { name: 'vacation-photos.zip', sizeMegabytes: 48 },
   { name: 'demo-recording.mp4', sizeMegabytes: 87 },
   { name: 'quarterly-report.pdf', sizeMegabytes: 12 },
@@ -21,15 +20,15 @@ export const FAKE_FILES: Array.NonEmptyReadonlyArray<FakeFile> = [
   { name: 'database-backup.sql', sizeMegabytes: 61 },
 ]
 
-const fakeFileForUpload = (uploadId: number): FakeFile =>
+const fakeFileForUpload = (uploadId: number): typeof FakeFile.Type =>
   pipe(
     FAKE_FILES,
     Array.get(uploadId % Array.length(FAKE_FILES)),
     Option.getOrElse(() => Array.headNonEmpty(FAKE_FILES)),
   )
 
-const setStatusForId = (uploadId: number, status: UploadStatus) =>
-  Array.map((upload: Upload) =>
+const setStatusForId = (uploadId: number, status: typeof UploadStatus.Type) =>
+  Array.map((upload: typeof Upload.Type) =>
     upload.id === uploadId
       ? modifyFields(upload, { status: () => status })
       : upload,

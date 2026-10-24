@@ -5,7 +5,7 @@ import { ApplicationDefinition } from './definition'
 import { Message } from './message'
 import { TODOS_STORAGE_KEY, Todos, TodosJsonString } from './model'
 
-export const GenerateTodo = ApplicationDefinition.command('GenerateTodo', {
+export const GenerateTodo = ApplicationDefinition.makeCommand('GenerateTodo', {
   args: { text: Schema.String },
   messages: [Message.CompletedGenerateTodo],
   handler: function* () {
@@ -24,7 +24,7 @@ export const GenerateTodo = ApplicationDefinition.command('GenerateTodo', {
   },
 })
 
-export const SaveTodos = ApplicationDefinition.command('SaveTodos', {
+export const SaveTodos = ApplicationDefinition.makeCommand('SaveTodos', {
   args: { todos: Todos },
   messages: [Message.SucceededSaveTodos, Message.FailedSaveTodos],
   handler: function* () {

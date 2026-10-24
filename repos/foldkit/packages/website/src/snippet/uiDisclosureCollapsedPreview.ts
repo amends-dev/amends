@@ -19,7 +19,6 @@ const Message = defineMessageUnion({
   ToggledArticle: { isOpen: Schema.Boolean },
 })
 
-type Message = typeof Message.Type
 const ArticlePreviewComposition = Block.makeDefinition('ArticlePreview', {
   Model,
   Message,
@@ -51,7 +50,7 @@ const view = ArticlePreviewComposition.makeView((model, h) => {
     button,
     panel,
     animatePanel,
-  }: Disclosure.DisclosureAttributes<Message>) =>
+  }: Disclosure.DisclosureAttributes<typeof Message.Type>) =>
     h.article(
       [h.Class('relative overflow-hidden rounded-lg border bg-white')],
       [

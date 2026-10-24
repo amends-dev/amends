@@ -9,11 +9,11 @@ import * as ExampleDetail from '../page/example/domain'
 import { ApplicationRoute, urlToApplicationRoute } from '../route'
 
 type SourcesBySlug = Readonly<
-  globalThis.Record<string, ExampleDetail.ExampleSources>
+  globalThis.Record<string, typeof ExampleDetail.ExampleSources.Type>
 >
 
 type RenderContext = Readonly<{
-  apiData: ApiReference.ApiData
+  apiData: typeof ApiReference.ApiData.Type
   sourcesBySlug: SourcesBySlug
   baseFlags: typeof Flags.Type
 }>
@@ -35,7 +35,7 @@ const loadBaseFlags: Effect.Effect<typeof Flags.Type> = Effect.gen(
   },
 )
 
-const loadApiData: Effect.Effect<ApiReference.ApiData> = Effect.map(
+const loadApiData: Effect.Effect<typeof ApiReference.ApiData.Type> = Effect.map(
   Effect.promise(() =>
     Promise.all([
       import('virtual:parsed-api'),
@@ -56,10 +56,9 @@ const loadAllExampleSources: Effect.Effect<SourcesBySlug> = Effect.map(
       ExampleDetail.runnableExampleSlugs.map(
         async (
           slug,
-        ): Promise<readonly [string, ExampleDetail.ExampleSources]> => [
-          slug,
-          await ExampleDetail.loadSourcesForSlug(slug),
-        ],
+        ): Promise<
+          readonly [string, typeof ExampleDetail.ExampleSources.Type]
+        > => [slug, await ExampleDetail.loadSourcesForSlug(slug)],
       ),
     ),
   ),

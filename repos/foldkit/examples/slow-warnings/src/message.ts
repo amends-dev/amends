@@ -10,5 +10,3 @@ export const Message = defineMessageUnion({
   ClickedClearWarnings: {},
   RecordedSlowWarning: { report: SlowWarningReport },
 })
-
-export type Message = typeof Message.Type

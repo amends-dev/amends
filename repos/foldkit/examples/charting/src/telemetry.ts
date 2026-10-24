@@ -53,7 +53,7 @@ import {
 const TOP_CONTRIBUTOR_COUNT = 6
 
 export type RawPackageData = Readonly<{
-  spec: PackageSpec
+  spec: typeof PackageSpec.Type
   downloads: typeof NpmDownloadsResponse.Type
   packument: typeof NpmPackument.Type
 }>
@@ -116,7 +116,7 @@ const dependenciesOrEmpty = (
 
 const latestMetadata = (
   packument: typeof NpmPackument.Type,
-): NpmVersionMetadata =>
+): typeof NpmVersionMetadata.Type =>
   Option.getOrElse(
     Record.get(packument.versions, packument['dist-tags'].latest),
     () => ({
@@ -126,8 +126,8 @@ const latestMetadata = (
   )
 
 export const dependencyEdgesForPackage = (
-  packageId: PackageId,
-  metadata: NpmVersionMetadata,
+  packageId: typeof PackageId.Type,
+  metadata: typeof NpmVersionMetadata.Type,
 ): ReadonlyArray<typeof DependencyEdge.Type> => {
   const dependencies = dependenciesOrEmpty(metadata.dependencies)
   const peerDependencies = dependenciesOrEmpty(metadata.peerDependencies)
@@ -160,7 +160,7 @@ export const dependencyEdgesForPackage = (
 }
 
 export const packageSnapshotFromResponses = (
-  spec: PackageSpec,
+  spec: typeof PackageSpec.Type,
   downloads: typeof NpmDownloadsResponse.Type,
   packument: typeof NpmPackument.Type,
   weekStarts: ReadonlyArray<string>,
@@ -321,7 +321,7 @@ export const makeWeeklyTelemetry = (
   )
 
 export const contributorSummary = (
-  contributor: GitHubContributorResponse,
+  contributor: typeof GitHubContributorResponse.Type,
 ): typeof ContributorSummary.Type =>
   ContributorSummary.make({
     login: contributor.login,
@@ -405,7 +405,8 @@ export const transformTelemetry = (
     pipe(
       Order.Number,
       Order.mapInput(
-        (contributor: GitHubContributorResponse) => contributor.contributions,
+        (contributor: typeof GitHubContributorResponse.Type) =>
+          contributor.contributions,
       ),
       Order.flip,
     ),

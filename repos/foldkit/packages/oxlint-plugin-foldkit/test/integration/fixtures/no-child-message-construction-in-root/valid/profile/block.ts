@@ -3,7 +3,7 @@ import { ProfileComposition } from './composition'
 import { update } from './profile'
 import { view } from './view'
 
-export const block = ProfileComposition.assembleBlock({
+export const block = ProfileComposition.prepareBlock({
   init: () => ({ model: Model.make({ child: undefined }) }),
   update,
   view,

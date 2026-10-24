@@ -1,7 +1,7 @@
 import { Option } from 'effect'
 import { modifyFields } from 'foldkit/struct'
 
-import { type PeopleRoute } from '../../route'
+import type { ApplicationRoute } from '../../route'
 import { FetchPeople, PushSearchUrl } from './command'
 import { PeopleComposition } from './composition'
 import { Message } from './message'
@@ -12,17 +12,19 @@ import {
   routeSearchText,
 } from './model'
 
-export const init = PeopleComposition.makeInit((route: PeopleRoute) => {
-  const searchText = routeSearchText(route)
-  return {
-    model: Model.make({
-      searchInput: searchText,
-      searchHistory: addSearchToHistory([], searchText),
-      results: SearchResults.Loading(),
-    }),
-    commands: [FetchPeople({ searchText })],
-  }
-})
+export const init = PeopleComposition.makeInit(
+  (route: typeof ApplicationRoute.People.Type) => {
+    const searchText = routeSearchText(route)
+    return {
+      model: Model.make({
+        searchInput: searchText,
+        searchHistory: addSearchToHistory([], searchText),
+        results: SearchResults.Loading(),
+      }),
+      commands: [FetchPeople({ searchText })],
+    }
+  },
+)
 export const update = PeopleComposition.makeUpdate((model, message) =>
   Message.match(message, {
     ChangedSearchInput: ({ value }) => ({

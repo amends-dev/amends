@@ -16,9 +16,11 @@ import { dual } from 'effect/Function'
 
 import {
   type AggregatedChildren,
+  type AnyBinding,
   type BindingRequirement,
   aggregateChildren,
 } from '../block/binding.js'
+import { LocalMountsTypeId, isComposition } from '../block/definition.js'
 import { identityOf } from '../block/identity.js'
 import { isScopedEntry } from '../block/scope.js'
 import type { Scoped } from '../block/scope.js'
@@ -47,13 +49,6 @@ import type {
   LayeredMountDefinition,
   MountDefinition,
 } from '../mount/index.js'
-import {
-  type AnyComposition,
-  type ChildrenOf,
-  type MessageSchemaOf,
-  type ModelSchemaOf,
-  definitionOf,
-} from '../runtime/applicationAuthoring.js'
 import { Dispatch } from '../runtime/dispatch.js'
 import {
   type Registrations as RuntimeRegistrations,
@@ -246,11 +241,40 @@ type RegisteredSubscriptions<Model, Message> = RuntimeRegistrations<
   any
 >
 
+type AnyComposition = Readonly<{
+  Model: Schema.Top
+  Message: Schema.Top
+  [LocalMountsTypeId]: ReadonlyArray<LayeredMountDefinition>
+  bindings: ReadonlyArray<AnyBinding>
+  makeView: (...args: ReadonlyArray<any>) => any
+}>
+
+type ModelSchemaOf<CompositionValue> =
+  CompositionValue extends Readonly<{
+    Model: infer ModelSchema extends Schema.Top
+  }>
+    ? ModelSchema
+    : never
+
+type MessageSchemaOf<CompositionValue> =
+  CompositionValue extends Readonly<{
+    Message: infer MessageSchema extends Schema.Top
+  }>
+    ? MessageSchema
+    : never
+
+type ChildrenOf<CompositionValue> =
+  CompositionValue extends Readonly<{
+    bindings: infer Children extends ReadonlyArray<AnyBinding>
+  }>
+    ? Children
+    : never
+
 type ChildSubscriptions<CompositionValue extends AnyComposition> =
   AggregatedChildren<ChildrenOf<CompositionValue>>['subscriptions']
 
 /**
- * Collects an Application Composition's registered child Subscriptions for
+ * Collects a Block Composition's registered child Subscriptions for
  * Scene emission steps. Local declarations may be supplied as the second
  * argument. The result retains placement-qualified keys, exact Message
  * declarations, and the same lift paths used by the Runtime.
@@ -259,8 +283,8 @@ type ChildSubscriptions<CompositionValue extends AnyComposition> =
  * construct handler Layers, or start Streams. Completed feature Blocks already
  * expose their aggregated `subscriptions` directly.
  *
- * @param composition - The Application Composition whose child graph is tested.
- * @param localSubscriptions - Optional Subscriptions declared by that Application.
+ * @param composition - The Block Composition whose child graph is tested.
+ * @param localSubscriptions - Optional Subscriptions declared by that Block.
  * Duplicate registration keys are rejected rather than overwritten.
  */
 export function subscriptions<const CompositionValue extends AnyComposition>(
@@ -281,7 +305,13 @@ export function subscriptions(
   composition: AnyComposition,
   localSubscriptions: AnySubscriptions = {},
 ): AnySubscriptions {
-  const children = aggregateChildren(definitionOf(composition).bindings)
+  if (!isComposition(composition)) {
+    throw new Error(
+      '[foldkit] Scene.subscriptions Composition must come from Block.makeDefinition(...).makeComposition(...).',
+    )
+  }
+
+  const children = aggregateChildren(composition.bindings)
   return aggregateSubscriptions(localSubscriptions, children.subscriptions)
 }
 
@@ -1189,9 +1219,9 @@ export const given = <Model>(model: Model): GivenStep<Model> => {
   /* eslint-enable @typescript-eslint/consistent-type-assertions */
 }
 
-/** Resolves a pending Command with the given result Message. Accepts either
- *  a Command Definition (matches by name; any pending Command of that name)
- *  or a Command instance (matches by name AND args; strict). */
+/** Resolves a pending Command with its raw result Message. A Definition matches
+ *  its originating identity; an instance also matches its complete args.
+ *  A scoped instance selects its composition occurrence. */
 const resolveCommand: {
   <Name extends string, ResultMessage>(
     definition: ResolvableCommandDefinition<Name, ResultMessage>,
@@ -1272,8 +1302,9 @@ const resolveAllExactCommands =
     return { ...internal, ...next }
   }
 
-/** Asserts that every given matcher matches a pending Command. Definition
- *  matchers match by name only; Instance matchers match by name + args. */
+/** Asserts that every matcher selects a pending Command. Definitions select
+ *  their originating identity; instances also compare complete args and any
+ *  explicitly scoped composition occurrence. */
 const expectHasCommandsStep =
   (...matchers: ReadonlyArray<CommandMatcher>) =>
   <Model, Message, OutMessage = undefined>(
@@ -1284,8 +1315,8 @@ const expectHasCommandsStep =
   }
 
 /** Asserts that the pending Commands match the given matchers exactly
- *  (order-independent). Definition matchers compare by name; Instance
- *  matchers compare by name + args. */
+ *  (order-independent). Definitions select their originating identity;
+ *  instances also compare complete args and any scoped occurrence. */
 const expectExactCommandsStep =
   (...matchers: ReadonlyArray<CommandMatcher>) =>
   <Model, Message, OutMessage = undefined>(
@@ -1305,9 +1336,9 @@ const expectNoCommandsStep =
     return simulation
   }
 
-/** Resolves a specific pending Mount with the given result Message. Accepts
- *  either a Mount Definition (matches by name) or a Mount instance produced
- *  by calling a Definition (matches by name + structural-equal args). The
+/** Resolves a specific pending Mount with the given result Message. A
+ *  Definition selects its originating identity; an instance also compares
+ *  complete args and any explicitly scoped composition occurrence. The
  *  first pending mount that matches is resolved. Mirrors `resolve` for
  *  Commands: when the mount lives inside a Block, the boundary's own
  *  `toParentMessage` lift (snapshotted at render time) is applied to
@@ -1384,8 +1415,9 @@ const resolveAllMounts =
       resolveMount(matcher, resultMessage)(current),
     )
 
-/** Asserts that every given Mount is among the pending Mounts. Accepts Mount
- *  Definitions (match by name) and Mount instances (match by name + args). */
+/** Asserts that every matcher selects a pending Mount. Definitions select
+ *  their originating identity; instances also compare complete args and any
+ *  explicitly scoped composition occurrence. */
 const expectHasMountsStep =
   (...matchers: ReadonlyArray<MountMatcher>) =>
   <Model, Message, OutMessage = undefined>(
@@ -1396,8 +1428,8 @@ const expectHasMountsStep =
   }
 
 /** Asserts that the pending Mounts match the given matchers exactly
- *  (order-independent). Accepts Mount Definitions (match by name) and Mount
- *  instances (match by name + args). */
+ *  (order-independent). Definitions select their originating identity;
+ *  instances also compare complete args and any scoped occurrence. */
 const expectExactMountsStep =
   (...matchers: ReadonlyArray<MountMatcher>) =>
   <Model, Message, OutMessage = undefined>(
@@ -1726,7 +1758,7 @@ export const Mount = {
   resolveAll: resolveAllMounts,
   /** Asserts that every given Mount is among the pending Mounts. */
   expectHas: expectHasMountsStep,
-  /** Asserts that the pending Mounts match the given definitions exactly (order-independent, by name). */
+  /** Asserts that the pending Mounts match the given source and instance matchers exactly, regardless of order. */
   expectExact: expectExactMountsStep,
   /** Asserts that there are no pending Mounts. */
   expectNone: expectNoMountsStep,

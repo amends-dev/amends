@@ -2,8 +2,8 @@ import { Record, Schema } from 'effect'
 import { expect, expectTypeOf, it } from 'vitest'
 
 import { defineMessageUnion } from '../message/index.js'
-import { makeDefinition as makeApplicationDefinition } from '../runtime/applicationPublic.js'
 import { makeDefinition } from './define.js'
+import * as Block from './public.js'
 
 const Model = Schema.Record(Schema.String, Schema.Boolean)
 type Model = typeof Model.Type
@@ -20,7 +20,7 @@ const update = DisclosuresComposition.makeUpdate((model, { id, isOpen }) => ({
   model: Record.set(model, id, isOpen),
 }))
 
-const ApplicationComposition = makeApplicationDefinition({
+const ApplicationComposition = Block.makeDefinition('Application', {
   Model,
   Message,
 }).makeComposition()
@@ -39,7 +39,7 @@ it('preserves a Record Model through owned graphless Block updates', () => {
   expect(toggled.model).toEqual({ faq: true })
 })
 
-it('preserves a Record Model through owned graphless Application updates', () => {
+it('preserves a Record Model through owned graphless root updates', () => {
   expectTypeOf<
     ReturnType<typeof updateApplication>['model']
   >().toEqualTypeOf<Model>()

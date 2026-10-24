@@ -1,8 +1,8 @@
 import { Context, Effect, Layer, Option, Schema } from 'effect'
-import { makeApplicationDefinition } from 'foldkit'
-import type { Element as ElementProgram } from 'foldkit/application'
+import { Program } from 'foldkit'
 import * as Block from 'foldkit/block'
 import { defineMessageUnion } from 'foldkit/message'
+import type { Element as ElementProgram } from 'foldkit/program'
 import type * as Update from 'foldkit/update'
 
 const WarmupModel = Schema.Struct({ value: Schema.Number })
@@ -12,7 +12,10 @@ const WarmupMessage = defineMessageUnion({ CompletedWarmup: {} })
 Effect.void
 Layer.empty
 Option.none()
-makeApplicationDefinition({ Model: WarmupModel, Message: WarmupMessage })
+Block.makeDefinition('Application', {
+  Model: WarmupModel,
+  Message: WarmupMessage,
+})
 Context.Service
 Block.makeDefinition('TypePerformanceWarmup', {
   Model: WarmupModel,
@@ -44,7 +47,7 @@ const TypePerformanceDeepLeafDefinition = Block.makeDefinition(
     Message: LeafMessage,
   },
 )
-const RunLeaf = TypePerformanceDeepLeafDefinition.command('RunLeaf', {
+const RunLeaf = TypePerformanceDeepLeafDefinition.makeCommand('RunLeaf', {
   messages: [LeafMessage.CompletedRun],
   handler: function* () {
     const clock = yield* Clock
@@ -52,27 +55,32 @@ const RunLeaf = TypePerformanceDeepLeafDefinition.command('RunLeaf', {
     return () => clock.run.pipe(Effect.as(LeafMessage.CompletedRun()))
   },
 })
-const runLeaf = TypePerformanceDeepLeafDefinition.step(model => ({
+const runLeaf = TypePerformanceDeepLeafDefinition.makeStep(model => ({
   model,
   commands: [RunLeaf()],
 }))
 const TypePerformanceDeepLeafComposition =
   TypePerformanceDeepLeafDefinition.makeComposition()
-const Leaf = TypePerformanceDeepLeafComposition.assembleBlock({
-  init: TypePerformanceDeepLeafComposition.makeInit(() => ({
-    model: LeafModel.make({ value: 0 }),
-  })),
-  update: TypePerformanceDeepLeafComposition.makeUpdate((model, message) =>
-    LeafMessage.match(message, {
-      RequestedRun: () => runLeaf(model),
-      CompletedRun: () => ({ model }),
-    }),
-  ),
-  operations: {
-    runLeaf: LeafMessage.RequestedRun,
-  },
-  EffectsLayer: RunLeaf.layer,
-})
+const prepareLeaf = () =>
+  TypePerformanceDeepLeafComposition.prepareBlock({
+    init: TypePerformanceDeepLeafComposition.makeInit(() => ({
+      model: LeafModel.make({ value: 0 }),
+    })),
+    update: TypePerformanceDeepLeafComposition.makeUpdate((model, message) =>
+      LeafMessage.match(message, {
+        RequestedRun: () => runLeaf(model),
+        CompletedRun: () => ({ model }),
+      }),
+    ),
+    operations: {
+      runLeaf: LeafMessage.RequestedRun,
+    },
+    EffectsLayer: RunLeaf.layer,
+  })
+const Leaf: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof LeafModel,
+  typeof prepareLeaf
+> = Block.assemble(prepareLeaf)
 
 const TypePerformanceLevel001Definition = Block.makeDefinition(
   'TypePerformanceLevel001',
@@ -81,7 +89,7 @@ const TypePerformanceLevel001Definition = Block.makeDefinition(
     Message: Schema.Never,
   },
 )
-const Child001Binding = TypePerformanceLevel001Definition.bindChild(Leaf, {
+const Child001Binding = TypePerformanceLevel001Definition.makeBinding(Leaf, {
   placement: 'child001',
   read: model => Option.some(model),
   write: (_model, nextChild) => nextChild,
@@ -90,13 +98,18 @@ const TypePerformanceLevel001Composition =
   TypePerformanceLevel001Definition.makeComposition({
     bindings: [Child001Binding],
   })
-const Level001 = TypePerformanceLevel001Composition.assembleBlock({
-  init: TypePerformanceLevel001Composition.makeInit(() =>
-    Child001Binding.init({ args: [], toParentModel: model => model }),
-  ),
-  update: TypePerformanceLevel001Composition.makeUpdate(),
-  EffectsLayer: Layer.empty,
-})
+const prepareLevel001 = () =>
+  TypePerformanceLevel001Composition.prepareBlock({
+    init: TypePerformanceLevel001Composition.makeInit(() =>
+      Child001Binding.init({ args: [], toParentModel: model => model }),
+    ),
+    update: TypePerformanceLevel001Composition.makeUpdate(),
+    EffectsLayer: Layer.empty,
+  })
+const Level001: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof LeafModel,
+  typeof prepareLevel001
+> = Block.assemble(prepareLevel001)
 
 const TypePerformanceLevel002Definition = Block.makeDefinition(
   'TypePerformanceLevel002',
@@ -105,22 +118,30 @@ const TypePerformanceLevel002Definition = Block.makeDefinition(
     Message: Schema.Never,
   },
 )
-const Child002Binding = TypePerformanceLevel002Definition.bindChild(Level001, {
-  placement: 'child002',
-  read: model => Option.some(model),
-  write: (_model, nextChild) => nextChild,
-})
+const Child002Binding = TypePerformanceLevel002Definition.makeBinding(
+  Level001,
+  {
+    placement: 'child002',
+    read: model => Option.some(model),
+    write: (_model, nextChild) => nextChild,
+  },
+)
 const TypePerformanceLevel002Composition =
   TypePerformanceLevel002Definition.makeComposition({
     bindings: [Child002Binding],
   })
-const Level002 = TypePerformanceLevel002Composition.assembleBlock({
-  init: TypePerformanceLevel002Composition.makeInit(() =>
-    Child002Binding.init({ args: [], toParentModel: model => model }),
-  ),
-  update: TypePerformanceLevel002Composition.makeUpdate(),
-  EffectsLayer: Layer.empty,
-})
+const prepareLevel002 = () =>
+  TypePerformanceLevel002Composition.prepareBlock({
+    init: TypePerformanceLevel002Composition.makeInit(() =>
+      Child002Binding.init({ args: [], toParentModel: model => model }),
+    ),
+    update: TypePerformanceLevel002Composition.makeUpdate(),
+    EffectsLayer: Layer.empty,
+  })
+const Level002: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof LeafModel,
+  typeof prepareLevel002
+> = Block.assemble(prepareLevel002)
 
 const TypePerformanceLevel003Definition = Block.makeDefinition(
   'TypePerformanceLevel003',
@@ -129,22 +150,30 @@ const TypePerformanceLevel003Definition = Block.makeDefinition(
     Message: Schema.Never,
   },
 )
-const Child003Binding = TypePerformanceLevel003Definition.bindChild(Level002, {
-  placement: 'child003',
-  read: model => Option.some(model),
-  write: (_model, nextChild) => nextChild,
-})
+const Child003Binding = TypePerformanceLevel003Definition.makeBinding(
+  Level002,
+  {
+    placement: 'child003',
+    read: model => Option.some(model),
+    write: (_model, nextChild) => nextChild,
+  },
+)
 const TypePerformanceLevel003Composition =
   TypePerformanceLevel003Definition.makeComposition({
     bindings: [Child003Binding],
   })
-const Level003 = TypePerformanceLevel003Composition.assembleBlock({
-  init: TypePerformanceLevel003Composition.makeInit(() =>
-    Child003Binding.init({ args: [], toParentModel: model => model }),
-  ),
-  update: TypePerformanceLevel003Composition.makeUpdate(),
-  EffectsLayer: Layer.empty,
-})
+const prepareLevel003 = () =>
+  TypePerformanceLevel003Composition.prepareBlock({
+    init: TypePerformanceLevel003Composition.makeInit(() =>
+      Child003Binding.init({ args: [], toParentModel: model => model }),
+    ),
+    update: TypePerformanceLevel003Composition.makeUpdate(),
+    EffectsLayer: Layer.empty,
+  })
+const Level003: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof LeafModel,
+  typeof prepareLevel003
+> = Block.assemble(prepareLevel003)
 
 const TypePerformanceLevel004Definition = Block.makeDefinition(
   'TypePerformanceLevel004',
@@ -153,22 +182,30 @@ const TypePerformanceLevel004Definition = Block.makeDefinition(
     Message: Schema.Never,
   },
 )
-const Child004Binding = TypePerformanceLevel004Definition.bindChild(Level003, {
-  placement: 'child004',
-  read: model => Option.some(model),
-  write: (_model, nextChild) => nextChild,
-})
+const Child004Binding = TypePerformanceLevel004Definition.makeBinding(
+  Level003,
+  {
+    placement: 'child004',
+    read: model => Option.some(model),
+    write: (_model, nextChild) => nextChild,
+  },
+)
 const TypePerformanceLevel004Composition =
   TypePerformanceLevel004Definition.makeComposition({
     bindings: [Child004Binding],
   })
-const Level004 = TypePerformanceLevel004Composition.assembleBlock({
-  init: TypePerformanceLevel004Composition.makeInit(() =>
-    Child004Binding.init({ args: [], toParentModel: model => model }),
-  ),
-  update: TypePerformanceLevel004Composition.makeUpdate(),
-  EffectsLayer: Layer.empty,
-})
+const prepareLevel004 = () =>
+  TypePerformanceLevel004Composition.prepareBlock({
+    init: TypePerformanceLevel004Composition.makeInit(() =>
+      Child004Binding.init({ args: [], toParentModel: model => model }),
+    ),
+    update: TypePerformanceLevel004Composition.makeUpdate(),
+    EffectsLayer: Layer.empty,
+  })
+const Level004: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof LeafModel,
+  typeof prepareLevel004
+> = Block.assemble(prepareLevel004)
 
 const TypePerformanceLevel005Definition = Block.makeDefinition(
   'TypePerformanceLevel005',
@@ -177,22 +214,30 @@ const TypePerformanceLevel005Definition = Block.makeDefinition(
     Message: Schema.Never,
   },
 )
-const Child005Binding = TypePerformanceLevel005Definition.bindChild(Level004, {
-  placement: 'child005',
-  read: model => Option.some(model),
-  write: (_model, nextChild) => nextChild,
-})
+const Child005Binding = TypePerformanceLevel005Definition.makeBinding(
+  Level004,
+  {
+    placement: 'child005',
+    read: model => Option.some(model),
+    write: (_model, nextChild) => nextChild,
+  },
+)
 const TypePerformanceLevel005Composition =
   TypePerformanceLevel005Definition.makeComposition({
     bindings: [Child005Binding],
   })
-const Level005 = TypePerformanceLevel005Composition.assembleBlock({
-  init: TypePerformanceLevel005Composition.makeInit(() =>
-    Child005Binding.init({ args: [], toParentModel: model => model }),
-  ),
-  update: TypePerformanceLevel005Composition.makeUpdate(),
-  EffectsLayer: Layer.empty,
-})
+const prepareLevel005 = () =>
+  TypePerformanceLevel005Composition.prepareBlock({
+    init: TypePerformanceLevel005Composition.makeInit(() =>
+      Child005Binding.init({ args: [], toParentModel: model => model }),
+    ),
+    update: TypePerformanceLevel005Composition.makeUpdate(),
+    EffectsLayer: Layer.empty,
+  })
+const Level005: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof LeafModel,
+  typeof prepareLevel005
+> = Block.assemble(prepareLevel005)
 
 const TypePerformanceLevel006Definition = Block.makeDefinition(
   'TypePerformanceLevel006',
@@ -201,22 +246,30 @@ const TypePerformanceLevel006Definition = Block.makeDefinition(
     Message: Schema.Never,
   },
 )
-const Child006Binding = TypePerformanceLevel006Definition.bindChild(Level005, {
-  placement: 'child006',
-  read: model => Option.some(model),
-  write: (_model, nextChild) => nextChild,
-})
+const Child006Binding = TypePerformanceLevel006Definition.makeBinding(
+  Level005,
+  {
+    placement: 'child006',
+    read: model => Option.some(model),
+    write: (_model, nextChild) => nextChild,
+  },
+)
 const TypePerformanceLevel006Composition =
   TypePerformanceLevel006Definition.makeComposition({
     bindings: [Child006Binding],
   })
-const Level006 = TypePerformanceLevel006Composition.assembleBlock({
-  init: TypePerformanceLevel006Composition.makeInit(() =>
-    Child006Binding.init({ args: [], toParentModel: model => model }),
-  ),
-  update: TypePerformanceLevel006Composition.makeUpdate(),
-  EffectsLayer: Layer.empty,
-})
+const prepareLevel006 = () =>
+  TypePerformanceLevel006Composition.prepareBlock({
+    init: TypePerformanceLevel006Composition.makeInit(() =>
+      Child006Binding.init({ args: [], toParentModel: model => model }),
+    ),
+    update: TypePerformanceLevel006Composition.makeUpdate(),
+    EffectsLayer: Layer.empty,
+  })
+const Level006: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof LeafModel,
+  typeof prepareLevel006
+> = Block.assemble(prepareLevel006)
 
 const TypePerformanceLevel007Definition = Block.makeDefinition(
   'TypePerformanceLevel007',
@@ -225,22 +278,30 @@ const TypePerformanceLevel007Definition = Block.makeDefinition(
     Message: Schema.Never,
   },
 )
-const Child007Binding = TypePerformanceLevel007Definition.bindChild(Level006, {
-  placement: 'child007',
-  read: model => Option.some(model),
-  write: (_model, nextChild) => nextChild,
-})
+const Child007Binding = TypePerformanceLevel007Definition.makeBinding(
+  Level006,
+  {
+    placement: 'child007',
+    read: model => Option.some(model),
+    write: (_model, nextChild) => nextChild,
+  },
+)
 const TypePerformanceLevel007Composition =
   TypePerformanceLevel007Definition.makeComposition({
     bindings: [Child007Binding],
   })
-const Level007 = TypePerformanceLevel007Composition.assembleBlock({
-  init: TypePerformanceLevel007Composition.makeInit(() =>
-    Child007Binding.init({ args: [], toParentModel: model => model }),
-  ),
-  update: TypePerformanceLevel007Composition.makeUpdate(),
-  EffectsLayer: Layer.empty,
-})
+const prepareLevel007 = () =>
+  TypePerformanceLevel007Composition.prepareBlock({
+    init: TypePerformanceLevel007Composition.makeInit(() =>
+      Child007Binding.init({ args: [], toParentModel: model => model }),
+    ),
+    update: TypePerformanceLevel007Composition.makeUpdate(),
+    EffectsLayer: Layer.empty,
+  })
+const Level007: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof LeafModel,
+  typeof prepareLevel007
+> = Block.assemble(prepareLevel007)
 
 const TypePerformanceLevel008Definition = Block.makeDefinition(
   'TypePerformanceLevel008',
@@ -249,29 +310,37 @@ const TypePerformanceLevel008Definition = Block.makeDefinition(
     Message: Schema.Never,
   },
 )
-const Child008Binding = TypePerformanceLevel008Definition.bindChild(Level007, {
-  placement: 'child008',
-  read: model => Option.some(model),
-  write: (_model, nextChild) => nextChild,
-})
+const Child008Binding = TypePerformanceLevel008Definition.makeBinding(
+  Level007,
+  {
+    placement: 'child008',
+    read: model => Option.some(model),
+    write: (_model, nextChild) => nextChild,
+  },
+)
 const TypePerformanceLevel008Composition =
   TypePerformanceLevel008Definition.makeComposition({
     bindings: [Child008Binding],
   })
-const Level008 = TypePerformanceLevel008Composition.assembleBlock({
-  init: TypePerformanceLevel008Composition.makeInit(() =>
-    Child008Binding.init({ args: [], toParentModel: model => model }),
-  ),
-  update: TypePerformanceLevel008Composition.makeUpdate(),
-  EffectsLayer: Layer.empty,
-})
+const prepareLevel008 = () =>
+  TypePerformanceLevel008Composition.prepareBlock({
+    init: TypePerformanceLevel008Composition.makeInit(() =>
+      Child008Binding.init({ args: [], toParentModel: model => model }),
+    ),
+    update: TypePerformanceLevel008Composition.makeUpdate(),
+    EffectsLayer: Layer.empty,
+  })
+const Level008: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof LeafModel,
+  typeof prepareLevel008
+> = Block.assemble(prepareLevel008)
 
 const ApplicationMessage = Schema.Never
-const ApplicationDefinition = makeApplicationDefinition({
+const ApplicationDefinition = Block.makeDefinition('Application', {
   Model: LeafModel,
   Message: ApplicationMessage,
 })
-const Child008RootBinding = ApplicationDefinition.bindChild(Level008, {
+const Child008RootBinding = ApplicationDefinition.makeBinding(Level008, {
   placement: 'child008Root',
   read: model => Option.some(model),
   write: (_model, nextChild) => nextChild,
@@ -282,14 +351,23 @@ const ApplicationComposition = ApplicationDefinition.makeComposition({
 const update = ApplicationComposition.makeUpdate()
 const view = ApplicationComposition.makeView((_model, h) => h.main([]))
 
-export const program = ApplicationComposition.assembleElement({
+const prepareApplicationBlock = () =>
+  ApplicationComposition.prepareBlock({
+    init: ApplicationComposition.makeInit(() =>
+      Child008RootBinding.init({ args: [], toParentModel: model => model }),
+    ),
+    update,
+    view,
+    EffectsLayer: Layer.empty,
+  })
+export const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof LeafModel,
+  typeof prepareApplicationBlock
+> = Block.assemble(prepareApplicationBlock)
+
+export const program = Program.makeElement({
+  block: ApplicationBlock,
   container: null,
-  init: ApplicationComposition.makeInit(() =>
-    Child008RootBinding.init({ args: [], toParentModel: model => model }),
-  ),
-  update,
-  view,
-  EffectsLayer: Layer.empty,
 })
 export const providedProgram = program.provide(ClockLayer)
 

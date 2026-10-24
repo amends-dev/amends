@@ -19,7 +19,7 @@ src/
 +-- view/
 |   +-- index.ts
 |   +-- view.ts             Primary Application view
-+-- entry.ts                Browser completion, container, and Runtime.run
++-- entry.ts                Browser host config, container, and Runtime.run
 +-- story.test.ts
 +-- scene.test.ts
 |

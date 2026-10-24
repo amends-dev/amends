@@ -131,7 +131,6 @@ const Model = Schema.Struct({
   isResetting: Schema.Boolean,
   resetDuration: Schema.Number,
 })
-type Model = typeof Model.Type
 
 // MESSAGE
 
@@ -141,7 +140,6 @@ const Message = defineMessageUnion({
   ClickedResetAfterDelay: {},
   CompletedDelayReset: {},
 })
-type Message = typeof Message.Type
 
 // COMMAND
 
@@ -163,7 +161,7 @@ const EffectsLayer = DelayReset.layer
 
 // UPDATE
 
-const update = Update.define((model: Model, message: Message) =>
+const update = Update.define((model: typeof Model.Type, message: typeof Message.Type) =>
   Message.match(message, {
     ClickedIncrement: () => ({
       model: modifyFields(model, { count: count => count + 1 }),
@@ -231,7 +229,6 @@ import { modifyFields } from 'foldkit/struct'`
 const NOTE_PLAYER_DEMO_CODE = `// MODEL
 
 const Note = Schema.Literals(['A', 'B', 'C', 'D', 'E', 'F', 'G'])
-type Note = typeof Note.Type
 
 const PlaybackState = defineTaggedUnion({
   Idle: {},
@@ -244,7 +241,6 @@ const Model = Schema.Struct({
   noteDuration: Schema.Number,
   playbackState: PlaybackState,
 })
-type Model = typeof Model.Type
 
 // MESSAGE
 
@@ -256,11 +252,10 @@ const Message = defineMessageUnion({
   FailedAcquireAudioContext: {},
   ReleasedAudioContext: {},
 })
-type Message = typeof Message.Type
 
 // UPDATE
 
-const playNoteAt = Update.defineStep((model: Model, noteIndex: number) => ({
+const playNoteAt = Update.defineStep((model: typeof Model.Type, noteIndex: number) => ({
   model: modifyFields(model, {
     playbackState: () => PlaybackState.Playing({ currentNoteIndex: noteIndex }),
   }),
@@ -273,7 +268,7 @@ const playNoteAt = Update.defineStep((model: Model, noteIndex: number) => ({
   ],
 }))
 
-const update = Update.define((model: Model, message: Message) =>
+const update = Update.define((model: typeof Model.Type, message: typeof Message.Type) =>
   Message.match(message, {
     ClickedPlay: () =>
       PlaybackState.match(model.playbackState, {
@@ -313,7 +308,10 @@ const update = Update.define((model: Model, message: Message) =>
 
 const AudioContextResource = ManagedResource.tag<AudioContext>()('AudioContext')
 
-const managedResources = ManagedResource.make<Model, Message>()(entry => ({
+const managedResources = ManagedResource.make<
+  typeof Model.Type,
+  typeof Message.Type
+>()(entry => ({
   audioContext: entry(
     'ManageAudioContext',
     Schema.Option(Schema.Null),
@@ -378,7 +376,7 @@ const NOTE_PLAYER_PHASE_REGIONS: PhaseRegions = {
   PlayUpdate: [
     { from: '    ClickedPlay: () =>', to: '      }),' },
     {
-      from: 'const playNoteAt = Update.defineStep((model: Model, noteIndex: number) => ({',
+      from: 'const playNoteAt = Update.defineStep((model: typeof Model.Type, noteIndex: number) => ({',
       to: '}))',
     },
   ],
@@ -387,7 +385,7 @@ const NOTE_PLAYER_PHASE_REGIONS: PhaseRegions = {
   NoteUpdate: [
     { from: '    CompletedPlayNote: ({ noteIndex }) => {', to: '    },' },
     {
-      from: 'const playNoteAt = Update.defineStep((model: Model, noteIndex: number) => ({',
+      from: 'const playNoteAt = Update.defineStep((model: typeof Model.Type, noteIndex: number) => ({',
       to: '}))',
     },
   ],

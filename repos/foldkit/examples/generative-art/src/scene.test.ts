@@ -19,7 +19,7 @@ import { type Model, type Particle } from './model'
 import { update } from './update'
 import { view } from './view'
 
-const initialModel: Model = {
+const initialModel: typeof Model.Type = {
   particles: [],
   nextId: 0,
   elapsedSeconds: 0,
@@ -41,7 +41,11 @@ const initialModel: Model = {
   }).model,
 }
 
-const makeParticle = (id: number, x: number, y: number): Particle => ({
+const makeParticle = (
+  id: number,
+  x: number,
+  y: number,
+): typeof Particle.Type => ({
   id,
   trail: [{ x, y }],
   baseHue: 200,
@@ -54,7 +58,7 @@ const makeParticle = (id: number, x: number, y: number): Particle => ({
   initialSpeedScale: 1,
 })
 
-const modelWithParticles = (count: number): Model =>
+const modelWithParticles = (count: number): typeof Model.Type =>
   modifyFields(initialModel, {
     particles: () =>
       Array.from({ length: count }, (_, index) =>

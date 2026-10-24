@@ -39,13 +39,14 @@ export type EmittedRequirements = Expect<
   Equal<Update.RequirementsOf<typeof combined>, never>
 >
 export type EmittedChannels = Expect<
-  Equal<keyof ReturnType<typeof ready>, 'model'>
+  Equal<keyof ReturnType<typeof ready>, 'model' | 'commands' | 'outMessage'>
 >
 
 preserveText('ready')
 // @ts-expect-error A primitive no-op still checks its owning Model.
 preserveText(1)
-// @ts-expect-error A field Step has no Command channel.
-ready(model).commands
-// @ts-expect-error A field Step has no OutMessage channel.
-ready(model).outMessage
+const result = ready(model)
+export type AbsentCommands = Expect<Equal<typeof result.commands, undefined>>
+export type AbsentOutMessage = Expect<
+  Equal<typeof result.outMessage, undefined>
+>

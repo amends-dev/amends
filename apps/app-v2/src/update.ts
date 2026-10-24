@@ -19,8 +19,8 @@ import { fromUrl, Route, sameRoute } from "./route.ts"
 
 export const update = ApplicationComposition.makeUpdate((model, message) =>
   Message.match(message, {
-    ClickedWorkspaces: () => Update.combine(model, [closeWorkspace]),
-    ClickedRetryWorkspace: () => Update.combine(model, [WorkspacesBinding.requestReload()]),
+    ClickedWorkspaces: () => Update.combineSteps(model, [closeWorkspace]),
+    ClickedRetryWorkspace: () => Update.combineSteps(model, [WorkspacesBinding.requestReload()]),
     CompletedNavigation: () => ({ model }),
     ClickedLink: ({ request }) =>
       UrlRequest.match(request, {
@@ -48,25 +48,25 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
             (page) => page
           )
       })
-      return Update.combine(next, [restoreRoute])
+      return Update.combineSteps(next, [restoreRoute])
     },
-    ClickedSignOut: () => Update.combine(model, [signOut]),
+    ClickedSignOut: () => Update.combineSteps(model, [signOut]),
     CompletedSignOut: () => ({ model }),
     CompletedShowAppearance: () => ({ model }),
     CompletedKeepAppearance: () => ({ model }),
     ChangedViewport: ({ viewport }) =>
-      Update.combine(model, [
-        ApplicationDefinition.stepFields(() => ({ viewport: () => viewport })),
+      Update.combineSteps(model, [
+        ApplicationDefinition.makeFieldsStep(() => ({ viewport: () => viewport })),
         ...Option.toArray(
           Option.map(openedWorkspaceId(model), (workspaceId) =>
             WorkspaceBinding.informViewport(workspaceId, { viewport })
           )
         )
       ]),
-    Ticked: ({ now }) => Update.combine(model, [ApplicationDefinition.stepFields(() => ({ now: () => now }))]),
+    Ticked: ({ now }) => Update.combineSteps(model, [ApplicationDefinition.makeFieldsStep(() => ({ now: () => now }))]),
     // The search belongs to the open workspace; with none open the key opens nothing.
     PressedSearchKey: () =>
-      Update.combine(
+      Update.combineSteps(
         model,
         Option.toArray(
           Option.map(openedWorkspaceId(model), (workspaceId) => WorkspaceBinding.requestSearch(workspaceId))

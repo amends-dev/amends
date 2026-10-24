@@ -1,5 +1,6 @@
 import { Option, pipe } from 'effect'
 import { type Block } from 'foldkit'
+import { modifyFields } from 'foldkit/struct'
 
 import { DialogBlock } from '@foldkit/ui'
 
@@ -12,40 +13,47 @@ import {
   PlaygroundBlock,
   UiBlock,
 } from '../page'
-import { ApplicationRoute } from '../route'
+import { ApplicationRoute, maybeExampleSlugForRoute } from '../route'
 import { SearchBlock } from '../search'
 import { SnippetCopyBlock } from '../snippetCopy'
 import { SnippetDisclosureBlock } from '../snippetDisclosure'
-import { selectThemePreference } from '../theme'
-import { ThemeMenu } from '../view'
+import { ApplyTheme, SaveThemePreference, resolveTheme } from '../theme'
+import { type ThemePreference } from '../themePreference'
+import * as ThemeMenu from '../view/themeMenu'
 import { HomeBinding } from './home'
 
-export const SearchBinding = ApplicationDefinition.bindChild(SearchBlock, {
+export const SearchBinding = ApplicationDefinition.makeBinding(SearchBlock, {
   field: 'search',
 })
 
-export const SnippetCopyBinding = ApplicationDefinition.bindChild(
+export const SnippetCopyBinding = ApplicationDefinition.makeBinding(
   SnippetCopyBlock,
   {
     field: 'snippetCopy',
   },
 )
 
-export const SnippetDisclosureBinding = ApplicationDefinition.bindChild(
+export const SnippetDisclosureBinding = ApplicationDefinition.makeBinding(
   SnippetDisclosureBlock,
   {
     field: 'snippetDisclosure',
   },
 )
 
-export const ExampleDetailBinding = ApplicationDefinition.bindChild(
+export const ExampleDetailBinding = ApplicationDefinition.makeBinding(
   ExampleDetailBlock,
   {
     field: 'exampleDetail',
+    init: {
+      contextToArgs: ({ route, maybeExampleSources }) => [
+        maybeExampleSlugForRoute(route),
+        maybeExampleSources,
+      ],
+    },
   },
 )
 
-export const PlaygroundBinding = ApplicationDefinition.bindChild(
+export const PlaygroundBinding = ApplicationDefinition.makeBinding(
   PlaygroundBlock,
   {
     field: 'playground',
@@ -60,60 +68,75 @@ export const PlaygroundBinding = ApplicationDefinition.bindChild(
   },
 )
 
-export const UiPagesBinding = ApplicationDefinition.bindChild(UiBlock, {
+export const UiPagesBinding = ApplicationDefinition.makeBinding(UiBlock, {
   field: 'uiPages',
   init: { contextToArgs: ({ today }) => [today] },
 })
 
-export const ApiReferenceBinding = ApplicationDefinition.bindChild(
+export const ApiReferenceBinding = ApplicationDefinition.makeBinding(
   ApiReferenceBlock,
   {
     field: 'apiReference',
+    init: { contextToArgs: ({ maybeApiData }) => [maybeApiData] },
   },
 )
 
-export const ComingFromReactBinding = ApplicationDefinition.bindChild(
+export const ComingFromReactBinding = ApplicationDefinition.makeBinding(
   ComingFromReactBlock,
   {
     field: 'comingFromReact',
   },
 )
 
-export const CoreBlockPageBinding = ApplicationDefinition.bindChild(
+export const CoreBlockPageBinding = ApplicationDefinition.makeBinding(
   BlockPageBlock,
   {
     field: 'coreBlockPage',
   },
 )
 
-const foldMobileMenuDialogOutMessage = DialogBlock.OutMessage.match({
-  Opened: () => ApplicationDefinition.stepNoop(),
-  Closed: () => ApplicationDefinition.stepNoop(),
-  CompletedClose: () => ApplicationDefinition.stepNoop(),
-})
-
-export const MobileMenuDialogBinding = ApplicationDefinition.bindChild(
+export const MobileMenuDialogBinding = ApplicationDefinition.makeBinding(
   DialogBlock,
   {
     field: 'mobileMenuDialog',
-    outMessage: { fold: foldMobileMenuDialogOutMessage },
     init: { contextToArgs: () => [{ id: 'mobile-menu' }] },
   },
-)
-
-const foldThemeMenuOutMessage = ThemeMenu.ThemeMenuBlock.OutMessage.match({
-  Selected: ({ value }) => selectThemePreference(value),
-  Closed: () => ApplicationDefinition.stepNoop(),
+).withOutMessagePolicy({
+  fold: ApplicationDefinition.makeOutMessageFold(DialogBlock, {
+    Opened: ApplicationDefinition.makeNoopStep,
+    Closed: ApplicationDefinition.makeNoopStep,
+    CompletedClose: ApplicationDefinition.makeNoopStep,
+  }),
 })
 
-export const ThemeMenuBinding = ApplicationDefinition.bindChild(
+const applyThemePreference = (preference: typeof ThemePreference.Type) =>
+  ApplicationDefinition.makeStep(model => {
+    const resolvedTheme = resolveTheme(preference, model.systemTheme)
+
+    return {
+      model: modifyFields(model, {
+        maybeThemePreference: () => Option.some(preference),
+        resolvedTheme: () => resolvedTheme,
+      }),
+      commands: [
+        ApplyTheme({ theme: resolvedTheme }),
+        SaveThemePreference({ preference }),
+      ],
+    }
+  })
+
+export const ThemeMenuBinding = ApplicationDefinition.makeBinding(
   ThemeMenu.ThemeMenuBlock,
   {
     field: 'themeMenu',
-    outMessage: { fold: foldThemeMenuOutMessage },
     init: { contextToArgs: () => [{ id: 'theme-menu' }] },
   },
-)
+).withOutMessagePolicy({
+  fold: ApplicationDefinition.makeOutMessageFold(ThemeMenu.ThemeMenuBlock, {
+    Selected: ({ value }) => applyThemePreference(value),
+    Closed: ApplicationDefinition.makeNoopStep,
+  }),
+})
 
 export const ApplicationComposition = ApplicationDefinition.makeComposition({
   bindings: [

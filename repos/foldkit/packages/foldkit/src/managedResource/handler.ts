@@ -2,24 +2,14 @@ import { Context, Effect, Layer, type Scope } from 'effect'
 
 import type { DefinitionIdentity } from '../block/identity.js'
 import type { ValidateConstructionRequirements } from '../block/scope.js'
+import type { Handler } from './public.js'
 
-declare const HandlerTypeId: unique symbol
+export type { Handler } from './public.js'
 
-type Invariant<Value> = (value: Value) => Value
-type AnyHandler = Readonly<{ readonly [HandlerTypeId]: unknown }>
-
-/**
- * The service required by a ManagedResource whose lifecycle is supplied by a
- * Layer. Its name, decoded acquire params, and resource value identify the
- * handler contract.
- */
-export interface Handler<Name extends string, Params, Value> {
-  readonly [HandlerTypeId]: Readonly<{
-    name: Invariant<Name>
-    params: Invariant<Params>
-    value: Invariant<Value>
-  }>
-}
+type ExtractHandler<Requirements> =
+  Requirements extends Handler<infer _Name, infer _Params, infer _Value>
+    ? Requirements
+    : never
 
 /**
  * Extracts the exact lifecycle handler requirement carried by a
@@ -29,7 +19,7 @@ export type HandlerOf<
   Entry extends {
     acquire: (...args: ReadonlyArray<any>) => Effect.Effect<any, any, any>
   },
-> = Extract<Effect.Services<ReturnType<Entry['acquire']>>, AnyHandler>
+> = ExtractHandler<Effect.Services<ReturnType<Entry['acquire']>>>
 
 type LifecycleHandler<Params, Value> = Readonly<{
   acquire: (params: Params) => Effect.Effect<Value, any, any>

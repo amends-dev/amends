@@ -6,7 +6,7 @@ import { PeopleDefinition } from './definition'
 import { Message } from './message'
 import { SEARCH_LATENCY, searchPeople } from './model'
 
-export const PushSearchUrl = PeopleDefinition.command('PushSearchUrl', {
+export const PushSearchUrl = PeopleDefinition.makeCommand('PushSearchUrl', {
   args: { searchText: Schema.Option(Schema.String) },
   messages: [Message.CompletedPushSearchUrl],
   handler: function* () {
@@ -17,7 +17,7 @@ export const PushSearchUrl = PeopleDefinition.command('PushSearchUrl', {
   },
 })
 
-export const FetchPeople = PeopleDefinition.command('FetchPeople', {
+export const FetchPeople = PeopleDefinition.makeCommand('FetchPeople', {
   args: { searchText: Schema.String },
   messages: [Message.CompletedFetchPeople],
   handler: function* () {

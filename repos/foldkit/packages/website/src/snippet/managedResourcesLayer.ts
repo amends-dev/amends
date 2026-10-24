@@ -47,9 +47,9 @@ const ChessEngineLayer: Layer.Layer<ChessEngineService> = Layer.effect(
 )
 
 const ChessDefinition = Block.makeDefinition('Chess', { Model, Message })
-const Engine = ChessDefinition.resource<ChessEngine>()('ChessEngine')
+const Engine = ChessDefinition.makeResource<ChessEngine>()('ChessEngine')
 
-const managedResources = ChessDefinition.managedResources(entry => ({
+const managedResources = ChessDefinition.makeManagedResources(entry => ({
   engine: entry('ManageEngine', Schema.Option(Schema.Null), {
     resource: Engine,
     modelToMaybeRequirements: model => Option.as(model.maybeAnalysisSlug, null),

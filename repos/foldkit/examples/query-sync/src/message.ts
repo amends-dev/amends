@@ -14,5 +14,3 @@ export const Message = defineMessageUnion({
   ChangedSearchInput: { value: Schema.String },
   ClickedColumnHeader: { column: SortColumn },
 })
-
-export type Message = typeof Message.Type

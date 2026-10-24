@@ -10,8 +10,6 @@ import { revealFieldErrors } from '../../validation'
 import { WorkHistoryEntryComposition } from './composition'
 import { Message, type Model, OutMessage } from './definition'
 
-// FIELD VALIDATION
-
 export const companyRules = makeRules({
   required: 'Company is required',
 })
@@ -52,12 +50,10 @@ export const update = WorkHistoryEntryComposition.makeUpdate((model, message) =>
   }),
 )
 
-// VALIDATION SUMMARY
-
-export const hasErrors = (entry: Model): boolean =>
+export const hasErrors = (entry: typeof Model.Type): boolean =>
   anyInvalid([entry.company, entry.title])
 
-export const isComplete = (entry: Model): boolean =>
+export const isComplete = (entry: typeof Model.Type): boolean =>
   allValid([
     [entry.company, companyRules],
     [entry.title, titleRules],

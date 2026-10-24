@@ -87,8 +87,8 @@ const selectAction = (
   )
 
 const action =
-  (selectedAction: HomeAction, h: HomeViewBuilder) =>
-  (homeAction: HomeAction): Html =>
+  (selectedAction: typeof HomeAction.Type, h: HomeViewBuilder) =>
+  (homeAction: typeof HomeAction.Type): Html =>
     h.div(
       [h.Class('whitespace-pre-wrap')],
       [

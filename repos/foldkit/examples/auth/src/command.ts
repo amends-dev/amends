@@ -8,7 +8,7 @@ import { Session, SessionJsonString } from './domain/session'
 import { Message } from './message'
 import { dashboardRouter, homeRouter, loginRouter } from './route'
 
-export const SaveSession = ApplicationDefinition.command('SaveSession', {
+export const SaveSession = ApplicationDefinition.makeCommand('SaveSession', {
   args: { session: Session },
   messages: [Message.SucceededSaveSession, Message.FailedSaveSession],
   handler: function* () {
@@ -28,7 +28,7 @@ export const SaveSession = ApplicationDefinition.command('SaveSession', {
   },
 })
 
-export const ClearSession = ApplicationDefinition.command('ClearSession', {
+export const ClearSession = ApplicationDefinition.makeCommand('ClearSession', {
   messages: [Message.SucceededClearSession, Message.FailedClearSession],
   handler: function* () {
     const store = yield* KeyValueStore.KeyValueStore
@@ -43,7 +43,7 @@ export const ClearSession = ApplicationDefinition.command('ClearSession', {
   },
 })
 
-export const LogError = ApplicationDefinition.command('LogError', {
+export const LogError = ApplicationDefinition.makeCommand('LogError', {
   args: { entries: Schema.Array(Schema.Unknown) },
   messages: [Message.CompletedLogError],
   handler: function* () {
@@ -52,7 +52,7 @@ export const LogError = ApplicationDefinition.command('LogError', {
   },
 })
 
-export const NavigateInternal = ApplicationDefinition.command(
+export const NavigateInternal = ApplicationDefinition.makeCommand(
   'NavigateInternal',
   {
     args: { url: Schema.String },
@@ -64,7 +64,7 @@ export const NavigateInternal = ApplicationDefinition.command(
   },
 )
 
-export const LoadExternal = ApplicationDefinition.command('LoadExternal', {
+export const LoadExternal = ApplicationDefinition.makeCommand('LoadExternal', {
   args: { href: Schema.String },
   messages: [Message.CompletedLoadExternal],
   handler: function* () {
@@ -73,7 +73,7 @@ export const LoadExternal = ApplicationDefinition.command('LoadExternal', {
   },
 })
 
-export const RedirectToLogin = ApplicationDefinition.command(
+export const RedirectToLogin = ApplicationDefinition.makeCommand(
   'RedirectToLogin',
   {
     messages: [Message.CompletedRedirectToLogin],
@@ -86,7 +86,7 @@ export const RedirectToLogin = ApplicationDefinition.command(
   },
 )
 
-export const RedirectToDashboard = ApplicationDefinition.command(
+export const RedirectToDashboard = ApplicationDefinition.makeCommand(
   'RedirectToDashboard',
   {
     messages: [Message.CompletedRedirectToDashboard],
@@ -99,15 +99,18 @@ export const RedirectToDashboard = ApplicationDefinition.command(
   },
 )
 
-export const RedirectToHome = ApplicationDefinition.command('RedirectToHome', {
-  messages: [Message.CompletedRedirectToHome],
-  handler: function* () {
-    return () =>
-      replaceUrl(homeRouter()).pipe(
-        Effect.as(Message.CompletedRedirectToHome()),
-      )
+export const RedirectToHome = ApplicationDefinition.makeCommand(
+  'RedirectToHome',
+  {
+    messages: [Message.CompletedRedirectToHome],
+    handler: function* () {
+      return () =>
+        replaceUrl(homeRouter()).pipe(
+          Effect.as(Message.CompletedRedirectToHome()),
+        )
+    },
   },
-})
+)
 
 export const EffectsLayer = Layer.mergeAll(
   SaveSession.layer,

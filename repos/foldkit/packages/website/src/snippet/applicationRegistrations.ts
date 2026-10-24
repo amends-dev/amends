@@ -1,11 +1,11 @@
 import { ApplicationDefinition } from '../definition'
 import { Home, Products } from '../page'
 
-export const HomeBinding = ApplicationDefinition.bindChild(Home.HomeBlock, {
+export const HomeBinding = ApplicationDefinition.makeBinding(Home.HomeBlock, {
   field: 'home',
 })
 
-export const ProductsBinding = ApplicationDefinition.bindChild(
+export const ProductsBinding = ApplicationDefinition.makeBinding(
   Products.ProductsBlock,
   {
     field: 'products',

@@ -35,7 +35,7 @@ const unreachable = "The host could not be reached. Try again."
 const refusalOf = (error: unknown) => (Schema.is(CoreError.Rejection)(error) ? error.message : unreachable)
 
 /** Add an agent called `name`, starting with the role `roleId`, set up as `configuration` says. */
-export const CreateAgent = AgentsDefinition.command("CreateAgent", {
+export const CreateAgent = AgentsDefinition.makeCommand("CreateAgent", {
   args: { ...Stores.AsMember, name: Schema.String, roleId: Role.RoleId, configuration: Agent.Configuration },
   messages: outcomes,
   handler: function* () {
@@ -53,7 +53,7 @@ export const CreateAgent = AgentsDefinition.command("CreateAgent", {
 })
 
 /** Set `agentId` up as `configuration` says, in place of how it is set up. */
-export const ConfigureAgent = AgentsDefinition.command("ConfigureAgent", {
+export const ConfigureAgent = AgentsDefinition.makeCommand("ConfigureAgent", {
   args: { ...Stores.AsMember, agentId: Identity.AgentId, configuration: Agent.Configuration },
   messages: outcomes,
   handler: function* () {
@@ -68,7 +68,7 @@ export const ConfigureAgent = AgentsDefinition.command("ConfigureAgent", {
 })
 
 /** Rename `agentId` to `name`, from the name the person saw. */
-export const RenameAgent = AgentsDefinition.command("RenameAgent", {
+export const RenameAgent = AgentsDefinition.makeCommand("RenameAgent", {
   args: { ...Stores.AsMember, agentId: Identity.AgentId, name: Schema.String, expectedName: Schema.String },
   messages: outcomes,
   handler: function* () {
@@ -86,7 +86,7 @@ export const RenameAgent = AgentsDefinition.command("RenameAgent", {
 })
 
 /** Remove `agentId`, which ends the membership `removeMemberId` of it in the workspace. */
-export const RemoveAgent = AgentsDefinition.command("RemoveAgent", {
+export const RemoveAgent = AgentsDefinition.makeCommand("RemoveAgent", {
   args: { ...Stores.AsMember, agentId: Identity.AgentId, removeMemberId: MemberId.MemberId },
   messages: outcomes,
   handler: function* () {
@@ -101,7 +101,7 @@ export const RemoveAgent = AgentsDefinition.command("RemoveAgent", {
 })
 
 /** List the models `connectionId` offers an agent. */
-export const LoadModels = AgentsDefinition.command("LoadModels", {
+export const LoadModels = AgentsDefinition.makeCommand("LoadModels", {
   args: { workspaceId: WorkspaceId.WorkspaceId, connectionId: ConnectionContract.ConnectionId },
   messages: [Message.ReceivedModels, Message.FailedLoadModels],
   handler: function* () {

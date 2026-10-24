@@ -22,4 +22,3 @@ export const Model = Schema.Struct({
   maybeChartError: Schema.Option(Schema.String),
   maybeSelectedDatumId: Schema.Option(Schema.String),
 })
-export type Model = typeof Model.Type

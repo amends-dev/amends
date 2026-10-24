@@ -38,6 +38,15 @@ export const runResultRecipe = <Recipe extends AnyResultRecipe>(
   return execute(model) as ResultRecipeOutput<Recipe>
 }
 
+/** @internal Rejects a deferred Step where execution requires its result. */
+export const assertResolvedStep = (value: unknown): void => {
+  if (Predicate.isFunction(value)) {
+    throw new Error(
+      '[foldkit] A Step returned another Step instead of its result. Pass the Step directly to Update.combineSteps, apply it to the current Model, or author deferred composition through Definition.makeStep.',
+    )
+  }
+}
+
 /** @internal Resolves nested passive operations in the active graph. */
 export const resolveOperationOutput = <Value>(
   value: Value,
@@ -52,6 +61,7 @@ export const resolveOperationOutput = <Value>(
   while (isResultRecipe(current)) {
     current = runResultRecipe(current, model)
   }
+  assertResolvedStep(current)
   /* eslint-disable-next-line @typescript-eslint/consistent-type-assertions */
   return current as ResolvedOperationOutput<Value>
 }

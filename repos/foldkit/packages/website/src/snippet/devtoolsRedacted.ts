@@ -1,5 +1,5 @@
 import { Effect, Redacted, Schema } from 'effect'
-import { Command, makeApplicationDefinition } from 'foldkit'
+import { Block, Command } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 
 const accessTokenLabel = 'access token'
@@ -9,20 +9,18 @@ const AccessToken = Schema.Redacted(Schema.String, {
   label: accessTokenLabel,
   disallowJsonEncode: true,
 })
-type AccessToken = typeof AccessToken.Type
 
-const makeAccessToken = (accessToken: string): AccessToken =>
+const makeAccessToken = (accessToken: string): typeof AccessToken.Type =>
   Redacted.make(accessToken, { label: accessTokenLabel })
 
 // 2. Store the wrapper in the Model, never the raw string.
 const Model = Schema.Struct({ accessToken: AccessToken })
-type Model = typeof Model.Type
 
 const Message = defineMessageUnion({
   CompletedFetchProfile: {},
   FailedFetchProfile: {},
 })
-const ApplicationComposition = makeApplicationDefinition({
+const ApplicationComposition = Block.makeDefinition('Application', {
   Model,
   Message,
 }).makeComposition()
@@ -51,5 +49,5 @@ const FetchProfile = Command.define('FetchProfile', {
   },
 })
 
-const fetchProfile = (model: Model) =>
+const fetchProfile = (model: typeof Model.Type) =>
   FetchProfile({ accessToken: model.accessToken })

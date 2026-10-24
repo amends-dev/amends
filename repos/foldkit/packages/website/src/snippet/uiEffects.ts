@@ -3,20 +3,18 @@ import { Dialog, Menu } from '@foldkit/ui'
 
 import { ApplicationDefinition } from './definition'
 
-export const DialogBinding = ApplicationDefinition.bindChild(
+export const DialogBinding = ApplicationDefinition.makeBinding(
   Dialog.DialogBlock,
   {
     field: 'dialog',
-    outMessage: { fold: foldDialogOutMessage },
   },
-)
+).withOutMessagePolicy({ fold: foldDialogOutMessage })
 
 export const ApplicationMenu = Menu.create<string>()
 
-export const MenuBinding = ApplicationDefinition.bindChild(ApplicationMenu, {
+export const MenuBinding = ApplicationDefinition.makeBinding(ApplicationMenu, {
   field: 'menu',
-  outMessage: { fold: foldMenuOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldMenuOutMessage })
 
 export const ApplicationComposition = ApplicationDefinition.makeComposition({
   bindings: [DialogBinding, MenuBinding],
@@ -57,20 +55,35 @@ export const view = ApplicationComposition.makeView((model, h) => ({
   ),
 }))
 
-// entry.ts
-import { Runtime } from 'foldkit'
+// block.ts
+import { Block } from 'foldkit'
 
 import { ApplicationComposition } from './composition'
 import { init } from './init'
+import type { Model } from './model'
 import { update } from './update'
 import { view } from './view'
 
-const application = ApplicationComposition.assembleApplication({
-  init,
-  update,
-  view,
+const prepare = () =>
+  ApplicationComposition.prepareBlock({
+    init,
+    update,
+    view,
+  })
+export const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)
+
+// entry.ts
+import { Program, Runtime } from 'foldkit'
+
+import { ApplicationBlock } from './block'
+
+const program = Program.make({
+  block: ApplicationBlock,
   container: document.getElementById('root'),
-  devTools: { Message: ApplicationComposition.Message },
+  devTools: { dispatch: true },
 })
 
-Runtime.run(application)
+Runtime.run(program)

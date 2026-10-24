@@ -35,5 +35,3 @@ export const Message = defineMessageUnion({
   ClickedVirtualListScrollToMiddle: {},
   ClickedVirtualListVariableScrollToMiddle: {},
 })
-
-export type Message = typeof Message.Type

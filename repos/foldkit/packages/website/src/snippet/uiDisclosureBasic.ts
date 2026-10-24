@@ -20,7 +20,6 @@ const Message = defineMessageUnion({
   ToggledFaq: { isOpen: Schema.Boolean },
 })
 
-type Message = typeof Message.Type
 const FrequentlyAskedQuestionsComposition = Block.makeDefinition(
   'FrequentlyAskedQuestions',
   {
@@ -62,7 +61,7 @@ const view = FrequentlyAskedQuestionsComposition.makeView((model, h) => {
     button,
     panel,
     animatePanel,
-  }: Disclosure.DisclosureAttributes<Message>) =>
+  }: Disclosure.DisclosureAttributes<typeof Message.Type>) =>
     h.div(
       [h.Class('border rounded-lg overflow-hidden')],
       [

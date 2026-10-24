@@ -53,7 +53,7 @@ export const OperationConstructorProofChildDefinition = Block.makeDefinition(
     OutMessage,
   },
 )
-export const RecordValue = OperationConstructorProofChildDefinition.command(
+export const RecordValue = OperationConstructorProofChildDefinition.makeCommand(
   'RecordValue',
   {
     args: { value: Schema.String },
@@ -110,8 +110,8 @@ export const EffectsLayer = Layer.merge(
   ),
 )
 
-export const ChildBlock =
-  OperationConstructorProofChildComposition.assembleBlock({
+const prepareChildBlock = () =>
+  OperationConstructorProofChildComposition.prepareBlock({
     init: () => ({ model: Model.make({ value: '' }) }),
     update,
     operations: {
@@ -132,6 +132,10 @@ export const ChildBlock =
     EffectsLayer,
     hostHandlers: [RecordValue],
   })
+export const ChildBlock: Block.FromAssemblyWithOutMessage<
+  typeof Model,
+  typeof prepareChildBlock
+> = Block.assemble(prepareChildBlock)
 
 export const ParentModel = Schema.Struct({
   maybeChild: Schema.Option(Model),
@@ -149,9 +153,8 @@ export const OperationConstructorProofParentDefinition = Block.makeDefinition(
     Message: ParentMessage,
   },
 )
-export const ChildBinding = OperationConstructorProofParentDefinition.bindChild(
-  ChildBlock,
-  {
+export const ChildBinding =
+  OperationConstructorProofParentDefinition.makeBinding(ChildBlock, {
     placement: 'child',
     read: model => model.maybeChild,
     write: (model, nextChild) =>
@@ -159,18 +162,15 @@ export const ChildBinding = OperationConstructorProofParentDefinition.bindChild(
     delivery: {
       toUpdateContext: () => [{ prefix: 'routed' }],
     },
-    outMessage: {
-      fold: OutMessage.match<
-        Update.Step<ParentModel, typeof ParentMessage.Type>
-      >({
+  }).withOutMessagePolicy({
+    fold: OutMessage.match<Update.Step<ParentModel, typeof ParentMessage.Type>>(
+      {
         ChangedValue: () => model => ({ model }),
-      }),
-    },
-  },
-)
-export const EntryBinding = OperationConstructorProofParentDefinition.bindChild(
-  ChildBlock,
-  {
+      },
+    ),
+  })
+export const EntryBinding =
+  OperationConstructorProofParentDefinition.makeBinding(ChildBlock, {
     placement: 'entries',
     readAll: model => model.entries,
     key: entry => entry.id,
@@ -185,24 +185,22 @@ export const EntryBinding = OperationConstructorProofParentDefinition.bindChild(
     delivery: {
       toUpdateContext: () => [{ prefix: 'routed' }],
     },
-    outMessage: {
-      fold: (_id, outMessage) =>
-        OutMessage.match<Update.Step<ParentModel, typeof ParentMessage.Type>>(
-          outMessage,
-          {
-            ChangedValue: () => model => ({ model }),
-          },
-        ),
-    },
-  },
-)
+  }).withOutMessagePolicy({
+    fold: (_id, outMessage) =>
+      OutMessage.match<Update.Step<ParentModel, typeof ParentMessage.Type>>(
+        outMessage,
+        {
+          ChangedValue: () => model => ({ model }),
+        },
+      ),
+  })
 export const OperationConstructorProofParentComposition =
   OperationConstructorProofParentDefinition.makeComposition({
     bindings: [ChildBinding, EntryBinding],
   })
 
-export const ParentBlock =
-  OperationConstructorProofParentComposition.assembleBlock({
+const prepareParentBlock = () =>
+  OperationConstructorProofParentComposition.prepareBlock({
     init: () => ({
       model: ParentModel.make({ maybeChild: Option.none(), entries: [] }),
     }),
@@ -229,6 +227,10 @@ export const ParentBlock =
       ),
     ),
   })
+export const ParentBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ParentModel,
+  typeof prepareParentBlock
+> = Block.assemble(prepareParentBlock)
 
 export function makeChoice<
   const Values extends readonly [string, ...Array<string>],
@@ -246,22 +248,28 @@ export function makeChoice<
   ).makeComposition()
   const select = ChoiceMessage.SelectedValue
 
-  return OperationConstructorProofChoiceComposition.assembleBlock({
-    init: (selected: Values[number]) => ({
-      model: ChoiceModel.make({ selected }),
-    }),
-    update: OperationConstructorProofChoiceComposition.makeUpdate(
-      (model, { value }) => ({
-        model: modifyFields(model, { selected: () => value }),
+  const prepare = () =>
+    OperationConstructorProofChoiceComposition.prepareBlock({
+      init: (selected: Values[number]) => ({
+        model: ChoiceModel.make({ selected }),
       }),
-    ),
-    operations: {
-      select,
-      selectPositionally: (value: Values[number]) =>
-        Tuple.make(ChoiceMessage.SelectedValue({ value })),
-    },
-    EffectsLayer: Layer.empty,
-  })
+      update: OperationConstructorProofChoiceComposition.makeUpdate(
+        (model, { value }) => ({
+          model: modifyFields(model, { selected: () => value }),
+        }),
+      ),
+      operations: {
+        select,
+        selectPositionally: (value: Values[number]) =>
+          Tuple.make(ChoiceMessage.SelectedValue({ value })),
+      },
+      EffectsLayer: Layer.empty,
+    })
+  const completedBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+    typeof ChoiceModel,
+    typeof prepare
+  > = Block.assemble(prepare)
+  return completedBlock
 }
 
 export const Choice = makeChoice(['First', 'Second'])
@@ -405,11 +413,17 @@ export const makeNamed = <const Name extends string>(name: Name) => {
     Message,
   }).makeComposition()
 
-  return NamedComposition.assembleBlock({
-    init: () => ({ model: Model.make({ value: '' }) }),
-    update: NamedComposition.makeUpdate(model => ({ model })),
-    operations: {
-      reset: Message.ResetValue,
-    },
-  })
+  const prepare = () =>
+    NamedComposition.prepareBlock({
+      init: () => ({ model: Model.make({ value: '' }) }),
+      update: NamedComposition.makeUpdate(model => ({ model })),
+      operations: {
+        reset: Message.ResetValue,
+      },
+    })
+  const completedBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+    typeof Model,
+    typeof prepare
+  > = Block.assemble(prepare)
+  return completedBlock
 }

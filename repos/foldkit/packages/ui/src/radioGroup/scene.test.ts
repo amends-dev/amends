@@ -1,5 +1,5 @@
 import { Option, Schema } from 'effect'
-import { Block, Update } from 'foldkit'
+import { Block } from 'foldkit'
 import * as Scene from 'foldkit/scene'
 import { modifyFields } from 'foldkit/struct'
 
@@ -9,7 +9,6 @@ import type { ViewInputs } from './radioGroup.js'
 import {
   FocusOption,
   Message as RadioGroupMessage,
-  OutMessage as RadioGroupOutMessage,
   create,
 } from './radioGroup.js'
 
@@ -36,24 +35,26 @@ const modelWith = (maybeSelectedValue: Option.Option<string>): Model => ({
 
 const nothingSelected = modelWith(Option.none())
 
-const foldRadioGroupOutMessage = RadioGroupOutMessage.match<
-  Update.Step<Model, never>,
-  RadioGroupOutMessage<string>
->({
-  Selected:
-    ({ value }) =>
-    model => ({
-      model: modifyFields(model, {
-        maybeSelectedValue: () => Option.some(value),
+const foldRadioGroupOutMessage = RadioGroupSceneDefinition.makeOutMessageFold(
+  TestRadioGroup,
+  {
+    Selected:
+      ({ value }) =>
+      model => ({
+        model: modifyFields(model, {
+          maybeSelectedValue: () => Option.some(value),
+        }),
       }),
-    }),
-})
+  },
+)
 
-const RadioGroupBinding = RadioGroupSceneDefinition.bindChild(TestRadioGroup, {
-  field: 'radioGroup',
-  init: false,
-  outMessage: { fold: foldRadioGroupOutMessage },
-})
+const RadioGroupBinding = RadioGroupSceneDefinition.makeBinding(
+  TestRadioGroup,
+  {
+    field: 'radioGroup',
+    init: false,
+  },
+).withOutMessagePolicy({ fold: foldRadioGroupOutMessage })
 
 const RadioGroupSceneComposition = RadioGroupSceneDefinition.makeComposition({
   bindings: [RadioGroupBinding],

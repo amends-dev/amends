@@ -13,14 +13,14 @@ import {
   readRooms,
 } from './generated-bindings.accepted.js'
 
-GeneratedBindingParentDefinition.bindChild(CounterBlock, {
+GeneratedBindingParentDefinition.makeBinding(CounterBlock, {
   read: model => model.selected,
   // @ts-expect-error A contextual accessor requires generated delivery context.
   write: (model, nextCounter) =>
     modifyFields(model, { selected: () => Option.some(nextCounter) }),
 })
 
-GeneratedBindingParentDefinition.bindChild(CounterBlock, {
+GeneratedBindingParentDefinition.makeBinding(CounterBlock, {
   // @ts-expect-error A contextual keyed child requires generated delivery context.
   field: 'counters',
   // @ts-expect-error A contextual keyed child requires generated delivery context.
@@ -30,7 +30,7 @@ GeneratedBindingParentDefinition.bindChild(CounterBlock, {
 })
 
 // @ts-expect-error General generated delivery requires an exact key Schema.
-GeneratedBindingParentDefinition.bindChild(CounterBlock, {
+GeneratedBindingParentDefinition.makeBinding(CounterBlock, {
   readAll: readRooms,
   key: readRoomId,
   read: readRoomCounter,
@@ -38,7 +38,7 @@ GeneratedBindingParentDefinition.bindChild(CounterBlock, {
   delivery: { toUpdateContext: model => [model.amount] },
 })
 
-GeneratedBindingParentDefinition.bindChild(CounterBlock, {
+GeneratedBindingParentDefinition.makeBinding(CounterBlock, {
   readAll: readRooms,
   key: readRoomId,
   // @ts-expect-error The key Schema must decode to the selector's key type.
@@ -48,7 +48,7 @@ GeneratedBindingParentDefinition.bindChild(CounterBlock, {
   delivery: { toUpdateContext: model => [model.amount] },
 })
 
-GeneratedBindingParentDefinition.bindChild(CounterBlock, {
+GeneratedBindingParentDefinition.makeBinding(CounterBlock, {
   // @ts-expect-error The keyed delivery predicate has an incompatible key type.
   field: 'counters',
   // @ts-expect-error The keyed delivery predicate has an incompatible key type.
@@ -60,7 +60,7 @@ GeneratedBindingParentDefinition.bindChild(CounterBlock, {
   },
 })
 
-GeneratedBindingParentDefinition.bindChild(CounterBlock, {
+GeneratedBindingParentDefinition.makeBinding(CounterBlock, {
   // @ts-expect-error Generated context must match the child update tuple.
   field: 'maybeCounter',
   // @ts-expect-error Generated context must match the child update tuple.
@@ -69,7 +69,7 @@ GeneratedBindingParentDefinition.bindChild(CounterBlock, {
   },
 })
 
-GeneratedBindingParentDefinition.bindChild(StatusBlock, {
+GeneratedBindingParentDefinition.makeBinding(StatusBlock, {
   // @ts-expect-error A context-free child cannot declare update context.
   field: 'status',
   // @ts-expect-error A context-free child cannot declare update context.
@@ -78,29 +78,29 @@ GeneratedBindingParentDefinition.bindChild(StatusBlock, {
   },
 })
 
-const UnregisteredStatusBinding = GeneratedBindingParentDefinition.bindChild(
+const UnregisteredStatusBinding = GeneratedBindingParentDefinition.makeBinding(
   StatusBlock,
   {
     field: 'status',
     placement: 'unregistered-status',
   },
 )
-const unregisteredGeneratedStep = GeneratedBindingParentDefinition.step(() =>
-  UnregisteredStatusBinding.requestToggle(),
+const unregisteredGeneratedStep = GeneratedBindingParentDefinition.makeStep(
+  () => UnregisteredStatusBinding.requestToggle(),
 )
 GeneratedBindingParentComposition.makeUpdate(model =>
-  // @ts-expect-error Wrapping an operation in Definition.step cannot erase its Binding registration.
+  // @ts-expect-error Wrapping an operation in Definition.makeStep cannot erase its Binding registration.
   unregisteredGeneratedStep(model),
 )
 
-GeneratedBindingParentDefinition.bindChild(CounterBlock, {
+GeneratedBindingParentDefinition.makeBinding(CounterBlock, {
   // @ts-expect-error Parent Message wrappers are generated from the Binding placement.
   field: 'maybeCounter',
   toParentMessage: () => ParentMessage.ClickedParent(),
   delivery: { toUpdateContext: model => [model.amount] },
 })
 
-GeneratedBindingParentDefinition.bindChild(CounterBlock, {
+GeneratedBindingParentDefinition.makeBinding(CounterBlock, {
   // @ts-expect-error Parent Message wrappers are generated from the Binding placement.
   field: 'maybeCounter',
   fromParentMessage: false,
@@ -117,12 +117,17 @@ const GeneratedBindingSilentDefinition = Block.makeDefinition(
 )
 const GeneratedBindingSilentComposition =
   GeneratedBindingSilentDefinition.makeComposition()
-const SilentBlock = GeneratedBindingSilentComposition.assembleBlock({
-  init: GeneratedBindingSilentComposition.makeInit(() => ({
-    model: { value: 0 },
-  })),
-  update: GeneratedBindingSilentComposition.makeUpdate(),
-})
+const prepareSilentBlock = () =>
+  GeneratedBindingSilentComposition.prepareBlock({
+    init: GeneratedBindingSilentComposition.makeInit(() => ({
+      model: { value: 0 },
+    })),
+    update: GeneratedBindingSilentComposition.makeUpdate(),
+  })
+const SilentBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof SilentModel,
+  typeof prepareSilentBlock
+> = Block.assemble(prepareSilentBlock)
 const GeneratedBindingSilentParentDefinition = Block.makeDefinition(
   'GeneratedBindingSilentParent',
   {
@@ -130,7 +135,7 @@ const GeneratedBindingSilentParentDefinition = Block.makeDefinition(
     Message: Schema.Never,
   },
 )
-GeneratedBindingSilentParentDefinition.bindChild(SilentBlock, {
+GeneratedBindingSilentParentDefinition.makeBinding(SilentBlock, {
   // @ts-expect-error A Message-free child cannot configure generated delivery.
   field: 'silent',
   // @ts-expect-error A Message-free child cannot configure generated delivery.

@@ -827,7 +827,7 @@ const defineSubscriptionsForRoot = <Id extends string>(
 
 /** Default drag Subscriptions, with the track looked up via `document`. */
 export const subscriptions = defineSubscriptionsForRoot(
-  SliderDefinition.subscriptions,
+  SliderDefinition.makeSubscriptions,
   () => document,
 )
 
@@ -839,15 +839,20 @@ const operations = {
   informRangeChanged: Message.InformedOfRangeChange,
 }
 
+const prepareSliderBlock = () =>
+  SliderComposition.prepareBlock({
+    init,
+    update,
+    view,
+    operations,
+    subscriptions,
+    EffectsLayer,
+  })
 /** Completed Slider Block. */
-export const SliderBlock = SliderComposition.assembleBlock({
-  init,
-  update,
-  view,
-  operations,
-  subscriptions,
-  EffectsLayer,
-})
+export const SliderBlock: Block.FromAssemblyWithViewAndOutMessage<
+  typeof Model,
+  typeof prepareSliderBlock
+> = Block.assemble(prepareSliderBlock)
 
 /**
  * Builds a complete Slider Block whose drag Subscriptions resolve tracks from
@@ -866,7 +871,7 @@ export const forRoot = (getTrackRoot: () => Document | ShadowRoot) => {
   const rootUpdate = SliderComposition.makeUpdate(update)
   const rootView = SliderComposition.makeView.withInputs<ViewInputs>(renderView)
   const subscriptions = defineSubscriptionsForRoot(
-    SliderDefinition.subscriptions,
+    SliderDefinition.makeSubscriptions,
     getTrackRoot,
   )
   const EffectsLayer = subscriptions.layer
@@ -874,12 +879,20 @@ export const forRoot = (getTrackRoot: () => Document | ShadowRoot) => {
     informRangeChanged: Message.InformedOfRangeChange,
   }
 
-  return SliderComposition.assembleBlock({
-    init,
-    update: rootUpdate,
-    view: rootView,
-    operations,
-    subscriptions,
-    EffectsLayer,
-  })
+  const prepareSliderBlock = () =>
+    SliderComposition.prepareBlock({
+      init,
+      update: rootUpdate,
+      view: rootView,
+      operations,
+      subscriptions,
+      EffectsLayer,
+    })
+
+  const sliderBlock: Block.FromAssemblyWithViewAndOutMessage<
+    typeof Model,
+    typeof prepareSliderBlock
+  > = Block.assemble(prepareSliderBlock)
+
+  return sliderBlock
 }

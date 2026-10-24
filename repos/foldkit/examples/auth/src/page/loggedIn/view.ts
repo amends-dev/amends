@@ -1,12 +1,11 @@
 import { clsx } from 'clsx'
 import { Match } from 'effect'
-import { Html, HtmlBuilder } from 'foldkit/html'
+import { Html } from 'foldkit/html'
 
 import { Session } from '../../domain/session'
 import { notFoundView } from '../../notFoundView'
 import { dashboardRouter, settingsRouter } from '../../route'
-import { LoggedInComposition } from './composition'
-import { Message } from './message'
+import { LoggedInComposition, type LoggedInViewBuilder } from './composition'
 import * as Dashboard from './page/dashboard'
 import * as Settings from './page/settings'
 
@@ -16,9 +15,9 @@ const navLinkClassName = (isActive: boolean) =>
   })
 
 const navigationView = (
-  session: Session,
+  session: typeof Session.Type,
   currentRouteTag: string,
-  h: HtmlBuilder<Message>,
+  h: LoggedInViewBuilder,
 ): Html =>
   h.nav(
     [h.Class('bg-blue-500 text-white p-4')],

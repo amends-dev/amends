@@ -1,8 +1,10 @@
 import { Match, Option, Schema } from 'effect'
+import * as Block from 'foldkit/block'
 import { type ChildAttribute, type Html, childAttributes } from 'foldkit/html'
 
 import { Position, SwipeState, Variant } from './schema.js'
 import { isSwipeExcludedTarget } from './swipeTarget.js'
+import { type ToastTest, makeTest } from './test.js'
 import { makeRuntime } from './update.js'
 
 export type {
@@ -22,8 +24,6 @@ export type {
   SwipeToDismissConfig,
 } from './schema.js'
 export type { ShowInput } from './update.js'
-
-export * as test from './test.js'
 
 export {
   Message,
@@ -133,7 +133,7 @@ const LEFT_MOUSE_BUTTON = 0
  *  Consume the completed Block everywhere. Use `Toast.Model` in your app
  *  Model, `Toast.Message` in your parent Message union, `Toast.operations.requestShow`
  *  and `Toast.operations.requestDismiss` for raw Model operations, and
- *  `Parent.bindChild(Toast, config)` in the parent Block. Exposed
+ *  `Parent.makeBinding(Toast, config)` in the parent Block. Exposed
  *  operations such as `show` and `dismiss` are available directly on the
  *  binding. The separate exports provide
  *  payload-independent Schemas, constants, and Commands.
@@ -305,7 +305,7 @@ export const makeFixture = <A, I>(payloadSchema: Schema.Codec<A, I>) => {
             slotId: entry.id,
             model: entry.animation,
             viewInputs: {
-              content: entryToView(entry, handlers),
+              toView: () => entryToView(entry, handlers),
               attributes: childAttributes(itemAttributes),
             },
           }),
@@ -320,20 +320,37 @@ export const makeFixture = <A, I>(payloadSchema: Schema.Codec<A, I>) => {
     },
   )
 
-  const block = ToastComposition.assembleBlock({
-    init: toastRuntime.init,
-    update: toastRuntime.update,
-    view,
-    operations: toastRuntime.operations,
-    subscriptions: toastRuntime.subscriptions,
-    EffectsLayer: toastRuntime.EffectsLayer,
+  const prepare = () =>
+    ToastComposition.prepareBlock({
+      init: toastRuntime.init,
+      update: toastRuntime.update,
+      view,
+      operations: toastRuntime.operations,
+      subscriptions: toastRuntime.subscriptions,
+      EffectsLayer: toastRuntime.EffectsLayer,
+    })
+  const block: Block.FromAssemblyWithViewAndOutMessage<
+    typeof toastRuntime.Model,
+    typeof prepare
+  > = Block.assemble(prepare)
+  const test = makeTest({
+    block,
+    entryAnimationBinding: EntryAnimationBinding,
+    waitBeforeDismissal: toastRuntime.WaitBeforeDismissal,
+  })
+  const publicTest: ToastTest<typeof block> = {
+    drainEntry: test.drainEntry,
+  }
+  const completedBlock = Object.assign(block, {
+    test: publicTest,
   })
 
   return {
     ...toastRuntime,
     ...block.operations,
     view,
-    block,
+    test,
+    block: completedBlock,
   }
 }
 

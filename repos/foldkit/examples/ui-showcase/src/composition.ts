@@ -3,7 +3,7 @@ import type { Block } from 'foldkit'
 import { ApplicationDefinition } from './definition'
 import { UiBlock } from './ui'
 
-export const UiBinding = ApplicationDefinition.bindChild(UiBlock, {
+export const UiBinding = ApplicationDefinition.makeBinding(UiBlock, {
   field: 'uiModel',
   init: { contextToArgs: ({ today }) => [today] },
 })

@@ -56,3 +56,41 @@ To test a Command's work, execute its Effect with the application's real handler
 Choose the lowest service boundary whose behavior the test needs to exercise. If an API service contains authentication or retry policy, retain that service and replace its transport. The same principle applies to Subscription Streams, Mount integrations, and ManagedResource acquisition and cleanup. [Testing through service boundaries](/core/layers#testing-through-service-boundaries) explains how to compose these providers at the application root.
 
 Replacing an entire handler tests a narrower orchestration path and excludes the replaced implementation. Story and Scene already supply results explicitly; execution tests use Effect and Layer composition to run the application's handlers.
+
+## Migrate an Existing Test Suite
+
+The Blocks preview changes where tests get identity, generated delivery, and lifecycle declarations. Keep tests at the same Story or Scene boundary, then replace hand-written observations with the declarations carried by the composed application.
+
+### Match Commands by Source Identity
+
+A bound child Command has a placement-qualified display name such as `Application/Pins/ReadPins`. Do not compare that string, or compare `command.name` with `Definition.name`. Story and Scene match the original Definition by its source identity, so the same matcher keeps working after the Command is registered below a Binding. Pass an instance for exact args; a bound instance also selects its composition path.
+
+When the Command belongs to a child Block, supply its raw child result Message. The pending Command retains the generated delivery chain and Story or Scene replays it before calling the parent update.
+
+::Snippet{name="testingMigrationCommandBefore" label="❌ Command test before Blocks"}
+
+::Snippet{name="testingMigrationCommandAfter" label="✅ Command test with source identity"}
+
+The parent Message union no longer declares `GotPinsMessage`. Composition owns generated child envelopes, and tests do not fabricate their placement or occurrence fields.
+
+### Register Scene Subscription Sources
+
+`Subscription.emit` identifies both the registered source and its raw Message. Build the Scene registry from the Application Composition, pass it in the Scene config, and select the entry that declared the Message. For a child entry, pass the child's Message; Scene derives every generated parent delivery from the registry.
+
+::Snippet{name="testingMigrationSubscriptionBefore" label="❌ Subscription test before registered sources"}
+
+::Snippet{name="testingMigrationSubscriptionAfter" label="✅ Subscription test with a Scene registry"}
+
+The scaffolded `tsconfig.json` includes `src/**/*`, which keeps `*.test.ts` files in the project typecheck. Preserve that coverage when customizing TypeScript project references or include patterns, so a changed Story or Scene signature fails during `typecheck` instead of waiting for the test runner.
+
+### Test Completed UI Blocks Through Public Contracts
+
+Stateful UI components expose their Model, Message, init, operations, and OutMessage through a completed Block. Read the Model type as `typeof FooBlock.Model.Type`. Let the parent Binding and Composition initialize the child so its startup Commands are retained.
+
+Command and Mount Definitions intended for Story and Scene live under the component's `test` namespace. Resolve the original public Definition with a result Message from the completed Block.
+
+::Snippet{name="testingMigrationUiBefore" label="❌ UI component test before completed Blocks"}
+
+::Snippet{name="testingMigrationUiAfter" label="✅ UI component test with a completed Block"}
+
+The [Block guide](/core/block) covers connected Steps, owner-specific builder aliases, and child initialization. The [Mount guide](/core/mount#mount-requirements-in-reusable-views) covers reusable mounted view helpers. Component pages document helpers that drain a component's whole pending lifecycle when one public operation is clearer than several individual resolvers.

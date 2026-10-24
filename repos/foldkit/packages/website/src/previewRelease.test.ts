@@ -1,10 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import {
-  decodePreviewRelease,
-  installCommand,
-  scaffoldCommand,
-} from './previewRelease'
+import { decodePreviewRelease, scaffoldCommand } from './previewRelease'
 
 const release = decodePreviewRelease(
   JSON.stringify({
@@ -27,12 +23,9 @@ describe('PreviewRelease', () => {
     )
   })
 
-  test('builds exact commands from the release versions', () => {
+  test('builds the exact scaffold command from the release versions', () => {
     expect(scaffoldCommand(release)).toBe(
       'npx create-foldkit-app@3.4.5-canary.0123456789ab',
-    )
-    expect(installCommand(release)).toBe(
-      'pnpm add --save-exact "@foldkit/ui@2.3.4-canary.0123456789ab" "foldkit@1.2.3-canary.0123456789ab"',
     )
   })
 

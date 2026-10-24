@@ -87,10 +87,12 @@ vi.mock('maplibre-gl', () => {
   return { Map, Marker, setWorkerUrl: vi.fn() }
 })
 
-const mountAndInteract = (host: HTMLElement): Effect.Effect<Array<Message>> =>
+const mountAndInteract = (
+  host: HTMLElement,
+): Effect.Effect<Array<typeof Message.Type>> =>
   Effect.scoped(
     Effect.gen(function* () {
-      const received: Array<Message> = []
+      const received: Array<typeof Message.Type> = []
       const mounted = yield* Deferred.make<void>()
 
       yield* MountMap({ hostId: 'test-map-host' })

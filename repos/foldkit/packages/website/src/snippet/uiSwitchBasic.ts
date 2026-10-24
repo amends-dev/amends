@@ -20,7 +20,6 @@ const Message = defineMessageUnion({
   ToggledNotifications: { isChecked: Schema.Boolean },
 })
 
-type Message = typeof Message.Type
 const NotificationSettingsComposition = Block.makeDefinition(
   'NotificationSettings',
   {
@@ -52,7 +51,9 @@ const update = NotificationSettingsComposition.makeUpdate((model, message) =>
 // track color keys off the data-checked attribute; the knob position derives
 // from the same Model field.
 const view = NotificationSettingsComposition.makeView((model, h) => {
-  const switchView = (attributes: Switch.SwitchAttributes<Message>) =>
+  const switchView = (
+    attributes: Switch.SwitchAttributes<typeof Message.Type>,
+  ) =>
     h.div(
       [h.Class('flex items-center gap-3')],
       [

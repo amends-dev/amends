@@ -16,7 +16,7 @@ import {
 
 export const today = Calendar.make(2026, 4, 16)
 
-export const initialModel: Model = {
+export const initialModel: typeof Model.Type = {
   currentStep: 'PersonalInfo',
   personalInfo: PersonalInfoBlock.init(today).model,
   workHistory: WorkHistoryBlock.init(today, 'work-history-entry-1').model,
@@ -31,7 +31,7 @@ export const initialModel: Model = {
   isSubmitAttempted: false,
 }
 
-export const completeModel: Model = modifyFields(initialModel, {
+export const completeModel: typeof Model.Type = modifyFields(initialModel, {
   personalInfo: personalInfo =>
     modifyFields(personalInfo, {
       firstName: () => Valid({ value: 'Jane' }),

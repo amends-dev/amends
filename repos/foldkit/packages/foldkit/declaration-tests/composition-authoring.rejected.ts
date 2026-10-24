@@ -79,7 +79,7 @@ const uncompletedRawRefreshUpdate = (
   _message: typeof ParentMessage.Type,
 ) => rawRefresh(model)
 
-ParentComposition.assembleBlock({
+ParentComposition.prepareBlock({
   init: parentInit,
   // @ts-expect-error A connected recipe must pass through Composition.makeUpdate before Block completion.
   update: uncompletedRawRefreshUpdate,
@@ -87,39 +87,41 @@ ParentComposition.assembleBlock({
 })
 
 // @ts-expect-error The Settings Command handler must be registered.
-SettingsComposition.assembleBlock({
+SettingsComposition.prepareBlock({
   init: settingsInit,
   update: settingsUpdate,
   EffectsLayer: Layer.empty,
 })
 
-// @ts-expect-error A direct child with required dispatch context needs a delivery context mapper.
-ParentDefinition.bindChild(SettingsBlock, {
+ParentDefinition.makeBinding(SettingsBlock, {
+  // @ts-expect-error A direct child with required dispatch context needs a delivery context mapper.
   field: 'settings',
+  // @ts-expect-error The invalid Binding configuration has no placement domain.
   placement: 'settingsWithoutContext',
-  outMessage: { forward: forwardSettingsOutMessage },
-})
+}).withOutMessagePolicy({ forward: forwardSettingsOutMessage })
 
-// @ts-expect-error Generated delivery requires the child's exact CurrentUser context tuple.
-ParentDefinition.bindChild(SettingsBlock, {
+ParentDefinition.makeBinding(SettingsBlock, {
+  // @ts-expect-error Generated delivery requires the child's exact CurrentUser context tuple.
   field: 'settings',
+  // @ts-expect-error The invalid Binding configuration has no placement domain.
   placement: 'settingsWithoutCompleteContext',
+  // @ts-expect-error The empty tuple omits the child's required CurrentUser context.
   delivery: { toUpdateContext: () => [] },
-  outMessage: { forward: forwardSettingsOutMessage },
-})
+}).withOutMessagePolicy({ forward: forwardSettingsOutMessage })
 
-// @ts-expect-error Generated delivery does not reinsert the child Message or extra arguments.
-ParentDefinition.bindChild(SettingsBlock, {
+ParentDefinition.makeBinding(SettingsBlock, {
+  // @ts-expect-error Generated delivery does not reinsert the child Message or extra arguments.
   field: 'settings',
+  // @ts-expect-error The invalid Binding configuration has no placement domain.
   placement: 'settingsWithExtraContext',
+  // @ts-expect-error Generated delivery accepts only the child's required CurrentUser context.
   delivery: {
     toUpdateContext: model => [model.currentUser, model.currentUser],
   },
-  outMessage: { forward: forwardSettingsOutMessage },
-})
+}).withOutMessagePolicy({ forward: forwardSettingsOutMessage })
 
 // @ts-expect-error A generated general keyed Binding requires an exact key Schema.
-ParentDefinition.bindChild(RoomBlock, {
+ParentDefinition.makeBinding(RoomBlock, {
   placement: 'roomWithoutKeySchema',
   readAll: model => Option.toArray(model.maybeRoom),
   key: room => room.id,
@@ -134,7 +136,7 @@ ParentDefinition.bindChild(RoomBlock, {
 })
 
 // @ts-expect-error A keyed child with required dispatch context needs a delivery context mapper.
-ParentDefinition.bindChild(RoomBlock, {
+ParentDefinition.makeBinding(RoomBlock, {
   placement: 'roomWithoutContext',
   readAll: model => Option.toArray(model.maybeRoom),
   key: room => room.id,
@@ -144,7 +146,7 @@ ParentDefinition.bindChild(RoomBlock, {
     ParentModel.make({ ...model, maybeRoom: Option.some(nextRoom) }),
 })
 
-ParentDefinition.bindChild(RoomBlock, {
+ParentDefinition.makeBinding(RoomBlock, {
   placement: 'roomWithWrongKeySchema',
   readAll: model => Option.toArray(model.maybeRoom),
   key: room => room.id,
@@ -156,7 +158,7 @@ ParentDefinition.bindChild(RoomBlock, {
   delivery: { toUpdateContext: (_model, roomId) => [{ roomId }] },
 })
 
-ParentDefinition.bindChild(RoomBlock, {
+ParentDefinition.makeBinding(RoomBlock, {
   placement: 'roomWithWrongContext',
   readAll: model => Option.toArray(model.maybeRoom),
   key: room => room.id,
@@ -171,39 +173,39 @@ ParentDefinition.bindChild(RoomBlock, {
 })
 
 // @ts-expect-error A Binding config must select one supported storage shape.
-ParentDefinition.bindChild(StatusBlock, {})
+ParentDefinition.makeBinding(StatusBlock, {})
 
 // @ts-expect-error A valid Binding config cannot add an unknown field.
-ParentDefinition.bindChild(StatusBlock, {
+ParentDefinition.makeBinding(StatusBlock, {
   field: 'status',
   unknownConfigField: true,
 })
 
-ParentDefinition.bindChild(StatusBlock, {
+ParentDefinition.makeBinding(StatusBlock, {
   // @ts-expect-error A direct field Binding cannot also declare general keyed storage.
   field: 'status',
   readAll: model => [model.status],
 })
 
 // @ts-expect-error A general keyed Binding requires its complete storage and generated delivery contract.
-ParentDefinition.bindChild(RoomBlock, {
+ParentDefinition.makeBinding(RoomBlock, {
   readAll: model => Option.toArray(model.maybeRoom),
 })
 
-ParentDefinition.bindChild(StatusBlock, {
+ParentDefinition.makeBinding(StatusBlock, {
   // @ts-expect-error A Binding init policy cannot add an unknown field.
   field: 'status',
   // @ts-expect-error The invalid Binding config is uninhabitable.
   init: { contextToArgs: () => [], unknownInitField: true },
 })
 
-// @ts-expect-error Authored incoming Message routes are no longer accepted by bindChild.
-ParentDefinition.bindChild(StatusBlock, {
+// @ts-expect-error Authored incoming Message routes are no longer accepted by makeBinding.
+ParentDefinition.makeBinding(StatusBlock, {
   field: 'status',
   fromParentMessage: false,
 })
 
-ParentDefinition.bindChild(StatusBlock, {
+ParentDefinition.makeBinding(StatusBlock, {
   // @ts-expect-error An invalid accessor init projection prevents the overload.
   placement: 'statusWithMultipleProjectionFields',
   // @ts-expect-error The invalid Binding config is uninhabitable.
@@ -218,7 +220,7 @@ ParentDefinition.bindChild(StatusBlock, {
   },
 })
 
-ParentDefinition.bindChild(StatusBlock, {
+ParentDefinition.makeBinding(StatusBlock, {
   // @ts-expect-error An invalid accessor init projection prevents the overload.
   placement: 'statusWithUndeclaredProjectionField',
   // @ts-expect-error The invalid Binding config is uninhabitable.
@@ -233,7 +235,7 @@ ParentDefinition.bindChild(StatusBlock, {
   },
 })
 
-const DuplicateStatusBinding = ParentDefinition.bindChild(StatusBlock, {
+const DuplicateStatusBinding = ParentDefinition.makeBinding(StatusBlock, {
   field: 'status',
   placement: 'status',
 })
@@ -295,7 +297,7 @@ ParentComposition.makeUpdate(model => ({
   outMessage: SettingsOutMessage.SelectedTheme({ theme: model.settings.theme }),
 }))
 
-const UnregisteredStatusBinding = ParentDefinition.bindChild(StatusBlock, {
+const UnregisteredStatusBinding = ParentDefinition.makeBinding(StatusBlock, {
   field: 'status',
   placement: 'unregisteredAlternativeStatus',
 })
@@ -362,9 +364,9 @@ const widenedRefresh: (
   unknown
 > = SettingsBinding.refresh(CurrentUser.make({ accountId: 'unknown-erasure' }))
 
-const combinedWidenedRefresh = Update.combine([
+const combinedWidenedRefresh = Update.combineSteps([
   widenedRefresh,
-  ParentDefinition.step(model => ({ model })),
+  ParentDefinition.makeStep(model => ({ model })),
 ])
 
 const erasedAnyRefresh: (
@@ -406,3 +408,34 @@ ParentComposition.makeUpdate((model, _message) => widenedRefresh(model))
 ParentComposition.makeUpdate((model, _message) => erasedAnyRefresh(model))
 
 void erasedRefresh
+
+// @ts-expect-error The removed command authoring name has no compatibility alias.
+ParentDefinition.command
+// @ts-expect-error The removed mount authoring name has no compatibility alias.
+ParentDefinition.mount
+// @ts-expect-error The removed mountStream authoring name has no compatibility alias.
+ParentDefinition.mountStream
+// @ts-expect-error The removed resource authoring name has no compatibility alias.
+ParentDefinition.resource
+// @ts-expect-error The removed subscriptions authoring name has no compatibility alias.
+ParentDefinition.subscriptions
+// @ts-expect-error The removed managedResources authoring name has no compatibility alias.
+ParentDefinition.managedResources
+// @ts-expect-error The removed bindChild authoring name has no compatibility alias.
+ParentDefinition.bindChild
+// @ts-expect-error The removed step authoring name has no compatibility alias.
+ParentDefinition.step
+// @ts-expect-error The removed stepFields authoring name has no compatibility alias.
+ParentDefinition.stepFields
+// @ts-expect-error The removed stepNoop authoring name has no compatibility alias.
+ParentDefinition.stepNoop
+
+const EarlyNamespace = Block.makeNamespace('RemovedFactoryAliases')
+// @ts-expect-error Early Namespaces use the same make family without a command alias.
+EarlyNamespace.command
+// @ts-expect-error Early Namespaces use the same make family without a mount alias.
+EarlyNamespace.mount
+// @ts-expect-error Early Namespaces use the same make family without a mountStream alias.
+EarlyNamespace.mountStream
+// @ts-expect-error Early Namespaces use the same make family without a resource alias.
+EarlyNamespace.resource

@@ -11,7 +11,7 @@ import {
 } from './message-free-keyed.accepted.js'
 
 // @ts-expect-error An exact Message-free child rejects obsolete outgoing Message mappers.
-ParentDefinition.bindChild(SilentBlock, {
+ParentDefinition.makeBinding(SilentBlock, {
   placement: 'mapped-silent',
   readAll: (model: typeof ParentModel.Type) => model.entries,
   key: (entry: typeof Entry.Type) => entry.key,
@@ -31,13 +31,18 @@ const MessagefulComposition = Block.makeDefinition(
     Message: MessagefulMessage,
   },
 ).makeComposition()
-const MessagefulBlock = MessagefulComposition.assembleBlock({
-  init: MessagefulComposition.makeInit(() => ({ model: { ready: false } })),
-  update: MessagefulComposition.makeUpdate(model => ({ model })),
-})
+const prepareMessagefulBlock = () =>
+  MessagefulComposition.prepareBlock({
+    init: MessagefulComposition.makeInit(() => ({ model: { ready: false } })),
+    update: MessagefulComposition.makeUpdate(model => ({ model })),
+  })
+const MessagefulBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof MessagefulComposition.Model,
+  typeof prepareMessagefulBlock
+> = Block.assemble(prepareMessagefulBlock)
 
 // @ts-expect-error A messageful general keyed Binding requires an exact key Schema for generated delivery.
-ParentDefinition.bindChild(MessagefulBlock, {
+ParentDefinition.makeBinding(MessagefulBlock, {
   readAll: (model: typeof ParentModel.Type) => model.entries,
   key: (entry: typeof Entry.Type) => entry.key,
   read: (entry: typeof Entry.Type) =>
@@ -45,7 +50,7 @@ ParentDefinition.bindChild(MessagefulBlock, {
   writeAt: (model: typeof ParentModel.Type, _key, _nextChild) => model,
 })
 
-const omittedInitialization = ParentDefinition.step((model, key: string) =>
+const omittedInitialization = ParentDefinition.makeStep((model, key: string) =>
   GeneralKeyedBinding.init({
     key,
     args: [key],
@@ -59,7 +64,7 @@ const omittedUpdate = OmittedComposition.makeUpdate((model, _message) =>
 )
 
 // @ts-expect-error Connected initialization requires its message-free Binding to be registered.
-OmittedComposition.assembleBlock({
+OmittedComposition.prepareBlock({
   init: OmittedComposition.makeInit(() => ({
     model: ParentModel.make({ entries: [] }),
   })),
@@ -71,7 +76,7 @@ const SilentComposition = Block.makeDefinition('InvalidSilentExposure', {
   Model: SilentBlock.Model,
   Message: Schema.Never,
 }).makeComposition()
-SilentComposition.assembleBlock({
+SilentComposition.prepareBlock({
   init: SilentComposition.makeInit((id: string) => ({
     model: SilentBlock.Model.make({ id, ready: false }),
   })),

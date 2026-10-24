@@ -4,11 +4,9 @@ import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
 
 export const Model = Schema.Struct({ theme: Schema.String })
-export type Model = typeof Model.Type
 export const Message = defineMessageUnion({
   InformedOfThemeChange: { theme: Schema.String },
 })
-export type Message = typeof Message.Type
 const BoundSettingsDefinition = Block.makeDefinition('BoundSettings', {
   Model,
   Message,
@@ -24,7 +22,8 @@ const update = BoundSettingsComposition.makeUpdate((model, message) =>
     }),
   }),
 )
-export const BoundSettingsBlock = BoundSettingsComposition.assembleBlock({
+const prepare = () =>
+  BoundSettingsComposition.prepareBlock({
   init,
   update,
   operations: {
@@ -32,3 +31,7 @@ export const BoundSettingsBlock = BoundSettingsComposition.assembleBlock({
   },
   EffectsLayer: Layer.empty,
 })
+export const BoundSettingsBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

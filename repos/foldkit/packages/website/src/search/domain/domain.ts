@@ -16,10 +16,9 @@ export const SearchState = defineTaggedUnion({
   Loading: { results: Results },
   Ok: { results: Results },
 })
-export type SearchState = typeof SearchState.Type
 
 export const resultsFromState = (
-  state: SearchState,
+  state: typeof SearchState.Type,
 ): ReadonlyArray<typeof SearchResult.Type> =>
   Match.value(state).pipe(
     Match.tag('Ok', ({ results }) => results),

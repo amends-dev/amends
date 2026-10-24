@@ -171,10 +171,10 @@ When one Vite app build produces the client and server artifacts, the plugin gen
 
 ```typescript
 // src/entry.server.ts
-Server.renderToString(config, { flags })
+Server.renderToString(ApplicationBlock, { Flags }, { flags })
 
 // src/entry.ts
-Runtime.hydrate(application)
+Runtime.hydrate(program)
 ```
 
 Use the `buildId` option or `FOLDKIT_BUILD_ID` as an explicit override when client and server build in separate jobs, or when the id should name a deployment in another system:

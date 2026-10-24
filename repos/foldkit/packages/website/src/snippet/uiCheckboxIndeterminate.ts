@@ -24,7 +24,6 @@ const Message = defineMessageUnion({
   ToggledOptionB: { isChecked: Schema.Boolean },
 })
 
-type Message = typeof Message.Type
 const NotificationPreferencesComposition = Block.makeDefinition(
   'NotificationPreferences',
   {
@@ -78,7 +77,9 @@ const view = NotificationPreferencesComposition.makeView((model, h) => {
     }
   }
 
-  const selectAllView = (attributes: Checkbox.CheckboxAttributes<Message>) =>
+  const selectAllView = (
+    attributes: Checkbox.CheckboxAttributes<typeof Message.Type>,
+  ) =>
     h.div(
       [h.Class('flex items-center gap-2')],
       [

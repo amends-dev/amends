@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { AsyncData, makeApplicationDefinition } from 'foldkit'
+import { AsyncData, Block } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 
 import { Api, ApiLayer } from './api'
@@ -11,19 +11,20 @@ const UserAsyncData = AsyncData.Schema(User, ApiError)
 export const Model = Schema.Struct({
   user: UserAsyncData.schema,
 })
-type Model = typeof Model.Type
 
 const Message = defineMessageUnion({
   ClickedLoadUser: {},
   SucceededLoadUser: { user: User },
   FailedLoadUser: { error: ApiError },
 })
-type Message = typeof Message.Type
 
-const ApplicationDefinition = makeApplicationDefinition({ Model, Message })
+const ApplicationDefinition = Block.makeDefinition('Application', {
+  Model,
+  Message,
+})
 
 // Api is an Effect service; ApiLayer provides it.
-const FetchUser = ApplicationDefinition.command('FetchUser', {
+const FetchUser = ApplicationDefinition.makeCommand('FetchUser', {
   messages: [Message.SucceededLoadUser, Message.FailedLoadUser],
   handler: function* () {
     const api = yield* Api

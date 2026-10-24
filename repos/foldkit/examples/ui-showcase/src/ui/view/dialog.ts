@@ -69,7 +69,11 @@ const OVERLAY_COMBOBOX_ANCHOR = {
 
 // PANEL CONTENT
 
-const trigger = (label: string, message: Message, h: UiViewBuilder): Html =>
+const trigger = (
+  label: string,
+  message: typeof Message.Type,
+  h: UiViewBuilder,
+): Html =>
   h.div(
     [h.Class(triggerRowClassName)],
     [h.button([h.Class(triggerClassName), h.OnClick(message)], [label])],
@@ -111,7 +115,7 @@ const editFiltersContent = (
   title: DialogRenderInfo['title'],
   description: DialogRenderInfo['description'],
   comboboxModel: typeof CityComboboxBlock.Model.Type,
-  maybeSelectedCity: Option.Option<City>,
+  maybeSelectedCity: Option.Option<typeof City.Type>,
   h: UiViewBuilder,
 ): ReadonlyArray<Html> => [
   h.h2([...title, h.Class(titleClassName)], ['Edit filters']),
@@ -267,7 +271,7 @@ const animatedDemo = (
 const overlayDemo = (
   dialogModel: typeof DialogBlock.Model.Type,
   comboboxModel: typeof CityComboboxBlock.Model.Type,
-  maybeSelectedCity: Option.Option<City>,
+  maybeSelectedCity: Option.Option<typeof City.Type>,
   h: UiViewBuilder,
 ): Html => {
   const overlayDialogView = (render: DialogRenderInfo): Html =>

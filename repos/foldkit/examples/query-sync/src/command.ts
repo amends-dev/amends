@@ -5,23 +5,26 @@ import { ApplicationDefinition } from './definition'
 import { Message } from './message'
 import { Diet, Period, Sorting, browseRouter } from './route'
 
-export const ReplaceFilters = ApplicationDefinition.command('ReplaceFilters', {
-  args: {
-    search: Schema.Option(Schema.String),
-    sorting: Sorting,
-    diet: Schema.Option(Diet),
-    period: Schema.Option(Period),
+export const ReplaceFilters = ApplicationDefinition.makeCommand(
+  'ReplaceFilters',
+  {
+    args: {
+      search: Schema.Option(Schema.String),
+      sorting: Sorting,
+      diet: Schema.Option(Diet),
+      period: Schema.Option(Period),
+    },
+    messages: [Message.CompletedReplaceFilters],
+    handler: function* () {
+      return fields =>
+        replaceUrl(browseRouter(fields)).pipe(
+          Effect.as(Message.CompletedReplaceFilters()),
+        )
+    },
   },
-  messages: [Message.CompletedReplaceFilters],
-  handler: function* () {
-    return fields =>
-      replaceUrl(browseRouter(fields)).pipe(
-        Effect.as(Message.CompletedReplaceFilters()),
-      )
-  },
-})
+)
 
-export const NavigateInternal = ApplicationDefinition.command(
+export const NavigateInternal = ApplicationDefinition.makeCommand(
   'NavigateInternal',
   {
     args: { url: Schema.String },
@@ -33,7 +36,7 @@ export const NavigateInternal = ApplicationDefinition.command(
   },
 )
 
-export const LoadExternal = ApplicationDefinition.command('LoadExternal', {
+export const LoadExternal = ApplicationDefinition.makeCommand('LoadExternal', {
   args: { href: Schema.String },
   messages: [Message.CompletedLoadExternal],
   handler: function* () {

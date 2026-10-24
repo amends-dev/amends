@@ -5,41 +5,39 @@ import { ApplicationDefinition } from '../definition'
 import { Message } from '../message'
 import { HomeBlock } from '../page'
 import { ExampleSlug } from '../page/example/meta'
-import { playgroundRouter } from '../route'
+import { ApplicationRoute, playgroundRouter } from '../route'
 
-export const LoadPlayground = ApplicationDefinition.command('LoadPlayground', {
-  args: { exampleSlug: ExampleSlug },
-  messages: [Message.CompletedLoadPlayground],
-  handler: function* () {
-    return ({ exampleSlug }) =>
-      load(playgroundRouter({ exampleSlug })).pipe(
-        Effect.as(Message.CompletedLoadPlayground()),
-      )
+export const LoadPlayground = ApplicationDefinition.makeCommand(
+  'LoadPlayground',
+  {
+    args: { exampleSlug: ExampleSlug },
+    messages: [Message.CompletedLoadPlayground],
+    handler: function* () {
+      return ({ exampleSlug }) =>
+        load(playgroundRouter({ exampleSlug })).pipe(
+          Effect.as(Message.CompletedLoadPlayground()),
+        )
+    },
   },
-})
+)
 
-const loadPlaygroundExample = (exampleSlug: ExampleSlug) =>
-  ApplicationDefinition.step(model => ({
-    model,
-    commands: [LoadPlayground({ exampleSlug })],
-  }))
-
-const updateNewsletterEmail = (value: string) =>
-  ApplicationDefinition.stepFields(() => ({ newsletterEmail: () => value }))
-
-const foldHomeOutMessage = HomeBlock.OutMessage.match({
+const foldHomeOutMessage = ApplicationDefinition.makeOutMessageFold(HomeBlock, {
   SelectedPlaygroundExample: ({ exampleSlug }) =>
-    loadPlaygroundExample(exampleSlug),
-  UpdatedNewsletterEmail: ({ value }) => updateNewsletterEmail(value),
+    ApplicationDefinition.makeCommandsStep([LoadPlayground({ exampleSlug })]),
+  UpdatedNewsletterEmail: ({ value }) =>
+    ApplicationDefinition.makeFieldsStep(() => ({
+      newsletterEmail: () => value,
+    })),
 })
 
-export const HomeBinding = ApplicationDefinition.bindChild(HomeBlock, {
+export const HomeBinding = ApplicationDefinition.makeBinding(HomeBlock, {
   field: 'maybeHome',
   init: {
     contextToArgs: ({ route }) =>
-      route._tag === 'Home' ? Option.some([]) : Option.none(),
+      Option.liftPredicate(route, ApplicationRoute.guards.Home).pipe(
+        Option.as([]),
+      ),
   },
-  outMessage: {
-    fold: foldHomeOutMessage,
-  },
+}).withOutMessagePolicy({
+  fold: foldHomeOutMessage,
 })

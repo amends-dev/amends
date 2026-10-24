@@ -53,7 +53,7 @@ import {
 } from "./update/submission.ts"
 
 /** Close the dialog, whose request is done with. */
-const closeDialog = Update.combine([leaveDialog, DialogBinding.requestClose()])
+const closeDialog = Update.combineSteps([leaveDialog, DialogBinding.requestClose()])
 
 /** The steps that close the dialog when `isDone`: the request it was making was kept. */
 const closeDialogWhen = (isDone: boolean): ReadonlyArray<typeof closeDialog> => (isDone ? [closeDialog] : [])
@@ -74,7 +74,7 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
   /** Ask for the dialog on an invitation to draft, where the person may invite. */
   const askToInvite = () =>
     mayInvite(model)
-      ? Update.combine(model, [
+      ? Update.combineSteps(model, [
           openDialog(
             Entering.Inviting({ email: "", roleId: BuiltinRoles.MemberId, isSending: false, failure: Option.none() })
           )
@@ -83,7 +83,7 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
 
   /** Ask for the dialog on every invitation, where the person may see them. */
   const askToViewHistory = () =>
-    mayInvite(model) ? Update.combine(model, [openDialog(Entering.ViewingHistory())]) : { model }
+    mayInvite(model) ? Update.combineSteps(model, [openDialog(Entering.ViewingHistory())]) : { model }
 
   /** Ask for the dialog that confirms revoking `invitationId`, where the person may and it is not itself on its way. */
   const askToRevoke = (invitationId: Invitation.InvitationId) =>
@@ -91,7 +91,7 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
       onNone: () => ({ model }),
       onSome: ({ invitation, pending }) =>
         mayInvite(model) && !pending
-          ? Update.combine(model, [
+          ? Update.combineSteps(model, [
               openDialog(
                 Entering.Revoking({
                   invitationId,
@@ -107,7 +107,7 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
   /** Ask for the dialog that chooses the new owner, where the person owns the workspace and someone can become it. */
   const askToTransfer = () =>
     mayTransferOwnership(model) && transferCandidates(model).length > 0
-      ? Update.combine(model, [
+      ? Update.combineSteps(model, [
           openDialog(Entering.Transferring({ newOwner: Option.none(), isSending: false, failure: Option.none() }))
         ])
       : { model }
@@ -118,7 +118,7 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
       onNone: () => ({ model }),
       onSome: ({ member, pending }) =>
         member.status === "active" && mayRemove(model, memberId) && !pending
-          ? Update.combine(model, [
+          ? Update.combineSteps(model, [
               openDialog(Entering.Removing({ memberId, name: member.name, isSending: false, failure: Option.none() }))
             ])
           : { model }
@@ -133,7 +133,10 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
       }),
       RenameSelf: () =>
         pipe(
-          Update.combine(model, closeDialogWhen(Option.exists(model.entering, Entering.isAnyOf(["ChangingName"])))),
+          Update.combineSteps(
+            model,
+            closeDialogWhen(Option.exists(model.entering, Entering.isAnyOf(["ChangingName"])))
+          ),
           Update.withOutMessage(OutMessage.RenamedSelf())
         ),
       ChangeRole: ({ memberId }) => ({
@@ -146,7 +149,7 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
       }),
       Remove: ({ memberId }) =>
         pipe(
-          Update.combine(
+          Update.combineSteps(
             modifyFields(model, { selected: Option.filter((selected) => selected.memberId !== memberId) }),
             closeDialogWhen(Option.exists(model.entering, (entering) => isRemoving(entering, memberId)))
           ),
@@ -154,17 +157,20 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
         ),
       Transfer: ({ memberId }) =>
         pipe(
-          Update.combine(model, closeDialogWhen(Option.exists(model.entering, Entering.isAnyOf(["Transferring"])))),
+          Update.combineSteps(
+            model,
+            closeDialogWhen(Option.exists(model.entering, Entering.isAnyOf(["Transferring"])))
+          ),
           Update.withOutMessage(OutMessage.TransferredOwnership({ name: nameOfMember(model, memberId) }))
         ),
       Invite: () =>
         pipe(
-          Update.combine(model, closeDialogWhen(Option.exists(model.entering, Entering.isAnyOf(["Inviting"])))),
+          Update.combineSteps(model, closeDialogWhen(Option.exists(model.entering, Entering.isAnyOf(["Inviting"])))),
           Update.withOutMessage(OutMessage.InvitedMember())
         ),
       Revoke: ({ invitationId }) =>
         pipe(
-          Update.combine(
+          Update.combineSteps(
             model,
             closeDialogWhen(Option.exists(model.entering, (entering) => isRevoking(entering, invitationId)))
           ),
@@ -192,7 +198,7 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
 
   return Message.match(message, {
     RequestedDismiss: () =>
-      Update.combine(model, [
+      Update.combineSteps(model, [
         AccountBinding.requestClose(),
         MemberStatusBinding.requestClose(),
         DialogBinding.requestClose()
@@ -284,7 +290,7 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
     ClickedViewHistory: () => askToViewHistory(),
     ClickedRevoke: ({ invitationId }) => askToRevoke(invitationId),
     ConfirmedRevocation: () => submitRevocation(model),
-    RequestedNameChange: () => Update.combine(model, [askToChangeName]),
+    RequestedNameChange: () => Update.combineSteps(model, [askToChangeName]),
     WroteAction: ({ written }) => keep(written),
     FailedWriteAction: ({ written, reason }) => ({ model: refuse(model, written, reason) })
   })

@@ -2,24 +2,14 @@ import { Context, Effect, Layer, type Scope, Stream } from 'effect'
 
 import type { DefinitionIdentity } from '../block/identity.js'
 import type { ValidateConstructionRequirements } from '../block/scope.js'
+import type { Handler } from './public.js'
 
-declare const HandlerTypeId: unique symbol
+export type { Handler } from './public.js'
 
-type Invariant<Value> = (value: Value) => Value
-type AnyHandler = Readonly<{ readonly [HandlerTypeId]: unknown }>
-
-/**
- * The service required by a Subscription whose implementation is supplied by
- * a Layer. Its name, decoded dependencies, and declared Message identify the
- * handler contract.
- */
-export interface Handler<Name extends string, Dependencies, Message> {
-  readonly [HandlerTypeId]: Readonly<{
-    name: Invariant<Name>
-    dependencies: Invariant<Dependencies>
-    message: Invariant<Message>
-  }>
-}
+type ExtractHandler<Requirements> =
+  Requirements extends Handler<infer _Name, infer _Dependencies, infer _Message>
+    ? Requirements
+    : never
 
 /** Extracts the exact handler requirement carried by a Subscription entry. */
 export type HandlerOf<
@@ -28,10 +18,7 @@ export type HandlerOf<
       ...args: ReadonlyArray<any>
     ) => Stream.Stream<any, any, any>
   },
-> = Extract<
-  Stream.Services<ReturnType<Entry['dependenciesToStream']>>,
-  AnyHandler
->
+> = ExtractHandler<Stream.Services<ReturnType<Entry['dependenciesToStream']>>>
 
 type StreamHandlerWithoutKeepAlive<Dependencies, Message, R> = (
   dependencies: Dependencies,

@@ -38,6 +38,8 @@ export const ApplicationRoute = defineRouteUnion({
   BestPracticesMessages: {},
   BestPracticesKeying: {},
   BestPracticesImmutability: {},
+  PreviewMigration: {},
+  PreviewUpgrade: {},
   ProjectOrganization: {},
   ToolingLinting: {},
   ApiModule: { moduleSlug: Schema.String },
@@ -119,10 +121,9 @@ export const ApplicationRoute = defineRouteUnion({
   BlogPost: { postSlug: Schema.String },
   NotFound: { path: Schema.String },
 })
-export type ApplicationRoute = typeof ApplicationRoute.Type
 
 export const maybeExampleSlugForRoute = (
-  route: ApplicationRoute,
+  route: typeof ApplicationRoute.Type,
 ): Option.Option<string> =>
   route._tag === 'ExampleDetail'
     ? Option.some(route.exampleSlug)
@@ -150,6 +151,8 @@ export const DocsRoute = ApplicationRoute.subset([
   'BestPracticesMessages',
   'BestPracticesKeying',
   'BestPracticesImmutability',
+  'PreviewMigration',
+  'PreviewUpgrade',
   'ProjectOrganization',
   'ToolingLinting',
   'ApiModule',
@@ -228,11 +231,6 @@ export const DocsRoute = ApplicationRoute.subset([
   'ContentApi',
   'NotFound',
 ])
-export type DocsRoute = typeof DocsRoute.Type
-
-export type BlogRoute = typeof ApplicationRoute.Blog.Type
-export type BlogPostRoute = typeof ApplicationRoute.BlogPost.Type
-export type PlaygroundRoute = typeof ApplicationRoute.Playground.Type
 
 export const isPlaygroundRoute = ApplicationRoute.isAnyOf(['Playground'])
 
@@ -242,7 +240,7 @@ const isMarketingRoute = ApplicationRoute.isAnyOf(['Home', 'Newsletter'])
 
 const isDocsUnionRoute = Schema.is(DocsRoute)
 
-export const isSearchRoute = (route: ApplicationRoute): boolean =>
+export const isSearchRoute = (route: typeof ApplicationRoute.Type): boolean =>
   isDocsUnionRoute(route) || isBlogRoute(route) || isMarketingRoute(route)
 
 /**
@@ -251,8 +249,9 @@ export const isSearchRoute = (route: ApplicationRoute): boolean =>
  * top-level route cannot silently join the section. `NotFound` is a member of
  * the union so 404s render in the docs shell, but it belongs to no section.
  */
-export const isDocsSectionRoute = (route: ApplicationRoute): boolean =>
-  isDocsUnionRoute(route) && route._tag !== 'NotFound'
+export const isDocsSectionRoute = (
+  route: typeof ApplicationRoute.Type,
+): boolean => isDocsUnionRoute(route) && route._tag !== 'NotFound'
 
 // ROUTERS
 
@@ -385,6 +384,15 @@ export const bestPracticesKeyingRouter = bestPractices(
 export const bestPracticesImmutabilityRouter = bestPractices(
   'immutability',
   ApplicationRoute.BestPracticesImmutability,
+)
+
+export const previewMigrationRouter = staticPage(
+  'preview-migration',
+  ApplicationRoute.PreviewMigration,
+)
+export const previewUpgradeRouter = staticPage(
+  'preview-upgrade',
+  ApplicationRoute.PreviewUpgrade,
 )
 
 export const projectOrganizationRouter = patterns(
@@ -704,8 +712,14 @@ const siteParser = oneOf(
 
 const getStartedParser = oneOf(getStartedFromNested, getStartedRouter)
 
+export const previewDocumentationEnabled =
+  import.meta.env?.VITE_FOLDKIT_PREVIEW_RELEASE !== undefined
+
 const docsParser = oneOf(
   getStartedParser,
+  ...(previewDocumentationEnabled
+    ? [previewMigrationRouter, previewUpgradeRouter]
+    : []),
   introductionParser,
   faqParser,
   reactParser,
@@ -766,7 +780,7 @@ export const urlToApplicationRoute = parseUrlWithFallback(
 
 export const SITE_URL = 'https://foldkit.dev'
 
-export const routeToUrlPath = (route: ApplicationRoute): string =>
+export const routeToUrlPath = (route: typeof ApplicationRoute.Type): string =>
   ApplicationRoute.match(route, {
     Home: () => homeRouter(),
     WhyFoldkit: () => whyFoldkitRouter(),
@@ -790,6 +804,8 @@ export const routeToUrlPath = (route: ApplicationRoute): string =>
     BestPracticesMessages: () => bestPracticesMessagesRouter(),
     BestPracticesKeying: () => bestPracticesKeyingRouter(),
     BestPracticesImmutability: () => bestPracticesImmutabilityRouter(),
+    PreviewMigration: () => previewMigrationRouter(),
+    PreviewUpgrade: () => previewUpgradeRouter(),
     ProjectOrganization: () => projectOrganizationRouter(),
     ToolingLinting: () => toolingLintingRouter(),
     CoreArchitecture: () => coreArchitectureRouter(),
@@ -874,5 +890,6 @@ export const routeToUrlPath = (route: ApplicationRoute): string =>
     NotFound: ({ path }) => path,
   })
 
-export const routeToCanonicalUrl = (route: ApplicationRoute): string =>
-  String.concat(SITE_URL, routeToUrlPath(route))
+export const routeToCanonicalUrl = (
+  route: typeof ApplicationRoute.Type,
+): string => String.concat(SITE_URL, routeToUrlPath(route))

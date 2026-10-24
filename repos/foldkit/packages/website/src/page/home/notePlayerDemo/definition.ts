@@ -6,12 +6,11 @@ import { defineTaggedUnion } from 'foldkit/schema'
 import { RadioGroup } from '@foldkit/ui'
 
 export const Note = Schema.Literals(['A', 'B', 'C', 'D', 'E', 'F', 'G'])
-export type Note = typeof Note.Type
 
 export const NoteDuration = Schema.Literals(['Short', 'Medium', 'Long'])
-export type NoteDuration = typeof NoteDuration.Type
 
-export const NoteDurationRadioGroupBlock = RadioGroup.create<NoteDuration>()
+export const NoteDurationRadioGroupBlock =
+  RadioGroup.create<typeof NoteDuration.Type>()
 
 export const PlaybackState = defineTaggedUnion({
   Idle: {},
@@ -33,14 +32,12 @@ export const NoteHighlightPhase = Schema.Literals([
   'NoteModel',
   'NoteCommand',
 ])
-export type NoteHighlightPhase = typeof NoteHighlightPhase.Type
 
 export const AudioState = defineTaggedUnion({
   Acquiring: {},
   Ready: {},
   Unavailable: {},
 })
-export type AudioState = typeof AudioState.Type
 
 export const Model = Schema.Struct({
   noteInput: FieldValidation.Field(Schema.String),
@@ -52,7 +49,6 @@ export const Model = Schema.Struct({
   messageLog: Schema.Array(Schema.String),
   audio: AudioState,
 })
-export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
   ChangedNoteInput: { value: Schema.String },
@@ -65,7 +61,6 @@ export const Message = defineMessageUnion({
   FailedAcquireAudioContext: {},
   ReleasedAudioContext: {},
 })
-export type Message = typeof Message.Type
 
 export const NotePlayerDemoDefinition = Block.makeDefinition('NotePlayerDemo', {
   Model,

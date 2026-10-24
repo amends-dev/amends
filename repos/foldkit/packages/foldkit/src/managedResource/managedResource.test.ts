@@ -628,6 +628,16 @@ describe('make', () => {
     >().toEqualTypeOf<UnavailableHandler>()
   })
 
+  it('preserves additional evidence on an extracted Handler requirement', () => {
+    type ExtendedHandler = Handler<'ManageExtended', null, string> &
+      Readonly<{ handlerEvidence: 'extended' }>
+    type ExtendedEntry = Readonly<{
+      acquire: () => Effect.Effect<string, never, ExtendedHandler | Prefix>
+    }>
+
+    expectTypeOf<HandlerOf<ExtendedEntry>>().toEqualTypeOf<ExtendedHandler>()
+  })
+
   it('rejects a same-name Layer with different params and value', () => {
     const NumberResource = tag<number>()('NumberResource')
     const incompatible = make<ChildModel, ChildMessage>()(entry => ({

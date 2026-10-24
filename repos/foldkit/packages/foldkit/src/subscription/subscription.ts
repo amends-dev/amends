@@ -433,7 +433,7 @@ type RuntimeHandlerGenerator = () => Generator<
  * Application features use their Block definition's `subscriptions`
  * helper, which also qualifies the handler identities. Pass the resulting
  * registry as `subscriptions` and its local handler recipes through
- * `EffectsLayer` when calling `Composition.assembleBlock`. Registered child bindings
+ * `EffectsLayer` when calling `Composition.prepareBlock`. Registered child bindings
  * collect their own registries automatically.
  *
  * @example

@@ -35,6 +35,21 @@ type ParentModel = Readonly<{
   child: ChildModel
 }>
 
+it('preserves additional evidence on an extracted Handler requirement', () => {
+  type ExtendedHandler = Handler<'ObserveExtended', string, string> &
+    Readonly<{ handlerEvidence: 'extended' }>
+  type OtherRequirement = Readonly<{ other: 'requirement' }>
+  type ExtendedEntry = Readonly<{
+    dependenciesToStream: () => Stream.Stream<
+      string,
+      never,
+      ExtendedHandler | OtherRequirement
+    >
+  }>
+
+  expectTypeOf<HandlerOf<ExtendedEntry>>().toEqualTypeOf<ExtendedHandler>()
+})
+
 type ParentMessage = Readonly<{
   _tag: 'GotChildMessage'
   message: string

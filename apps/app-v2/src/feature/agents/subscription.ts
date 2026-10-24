@@ -55,7 +55,7 @@ export const readActivity = (store: Store.Store["Service"]) =>
     Stream.map(([turns, groups]) => receivedActivity(turns, groups))
   )
 
-export const subscriptions = AgentsDefinition.subscriptions((entry) => ({
+export const subscriptions = AgentsDefinition.makeSubscriptions((entry) => ({
   agents: entry(
     "ReadAgents",
     { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, reads: Schema.Int },

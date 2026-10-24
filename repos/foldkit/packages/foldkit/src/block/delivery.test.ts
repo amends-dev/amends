@@ -10,6 +10,7 @@ import {
   trackParentMessageMapper,
 } from './delivery.js'
 import { assertRegisteredBinding } from './operationGraph.js'
+import * as Block from './public.js'
 
 const ChildMessage = defineMessageUnion({
   ChangedCount: { amount: Schema.Number },
@@ -37,16 +38,21 @@ describe('Composition update delivery', () => {
       Model: ContextualChildModel,
       Message: ContextualChildMessage,
     }).makeComposition()
-    const contextualBlock = contextualComposition.assembleBlock({
-      init: contextualComposition.makeInit(() => ({
-        model: ContextualChildModel.make({ count: 0 }),
-      })),
-      update: contextualComposition.makeUpdate(
-        (model, _message, _context: Readonly<{ source: 'Required' }>) => ({
-          model,
-        }),
-      ),
-    })
+    const prepareContextualBlock = () =>
+      contextualComposition.prepareBlock({
+        init: contextualComposition.makeInit(() => ({
+          model: ContextualChildModel.make({ count: 0 }),
+        })),
+        update: contextualComposition.makeUpdate(
+          (model, _message, _context: Readonly<{ source: 'Required' }>) => ({
+            model,
+          }),
+        ),
+      })
+    const contextualBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+      typeof ContextualChildModel,
+      typeof prepareContextualBlock
+    > = Block.assemble(prepareContextualBlock)
     const ContextualParentModel = Schema.Struct({
       child: ContextualChildModel,
     })
@@ -57,7 +63,7 @@ describe('Composition update delivery', () => {
 
     expect(contextualBlock.update.length).toBe(2)
     expect(() =>
-      Reflect.apply(ContextualParent.bindChild, undefined, [
+      Reflect.apply(ContextualParent.makeBinding, undefined, [
         contextualBlock,
         {
           field: 'child',
@@ -103,18 +109,23 @@ describe('Composition update delivery', () => {
       Model: CounterModel,
       Message: ChildMessage,
     }).makeComposition()
-    const counterBlock = CounterComposition.assembleBlock({
-      init: CounterComposition.makeInit(() => ({
-        model: CounterModel.make({ count: 0 }),
-      })),
-      update: CounterComposition.makeUpdate(
-        (model, message, context: Readonly<{ multiplier: number }>) => ({
-          model: modifyFields(model, {
-            count: count => count + message.amount * context.multiplier,
+    const prepareCounterBlock = () =>
+      CounterComposition.prepareBlock({
+        init: CounterComposition.makeInit(() => ({
+          model: CounterModel.make({ count: 0 }),
+        })),
+        update: CounterComposition.makeUpdate(
+          (model, message, context: Readonly<{ multiplier: number }>) => ({
+            model: modifyFields(model, {
+              count: count => count + message.amount * context.multiplier,
+            }),
           }),
-        }),
-      ),
-    })
+        ),
+      })
+    const counterBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+      typeof CounterModel,
+      typeof prepareCounterBlock
+    > = Block.assemble(prepareCounterBlock)
     const CounterInstance = Schema.Struct({
       id: Schema.String,
       counter: CounterModel,
@@ -128,7 +139,7 @@ describe('Composition update delivery', () => {
       Model: ParentModel,
       Message: Schema.Never,
     })
-    const CounterBinding = Parent.bindChild(counterBlock, {
+    const CounterBinding = Parent.makeBinding(counterBlock, {
       readAll: model => model.counters,
       key: instance => instance.id,
       read: instance => instance.counter,

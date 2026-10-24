@@ -23,15 +23,15 @@ import {
 import { isMemberOpen, Message, OutMessage, WorkspaceDefinition } from "./definition.ts"
 
 /** Lay the workspace out for a window of the width `viewport`. */
-const showViewport = (viewport: Viewport) => WorkspaceDefinition.stepFields(() => ({ viewport: () => viewport }))
+const showViewport = (viewport: Viewport) => WorkspaceDefinition.makeFieldsStep(() => ({ viewport: () => viewport }))
 
 /**
  * Put the member open in the settings, if there is one, where the window's width puts the side pane: in its dialog,
  * which opens, or beside the main pane, which closes the dialog without closing the member.
  */
-const placeAside = WorkspaceDefinition.step((model) => {
+const placeAside = WorkspaceDefinition.makeStep((model) => {
   if (!isMemberOpen(model)) {
-    return WorkspaceDefinition.stepNoop()
+    return WorkspaceDefinition.makeNoopStep()
   }
 
   if (isAsideInDialog(model.viewport)) {
@@ -46,36 +46,38 @@ const hasSidebarInPlace = (viewport: Viewport): boolean => viewport === "Desktop
 
 export const update = WorkspaceComposition.makeUpdate((model, message) =>
   Message.match(message, {
-    RequestedDestination: ({ destination }) => Update.combine(model, [dismissOverlays, showDestination(destination)]),
+    RequestedDestination: ({ destination }) =>
+      Update.combineSteps(model, [dismissOverlays, showDestination(destination)]),
     ClickedWorkspaceSwitcher: () => ({ model, outMessage: OutMessage.ClosedWorkspace() }),
-    ClickedHome: () => Update.withOutMessage(Update.combine(model, [switchTo(showHome)]), OutMessage.Navigated()),
+    ClickedHome: () => Update.withOutMessage(Update.combineSteps(model, [switchTo(showHome)]), OutMessage.Navigated()),
     ClickedConnections: () =>
-      Update.withOutMessage(Update.combine(model, [switchTo(showConnections)]), OutMessage.Navigated()),
-    ClickedAgents: () => Update.withOutMessage(Update.combine(model, [switchTo(showAgents)]), OutMessage.Navigated()),
+      Update.withOutMessage(Update.combineSteps(model, [switchTo(showConnections)]), OutMessage.Navigated()),
+    ClickedAgents: () =>
+      Update.withOutMessage(Update.combineSteps(model, [switchTo(showAgents)]), OutMessage.Navigated()),
     ClickedSettings: () =>
-      Update.withOutMessage(Update.combine(model, [switchTo(showSettings("Workspace"))]), OutMessage.Navigated()),
+      Update.withOutMessage(Update.combineSteps(model, [switchTo(showSettings("Workspace"))]), OutMessage.Navigated()),
     ClickedWorkspace: () =>
-      Update.withOutMessage(Update.combine(model, [goTo(showSettings("Workspace"))]), OutMessage.Navigated()),
+      Update.withOutMessage(Update.combineSteps(model, [goTo(showSettings("Workspace"))]), OutMessage.Navigated()),
     ClickedMembers: () =>
-      Update.withOutMessage(Update.combine(model, [goTo(showSettings("Members"))]), OutMessage.Navigated()),
-    ClickedMenu: () => Update.combine(model, [MenuBinding.requestOpen()]),
-    ClickedSearch: () => Update.combine(model, [SearchBinding.requestOpen()]),
-    RequestedSearch: () => Update.combine(model, [SearchBinding.requestOpen()]),
+      Update.withOutMessage(Update.combineSteps(model, [goTo(showSettings("Members"))]), OutMessage.Navigated()),
+    ClickedMenu: () => Update.combineSteps(model, [MenuBinding.requestOpen()]),
+    ClickedSearch: () => Update.combineSteps(model, [SearchBinding.requestOpen()]),
+    RequestedSearch: () => Update.combineSteps(model, [SearchBinding.requestOpen()]),
     InformedOfViewport: ({ viewport }) =>
-      Update.combine(model, [
+      Update.combineSteps(model, [
         showViewport(viewport),
         ...(hasSidebarInPlace(viewport) ? [MenuBinding.requestClose()] : []),
         placeAside,
         HomeBinding.informViewport({ viewport })
       ]),
     ReceivedIntegrations: ({ integrations }) =>
-      Update.combine(model, [
+      Update.combineSteps(model, [
         ConnectionsBinding.informReceivedIntegrations({ integrations }),
         AgentsBinding.informReceivedIntegrations({ integrations }),
         ChannelsBinding.informReceivedIntegrations({ integrations })
       ]),
     FailedLoadIntegrations: ({ error }) =>
-      Update.combine(model, [
+      Update.combineSteps(model, [
         ConnectionsBinding.informFailedLoadIntegrations({ error }),
         AgentsBinding.informFailedLoadIntegrations({ error }),
         ChannelsBinding.informFailedLoadIntegrations({ error })

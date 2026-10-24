@@ -1,5 +1,5 @@
 import { Option, Schema, Tuple } from 'effect'
-import type * as Block from 'foldkit/block'
+import * as Block from 'foldkit/block'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 import * as Mount from 'foldkit/mount'
 import type * as Update from 'foldkit/update'
@@ -93,8 +93,11 @@ const makeBlockParts = <Item, Value extends string>() => {
     OutMessage: RefinedOutMessage,
   })
   const itemUpdate = makeUpdate(
-    ListboxDefinition.bindChild,
-    ListboxDefinition.step,
+    ListboxDefinition.makeBinding,
+    ListboxDefinition.makeOutMessageFold,
+    ListboxDefinition.makeStep,
+    ListboxDefinition.makeFieldsStep,
+    ListboxDefinition.makeNoopStep,
     'CloseWithFocus',
     (model, item) => ({
       model,
@@ -114,7 +117,7 @@ const makeBlockParts = <Item, Value extends string>() => {
     mounts,
     bindings: [itemUpdate.AnimationBinding],
   })
-  const authoredUpdate = ListboxDefinition.step(
+  const authoredUpdate = ListboxDefinition.makeStep(
     (model, message: Parameters<typeof itemUpdate.update>[1]) =>
       castReturn(itemUpdate.update(model, message)),
   )
@@ -169,7 +172,13 @@ export interface Completed<
 const makeBlock = <Item, Value extends string>(): Completed<Item, Value> => {
   const { composition, implementation } = makeBlockParts<Item, Value>()
 
-  return composition.assembleBlock(implementation)
+  const prepare = () => composition.prepareBlock(implementation)
+  const completedBlock: Block.FromAssemblyWithViewAndOutMessage<
+    typeof Model,
+    typeof prepare
+  > = Block.assemble(prepare)
+
+  return completedBlock
 }
 
 /** Creates a complete single-select Listbox Block refined to one Item and
@@ -196,7 +205,8 @@ export const update = block.update
 type UpdateReturn = ReturnType<typeof update>
 
 /** Programmatically opens the Listbox, updating the Model and returning focus
- *  and modal Commands. Use this in domain-event handlers. */
+ *  and modal Commands. When it is already open, returns the Model unchanged
+ *  with no Commands. Use this in domain-event handlers. */
 export const open = (model: Model): UpdateReturn =>
   block.operations.requestOpen(model)
 

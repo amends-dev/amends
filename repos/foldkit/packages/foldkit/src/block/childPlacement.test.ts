@@ -3,18 +3,23 @@ import { expect, it } from 'vitest'
 
 import { modifyFields } from '../struct/index.js'
 import { makeDefinition } from './define.js'
+import * as Block from './public.js'
 
 const ChildModel = Schema.Struct({ value: Schema.String })
-type ChildModel = typeof ChildModel.Type
 
 const ChildComposition = makeDefinition('ChildPlacementChild', {
   Model: ChildModel,
   Message: Schema.Never,
 }).makeComposition()
-const ChildBlock = ChildComposition.assembleBlock({
-  init: () => ({ model: ChildModel.make({ value: '' }) }),
-  update: ChildComposition.makeUpdate(),
-})
+const prepareChildBlock = () =>
+  ChildComposition.prepareBlock({
+    init: () => ({ model: ChildModel.make({ value: '' }) }),
+    update: ChildComposition.makeUpdate(),
+  })
+const ChildBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ChildModel,
+  typeof prepareChildBlock
+> = Block.assemble(prepareChildBlock)
 
 const Entry = Schema.Struct({ id: Schema.String, child: ChildModel })
 const ParentModel = Schema.Struct({
@@ -23,34 +28,33 @@ const ParentModel = Schema.Struct({
   maybeChild: Schema.Option(ChildModel),
   entries: Schema.Array(Entry),
 })
-type ParentModel = typeof ParentModel.Type
 
 const Parent = makeDefinition('ChildPlacementParent', {
   Model: ParentModel,
   Message: Schema.Never,
 })
 
-const PrimaryBinding = Parent.bindChild(ChildBlock, {
+const PrimaryBinding = Parent.makeBinding(ChildBlock, {
   field: 'primary',
 })
 
-const SecondaryAtPrimaryBinding = Parent.bindChild(ChildBlock, {
+const SecondaryAtPrimaryBinding = Parent.makeBinding(ChildBlock, {
   field: 'secondary',
   placement: 'primary',
 })
 
-const SecondaryBinding = Parent.bindChild(ChildBlock, {
+const SecondaryBinding = Parent.makeBinding(ChildBlock, {
   field: 'secondary',
 })
 
-const OptionalBinding = Parent.bindChild(ChildBlock, {
+const OptionalBinding = Parent.makeBinding(ChildBlock, {
   placement: 'optional',
   read: model => model.maybeChild,
   write: (model, nextChild) =>
     modifyFields(model, { maybeChild: () => Option.some(nextChild) }),
 })
 
-const EntriesBinding = Parent.bindChild(ChildBlock, {
+const EntriesBinding = Parent.makeBinding(ChildBlock, {
   placement: 'entries',
   readAll: model => model.entries,
   key: entry => entry.id,
@@ -58,7 +62,7 @@ const EntriesBinding = Parent.bindChild(ChildBlock, {
   writeAt: model => model,
 })
 
-const EntriesAtOptionalBinding = Parent.bindChild(ChildBlock, {
+const EntriesAtOptionalBinding = Parent.makeBinding(ChildBlock, {
   placement: 'optional',
   readAll: model => model.entries,
   key: entry => entry.id,
@@ -66,27 +70,27 @@ const EntriesAtOptionalBinding = Parent.bindChild(ChildBlock, {
   writeAt: model => model,
 })
 
-const DefaultAccessorBinding = Parent.bindChild(ChildBlock, {
+const DefaultAccessorBinding = Parent.makeBinding(ChildBlock, {
   read: model => model.maybeChild,
   write: (model, nextChild) =>
     modifyFields(model, { maybeChild: () => Option.some(nextChild) }),
 })
 
-const DefaultEntriesByIdBinding = Parent.bindChild(ChildBlock, {
+const DefaultEntriesByIdBinding = Parent.makeBinding(ChildBlock, {
   readAll: model => model.entries,
   key: entry => entry.id,
   read: entry => entry.child,
   writeAt: model => model,
 })
 
-const DefaultEntriesByIdLengthBinding = Parent.bindChild(ChildBlock, {
+const DefaultEntriesByIdLengthBinding = Parent.makeBinding(ChildBlock, {
   readAll: model => model.entries,
   key: entry => entry.id.length,
   read: entry => entry.child,
   writeAt: model => model,
 })
 
-const EntriesByIdBinding = Parent.bindChild(ChildBlock, {
+const EntriesByIdBinding = Parent.makeBinding(ChildBlock, {
   placement: 'entriesById',
   readAll: model => model.entries,
   key: entry => entry.id,
@@ -94,7 +98,7 @@ const EntriesByIdBinding = Parent.bindChild(ChildBlock, {
   writeAt: model => model,
 })
 
-const EntriesByIdLengthBinding = Parent.bindChild(ChildBlock, {
+const EntriesByIdLengthBinding = Parent.makeBinding(ChildBlock, {
   placement: 'entriesByIdLength',
   readAll: model => model.entries,
   key: entry => entry.id.length,

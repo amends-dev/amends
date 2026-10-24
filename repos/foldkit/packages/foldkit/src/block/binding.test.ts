@@ -12,8 +12,7 @@ import * as Update from '../update/index.js'
 import type { RequirementOfBinding } from './binding.js'
 import { aggregateChildren, inspectBinding } from './binding.js'
 import { makeDefinition, makeNamespace } from './define.js'
-import { LocalMountsTypeId } from './definition.js'
-import type { Owner } from './owner.js'
+import * as Block from './public.js'
 import type { Qualify, Scoped } from './scope.js'
 
 type CommandMessageOfReturn<Value> =
@@ -51,7 +50,7 @@ const ChildOutMessage = defineMessageUnion({
 })
 type ChildOutMessage = typeof ChildOutMessage.Type
 
-const Save = ChildNamespace.command('Save', {
+const Save = ChildNamespace.makeCommand('Save', {
   messages: [ChildMessage.CompletedSave],
 })
 
@@ -61,7 +60,7 @@ const ChildChannelsDefinition = ChildNamespace.makeDefinition({
   OutMessage: ChildOutMessage,
 })
 
-const childSubscriptions = ChildChannelsDefinition.subscriptions(entry => ({
+const childSubscriptions = ChildChannelsDefinition.makeSubscriptions(entry => ({
   ticks: entry(
     'ObserveTicks',
     { count: Schema.Number },
@@ -72,9 +71,9 @@ const childSubscriptions = ChildChannelsDefinition.subscriptions(entry => ({
   ),
 }))
 
-const Session = ChildNamespace.resource<string>()('Session')
+const Session = ChildNamespace.makeResource<string>()('Session')
 
-const childManagedResources = ChildChannelsDefinition.managedResources(
+const childManagedResources = ChildChannelsDefinition.makeManagedResources(
   entry => ({
     session: entry('ManageSession', Schema.Option(Schema.String), {
       resource: Session,
@@ -87,7 +86,7 @@ const childManagedResources = ChildChannelsDefinition.managedResources(
   }),
 )
 
-const Measure = ChildNamespace.mount('Measure', {
+const Measure = ChildNamespace.makeMount('Measure', {
   messages: [ChildMessage.CompletedMeasure],
 })
 
@@ -108,16 +107,16 @@ const detailedChildView = ChildComposition.makeView.withInputs<
   Readonly<{ prefix: string }>
 >((model, viewInputs, h) => h.div([], [`${viewInputs.prefix} ${model.count}`]))
 
-const save = ChildBaseDefinition.step(model => ({
+const save = ChildBaseDefinition.makeStep(model => ({
   model,
   commands: [Save()],
 }))
 
-const reset = ChildBaseDefinition.step(model => ({
+const reset = ChildBaseDefinition.makeStep(model => ({
   model: modifyFields(model, { count: () => 0 }),
 }))
 
-const addForRoom = ChildBaseDefinition.step(
+const addForRoom = ChildBaseDefinition.makeStep(
   (model, amount: number, context: Readonly<{ roomId: string }>) => ({
     model: modifyFields(model, {
       count: () => model.count + amount + context.roomId.length,
@@ -125,7 +124,7 @@ const addForRoom = ChildBaseDefinition.step(
   }),
 )
 
-const report = ChildBaseDefinition.step(model => ({
+const report = ChildBaseDefinition.makeStep(model => ({
   model,
   outMessage: ChildOutMessage.Reported({ value: model.count }),
 }))
@@ -155,27 +154,32 @@ const childUpdate = ChildComposition.makeUpdate(
     }),
 )
 
-const Child = ChildComposition.assembleBlock({
-  view: childView,
-  init: (count: number) => ({ model: ChildModel.make({ count }) }),
-  update: childUpdate,
-  operations: {
-    save: () => Tuple.make(ChildMessage.RequestedSave(), { roomId: '' }),
-    reset: () => Tuple.make(ChildMessage.RequestedReset(), { roomId: '' }),
-    addForRoom: (amount: number, context: Readonly<{ roomId: string }>) =>
-      Tuple.make(ChildMessage.RequestedAddForRoom({ amount }), context),
-    report: () => Tuple.make(ChildMessage.RequestedReport(), { roomId: '' }),
-  },
-  subscriptions: childSubscriptions,
-  managedResources: childManagedResources,
-  EffectsLayer: Layer.empty,
-  hostHandlers: [
-    Save,
-    childSubscriptions.ticks,
-    childManagedResources.session,
-    Measure,
-  ],
-})
+const prepareChild = () =>
+  ChildComposition.prepareBlock({
+    view: childView,
+    init: (count: number) => ({ model: ChildModel.make({ count }) }),
+    update: childUpdate,
+    operations: {
+      save: () => Tuple.make(ChildMessage.RequestedSave(), { roomId: '' }),
+      reset: () => Tuple.make(ChildMessage.RequestedReset(), { roomId: '' }),
+      addForRoom: (amount: number, context: Readonly<{ roomId: string }>) =>
+        Tuple.make(ChildMessage.RequestedAddForRoom({ amount }), context),
+      report: () => Tuple.make(ChildMessage.RequestedReport(), { roomId: '' }),
+    },
+    subscriptions: childSubscriptions,
+    managedResources: childManagedResources,
+    EffectsLayer: Layer.empty,
+    hostHandlers: [
+      Save,
+      childSubscriptions.ticks,
+      childManagedResources.session,
+      Measure,
+    ],
+  })
+const Child: Block.FromAssemblyWithViewAndOutMessage<
+  typeof ChildModel,
+  typeof prepareChild
+> = Block.assemble(prepareChild)
 
 const ParentModel = Schema.Struct({
   maybeChild: Schema.Option(ChildModel),
@@ -229,14 +233,10 @@ const writeChild = (
 ): ParentModel =>
   modifyFields(model, { maybeChild: () => Option.some(nextChildModel) })
 
-const HomeBinding = Parent.bindChild(Child, {
+const HomeBinding = Parent.makeBinding(Child, {
   placement: 'home',
   read: (model: ParentModel) => model.maybeChild,
   write: writeChild,
-  outMessage: {
-    fold: foldChildOutMessage,
-    forward: forwardChildOutMessage,
-  },
   subscriptions: {
     when: {
       ticks: (model: ParentModel) => model.isListening,
@@ -245,6 +245,9 @@ const HomeBinding = Parent.bindChild(Child, {
   delivery: {
     toUpdateContext: () => [{ roomId: 'room' }],
   },
+}).withOutMessagePolicy({
+  fold: foldChildOutMessage,
+  forward: forwardChildOutMessage,
 })
 const foldChildOutMessageWithCommand = (
   outMessage: ChildOutMessage,
@@ -268,15 +271,14 @@ const foldChildOutMessageWithCommand = (
       }),
   })
 
-const CommandHomeBinding = Parent.bindChild(Child, {
+const CommandHomeBinding = Parent.makeBinding(Child, {
   placement: 'command-home',
   read: (model: ParentModel) => model.maybeChild,
   write: writeChild,
-  outMessage: { fold: foldChildOutMessageWithCommand },
   delivery: {
     toUpdateContext: () => [{ roomId: 'room' }],
   },
-})
+}).withOutMessagePolicy({ fold: foldChildOutMessageWithCommand })
 
 const PolicyMessage = defineMessageUnion({
   CompletedPolicyWork: {},
@@ -286,7 +288,7 @@ const PolicyMessage = defineMessageUnion({
 type PolicyMessage = typeof PolicyMessage.Type
 
 const ParentPolicyNamespace = makeNamespace('BindingParentPolicy')
-const RunPolicyWork = ParentPolicyNamespace.command('RunPolicyWork', {
+const RunPolicyWork = ParentPolicyNamespace.makeCommand('RunPolicyWork', {
   messages: [PolicyMessage.CompletedPolicyWork],
 })
 const ParentPolicyDefinition = ParentPolicyNamespace.makeDefinition({
@@ -312,28 +314,26 @@ const foldChildOutMessageWithParentCommand = ChildOutMessage.match<
     }),
 })
 
-const ParentCommandHomeBinding = ParentPolicyDefinition.bindChild(Child, {
+const ParentCommandHomeBinding = ParentPolicyDefinition.makeBinding(Child, {
   placement: 'parent-command-home',
   read: (model: ParentModel) => model.maybeChild,
   write: writeChild,
-  outMessage: { fold: foldChildOutMessageWithParentCommand },
   delivery: {
     toUpdateContext: () => [{ roomId: 'room' }],
   },
-})
+}).withOutMessagePolicy({ fold: foldChildOutMessageWithParentCommand })
 
-const ForwardOnlyHomeBinding = Parent.bindChild(Child, {
+const ForwardOnlyHomeBinding = Parent.makeBinding(Child, {
   placement: 'forward-only-home',
   read: (model: ParentModel) => model.maybeChild,
   write: writeChild,
-  outMessage: { forward: forwardChildOutMessage },
   delivery: {
     toUpdateContext: () => [{ roomId: 'room' }],
   },
-})
+}).withOutMessagePolicy({ forward: forwardChildOutMessage })
 
 const bindWithoutOutMessagePolicy = () =>
-  Parent.bindChild(Child, {
+  Parent.makeBinding(Child, {
     // @ts-expect-error This invalid Binding configuration has no matching overload.
     placement: 'missing-policy',
     // @ts-expect-error This invalid Binding configuration has no matching overload.
@@ -344,7 +344,7 @@ const bindWithoutOutMessagePolicy = () =>
 void bindWithoutOutMessagePolicy
 
 const bindWithUnknownForward = () =>
-  Parent.bindChild(Child, {
+  Parent.makeBinding(Child, {
     // @ts-expect-error This invalid Binding configuration has no matching overload.
     placement: 'unknown-forward',
     // @ts-expect-error This invalid Binding configuration has no matching overload.
@@ -357,15 +357,14 @@ const bindWithUnknownForward = () =>
   })
 void bindWithUnknownForward
 
-const LocallyHandledWithoutForwardingBinding = Parent.bindChild(Child, {
+const LocallyHandledWithoutForwardingBinding = Parent.makeBinding(Child, {
   placement: 'locally-handled',
   read: (model: ParentModel) => model.maybeChild,
   write: writeChild,
-  outMessage: { fold: foldChildOutMessage },
   delivery: {
     toUpdateContext: () => [{ roomId: 'room' }],
   },
-})
+}).withOutMessagePolicy({ fold: foldChildOutMessage })
 void LocallyHandledWithoutForwardingBinding
 
 const initialParent: ParentModel = {
@@ -387,44 +386,49 @@ const ForwardOnlyComposition = Parent.makeComposition({
 const foldForwardOnlyHome = ForwardOnlyComposition.makeUpdate(model => ({
   model,
 }))
-const resetHome = Parent.step(_model => HomeBinding.reset())
-const addHomeForRoom = Parent.step(
+const resetHome = Parent.makeStep(_model => HomeBinding.reset())
+const addHomeForRoom = Parent.makeStep(
   (_model, amount: number, context: Readonly<{ roomId: string }>) =>
     HomeBinding.addForRoom(amount, context),
 )
-const reportHome = Parent.step(_model => HomeBinding.report())
-const ParentRuntime = ParentComposition.assembleBlock({
-  init: () => ({ model: initialParent }),
-  update: ParentComposition.makeUpdate((model, message) =>
-    ParentMessage.match(message, {
-      RequestedResetHome: () => resetHome(model),
-      RequestedAddHomeForRoom: ({ amount, roomId }) =>
-        addHomeForRoom(model, amount, { roomId }),
-      RequestedReportHome: () => reportHome(model),
-      RecordedReport: () => ({ model }),
-    }),
-  ),
-  operations: {
-    resetHome: () => Tuple.make(ParentMessage.RequestedResetHome()),
-    addHomeForRoom: (amount: number, context: Readonly<{ roomId: string }>) =>
-      Tuple.make(
-        ParentMessage.RequestedAddHomeForRoom({
-          amount,
-          roomId: context.roomId,
-        }),
-      ),
-    reportHome: () => Tuple.make(ParentMessage.RequestedReportHome()),
-  },
-  EffectsLayer: Layer.empty,
-})
+const reportHome = Parent.makeStep(_model => HomeBinding.report())
+const prepareParentRuntime = () =>
+  ParentComposition.prepareBlock({
+    init: () => ({ model: initialParent }),
+    update: ParentComposition.makeUpdate((model, message) =>
+      ParentMessage.match(message, {
+        RequestedResetHome: () => resetHome(model),
+        RequestedAddHomeForRoom: ({ amount, roomId }) =>
+          addHomeForRoom(model, amount, { roomId }),
+        RequestedReportHome: () => reportHome(model),
+        RecordedReport: () => ({ model }),
+      }),
+    ),
+    operations: {
+      resetHome: () => Tuple.make(ParentMessage.RequestedResetHome()),
+      addHomeForRoom: (amount: number, context: Readonly<{ roomId: string }>) =>
+        Tuple.make(
+          ParentMessage.RequestedAddHomeForRoom({
+            amount,
+            roomId: context.roomId,
+          }),
+        ),
+      reportHome: () => Tuple.make(ParentMessage.RequestedReportHome()),
+    },
+    EffectsLayer: Layer.empty,
+  })
+const ParentRuntime: Block.FromAssemblyWithOutMessage<
+  typeof ParentModel,
+  typeof prepareParentRuntime
+> = Block.assemble(prepareParentRuntime)
 
 const ParentPolicyComposition = ParentPolicyDefinition.makeComposition({
   bindings: [ParentCommandHomeBinding],
 })
-const resetParentCommandHome = ParentPolicyDefinition.step(_model =>
+const resetParentCommandHome = ParentPolicyDefinition.makeStep(_model =>
   ParentCommandHomeBinding.reset(),
 )
-const reportParentCommandHome = ParentPolicyDefinition.step(_model =>
+const reportParentCommandHome = ParentPolicyDefinition.makeStep(_model =>
   ParentCommandHomeBinding.report(),
 )
 const foldParentPolicy = ParentPolicyComposition.makeUpdate((model, message) =>
@@ -434,18 +438,23 @@ const foldParentPolicy = ParentPolicyComposition.makeUpdate((model, message) =>
     CompletedPolicyWork: () => ({ model }),
   }),
 )
-const ParentPolicyRuntime = ParentPolicyComposition.assembleBlock({
-  init: () => ({ model: initialParent }),
-  update: foldParentPolicy,
-  operations: {
-    resetParentCommandHome: () =>
-      Tuple.make(PolicyMessage.RequestedResetHome()),
-    reportParentCommandHome: () =>
-      Tuple.make(PolicyMessage.RequestedReportHome()),
-  },
-  EffectsLayer: Layer.empty,
-  hostHandlers: [RunPolicyWork],
-})
+const prepareParentPolicyRuntime = () =>
+  ParentPolicyComposition.prepareBlock({
+    init: () => ({ model: initialParent }),
+    update: foldParentPolicy,
+    operations: {
+      resetParentCommandHome: () =>
+        Tuple.make(PolicyMessage.RequestedResetHome()),
+      reportParentCommandHome: () =>
+        Tuple.make(PolicyMessage.RequestedReportHome()),
+    },
+    EffectsLayer: Layer.empty,
+    hostHandlers: [RunPolicyWork],
+  })
+const ParentPolicyRuntime: Block.FromAssemblyWithOutMessage<
+  typeof ParentModel,
+  typeof prepareParentPolicyRuntime
+> = Block.assemble(prepareParentPolicyRuntime)
 
 const callFoldDataLast = () =>
   // @ts-expect-error fold executes immediately and requires the parent Model
@@ -479,7 +488,6 @@ const ArityParentMessage = defineMessageUnion({
   RequestedAddMany: { amounts: Schema.Array(Schema.Number) },
   RequestedReset: {},
 })
-type ArityParentMessage = typeof ArityParentMessage.Type
 
 const ArityParent = Schema.Struct({ child: ArityModel })
 type ArityParent = typeof ArityParent.Type
@@ -499,12 +507,12 @@ const WrappedArityDefinition = WrappedArityNamespace.makeDefinition({
   Message: ArityMessage,
 })
 const WrappedArityComposition = WrappedArityDefinition.makeComposition()
-const defaultIncrement = WrappedArityDefinition.step(
+const defaultIncrement = WrappedArityDefinition.makeStep(
   (model: ArityModel, amount: number = 1) => ({
     model: modifyFields(model, { count: count => count + amount }),
   }),
 )
-const addMany = WrappedArityDefinition.step(
+const addMany = WrappedArityDefinition.makeStep(
   (model: ArityModel, ...amounts: ReadonlyArray<number>) => ({
     model: modifyFields(model, {
       count: count =>
@@ -512,7 +520,7 @@ const addMany = WrappedArityDefinition.step(
     }),
   }),
 )
-const resetArity = WrappedArityDefinition.step((model: ArityModel) => ({
+const resetArity = WrappedArityDefinition.makeStep((model: ArityModel) => ({
   model: modifyFields(model, { count: () => 0 }),
 }))
 const wrappedArityUpdate = WrappedArityComposition.makeUpdate(
@@ -550,48 +558,60 @@ const wrappedArityUpdate = WrappedArityComposition.makeUpdate(
       }),
     }),
 )
-const WrappedArityBlock = WrappedArityComposition.assembleBlock({
-  init: () => ({ model: ArityModel.make({ count: 0 }) }),
-  update: wrappedArityUpdate,
-  operations: {
-    defaultIncrement: (amount?: number) =>
-      Tuple.make(
-        ArityMessage.RequestedDefaultIncrement(
-          amount === undefined ? {} : { amount },
+const prepareWrappedArityBlock = () =>
+  WrappedArityComposition.prepareBlock({
+    init: () => ({ model: ArityModel.make({ count: 0 }) }),
+    update: wrappedArityUpdate,
+    operations: {
+      defaultIncrement: (amount?: number) =>
+        Tuple.make(
+          ArityMessage.RequestedDefaultIncrement(
+            amount === undefined ? {} : { amount },
+          ),
+          { amount: 0 },
         ),
-        { amount: 0 },
-      ),
-    addMany: (...amounts: ReadonlyArray<number>) =>
-      Tuple.make(ArityMessage.RequestedAddMany({ amounts }), { amount: 0 }),
-    addWithRequiredPrefix: (
-      ...[first, ...labels]: readonly [first: number, ...labels: Array<string>]
-    ) =>
-      Tuple.make(
-        ArityMessage.RequestedAddWithRequiredPrefix({ first, labels }),
-        { amount: 0 },
-      ),
-    addWithOptionalPrefix: (
-      ...[first, ...labels]: readonly [first?: number, ...labels: Array<string>]
-    ) =>
-      Tuple.make(
-        ArityMessage.RequestedAddWithOptionalPrefix(
-          first === undefined ? { labels } : { first, labels },
+      addMany: (...amounts: ReadonlyArray<number>) =>
+        Tuple.make(ArityMessage.RequestedAddMany({ amounts }), { amount: 0 }),
+      addWithRequiredPrefix: (
+        ...[first, ...labels]: readonly [
+          first: number,
+          ...labels: Array<string>,
+        ]
+      ) =>
+        Tuple.make(
+          ArityMessage.RequestedAddWithRequiredPrefix({ first, labels }),
+          { amount: 0 },
         ),
-        { amount: 0 },
-      ),
-    addMixed: (...values: ReadonlyArray<number | string>) =>
-      Tuple.make(ArityMessage.RequestedAddMixed({ values }), { amount: 0 }),
-    addRefined: (...amounts: ReadonlyArray<1 | 2>) =>
-      Tuple.make(ArityMessage.RequestedAddMany({ amounts }), { amount: 0 }),
-    resetArity: () => Tuple.make(ArityMessage.RequestedReset(), { amount: 0 }),
-  },
-  EffectsLayer: Layer.empty,
-})
+      addWithOptionalPrefix: (
+        ...[first, ...labels]: readonly [
+          first?: number,
+          ...labels: Array<string>,
+        ]
+      ) =>
+        Tuple.make(
+          ArityMessage.RequestedAddWithOptionalPrefix(
+            first === undefined ? { labels } : { first, labels },
+          ),
+          { amount: 0 },
+        ),
+      addMixed: (...values: ReadonlyArray<number | string>) =>
+        Tuple.make(ArityMessage.RequestedAddMixed({ values }), { amount: 0 }),
+      addRefined: (...amounts: ReadonlyArray<1 | 2>) =>
+        Tuple.make(ArityMessage.RequestedAddMany({ amounts }), { amount: 0 }),
+      resetArity: () =>
+        Tuple.make(ArityMessage.RequestedReset(), { amount: 0 }),
+    },
+    EffectsLayer: Layer.empty,
+  })
+const WrappedArityBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ArityModel,
+  typeof prepareWrappedArityBlock
+> = Block.assemble(prepareWrappedArityBlock)
 const WrappedArityParent = makeDefinition('BindingWrappedArityParent', {
   Model: ArityParent,
   Message: ArityParentMessage,
 })
-const WrappedArityBinding = WrappedArityParent.bindChild(WrappedArityBlock, {
+const WrappedArityBinding = WrappedArityParent.makeBinding(WrappedArityBlock, {
   placement: 'wrapped-arity',
   read: readArityChild,
   write: writeArityChild,
@@ -608,94 +628,85 @@ const embedViewlessBlockWithoutView = () =>
   })
 void embedViewlessBlockWithoutView
 
-const makeArityBlock = <
-  const OwnerValue extends Owner<any>,
-  const UpdateFunction extends (...args: ReadonlyArray<any>) => any,
->(
-  ownerValue: OwnerValue,
-  update: UpdateFunction,
-) => ({
-  owner: ownerValue,
-  Model: ArityModel,
-  Message: ArityMessage,
-  mounts: [],
-  [LocalMountsTypeId]: [],
-  bindings: [],
-  init: (): Update.Return<ArityModel, ArityMessage> => ({
-    model: ArityModel.make({ count: 0 }),
-  }),
-  update,
-  operations: {},
-  subscriptions: {},
-  managedResources: {},
-  EffectsLayer: Layer.empty,
-  hostHandlers: [],
-})
+const arityInit = () => ({ model: ArityModel.make({ count: 0 }) })
 
 const IgnoredMessageNamespace = makeNamespace('BindingIgnoredMessage')
-const IgnoredMessage = makeArityBlock(
-  IgnoredMessageNamespace.makeDefinition({
-    Model: ArityModel,
-    Message: ArityMessage,
-  }).owner,
-  (model: ArityModel): Update.Return<ArityModel, ArityMessage> => ({
-    model: modifyFields(model, { count: count => count + 1 }),
-  }),
-)
-const IgnoredMessageBinding = WrappedArityParent.bindChild(IgnoredMessage, {
+const IgnoredMessageComposition = IgnoredMessageNamespace.makeDefinition({
+  Model: ArityModel,
+  Message: ArityMessage,
+}).makeComposition()
+const ignoredMessageUpdate = (model: typeof ArityModel.Type) => ({
+  model: modifyFields(model, { count: count => count + 1 }),
+})
+const prepareIgnoredMessage = () =>
+  IgnoredMessageComposition.prepareBlock({
+    init: IgnoredMessageComposition.makeInit(arityInit),
+    update: IgnoredMessageComposition.makeUpdate(ignoredMessageUpdate),
+  })
+const IgnoredMessage: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ArityModel,
+  typeof prepareIgnoredMessage
+> = Block.assemble(prepareIgnoredMessage)
+const IgnoredMessageBinding = WrappedArityParent.makeBinding(IgnoredMessage, {
   placement: 'ignored-message',
   read: readArityChild,
   write: writeArityChild,
 })
 
 const DefaultContextNamespace = makeNamespace('BindingDefaultContext')
-const DefaultContext = makeArityBlock(
-  DefaultContextNamespace.makeDefinition({
-    Model: ArityModel,
-    Message: ArityMessage,
-  }).owner,
-  (
-    model: ArityModel,
-    _message: ArityMessage,
-    context: Readonly<{ amount: number }> = { amount: 2 },
-  ): Update.Return<ArityModel, ArityMessage> => ({
-    model: modifyFields(model, {
-      count: count => count + context.amount,
-    }),
-  }),
-)
-const DefaultContextBinding = WrappedArityParent.bindChild(DefaultContext, {
+const DefaultContextComposition = DefaultContextNamespace.makeDefinition({
+  Model: ArityModel,
+  Message: ArityMessage,
+}).makeComposition()
+const prepareDefaultContext = () =>
+  DefaultContextComposition.prepareBlock({
+    init: DefaultContextComposition.makeInit(arityInit),
+    update: DefaultContextComposition.makeUpdate(
+      (
+        model,
+        _message,
+        context: Readonly<{ amount: number }> = { amount: 2 },
+      ) => ({
+        model: modifyFields(model, { count: count => count + context.amount }),
+      }),
+    ),
+  })
+const DefaultContext: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ArityModel,
+  typeof prepareDefaultContext
+> = Block.assemble(prepareDefaultContext)
+const DefaultContextBinding = WrappedArityParent.makeBinding(DefaultContext, {
   placement: 'default-context',
   read: readArityChild,
   write: writeArityChild,
-  delivery: {
-    toUpdateContext: () => [{ amount: 2 }],
-  },
+  delivery: { toUpdateContext: () => [{ amount: 2 }] },
 })
 
 const OptionalContextNamespace = makeNamespace('BindingOptionalContext')
-const OptionalContext = makeArityBlock(
-  OptionalContextNamespace.makeDefinition({
-    Model: ArityModel,
-    Message: ArityMessage,
-  }).owner,
-  (
-    model: ArityModel,
-    _message: ArityMessage,
-    context?: Readonly<{ amount: number }>,
-  ): Update.Return<ArityModel, ArityMessage> => ({
-    model: modifyFields(model, {
-      count: count => count + (context?.amount ?? 1),
-    }),
-  }),
-)
-const OptionalContextBinding = WrappedArityParent.bindChild(OptionalContext, {
+const OptionalContextComposition = OptionalContextNamespace.makeDefinition({
+  Model: ArityModel,
+  Message: ArityMessage,
+}).makeComposition()
+const prepareOptionalContext = () =>
+  OptionalContextComposition.prepareBlock({
+    init: OptionalContextComposition.makeInit(arityInit),
+    update: OptionalContextComposition.makeUpdate(
+      (model, _message, context?: Readonly<{ amount: number }>) => ({
+        model: modifyFields(model, {
+          count: count => count + (context?.amount ?? 1),
+        }),
+      }),
+    ),
+  })
+const OptionalContext: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ArityModel,
+  typeof prepareOptionalContext
+> = Block.assemble(prepareOptionalContext)
+const OptionalContextBinding = WrappedArityParent.makeBinding(OptionalContext, {
   placement: 'optional-context',
   read: readArityChild,
   write: writeArityChild,
-  delivery: {
-    toUpdateContext: () => [{ amount: 1 }],
-  },
+  delivery: { toUpdateContext: () => [{ amount: 1 }] },
 })
 
 const WrappedArityParentComposition = WrappedArityParent.makeComposition({
@@ -709,7 +720,7 @@ const WrappedArityParentComposition = WrappedArityParent.makeComposition({
 const foldWrappedArity = WrappedArityParentComposition.makeUpdate(model => ({
   model,
 }))
-const runDefaultIncrement = WrappedArityParent.step(
+const runDefaultIncrement = WrappedArityParent.makeStep(
   (_model, amount?: number) => {
     if (amount === undefined) {
       return WrappedArityBinding.defaultIncrement()
@@ -718,36 +729,41 @@ const runDefaultIncrement = WrappedArityParent.step(
     }
   },
 )
-const runAddMany = WrappedArityParent.step(
+const runAddMany = WrappedArityParent.makeStep(
   (_model, ...amounts: ReadonlyArray<number>) =>
     WrappedArityBinding.addMany(...amounts),
 )
-const runResetArity = WrappedArityParent.step(_model =>
+const runResetArity = WrappedArityParent.makeStep(_model =>
   WrappedArityBinding.resetArity(),
 )
-const WrappedArityRuntime = WrappedArityParentComposition.assembleBlock({
-  init: () => ({ model: initialArityParent }),
-  update: WrappedArityParentComposition.makeUpdate((model, message) =>
-    ArityParentMessage.match(message, {
-      RequestedDefaultIncrement: ({ amount }) =>
-        runDefaultIncrement(model, amount),
-      RequestedAddMany: ({ amounts }) => runAddMany(model, ...amounts),
-      RequestedReset: () => runResetArity(model),
-    }),
-  ),
-  operations: {
-    runDefaultIncrement: (amount?: number) =>
-      Tuple.make(
-        ArityParentMessage.RequestedDefaultIncrement(
-          amount === undefined ? {} : { amount },
+const prepareWrappedArityRuntime = () =>
+  WrappedArityParentComposition.prepareBlock({
+    init: () => ({ model: initialArityParent }),
+    update: WrappedArityParentComposition.makeUpdate((model, message) =>
+      ArityParentMessage.match(message, {
+        RequestedDefaultIncrement: ({ amount }) =>
+          runDefaultIncrement(model, amount),
+        RequestedAddMany: ({ amounts }) => runAddMany(model, ...amounts),
+        RequestedReset: () => runResetArity(model),
+      }),
+    ),
+    operations: {
+      runDefaultIncrement: (amount?: number) =>
+        Tuple.make(
+          ArityParentMessage.RequestedDefaultIncrement(
+            amount === undefined ? {} : { amount },
+          ),
         ),
-      ),
-    runAddMany: (...amounts: ReadonlyArray<number>) =>
-      Tuple.make(ArityParentMessage.RequestedAddMany({ amounts })),
-    runResetArity: () => Tuple.make(ArityParentMessage.RequestedReset()),
-  },
-  EffectsLayer: Layer.empty,
-})
+      runAddMany: (...amounts: ReadonlyArray<number>) =>
+        Tuple.make(ArityParentMessage.RequestedAddMany({ amounts })),
+      runResetArity: () => Tuple.make(ArityParentMessage.RequestedReset()),
+    },
+    EffectsLayer: Layer.empty,
+  })
+const WrappedArityRuntime: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ArityParent,
+  typeof prepareWrappedArityRuntime
+> = Block.assemble(prepareWrappedArityRuntime)
 
 const foldIgnoredMessage = WrappedArityParentComposition.makeUpdate(model => ({
   model,
@@ -858,18 +874,17 @@ describe('Block binding', () => {
   })
 
   it('applies one Subscription gate across every child entry', () => {
-    const GatedBinding = Parent.bindChild(Child, {
+    const GatedBinding = Parent.makeBinding(Child, {
       placement: 'gated-home',
       read: (model: ParentModel) => model.maybeChild,
       write: writeChild,
-      outMessage: { fold: foldChildOutMessage },
       subscriptions: {
         when: (model: ParentModel) => model.isListening,
       },
       delivery: {
         toUpdateContext: () => [{ roomId: 'room' }],
       },
-    })
+    }).withOutMessagePolicy({ fold: foldChildOutMessage })
     const dependencies = inspectBinding(
       GatedBinding,
     ).subscriptions.ticks.modelToDependencies({
@@ -998,13 +1013,18 @@ describe('Block binding', () => {
   })
 
   it('preserves lifecycle contracts from a named child array', () => {
-    const pulseChild = ChildComposition.assembleBlock({
-      init: Child.init,
-      update: Child.update,
-      subscriptions: { pulses: childSubscriptions.ticks },
-      EffectsLayer: Layer.empty,
-      hostHandlers: [Save, childSubscriptions.ticks, Measure],
-    })
+    const preparePulseChild = () =>
+      ChildComposition.prepareBlock({
+        init: Child.init,
+        update: Child.update,
+        subscriptions: { pulses: childSubscriptions.ticks },
+        EffectsLayer: Layer.empty,
+        hostHandlers: [Save, childSubscriptions.ticks, Measure],
+      })
+    const pulseChild: Block.FromAssemblyWithOutMessage<
+      typeof ChildModel,
+      typeof preparePulseChild
+    > = Block.assemble(preparePulseChild)
     const ParentSchema = Schema.Struct({
       maybeChild: Schema.Option(ChildModel),
       reports: Schema.Array(Schema.Number),
@@ -1035,34 +1055,37 @@ describe('Block binding', () => {
       Message: NamedParentMessage,
       OutMessage: ParentOutMessage,
     })
-    const NamedHomeBinding = ParentBaseDefinition.bindChild(Child, {
+    const NamedHomeBinding = ParentBaseDefinition.makeBinding(Child, {
       placement: 'home',
       read: (model: ParentModel) => model.maybeChild,
       write: writeChild,
-      outMessage: { fold: foldNamedChildOutMessage },
       delivery: {
         toUpdateContext: () => [{ roomId: 'room' }],
       },
-    })
-    const RoomBinding = ParentBaseDefinition.bindChild(pulseChild, {
+    }).withOutMessagePolicy({ fold: foldNamedChildOutMessage })
+    const RoomBinding = ParentBaseDefinition.makeBinding(pulseChild, {
       placement: 'room',
       read: (model: ParentModel) => model.maybeChild,
       write: writeChild,
-      outMessage: { fold: foldNamedChildOutMessage },
       delivery: {
         toUpdateContext: () => [{ roomId: 'room' }],
       },
-    })
+    }).withOutMessagePolicy({ fold: foldNamedChildOutMessage })
     const namedHomeInspection = inspectBinding(NamedHomeBinding)
     const bindings = [NamedHomeBinding, RoomBinding]
     const parentContract = ParentBaseDefinition.makeComposition({
       bindings,
     })
-    const parent = parentContract.assembleBlock({
-      init: () => ({ model: initialParent }),
-      update: (model, _message) => ({ model }),
-      EffectsLayer: Layer.empty,
-    })
+    const prepareParent = () =>
+      parentContract.prepareBlock({
+        init: () => ({ model: initialParent }),
+        update: (model, _message) => ({ model }),
+        EffectsLayer: Layer.empty,
+      })
+    const parent: Block.FromAssemblyWithOutMessage<
+      typeof ParentSchema,
+      typeof prepareParent
+    > = Block.assemble(prepareParent)
 
     const inline = aggregateChildren([NamedHomeBinding, RoomBinding])
 
@@ -1171,7 +1194,7 @@ describe('Block binding arity', () => {
     } satisfies typeof WrappedArityParentComposition.Message.Type
     const folded = foldIgnoredMessage(initialArityParent, message)
 
-    expect(IgnoredMessage.update.length).toBe(1)
+    expect(ignoredMessageUpdate.length).toBe(1)
     expect(folded.model.child.count).toBe(1)
   })
 
@@ -1298,15 +1321,14 @@ if (false) {
 
 describe('Block child registration composition', () => {
   it('gives repeated ManagedResources independent placement capability keys', () => {
-    const SidebarBinding = Parent.bindChild(Child, {
+    const SidebarBinding = Parent.makeBinding(Child, {
       placement: 'sidebar',
       read: (model: ParentModel) => model.maybeChild,
       write: writeChild,
-      outMessage: { fold: foldChildOutMessage },
       delivery: {
         toUpdateContext: () => [{ roomId: 'room' }],
       },
-    })
+    }).withOutMessagePolicy({ fold: foldChildOutMessage })
 
     const aggregated = aggregateChildren([HomeBinding, SidebarBinding])
     expect(Object.keys(aggregated.managedResources)).toEqual([
@@ -1329,8 +1351,7 @@ describe('Block child registration composition', () => {
       let buildCount = 0
       const RepeatedNamespace = makeNamespace('BindingRepeated')
       const RepeatedMessage = defineMessageUnion({ CompletedMount: {} })
-      type RepeatedMessage = typeof RepeatedMessage.Type
-      const RepeatedMount = RepeatedNamespace.mount('Mount', {
+      const RepeatedMount = RepeatedNamespace.makeMount('Mount', {
         messages: [RepeatedMessage.CompletedMount],
       })
 
@@ -1344,12 +1365,17 @@ describe('Block child registration composition', () => {
         buildCount += 1
         return {}
       })
-      const Repeated = RepeatedComposition.assembleBlock({
-        init: () => ({ model: ChildModel.make({ count: 0 }) }),
-        update: model => ({ model }),
-        EffectsLayer,
-        hostHandlers: [RepeatedMount],
-      })
+      const prepareRepeated = () =>
+        RepeatedComposition.prepareBlock({
+          init: () => ({ model: ChildModel.make({ count: 0 }) }),
+          update: model => ({ model }),
+          EffectsLayer,
+          hostHandlers: [RepeatedMount],
+        })
+      const Repeated: Block.FromAssemblyWithoutViewOrOutMessage<
+        typeof ChildModel,
+        typeof prepareRepeated
+      > = Block.assemble(prepareRepeated)
       const RepeatedParentModel = Schema.Struct({ child: ChildModel })
       type RepeatedParentModel = typeof RepeatedParentModel.Type
       const RepeatedParentMessage = Schema.Never
@@ -1358,7 +1384,7 @@ describe('Block child registration composition', () => {
         Message: RepeatedParentMessage,
       })
       const bindRepeated = (placement: 'first' | 'second') =>
-        RepeatedParent.bindChild(Repeated, {
+        RepeatedParent.makeBinding(Repeated, {
           placement,
           read: (model: RepeatedParentModel) => Option.some(model.child),
           write: (model, child) => ({ ...model, child }),
@@ -1379,29 +1405,26 @@ describe('Block child registration composition', () => {
 describe('generic block refinement', () => {
   const GenericNamespace = makeNamespace('BindingChoice')
   const CompletedChoiceWork = Schema.TaggedStruct('CompletedChoiceWork', {})
-  const FinishChoice = GenericNamespace.command('FinishChoice', {
+  const FinishChoice = GenericNamespace.makeCommand('FinishChoice', {
     messages: [CompletedChoiceWork],
   })
 
   const makeChoice = <Value extends string>(Value: Schema.Schema<Value>) => {
     const Model = Schema.Struct({ value: Value })
-    type Model = typeof Model.Type
     const RequestedFinish = Schema.TaggedStruct('RequestedFinish', {})
     const Message = Schema.Union([
       RequestedFinish,
       Schema.TaggedStruct('SelectedValue', { value: Value }),
       CompletedChoiceWork,
     ])
-    type Message = typeof Message.Type
     const OutMessage = Schema.TaggedStruct('SelectedValue', { value: Value })
-    type OutMessage = typeof OutMessage.Type
     const ChoiceDefinition = GenericNamespace.makeDefinition({
       Model,
       Message,
       OutMessage,
     })
     const Composition = ChoiceDefinition.makeComposition()
-    const finish = ChoiceDefinition.step(model => ({
+    const finish = ChoiceDefinition.makeStep(model => ({
       model,
       commands: [FinishChoice()],
     }))
@@ -1417,15 +1440,21 @@ describe('generic block refinement', () => {
         return { model }
       }
     })
-    return Composition.assembleBlock({
-      init: (value: Value) => ({ model: Model.make({ value }) }),
-      update,
-      operations: {
-        finish: () => Tuple.make(RequestedFinish.make({})),
-      },
-      EffectsLayer: Layer.empty,
-      hostHandlers: [FinishChoice],
-    })
+    const prepare = () =>
+      Composition.prepareBlock({
+        init: (value: Value) => ({ model: Model.make({ value }) }),
+        update,
+        operations: {
+          finish: () => Tuple.make(RequestedFinish.make({})),
+        },
+        EffectsLayer: Layer.empty,
+        hostHandlers: [FinishChoice],
+      })
+    const completedBlock: Block.FromAssemblyWithOutMessage<
+      typeof Model,
+      typeof prepare
+    > = Block.assemble(prepare)
+    return completedBlock
   }
 
   it('preserves a refined OutMessage payload and shared handler definition', () => {
@@ -1454,28 +1483,26 @@ describe('generic block refinement', () => {
         outMessage,
       }),
     }
-    const DirectBinding = ChoiceParent.bindChild(Choice, {
+    const DirectBinding = ChoiceParent.makeBinding(Choice, {
       placement: 'direct-choice',
       read: (model: ChoiceParentModel) => Option.some(model.choice),
       write: (model, choice) => ({ ...model, choice }),
-      outMessage: directChoicePolicy,
-    })
+    }).withOutMessagePolicy(directChoicePolicy)
     const DirectComposition = ChoiceParent.makeComposition({
       bindings: [DirectBinding],
     })
-    const Binding = ChoiceParent.bindChild(Choice, {
+    const Binding = ChoiceParent.makeBinding(Choice, {
       placement: 'choice',
       read: (model: ChoiceParentModel) => Option.some(model.choice),
       write: (model: ChoiceParentModel, choice: ChoiceModel) => ({
         ...model,
         choice,
       }),
-      outMessage: {
-        fold: (outMessage: ChoiceOutMessage) => (model: ChoiceParentModel) => ({
-          model,
-          outMessage,
-        }),
-      },
+    }).withOutMessagePolicy({
+      fold: (outMessage: ChoiceOutMessage) => (model: ChoiceParentModel) => ({
+        model,
+        outMessage,
+      }),
     })
     const ChoiceComposition = ChoiceParent.makeComposition({
       bindings: [Binding],

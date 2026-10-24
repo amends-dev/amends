@@ -1,5 +1,4 @@
-import { Effect, Match, Option } from 'effect'
-import { modifyFields } from 'foldkit/struct'
+import { Effect, Match } from 'effect'
 
 import { ApplicationDefinition } from './definition'
 import { Message, ResolvedTheme } from './message'
@@ -9,32 +8,16 @@ import { ThemePreference } from './themePreference'
 export const THEME_STORAGE_KEY = 'theme-preference'
 
 export const resolveTheme = (
-  preference: ThemePreference,
-  systemTheme: ResolvedTheme,
-): ResolvedTheme =>
+  preference: typeof ThemePreference.Type,
+  systemTheme: typeof ResolvedTheme.Type,
+): typeof ResolvedTheme.Type =>
   Match.value(preference).pipe(
-    Match.withReturnType<ResolvedTheme>(),
+    Match.withReturnType<typeof ResolvedTheme.Type>(),
     Match.when('Dark', () => 'Dark'),
     Match.when('Light', () => 'Light'),
     Match.when('System', () => systemTheme),
     Match.exhaustive,
   )
-
-export const selectThemePreference = (preference: ThemePreference) =>
-  ApplicationDefinition.step(model => {
-    const resolvedTheme = resolveTheme(preference, model.systemTheme)
-
-    return {
-      model: modifyFields(model, {
-        maybeThemePreference: () => Option.some(preference),
-        resolvedTheme: () => resolvedTheme,
-      }),
-      commands: [
-        ApplyTheme({ theme: resolvedTheme }),
-        SaveThemePreference({ preference }),
-      ],
-    }
-  })
 
 // NOTE: mirrors --color-cream and --color-gray-900 in styles.css.
 // src/themeColor.test.ts fails when these drift.
@@ -48,7 +31,7 @@ const setThemeColorMeta = (color: string): void => {
   }
 }
 
-export const ApplyTheme = ApplicationDefinition.command('ApplyTheme', {
+export const ApplyTheme = ApplicationDefinition.makeCommand('ApplyTheme', {
   args: { theme: ResolvedTheme },
   messages: [Message.CompletedApplyTheme],
   handler: function* () {
@@ -70,7 +53,7 @@ export const ApplyTheme = ApplicationDefinition.command('ApplyTheme', {
   },
 })
 
-export const SaveThemePreference = ApplicationDefinition.command(
+export const SaveThemePreference = ApplicationDefinition.makeCommand(
   'SaveThemePreference',
   {
     args: { preference: ThemePreference },

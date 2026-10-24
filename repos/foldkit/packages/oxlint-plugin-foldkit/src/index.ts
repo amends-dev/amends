@@ -3,14 +3,12 @@ import { Plugin } from 'effect-oxlint'
 import { acquireReleaseConstructsInAcquireBody } from './rules/acquire-release-constructs-in-acquire-body.ts'
 import { blockNameMatchesVariable } from './rules/block-name-matches-variable.ts'
 import { commandDefinePascalConst } from './rules/command-define-pascal-const.ts'
-import { gotBlockMessageName } from './rules/got-block-message-name.ts'
-import { gotPrefixRequiresBlockPayload } from './rules/got-prefix-requires-block-payload.ts'
-import { gotWrapperCarriesOnlyRouting } from './rules/got-wrapper-carries-only-routing.ts'
 import { keyedRequiredForMappedRows } from './rules/keyed-required-for-mapped-rows.ts'
 import { lazyViewStableReferences } from './rules/lazy-view-stable-references.ts'
 import { mountFactoryMustUseElement } from './rules/mount-factory-must-use-element.ts'
 import { noArrayIndexViewKeys } from './rules/no-array-index-view-keys.ts'
 import { noChildMessageConstructionInRoot } from './rules/no-child-message-construction-in-root.ts'
+import { noCompletedBlockModelInSchema } from './rules/no-completed-block-model-in-schema.ts'
 import { noDirectBlockStateUpdate } from './rules/no-direct-block-state-update.ts'
 import { noDisablingDevGuardrails } from './rules/no-disabling-dev-guardrails.ts'
 import { noDuplicateOnmountPerElement } from './rules/no-duplicate-onmount-per-element.ts'
@@ -36,7 +34,6 @@ import { preferEffectModuleNames } from './rules/prefer-effect-module-names.ts'
 import { preferOptionOverNullableInModel } from './rules/prefer-option-over-nullable-in-model.ts'
 import { requireRelForExternalLink } from './rules/require-rel-for-external-link.ts'
 import { selectionBlockFactoryAtModuleScope } from './rules/selection-block-factory-at-module-scope.ts'
-import { wrapChildOutputInGotMessage } from './rules/wrap-child-output-in-got-message.ts'
 
 const basePlugin = Plugin.define({
   name: 'foldkit',
@@ -46,14 +43,12 @@ const basePlugin = Plugin.define({
       acquireReleaseConstructsInAcquireBody,
     'block-name-matches-variable': blockNameMatchesVariable,
     'command-define-pascal-const': commandDefinePascalConst,
-    'got-prefix-requires-block-payload': gotPrefixRequiresBlockPayload,
-    'got-block-message-name': gotBlockMessageName,
-    'got-wrapper-carries-only-routing': gotWrapperCarriesOnlyRouting,
     'keyed-required-for-mapped-rows': keyedRequiredForMappedRows,
     'lazy-view-stable-references': lazyViewStableReferences,
     'mount-factory-must-use-element': mountFactoryMustUseElement,
     'no-array-index-view-keys': noArrayIndexViewKeys,
     'no-child-message-construction-in-root': noChildMessageConstructionInRoot,
+    'no-completed-block-model-in-schema': noCompletedBlockModelInSchema,
     'no-direct-block-state-update': noDirectBlockStateUpdate,
     'no-disabling-dev-guardrails': noDisablingDevGuardrails,
     'no-duplicate-onmount-per-element': noDuplicateOnmountPerElement,
@@ -80,7 +75,6 @@ const basePlugin = Plugin.define({
     'require-rel-for-external-link': requireRelForExternalLink,
     'selection-block-factory-at-module-scope':
       selectionBlockFactoryAtModuleScope,
-    'wrap-child-output-in-got-message': wrapChildOutputInGotMessage,
   },
 })
 
@@ -131,13 +125,6 @@ const entryFilePatterns = [
 
 const decisionTimeRuleId = 'foldkit/no-impure-call-at-decision-time'
 
-const legacyAuthoredDeliveryRuleIds = [
-  'foldkit/got-block-message-name',
-  'foldkit/got-prefix-requires-block-payload',
-  'foldkit/got-wrapper-carries-only-routing',
-  'foldkit/wrap-child-output-in-got-message',
-]
-
 const serverOverride: Override = {
   files: serverFilePatterns,
   excludeFiles: testFilePatterns,
@@ -174,22 +161,33 @@ const testOverride = (config: Plugin.OxlintConfig): Override => ({
   ),
 })
 
-const withOverrides = (config: Plugin.OxlintConfig): OverriddenConfig => ({
-  ...config,
-  rules: {
+const withOverrides = (
+  config: Plugin.OxlintConfig,
+  additionalRules: Record<string, Plugin.RuleSeverity> = {},
+): OverriddenConfig => {
+  const rules: Record<string, Plugin.RuleSeverity> = {
     ...config.rules,
+    ...additionalRules,
     'foldkit/no-nonportable-server-globals': 'off',
-    ...Object.fromEntries(
-      legacyAuthoredDeliveryRuleIds.map(id => [id, 'off'] as const),
-    ),
-  },
-  overrides: [serverOverride, entryOverride, testOverride(config)],
-})
+  }
+
+  return {
+    ...config,
+    rules,
+    overrides: [
+      serverOverride,
+      entryOverride,
+      testOverride({ ...config, rules }),
+    ],
+  }
+}
 
 export default {
   ...basePlugin,
   configs: {
-    recommended: withOverrides(basePlugin.configs.recommended),
+    recommended: withOverrides(basePlugin.configs.recommended, {
+      'require-yield': 'off',
+    }),
     all: withOverrides(basePlugin.configs.all),
   },
 }

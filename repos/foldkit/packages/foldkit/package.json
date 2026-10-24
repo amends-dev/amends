@@ -1,6 +1,6 @@
 {
   "name": "foldkit",
-  "version": "0.168.0",
+  "version": "0.169.0",
   "description": "A TypeScript frontend framework, built on Effect and architected like Elm",
   "type": "module",
   "main": "./dist/index.js",
@@ -10,10 +10,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./application": {
-      "types": "./dist/runtime/applicationPublic.d.ts",
-      "import": "./dist/runtime/applicationPublic.js"
     },
     "./asyncData": {
       "types": "./dist/asyncData/public.d.ts",
@@ -86,6 +82,10 @@
     "./port": {
       "types": "./dist/port/public.d.ts",
       "import": "./dist/port/public.js"
+    },
+    "./program": {
+      "types": "./dist/runtime/programPublic.d.ts",
+      "import": "./dist/runtime/programPublic.js"
     },
     "./render": {
       "types": "./dist/render/public.d.ts",
@@ -172,7 +172,7 @@
     "check:block-type-performance": "node scripts/check-block-type-performance.ts",
     "update:block-type-performance": "node scripts/check-block-type-performance.ts --update",
     "watch": "tsc -b tsconfig.build.json --watch",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p declaration-tests/tsconfig.route-step-program.source.json",
     "test": "vitest run --coverage"
   },
   "dependencies": {
@@ -189,7 +189,7 @@
     "effect": "4.0.0",
     "happy-dom": "^20.14.5",
     "rimraf": "^6.1.3",
-    "typescript": "^7.0.2",
+    "typescript": "7.1.0-beta",
     "vitest": "^5.0.2"
   },
   "keywords": [

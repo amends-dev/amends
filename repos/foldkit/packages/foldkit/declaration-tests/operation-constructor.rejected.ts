@@ -72,7 +72,7 @@ Choice.operations.selectPositionally(
 
 const ForeignMessage = defineMessageUnion({ UpdatedForeignValue: {} })
 // @ts-expect-error Operations accept only constructors from the local Message Schema.
-OperationConstructorProofChildComposition.assembleBlock({
+OperationConstructorProofChildComposition.prepareBlock({
   init: () => ({ model }),
   update,
   operations: {
@@ -82,7 +82,7 @@ OperationConstructorProofChildComposition.assembleBlock({
   hostHandlers: [RecordValue],
 })
 
-OperationConstructorProofParentComposition.assembleBlock({
+OperationConstructorProofParentComposition.prepareBlock({
   init: ParentBlock.init,
   update: ParentBlock.update,
   operations: {
@@ -96,7 +96,7 @@ const plainTaggedStruct = Schema.TaggedStruct('UpdatedValue', {
   value: Schema.String,
 })
 // @ts-expect-error Operations require a Foldkit callable Message constructor or tuple producer.
-OperationConstructorProofChildComposition.assembleBlock({
+OperationConstructorProofChildComposition.prepareBlock({
   init: () => ({ model }),
   update,
   operations: {
@@ -107,7 +107,7 @@ OperationConstructorProofChildComposition.assembleBlock({
 })
 
 // @ts-expect-error Operation names cannot collide with reserved Block or Binding members.
-OperationConstructorProofChildComposition.assembleBlock({
+OperationConstructorProofChildComposition.prepareBlock({
   init: () => ({ model }),
   update,
   operations: { fold: updateValue },

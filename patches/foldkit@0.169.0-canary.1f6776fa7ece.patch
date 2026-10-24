@@ -1,0 +1,109 @@
+diff --git a/dist/block/deferredPolicy.d.ts b/dist/block/deferredPolicy.d.ts
+index 147fe02..9931c3d 100644
+--- a/dist/block/deferredPolicy.d.ts
++++ b/dist/block/deferredPolicy.d.ts
+@@ -29,11 +29,17 @@ type EmptyChannels = Readonly<{
+     requirements: never;
+     registration: never;
+ }>;
+-type PolicyChannels<Marker, Children extends ReadonlyArray<AnyBinding>, VisitedPlacements extends string> = Marker extends DeferredBindingPolicy<infer Placement, infer ChildId> ? Placement extends VisitedPlacements ? EmptyChannels : BindingAt<Children, Placement> extends infer BindingValue ? PolicyOfBinding<BindingValue> extends infer Policy ? ResolveCompositionOutput<PolicyFoldReturn<Policy>, Children, VisitedPlacements | Placement> extends infer FoldOutput ? Readonly<{
+-    message: CommandMessage<FoldOutput>;
+-    outMessage: ForwardedOutMessage<Policy> | OutputOutMessage<FoldOutput>;
+-    requirements: QualifyOwned<Placement, ChildId, Update.RequirementsOf<() => FoldOutput>>;
+-    registration: Update.RegistrationEvidenceOf<FoldOutput>;
++type OutputChannels<Output, Children extends ReadonlyArray<AnyBinding>, VisitedPlacements extends string> = DeferredChannels<Output, Children, VisitedPlacements> extends infer Channels ? Readonly<{
++    message: CommandMessage<Output> | FieldOf<Channels, 'message'>;
++    outMessage: OutputOutMessage<Output> | FieldOf<Channels, 'outMessage'>;
++    requirements: Update.RequirementsOf<() => Output> | FieldOf<Channels, 'requirements'>;
++    registration: Update.RegistrationEvidenceOf<Output> | FieldOf<Channels, 'registration'>;
++}> : never;
++type PolicyChannels<Marker, Children extends ReadonlyArray<AnyBinding>, VisitedPlacements extends string> = Marker extends DeferredBindingPolicy<infer Placement, infer ChildId> ? Placement extends VisitedPlacements ? EmptyChannels : BindingAt<Children, Placement> extends infer BindingValue ? PolicyOfBinding<BindingValue> extends infer Policy ? OutputChannels<Update.ResolvedOperationOutput<PolicyFoldReturn<Policy>>, Children, VisitedPlacements | Placement> extends infer Channels ? Readonly<{
++    message: FieldOf<Channels, 'message'>;
++    outMessage: ForwardedOutMessage<Policy> | FieldOf<Channels, 'outMessage'>;
++    requirements: QualifyOwned<Placement, ChildId, FieldOf<Channels, 'requirements'>>;
++    registration: FieldOf<Channels, 'registration'>;
+ }> : EmptyChannels : EmptyChannels : EmptyChannels : EmptyChannels;
+ type DeferredChannels<Output, Children extends ReadonlyArray<AnyBinding>, VisitedPlacements extends string> = PolicyChannels<Update.DeferredResultEvidenceOf<Output> extends infer Evidence ? Evidence extends Update.DeferredResultEvidence<infer Marker> ? Marker : never : never, Children, VisitedPlacements>;
+ type ResolvedReturn<Output, Children extends ReadonlyArray<AnyBinding>, VisitedPlacements extends string> = DeferredChannels<Output, Children, VisitedPlacements> extends infer Channels ? Channels extends Readonly<{
+diff --git a/dist/block/definition.d.ts b/dist/block/definition.d.ts
+index ef47988..ddada19 100644
+--- a/dist/block/definition.d.ts
++++ b/dist/block/definition.d.ts
+@@ -576,6 +576,7 @@ type ImplementationForValidation<Mounts extends ReadonlyArray<Mount.LayeredMount
+     subscriptions: ImplementationSubscriptions<ImplementationValue>;
+     managedResources: ImplementationManagedResources<ImplementationValue>;
+     EffectsLayer: CompleteEffectsLayer<ImplementationValue['EffectsLayer'], Children>;
++    [LocalEffectsLayerTypeId]: ImplementationValue['EffectsLayer'];
+     hostHandlers: ImplementationHostHandlers<ImplementationValue>;
+ }>;
+ type MergeLayers<Left extends Layer.Any, Right extends Layer.Any> = Layer.Layer<Layer.Success<Left | Right>, Layer.Error<Left | Right>, Layer.Services<Left | Right>>;
+diff --git a/dist/block/requirements.d.ts b/dist/block/requirements.d.ts
+index 0c4dbb1..6b8adc6 100644
+--- a/dist/block/requirements.d.ts
++++ b/dist/block/requirements.d.ts
+@@ -8,7 +8,7 @@ import type { ValidHandlerContracts } from '../runtime/handlerContracts.js';
+ import type { Handler as SubscriptionHandler } from '../subscription/handler.js';
+ import type * as Update from '../update/index.js';
+ import type { BlockOfBinding, HandlerRequirementsOfBinding, InspectionOfBinding, IsKeyedBinding, RequirementsOfBindings, ValidateBindingOperationNames } from './binding.js';
+-import type { LocalMountsTypeId } from './definition.js';
++import type { LocalEffectsLayerTypeId, LocalMountsTypeId } from './definition.js';
+ import type { IsConcreteOwner, Owner } from './owner.js';
+ import type { Qualify, Scoped } from './scope.js';
+ type AnyFunction = (...args: ReadonlyArray<any>) => any;
+@@ -121,6 +121,9 @@ type DeclaredHostHandlers<Block> = HandlerOfHostDefinition<HostDefinitions<Block
+ type BlockLayer<Block> = Block extends Readonly<{
+     EffectsLayer: infer LayerRecipe;
+ }> ? LayerRecipe : never;
++type LocalBlockLayer<Block> = Block extends Readonly<{
++    [LocalEffectsLayerTypeId]: infer LayerRecipe;
++}> ? LayerRecipe : BlockLayer<Block>;
+ type BlockManagedResources<Block> = Block extends Readonly<{
+     managedResources: infer ManagedResources;
+ }> ? ManagedResources : Readonly<Record<never, never>>;
+@@ -318,7 +321,7 @@ type FallbackLocalCompositionChannels<Composition> = Readonly<{
+     registeredChildEvidence: RegisteredChildEvidence<Composition>;
+ }>;
+ type LocalCompositionChannels<Composition> = HasCompleteLocalCompositionShape<Composition> extends true ? FastLocalCompositionChannels<Composition> : FallbackLocalCompositionChannels<Composition>;
+-type ValidateLocalCompositionChannels<Composition, Channels extends LocalCompositionChannelsShape, LocalRequirements = Channels['initRequirements'] | Channels['updateRequirements'] | Channels['subscriptionRequirements'] | Channels['managedResourceRequirements'] | Channels['mountRequirements'], DeclaredHostHandlersValue = HandlerOfHostDefinition<Channels['hostDefinitions']>, LocalResidual = SatisfyLocalRequirements<Exclude<LocalRequirements, Channels['managedResourceServices']>, Channels['layerOutputs']> | Exclude<Channels['layerInputs'], Channels['managedResourceServices']>, ResidualHandlers = HandlerRequirements<LocalResidual>, PrecisionFailure = ErasedRequirement<'init, update, or exposed operations', Channels['initRequirements']> | ErasedRequirement<'init, update, or exposed operations', Channels['updateRequirements']> | ErasedRequirement<'subscriptions', Channels['subscriptionRequirements']> | ErasedRequirement<'managed resources', Channels['managedResourceRequirements'] | Channels['managedResourceServices']> | ErasedRequirement<'mounts', Channels['mountRequirements']> | ErasedRequirement<'EffectsLayer outputs', Channels['layerOutputs']> | ErasedRequirement<'EffectsLayer inputs', Channels['layerInputs']> | ErasedRequirement<'hostHandlers', DeclaredHostHandlersValue>, InvalidHostDefinition = Channels['hostDefinitions'] extends infer Definition ? Definition extends unknown ? [HandlerOfHostDefinition<Definition>] extends [never] ? Definition : never : never : never, MissingRegistration = Exclude<Channels['registrationEvidence'], Channels['registeredChildEvidence']>, MissingHostHandler = Exclude<ResidualHandlers, DeclaredHostHandlersValue | Channels['childHandlerEvidence']>, UnexpectedHostHandler = Exclude<DeclaredHostHandlersValue, ResidualHandlers>, HandlerContract = UnscopedHandlerRequirements<LocalRequirements> | HandlerRequirements<Channels['layerOutputs'] | Channels['layerInputs'] | DeclaredHostHandlersValue>> = ValidateBlockOperationNames<Composition> & ([MissingRegistration] extends [never] ? unknown : Readonly<{
++type ValidateLocalCompositionChannels<Composition, Channels extends LocalCompositionChannelsShape, LocalRequirements = Channels['initRequirements'] | Channels['updateRequirements'] | Channels['subscriptionRequirements'] | Channels['managedResourceRequirements'] | Channels['mountRequirements'], DeclaredHostHandlersValue = HandlerOfHostDefinition<Channels['hostDefinitions']>, LocalResidual = SatisfyLocalRequirements<Exclude<LocalRequirements, Channels['managedResourceServices']>, Channels['layerOutputs']> | Exclude<Channels['layerInputs'], Channels['managedResourceServices']>, ResidualHandlers = HandlerRequirements<LocalResidual>, PrecisionFailure = ErasedRequirement<'init, update, or exposed operations', Channels['initRequirements']> | ErasedRequirement<'init, update, or exposed operations', Channels['updateRequirements']> | ErasedRequirement<'subscriptions', Channels['subscriptionRequirements']> | ErasedRequirement<'managed resources', Channels['managedResourceRequirements'] | Channels['managedResourceServices']> | ErasedRequirement<'mounts', Channels['mountRequirements']> | ErasedRequirement<'EffectsLayer outputs', Channels['layerOutputs']> | ErasedRequirement<'EffectsLayer inputs', Channels['layerInputs']> | ErasedRequirement<'hostHandlers', DeclaredHostHandlersValue>, InvalidHostDefinition = Channels['hostDefinitions'] extends infer Definition ? Definition extends unknown ? [HandlerOfHostDefinition<Definition>] extends [never] ? Definition : never : never : never, MissingRegistration = Exclude<Channels['registrationEvidence'], Channels['registeredChildEvidence']>, MissingHostHandler = Exclude<ResidualHandlers, DeclaredHostHandlersValue | Channels['childHandlerEvidence']>, UnexpectedHostHandler = Exclude<DeclaredHostHandlersValue, ResidualHandlers>, HandlerContract = UnscopedHandlerRequirements<LocalRequirements> | HandlerRequirements<LayerOutputs<LocalBlockLayer<Composition>> | LayerInputs<LocalBlockLayer<Composition>> | DeclaredHostHandlersValue>> = ValidateBlockOperationNames<Composition> & ([MissingRegistration] extends [never] ? unknown : Readonly<{
+     'Block operations may use only registered child bindings': MissingRegistration;
+ }>) & ([PrecisionFailure] extends [never] ? unknown : Readonly<{
+     'Block requirement sources must preserve exact service types': PrecisionFailure;
+diff --git a/dist/html/viewInputs.d.ts b/dist/html/viewInputs.d.ts
+index 8898401..d5fa17a 100644
+--- a/dist/html/viewInputs.d.ts
++++ b/dist/html/viewInputs.d.ts
+@@ -1,4 +1,4 @@
+-import type { Option, Pipeable } from 'effect';
++import type { Inspectable, Option, Pipeable } from 'effect';
+ import type { VNode } from '../vdom.js';
+ import type { ChildAttribute } from './childAttribute.js';
+ type AnyFunction = (...args: ReadonlyArray<any>) => any;
+@@ -6,7 +6,7 @@ type Primitive = bigint | boolean | null | number | string | symbol | undefined;
+ type IsAny<Value> = 0 extends 1 & Value ? true : false;
+ type IsEqual<Left, Right> = [Left] extends [Right] ? [Right] extends [Left] ? true : false : false;
+ type Includes<Values extends ReadonlyArray<unknown>, Value> = Values extends readonly [infer Head, ...infer Tail] ? IsEqual<Head, Value> extends true ? true : Includes<Tail, Value> : false;
+-type ObjectKey<Value> = Exclude<keyof Value, symbol | (Value extends Pipeable.Pipeable ? keyof Pipeable.Pipeable : never) | (Value extends Date ? keyof Date : never)>;
++type ObjectKey<Value> = Exclude<keyof Value, symbol | (Value extends Pipeable.Pipeable ? keyof Pipeable.Pipeable : never) | (Value extends Inspectable.Inspectable ? keyof Inspectable.Inspectable : never) | (Value extends Date ? keyof Date : never)>;
+ type NestedFunctionInFields<Value extends object, Seen extends ReadonlyArray<unknown>> = true extends {
+     [Key in ObjectKey<Value>]-?: NestedFunction<Value[Key], Seen>;
+ }[ObjectKey<Value>] ? true : false;
+diff --git a/dist/update/update.d.ts b/dist/update/update.d.ts
+index c0ade81..2841db9 100644
+--- a/dist/update/update.d.ts
++++ b/dist/update/update.d.ts
+@@ -418,10 +418,10 @@ type CombinedStepRecipe<Model, Steps extends ReadonlyArray<AnyStep>> = ResultRec
+  * ```
+  */
+ export declare const combineSteps: {
+-    <const Steps extends NonEmptySteps>(steps: Steps & StepsForModel<Steps, OperationStepModel<Steps>> & RequireOperationStep<Steps> & StepsWithoutOutMessage<NoInfer<Steps>>): NoInfer<(model: GraphInput<OperationStepModel<Steps>, CombinedGraphRequirement<Steps>>) => CombinedStepRecipe<OperationStepModel<Steps>, Steps>>;
+-    <ModelInput, const Steps extends NonEmptySteps>(model: ModelInput & GraphInput<GraphModelOfValue<ModelInput>, NoInfer<CombinedGraphRequirement<Steps>>>, steps: Steps & StepsForModel<Steps, GraphModelOfValue<ModelInput>> & RequireOperationStep<Steps> & StepsWithoutOutMessage<NoInfer<Steps>>): NoInfer<CombinedStepRecipe<GraphModelOfValue<ModelInput>, Steps>>;
+-    <StepValue>(steps: ReadonlyArray<StepValue> & StepsForModel<CommonOperationSteps<StepValue>, OperationStepModel<CommonOperationSteps<StepValue>>> & RequireOperationStep<CommonOperationSteps<StepValue>> & StepsWithoutOutMessage<ReadonlyArray<StepValue>>): NoInfer<(model: GraphInput<OperationStepModel<CommonOperationSteps<StepValue>>, CombinedGraphRequirement<CommonOperationSteps<StepValue>>>) => CombinedStepOutputFor<OperationStepModel<CommonOperationSteps<StepValue>>, CommonOperationSteps<StepValue>> | CombinedStepRecipe<OperationStepModel<CommonOperationSteps<StepValue>>, CommonOperationSteps<StepValue>>>;
+-    <ModelInput, StepValue>(model: ModelInput & GraphInput<GraphModelOfValue<ModelInput>, NoInfer<CombinedGraphRequirement<CommonOperationSteps<StepValue>>>>, steps: ReadonlyArray<StepValue> & StepsForModel<CommonOperationSteps<StepValue>, GraphModelOfValue<ModelInput>> & RequireOperationStep<CommonOperationSteps<StepValue>> & StepsWithoutOutMessage<ReadonlyArray<StepValue>>): NoInfer<CombinedStepOutputFor<GraphModelOfValue<ModelInput>, CommonOperationSteps<StepValue>> | CombinedStepRecipe<GraphModelOfValue<ModelInput>, CommonOperationSteps<StepValue>>>;
++    <const Steps extends NonEmptySteps>(steps: Steps & StepsForModel<Steps, OperationStepModel<Steps>> & RequireOperationStep<Steps> & StepsWithoutOutMessage<NoInfer<Steps>>): (model: GraphInput<OperationStepModel<Steps>, CombinedGraphRequirement<Steps>>) => CombinedStepRecipe<OperationStepModel<Steps>, Steps>;
++    <ModelInput, const Steps extends NonEmptySteps>(model: ModelInput & GraphInput<GraphModelOfValue<ModelInput>, NoInfer<CombinedGraphRequirement<Steps>>>, steps: Steps & StepsForModel<Steps, GraphModelOfValue<ModelInput>> & RequireOperationStep<Steps> & StepsWithoutOutMessage<NoInfer<Steps>>): CombinedStepRecipe<GraphModelOfValue<ModelInput>, Steps>;
++    <StepValue>(steps: ReadonlyArray<StepValue> & StepsForModel<CommonOperationSteps<StepValue>, OperationStepModel<CommonOperationSteps<StepValue>>> & RequireOperationStep<CommonOperationSteps<StepValue>> & StepsWithoutOutMessage<ReadonlyArray<StepValue>>): (model: GraphInput<OperationStepModel<CommonOperationSteps<StepValue>>, CombinedGraphRequirement<CommonOperationSteps<StepValue>>>) => CombinedStepOutputFor<OperationStepModel<CommonOperationSteps<StepValue>>, CommonOperationSteps<StepValue>> | CombinedStepRecipe<OperationStepModel<CommonOperationSteps<StepValue>>, CommonOperationSteps<StepValue>>;
++    <ModelInput, StepValue>(model: ModelInput & GraphInput<GraphModelOfValue<ModelInput>, NoInfer<CombinedGraphRequirement<CommonOperationSteps<StepValue>>>>, steps: ReadonlyArray<StepValue> & StepsForModel<CommonOperationSteps<StepValue>, GraphModelOfValue<ModelInput>> & RequireOperationStep<CommonOperationSteps<StepValue>> & StepsWithoutOutMessage<ReadonlyArray<StepValue>>): CombinedStepOutputFor<GraphModelOfValue<ModelInput>, CommonOperationSteps<StepValue>> | CombinedStepRecipe<GraphModelOfValue<ModelInput>, CommonOperationSteps<StepValue>>;
+     <const Steps extends NonEmptySteps>(steps: Steps & StepsForModel<Steps, FirstStepModel<Steps>> & StepsWithoutOutMessage<NoInfer<Steps>>): (model: GraphInput<FirstStepModel<Steps>, CombinedGraphRequirement<Steps>>) => WithRegistrationEvidence<Return<FirstStepModel<Steps>, CombinedStepMessage<Steps>, CombinedStepRequirements<Steps>>, CombinedStepRegistrationEvidence<Steps>>;
+     <Model, const StepReturns extends NonEmptyStepReturnsFor<Model>>(model: Model, steps: StepsFromReturns<Model, StepReturns>): WithRegistrationEvidence<Return<Model, CommandMessage<StepReturns[number]>, CommandRequirements<StepReturns[number]>>, RegistrationEvidenceOf<StepReturns[number]>>;
+     <ModelInput, const Steps extends ReadonlyArray<AnyStep>>(model: ModelInput, steps: Steps extends readonly [] ? Steps : number extends Steps['length'] ? [CombinedGraphRequirement<Steps>] extends [never] ? Steps & StepsForModel<Steps, GraphModelOfValue<ModelInput>> & StepsWithoutOutMessage<NoInfer<Steps>> : never : never): WithRegistrationEvidence<Return<GraphModelOfValue<ModelInput>, CombinedStepMessage<Steps>, CombinedStepRequirements<Steps>>, CombinedStepRegistrationEvidence<Steps>>;

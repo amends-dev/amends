@@ -49,42 +49,26 @@ const fullData = ApiData.make({
 })
 const signatureId = scopedId('function', 'Command', 'define')
 
-const failedLoad = (model: Model) =>
+const failedLoad = (model: typeof Model.Type) =>
   update(model, Message.FailedLoadApiData({ error: 'Offline' }))
 
 describe('API Reference startup', () => {
-  test('init creates an idle baseline without Commands', () => {
-    const apiReferenceInit = init()
-
-    expect(apiReferenceInit.model).toEqual({
-      apiData: ApiDataAsyncData.Idle(),
-      disclosures: {},
-    })
-    expect(apiReferenceInit.commands).toEqual([])
-  })
-
   test('cold startup schedules the full reference load', () => {
-    const initialDataLoad = ApiReferenceBlock.operations.requestLoadInitialData(
-      init().model,
-    )
+    const initialDataLoad = init()
 
     expect(initialDataLoad.model.apiData).toEqual(ApiDataAsyncData.Loading())
+    expect(initialDataLoad.model.disclosures).toEqual({})
     expect(initialDataLoad.commands).toHaveLength(1)
     expect(initialDataLoad.commands?.map(command => command.name)).toEqual([
       LoadApiData.name,
     ])
-    expectTypeOf<
-      Update.RequirementsOf<
-        typeof ApiReferenceBlock.operations.requestLoadInitialData
-      >
-    >().toEqualTypeOf<Command.HandlerOf<typeof LoadApiData>>()
+    expectTypeOf<Update.RequirementsOf<typeof init>>().toEqualTypeOf<
+      Command.HandlerOf<typeof LoadApiData>
+    >()
   })
 
   test('prerendered data stays visible while the full reference loads', () => {
-    const initialDataLoad = ApiReferenceBlock.operations.requestLoadInitialData(
-      init().model,
-      Option.some(seededData),
-    )
+    const initialDataLoad = init(Option.some(seededData))
 
     expect(initialDataLoad.model.apiData).toEqual(
       ApiDataAsyncData.Refreshing({ data: seededData }),
@@ -101,9 +85,7 @@ describe('API Reference startup', () => {
   })
 
   test('failed cold loads can be requested again', () => {
-    const initialDataLoad = ApiReferenceBlock.operations.requestLoadInitialData(
-      init().model,
-    )
+    const initialDataLoad = init()
     const apiReferenceFailure = failedLoad(initialDataLoad.model)
     const retry = ApiReferenceBlock.operations.informRouteChanged(
       apiReferenceFailure.model,
@@ -119,10 +101,7 @@ describe('API Reference startup', () => {
   })
 
   test('failed full loads retain the seeded slice and retry on entry', () => {
-    const initialDataLoad = ApiReferenceBlock.operations.requestLoadInitialData(
-      init().model,
-      Option.some(seededData),
-    )
+    const initialDataLoad = init(Option.some(seededData))
     const apiReferenceFailure = failedLoad(initialDataLoad.model)
     const retry = ApiReferenceBlock.operations.informRouteChanged(
       apiReferenceFailure.model,
@@ -148,10 +127,7 @@ describe('API Reference startup', () => {
   })
 
   test('full success adds disclosures without resetting the seeded selection', () => {
-    const initialDataLoad = ApiReferenceBlock.operations.requestLoadInitialData(
-      init().model,
-      Option.some(seededData),
-    )
+    const initialDataLoad = init(Option.some(seededData))
     const expandedModel = modifyFields(initialDataLoad.model, {
       disclosures: () => ({ [signatureId]: true }),
     })

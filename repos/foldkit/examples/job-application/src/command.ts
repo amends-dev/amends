@@ -3,7 +3,7 @@ import { Duration, Effect } from 'effect'
 import { ApplicationDefinition } from './definition'
 import { Message } from './message'
 
-export const SubmitApplication = ApplicationDefinition.command(
+export const SubmitApplication = ApplicationDefinition.makeCommand(
   'SubmitApplication',
   {
     messages: [

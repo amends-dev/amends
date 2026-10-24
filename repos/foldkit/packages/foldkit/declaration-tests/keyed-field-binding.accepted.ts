@@ -22,24 +22,29 @@ const DeclarationKeyedFieldChildComposition = Block.makeDefinition(
     Message: ChildMessage,
   },
 ).makeComposition()
-export const ChildBlock = DeclarationKeyedFieldChildComposition.assembleBlock({
-  init: DeclarationKeyedFieldChildComposition.makeInit(() => ({
-    model: ChildModel.make({ id: 'initial', count: 0 }),
-  })),
-  update: DeclarationKeyedFieldChildComposition.makeUpdate((model, message) =>
-    ChildMessage.match(message, {
-      UpdatedCount: ({ count }) => ({
-        model: Struct.modifyFields(model, { count: () => count }),
+const prepareChildBlock = () =>
+  DeclarationKeyedFieldChildComposition.prepareBlock({
+    init: DeclarationKeyedFieldChildComposition.makeInit(() => ({
+      model: ChildModel.make({ id: 'initial', count: 0 }),
+    })),
+    update: DeclarationKeyedFieldChildComposition.makeUpdate((model, message) =>
+      ChildMessage.match(message, {
+        UpdatedCount: ({ count }) => ({
+          model: Struct.modifyFields(model, { count: () => count }),
+        }),
+        RequestedRefresh: () => ({ model }),
+        RequestedSelect: () => ({ model }),
+        CompletedReadCount: ({ count }) => ({
+          model: Struct.modifyFields(model, { count: () => count }),
+        }),
       }),
-      RequestedRefresh: () => ({ model }),
-      RequestedSelect: () => ({ model }),
-      CompletedReadCount: ({ count }) => ({
-        model: Struct.modifyFields(model, { count: () => count }),
-      }),
-    }),
-  ),
-  EffectsLayer: Layer.empty,
-})
+    ),
+    EffectsLayer: Layer.empty,
+  })
+export const ChildBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ChildModel,
+  typeof prepareChildBlock
+> = Block.assemble(prepareChildBlock)
 
 export const CallableChildModel = FoldkitSchema.taggedStruct(
   'DeclarationCallableKeyedFieldChild',
@@ -53,8 +58,8 @@ const DeclarationCallableKeyedFieldChildComposition = Block.makeDefinition(
     Message: ChildMessage,
   },
 ).makeComposition()
-export const CallableChildBlock =
-  DeclarationCallableKeyedFieldChildComposition.assembleBlock({
+const prepareCallableChildBlock = () =>
+  DeclarationCallableKeyedFieldChildComposition.prepareBlock({
     init: DeclarationCallableKeyedFieldChildComposition.makeInit(() => ({
       model: CallableChildModel({ id: 'initial', count: 0 }),
     })),
@@ -73,6 +78,10 @@ export const CallableChildBlock =
     ),
     EffectsLayer: Layer.empty,
   })
+export const CallableChildBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof CallableChildModel,
+  typeof prepareCallableChildBlock
+> = Block.assemble(prepareCallableChildBlock)
 
 export const RefinedId = Schema.String.pipe(
   Schema.brand('DeclarationKeyedFieldRefinedId'),
@@ -91,8 +100,8 @@ const DeclarationRefinedKeyChildComposition = Block.makeDefinition(
     Message: RefinedKeyMessage,
   },
 ).makeComposition()
-export const RefinedKeyBlock =
-  DeclarationRefinedKeyChildComposition.assembleBlock({
+const prepareRefinedKeyBlock = () =>
+  DeclarationRefinedKeyChildComposition.prepareBlock({
     init: DeclarationRefinedKeyChildComposition.makeInit(() => ({
       model: RefinedKeyModel.make({
         id: Schema.decodeSync(RefinedId)('initial'),
@@ -105,6 +114,10 @@ export const RefinedKeyBlock =
     })),
     EffectsLayer: Layer.empty,
   })
+export const RefinedKeyBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof RefinedKeyModel,
+  typeof prepareRefinedKeyBlock
+> = Block.assemble(prepareRefinedKeyBlock)
 
 const ArrayChildModel = Schema.Array(Schema.String)
 const ArrayChildMessage = Message.defineMessageUnion({ IgnoredValue: {} })
@@ -116,8 +129,8 @@ const DeclarationArrayModelChildComposition = Block.makeDefinition(
     Message: ArrayChildMessage,
   },
 ).makeComposition()
-export const ArrayChildBlock =
-  DeclarationArrayModelChildComposition.assembleBlock({
+const prepareArrayChildBlock = () =>
+  DeclarationArrayModelChildComposition.prepareBlock({
     init: DeclarationArrayModelChildComposition.makeInit(() => ({
       model: ArrayChildModel.make(['initial']),
     })),
@@ -126,6 +139,10 @@ export const ArrayChildBlock =
     })),
     EffectsLayer: Layer.empty,
   })
+export const ArrayChildBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ArrayChildModel,
+  typeof prepareArrayChildBlock
+> = Block.assemble(prepareArrayChildBlock)
 
 export class ChildCounter extends Context.Service<
   ChildCounter,
@@ -142,9 +159,8 @@ const DeclarationKeyedFieldOutChildDefinition = Block.makeDefinition(
     OutMessage: ChildOutMessage,
   },
 )
-export const ReadChildCount = DeclarationKeyedFieldOutChildDefinition.command(
-  'ReadChildCount',
-  {
+export const ReadChildCount =
+  DeclarationKeyedFieldOutChildDefinition.makeCommand('ReadChildCount', {
     messages: [ChildMessage.CompletedReadCount],
     handler: function* () {
       const counter = yield* ChildCounter
@@ -154,12 +170,11 @@ export const ReadChildCount = DeclarationKeyedFieldOutChildDefinition.command(
           Effect.map(count => ChildMessage.CompletedReadCount({ count })),
         )
     },
-  },
-)
+  })
 const DeclarationKeyedFieldOutChildComposition =
   DeclarationKeyedFieldOutChildDefinition.makeComposition()
-export const OutChildBlock =
-  DeclarationKeyedFieldOutChildComposition.assembleBlock({
+const prepareOutChildBlock = () =>
+  DeclarationKeyedFieldOutChildComposition.prepareBlock({
     init: DeclarationKeyedFieldOutChildComposition.makeInit(() => ({
       model: ChildModel.make({ id: 'initial', count: 0 }),
     })),
@@ -185,6 +200,10 @@ export const OutChildBlock =
     },
     EffectsLayer: ReadChildCount.layer,
   })
+export const OutChildBlock: Block.FromAssemblyWithOutMessage<
+  typeof ChildModel,
+  typeof prepareOutChildBlock
+> = Block.assemble(prepareOutChildBlock)
 
 const WrappedRow = Schema.Struct({
   rowId: Schema.String,
@@ -249,10 +268,13 @@ export const DeclarationCallableKeyedFieldParentDefinition =
     Message: CallableParentMessage,
   })
 export const CallableEntriesBinding =
-  DeclarationCallableKeyedFieldParentDefinition.bindChild(CallableChildBlock, {
-    field: 'entries',
-    key: 'id',
-  })
+  DeclarationCallableKeyedFieldParentDefinition.makeBinding(
+    CallableChildBlock,
+    {
+      field: 'entries',
+      key: 'id',
+    },
+  )
 const DeclarationCallableKeyedFieldParentComposition =
   DeclarationCallableKeyedFieldParentDefinition.makeComposition({
     bindings: [CallableEntriesBinding],
@@ -266,7 +288,7 @@ export const callableInitialParentModel = CallableParentModel({
   entries: [CallableChildModel({ id: 'first', count: 1 })],
 })
 
-export const EntriesBinding = DeclarationKeyedFieldParentDefinition.bindChild(
+export const EntriesBinding = DeclarationKeyedFieldParentDefinition.makeBinding(
   ChildBlock,
   {
     field: 'entries',
@@ -302,7 +324,7 @@ const DeclarationInitializedKeyedFieldParentDefinition = Block.makeDefinition(
   },
 )
 export const InitializedEntriesBinding =
-  DeclarationInitializedKeyedFieldParentDefinition.bindChild(ChildBlock, {
+  DeclarationInitializedKeyedFieldParentDefinition.makeBinding(ChildBlock, {
     field: 'entries',
     key: 'id',
     init: {
@@ -323,60 +345,61 @@ export const initializeKeyedParent =
   )
 
 export const EquivalentEntriesBinding =
-  DeclarationKeyedFieldParentDefinition.bindChild(ChildBlock, {
+  DeclarationKeyedFieldParentDefinition.makeBinding(ChildBlock, {
     field: 'equivalentEntries',
     key: 'id',
   })
 
 export const SuspendedEntriesBinding =
-  DeclarationKeyedFieldParentDefinition.bindChild(ChildBlock, {
+  DeclarationKeyedFieldParentDefinition.makeBinding(ChildBlock, {
     field: 'suspendedEntries',
     key: 'id',
   })
 
 export const BrandedEntriesBinding =
-  DeclarationKeyedFieldParentDefinition.bindChild(RefinedKeyBlock, {
+  DeclarationKeyedFieldParentDefinition.makeBinding(RefinedKeyBlock, {
     field: 'brandedEntries',
     key: 'id',
   })
 
 export const LiteralEntriesBinding =
-  DeclarationKeyedFieldParentDefinition.bindChild(RefinedKeyBlock, {
+  DeclarationKeyedFieldParentDefinition.makeBinding(RefinedKeyBlock, {
     placement: 'literalEntries',
     field: 'literalEntries',
     key: 'kind',
   })
 
 export const ArrayChildBinding =
-  DeclarationKeyedFieldParentDefinition.bindChild(ArrayChildBlock, {
+  DeclarationKeyedFieldParentDefinition.makeBinding(ArrayChildBlock, {
     field: 'arrayChild',
   })
 
 export const OutEntriesBinding =
-  DeclarationKeyedFieldParentDefinition.bindChild(OutChildBlock, {
+  DeclarationKeyedFieldParentDefinition.makeBinding(OutChildBlock, {
     field: 'outEntries',
     key: 'id',
-    outMessage: {
-      fold: (id, outMessage, context) => {
-        const exactId: string = id
-        const exactOutMessage: typeof ChildOutMessage.Type = outMessage
-        const exactContext: Update.FoldContext<
-          typeof ChildMessage.Type,
-          typeof ParentMessage.Type,
-          typeof ParentModel.Type
-        > = context
-        void exactId
-        void exactOutMessage
-        void exactContext
+  }).withOutMessagePolicy({
+    fold: (id, outMessage, context) => {
+      const exactId: string = id
+      const exactOutMessage: typeof ChildOutMessage.Type = outMessage
+      const exactContext: Update.FoldContext<
+        typeof ChildMessage.Type,
+        typeof ParentMessage.Type,
+        typeof ParentModel.Type
+      > = context
+      void exactId
+      void exactOutMessage
+      void exactContext
 
-        return DeclarationKeyedFieldParentDefinition.step(model => ({ model }))
-      },
+      return DeclarationKeyedFieldParentDefinition.makeStep(model => ({
+        model,
+      }))
     },
   })
 export const outEntriesInspection = Block.inspectBinding(OutEntriesBinding)
 
 export const WrappedRowsBinding =
-  DeclarationKeyedFieldParentDefinition.bindChild(ChildBlock, {
+  DeclarationKeyedFieldParentDefinition.makeBinding(ChildBlock, {
     placement: 'wrappedRows',
     readAll: model => model.wrappedRows,
     key: row => row.rowId,
@@ -392,7 +415,7 @@ export const WrappedRowsBinding =
       }),
   })
 
-export const RoomBinding = DeclarationKeyedFieldParentDefinition.bindChild(
+export const RoomBinding = DeclarationKeyedFieldParentDefinition.makeBinding(
   ChildBlock,
   {
     placement: 'room',

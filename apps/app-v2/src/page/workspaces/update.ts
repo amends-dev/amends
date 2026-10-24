@@ -50,14 +50,14 @@ const atJoinForm = (model: Model, change: (form: EnteringAs<"FillingJoin">) => E
   modifyFields(model, { entering: Option.map(Entering.matchOrElse({ FillingJoin: change }, (same) => same)) })
 
 /** Ask for a new workspace: no names yet, no request made, and nothing refused. */
-const openCreateForm = WorkspacesDefinition.stepFields(() => ({
+const openCreateForm = WorkspacesDefinition.makeFieldsStep(() => ({
   entering: () =>
     Option.some(Entering.FillingCreate({ name: "", memberName: "", key: Option.none(), errors: noFormErrors }))
 }))
 
 /** Answer `invitation`, offering the name suggested from the person's address, and with nothing refused. */
 const openJoinForm = (invitation: PendingInvitation) =>
-  WorkspacesDefinition.step((model: Model) => ({
+  WorkspacesDefinition.makeStep((model: Model) => ({
     model: modifyFields(model, {
       entering: () => Option.some(Entering.FillingJoin({ invitation, name: model.suggestedName, errors: noJoinErrors }))
     })
@@ -65,7 +65,7 @@ const openJoinForm = (invitation: PendingInvitation) =>
 
 /** Once the workspace is created, the dialog opens it, while the person is still at the dialog. */
 const openCreated = (workspace: Workspace.Workspace) =>
-  WorkspacesDefinition.stepFields(() => ({
+  WorkspacesDefinition.makeFieldsStep(() => ({
     entering: Option.map(
       Entering.matchOrElse(
         {
@@ -78,7 +78,7 @@ const openCreated = (workspace: Workspace.Workspace) =>
   }))
 
 /** Once the person is in the workspace, the dialog has joined it, while the person is still at the dialog. */
-const markJoined = WorkspacesDefinition.stepFields(() => ({
+const markJoined = WorkspacesDefinition.makeFieldsStep(() => ({
   entering: Option.map(
     Entering.matchOrElse(
       { SendingJoin: ({ invitation }) => Entering.Joined({ invitation, reloadFailed: false }) },
@@ -112,7 +112,7 @@ const failedToList = Workspaces.matchOrElse(
 )
 
 /** Read the listing again, which is under way until it ends. */
-const reload = WorkspacesDefinition.step((model: Model) => ({
+const reload = WorkspacesDefinition.makeStep((model: Model) => ({
   model: modifyFields(model, { workspaces: listedAgain, entering: reloadFailedAs(false) }),
   commands: [LoadWorkspaces()]
 }))
@@ -122,7 +122,7 @@ const reload = WorkspacesDefinition.step((model: Model) => ({
  * row, since the invitation's button they pressed has gone.
  */
 const announceJoined = (workspace: Workspace.Workspace) =>
-  WorkspacesDefinition.step((model: Model) => ({
+  WorkspacesDefinition.makeStep((model: Model) => ({
     model: modifyFields(model, {
       confirmations: (confirmations) => [
         ...confirmations,
@@ -152,14 +152,14 @@ export const update = WorkspacesComposition.makeUpdate((model, message) =>
           {
             Opening: ({ workspaceId }) =>
               Update.withOutMessage(
-                Update.combine(listed, [leaveEntering, DialogBinding.requestClose()]),
+                Update.combineSteps(listed, [leaveEntering, DialogBinding.requestClose()]),
                 Option.match(findMembership(memberships, workspaceId), {
                   onNone: () => undefined,
                   onSome: (membership) => OutMessage.OpenedWorkspace({ membership })
                 })
               ),
             Joined: ({ invitation }) =>
-              Update.combine(listed, [
+              Update.combineSteps(listed, [
                 leaveEntering,
                 DialogBinding.requestClose(),
                 ...Option.toArray(
@@ -192,9 +192,9 @@ export const update = WorkspacesComposition.makeUpdate((model, message) =>
     ClickedAccept: ({ invitationId }) =>
       Option.match(findInvitation(model.workspaces, invitationId), {
         onNone: () => ({ model }),
-        onSome: (invitation) => Update.combine(model, [openJoinForm(invitation), DialogBinding.requestOpen()])
+        onSome: (invitation) => Update.combineSteps(model, [openJoinForm(invitation), DialogBinding.requestOpen()])
       }),
-    ClickedCreate: () => Update.combine(model, [openCreateForm, DialogBinding.requestOpen()]),
+    ClickedCreate: () => Update.combineSteps(model, [openCreateForm, DialogBinding.requestOpen()]),
     TypedName: ({ name }) => ({
       model: atCreateForm(model, (form) =>
         Entering.FillingCreate({
@@ -245,7 +245,7 @@ export const update = WorkspacesComposition.makeUpdate((model, message) =>
           ]
         })
       }),
-    SucceededCreate: ({ workspace }) => Update.combine(model, [openCreated(workspace), reload]),
+    SucceededCreate: ({ workspace }) => Update.combineSteps(model, [openCreated(workspace), reload]),
     FailedCreate: ({ key, error }) =>
       Option.match(enteringAs(model, "SendingCreate"), {
         onNone: () => ({ model }),
@@ -255,7 +255,7 @@ export const update = WorkspacesComposition.makeUpdate((model, message) =>
           })
         })
       }),
-    SucceededJoin: () => Update.combine(model, [markJoined, reload]),
+    SucceededJoin: () => Update.combineSteps(model, [markJoined, reload]),
     FailedJoin: ({ error }) =>
       Option.match(enteringAs(model, "SendingJoin"), {
         onNone: () => ({ model }),

@@ -1,5 +1,5 @@
 import { Array, Schema, Tuple } from 'effect'
-import { Block, Update } from 'foldkit'
+import { Block } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
 
@@ -7,20 +7,17 @@ import { VirtualList } from '@foldkit/ui'
 import { ScrollTarget as VirtualListScrollTarget } from '@foldkit/ui/virtualList'
 
 const ChatMessage = Schema.Struct({ id: Schema.String, body: Schema.String })
-type ChatMessage = typeof ChatMessage.Type
 
-const MessageList = VirtualList.create<ChatMessage>()
+const MessageList = VirtualList.create<typeof ChatMessage.Type>()
 
 const Model = Schema.Struct({
   messages: Schema.Array(ChatMessage),
   messageList: MessageList.Model,
 })
-type Model = typeof Model.Type
 
 const Message = defineMessageUnion({
   ReceivedMessage: { message: ChatMessage },
 })
-type Message = typeof Message.Type
 
 const initialMessages: ReadonlyArray<typeof ChatMessage.Type> = []
 
@@ -32,25 +29,26 @@ const MessageListExampleDefinition = Block.makeDefinition(
   },
 )
 
-const foldMessageListOutMessage = MessageList.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  ObservedContainerScroll: () => MessageListExampleDefinition.stepNoop(),
-})
+const foldMessageListOutMessage =
+  MessageListExampleDefinition.makeOutMessageFold(MessageList, {
+    ObservedContainerScroll: MessageListExampleDefinition.makeNoopStep,
+  })
 
-const MessageListBinding = MessageListExampleDefinition.bindChild(MessageList, {
-  field: 'messageList',
-  outMessage: { fold: foldMessageListOutMessage },
-  init: {
-    contextToArgs: () =>
-      Tuple.make({
-        id: 'message-list',
-        rowHeightPx: 64,
-        initialScroll: { target: VirtualListScrollTarget.End() },
-        followEnd: { thresholdPx: 8 },
-      }),
+const MessageListBinding = MessageListExampleDefinition.makeBinding(
+  MessageList,
+  {
+    field: 'messageList',
+    init: {
+      contextToArgs: () =>
+        Tuple.make({
+          id: 'message-list',
+          rowHeightPx: 64,
+          initialScroll: { target: VirtualListScrollTarget.End() },
+          followEnd: { thresholdPx: 8 },
+        }),
+    },
   },
-})
+).withOutMessagePolicy({ fold: foldMessageListOutMessage })
 
 const MessageListExampleComposition =
   MessageListExampleDefinition.makeComposition({

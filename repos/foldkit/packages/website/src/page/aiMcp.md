@@ -20,7 +20,7 @@ Keep API keys, passwords, access and refresh tokens, authorization headers, sess
 
 When the browser must temporarily carry a sensitive value, represent it with Effect's `Redacted` type. Use a `Schema.Redacted` field with `disallowJsonEncode: true`, construct its value with `Redacted.make`, and recover it only where the application must use it. `Redacted` prevents normal string, JSON, and inspection output from revealing the value. It does not encrypt the value or make a browser-side credential secret from the person running the browser.
 
-`excludeFromHistory` is not a redaction control. It removes the named Message from history, but the resulting Model remains available through current and historical Model inspection. Omitting `DevToolsConfig.Message` disables agent dispatch only; every inspection and replay tool remains available.
+`excludeFromHistory` is not a redaction control. It removes the named Message from history, but the resulting Model remains available through current and historical Model inspection. External dispatch is disabled by default; every inspection and replay tool remains available.
 
 ### Disable MCP Connections
 
@@ -60,11 +60,13 @@ Set `FOLDKIT_DEVTOOLS_MCP_PORT` to the same port for the MCP server. When the ag
 
 #### Enable Message Dispatch
 
-To let an agent dispatch Messages, pass the application's `Message` Schema to `ApplicationComposition.assembleApplication`:
+To let an agent discover and dispatch Messages, set `devTools.dispatch` to `true`:
 
 ::Snippet{name="aiMcpApplicationConfig" label="Application configuration"}
 
-Inspection and replay tools work without the Schema. Dispatch tools reject every request until it is configured.
+Foldkit derives the dispatch Schema from the completed root Block. That Schema contains the root's local Message variants and the generated envelopes for registered child Blocks. Inspection and replay tools work without this opt-in. Dispatch tools reject every request until it is enabled, and `foldkit_get_message_schema` returns `None`.
+
+When the root Message Codec needs Services for decoding, `dispatch: true` carries those requirements into the Program. Supply any remaining decoding Services through `program.provide(...)`. The bridge decodes with the resulting Runtime Context; enabling dispatch does not provide the Services itself. Leaving dispatch disabled adds no Message decoding requirements.
 
 #### Connect the Agent and Browser
 
@@ -120,12 +122,14 @@ More than one browser tab can connect at once. `foldkit_list_runtimes` returns e
 
 ### Message Decoding
 
-Messages stay as Effect Schema values across the connection. Before dispatching, an agent can call `foldkit_get_message_schema` for the top-level variants and then inspect the payload shape of the variant it needs. The Runtime decodes the constructed value before it reaches update. A batch is fully decoded before its first Message is dispatched.
+Messages stay as Effect Schema values across the connection. Before dispatching, an agent can call `foldkit_get_message_schema` for the top-level variants and then inspect the payload shape of the variant it needs. The Runtime decodes the constructed value against the completed root Block's Message Codec before it reaches update. A batch is fully decoded before its first Message is dispatched.
+
+The bridge derives JSON Schema for the transport boundary. A Message payload must have a supported JSON representation to be dispatched from MCP. Browser-memory values such as `File` cannot be constructed through this connection.
 
 ## Development and Production
 
 The MCP bridge follows the DevTools lifecycle. DevTools and the bridge are enabled by default during development. Setting `devTools: false` disables both, so no Runtime is visible to MCP.
 
-The Message Schema controls dispatch only. Without it, inspection and replay tools remain available.
+External dispatch and Message Schema discovery require `devTools: { dispatch: true }`. Without it, inspection and replay tools remain available.
 
 The relay and browser bridge run only in development. Production builds omit both, including builds that configure the DevTools panel with `show: 'Always'`.

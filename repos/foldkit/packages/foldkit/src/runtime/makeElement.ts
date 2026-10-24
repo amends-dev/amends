@@ -93,10 +93,10 @@ export type ElementConfigWithFlags<
   Readonly<{
     /**
      * Resolves the Flags once at startup, before `init` runs. Define an
-     * Element with `ApplicationComposition.assembleElement` to supply shared Flags services
-     * through the completed Element's `provide` method. The error channel is
-     * `never`, so this Effect handles its own failures with `Effect.catch`,
-     * the same contract a Command's Effect has.
+     * Element with `Program.makeElement` to supply shared Flags Services through
+     * the completed Program's `provide` method. The error channel is `never`, so
+     * this Effect handles its own failures with `Effect.catch`, the same contract
+     * a Command's Effect has.
      */
     flags: Effect.Effect<Flags, never, NoInfer<Resources>>
     init: (
@@ -340,8 +340,10 @@ const toCrashConfig = <Model, Message>(
  * `makeApplication` when the app owns the page and should manage those tags, and
  * `makeElement` when it is one component among others on a page it does not
  * control. Embedded apps do not own the URL bar, so `makeElement` has no
- * `routing` config. Use `ApplicationComposition.assembleElement` when Commands, Flags,
- * Subscriptions, Mounts, or ManagedResources need services.
+ * `routing` config. Complete the root with
+ * `ApplicationComposition.prepareBlock`, pass it to `Program.makeElement`, and
+ * supply Services through the Program's `provide` method when Commands, Flags,
+ * Subscriptions, Mounts, or ManagedResources need them.
  */
 export function makeElement<
   const ModelSchema extends Schema.Codec<any, any, any, any>,

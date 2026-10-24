@@ -43,11 +43,11 @@ type ChildAttributeValue<RequiredMountRequirements> =
  *
  *  `resolveUnmount` snapshots the boundary's wrapping chain at the time the
  *  group was published (child boundary alive) so `OnUnmount` can dispatch a
- *  root message from a destroy hook that fires after the boundary has been
- *  torn down. `boundaryMappers` snapshots the `toParentMessage` lifts
- *  (innermost first) for the Scene test harness. Groups containing `OnMount`
- *  also carry `resolveMountDispatch`, which binds the Mount to the acquiring
- *  render's dispatch owner while following that owner's current live wrappers.
+ *  root message after the boundary has been torn down. `boundaryMappers`
+ *  snapshots the `toParentMessage` lifts (innermost first) for the Scene test
+ *  harness. Groups containing `OnMount` also carry `resolveMountDispatch`,
+ *  which binds the Mount to the acquiring render's dispatch owner while
+ *  following that owner's current live wrappers.
  *
  *  Created via {@link childAttributes}. Element constructors accept
  *  `ChildAttribute` alongside `Attribute<Message>` in their attribute

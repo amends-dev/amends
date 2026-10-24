@@ -431,7 +431,7 @@ const wrapEffectAsStream =
  * `handler` is a generator function that constructs the handler. Foldkit
  * applies `Effect.gen` to the generator. Include the Definition in the owning
  * Block's `makeComposition({ mounts: [...] })` call and include its `layer`
- * recipe in the local Effects Layer passed to `assembleBlock`. The returned
+ * recipe in the local Effects Layer passed to `prepareBlock`. The returned
  * handler receives the live `Element` as `element` and the runtime's
  * `viewStateChanges` Stream alongside the declared args, and returns an
  * `Effect<Message>` that runs once when the element mounts.
@@ -483,9 +483,10 @@ const wrapEffectAsStream =
  * effect stays observable; `update` simply has nothing meaningful to
  * do with the acknowledgment.
  *
- * Cleanup is asynchronous with respect to snabbdom's `destroy` hook: the
- * runtime forks `Fiber.interrupt` and returns immediately, so finalizers run
- * on a separate fiber after `destroy` has already completed. For idempotent
+ * The runtime starts cleanup from snabbdom's `destroy` hook by forking
+ * `Fiber.interrupt` without waiting. A release with no asynchronous step
+ * normally finishes inside `destroy`, before snabbdom removes the element's
+ * event listeners; one with an asynchronous step finishes later. For idempotent
  * DOM operations (`element.remove()`, observer `disconnect()`,
  * `removeEventListener`) this is fine; if your cleanup has ordering
  * requirements relative to other DOM removals, prefer doing the imperative
@@ -736,7 +737,7 @@ export function define<
  * constructs a Stream handler. Foldkit applies `Effect.gen` to the generator.
  * Include the Definition in the owning Block's
  * `makeComposition({ mounts: [...] })` call and include its `layer` recipe in the
- * local Effects Layer passed to `assembleBlock`. The completed Block carries the
+ * local Effects Layer passed to `prepareBlock`. The completed Block carries the
  * recipe without building it; a Runtime builds it once for the application.
  * The returned handler receives the
  * live `Element` as `element` and the runtime's
@@ -784,8 +785,8 @@ export function define<
  * effect stays observable; `update` simply has nothing meaningful to
  * do with the acknowledgment.
  *
- * Cleanup timing relative to snabbdom's `destroy` hook is the same as
- * `Mount.define` (asynchronous via `Fiber.interrupt`).
+ * Cleanup has the same timing relative to snabbdom's `destroy` hook as
+ * `Mount.define`.
  *
  * For a Mount that produces exactly one Message at acquire and then holds
  * lifecycle-scoped resources, use `Mount.define` with `Effect<Message>`.

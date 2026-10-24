@@ -1,26 +1,22 @@
-import type { Update } from 'foldkit'
-import { modifyFields } from 'foldkit/struct'
+import { Block } from 'foldkit'
 
-import { ApplicationDefinition, Message, Model } from './blockProfileContract'
+import type { Model } from './blockProfileContract'
+import { ApplicationDefinition } from './blockProfileContract'
 import * as Settings from './blockSettings'
 
-const foldSettingsOutMessage = Settings.SettingsBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  ChangedTheme:
-    ({ theme }) =>
-    model => ({
-      model: modifyFields(model, { previewTheme: () => theme }),
-    }),
-})
-
-export const SettingsBinding = ApplicationDefinition.bindChild(
+export const SettingsBinding = ApplicationDefinition.makeBinding(
   Settings.SettingsBlock,
   {
     field: 'settings',
-    outMessage: { fold: foldSettingsOutMessage },
   },
-)
+).withOutMessagePolicy({
+  fold: ApplicationDefinition.makeOutMessageFold(Settings.SettingsBlock, {
+    ChangedTheme: ({ theme }) =>
+      ApplicationDefinition.makeFieldsStep(() => ({
+        previewTheme: () => theme,
+      })),
+  }),
+})
 
 export const ApplicationComposition = ApplicationDefinition.makeComposition({
   bindings: [SettingsBinding],
@@ -44,3 +40,14 @@ export const view = ApplicationComposition.makeView((model, h) => ({
     }),
   ),
 }))
+
+const prepare = () =>
+  ApplicationComposition.prepareBlock({
+    init,
+    update,
+    view,
+  })
+export const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

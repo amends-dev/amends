@@ -1,4 +1,4 @@
-import { Array, Predicate, Schema, SchemaAST } from 'effect'
+import { Array, Option, Predicate, Schema, SchemaAST } from 'effect'
 
 import { modifyFields } from '../struct/index.js'
 import type { BindableBlock } from './binding.js'
@@ -56,9 +56,13 @@ export type RequiredKeyedField<Model, ChildModel> = RequiredExactField<
   ReadonlyArray<ChildModel>
 >
 
-/** @internal The wrapper Model stored by a parent array field. */
+/** @internal The wrapper Model stored by a parent keyed field. */
 export type WrappedItemAt<Model, Field extends keyof Model> =
-  Model[Field] extends ReadonlyArray<infer Item> ? Item : never
+  Model[Field] extends ReadonlyArray<infer Item>
+    ? Item
+    : Model[Field] extends Option.Option<infer Item>
+      ? Item
+      : never
 
 type IsUnion<Value, Whole = Value> = Value extends Whole
   ? [Whole] extends [Value]
@@ -69,7 +73,7 @@ type IsUnion<Value, Whole = Value> = Value extends Whole
 type SingularField<Field extends string> =
   IsUnion<Field> extends true ? never : string extends Field ? never : Field
 
-type WrappedArraySchema<
+type WrappedStorageSchema<
   ParentModelSchema extends Schema.Struct<Schema.Struct.Fields>,
   Field,
 > = Field extends keyof ParentModelSchema['fields']
@@ -77,13 +81,17 @@ type WrappedArraySchema<
     ? ItemSchema extends Schema.Struct<Schema.Struct.Fields>
       ? ParentModelSchema['fields'][Field]
       : never
-    : never
+    : ParentModelSchema['fields'][Field] extends Schema.Option<infer ItemSchema>
+      ? ItemSchema extends Schema.Struct<Schema.Struct.Fields>
+        ? ParentModelSchema['fields'][Field]
+        : never
+      : never
   : never
 
-type ValidateWrappedArrayField<
+type ValidateWrappedStorageField<
   ParentModelSchema extends Schema.Struct<Schema.Struct.Fields>,
   Field extends keyof ParentModelSchema['Type'],
-> = [WrappedArraySchema<ParentModelSchema, Field>] extends [never]
+> = [WrappedStorageSchema<ParentModelSchema, Field>] extends [never]
   ? never
   : {} extends Pick<ParentModelSchema['Type'], Field>
     ? never
@@ -225,10 +233,10 @@ export type WrappedKeyedFieldConfig<
   ChildField extends string,
   Placement extends string,
 > = Readonly<{
-  /** Selects the required parent Struct field containing the declared array of
-   * closed Struct wrappers. */
+  /** Selects the required parent Struct field containing a declared array or
+   * Option of closed Struct wrappers. */
   field: SingularField<Field> &
-    ValidateWrappedArrayField<ParentModelSchema, Field>
+    ValidateWrappedStorageField<ParentModelSchema, Field>
   /** Selects the required stable string or finite-number key on each wrapper. The
    * parent owns that identity; it remains outside the child Model. */
   key: SingularField<KeyField> &
@@ -237,8 +245,9 @@ export type WrappedKeyedFieldConfig<
       KeyField
     >
   /** Selects the required wrapper field whose Schema has exactly the same
-   * decoded shape as the child Model. Writes replace only this field in an existing matching wrapper, preserving
-   * its key, other fields and collection order. It must differ from key. */
+   * decoded shape as the child Model. Writes replace only this field in an
+   * existing matching wrapper, preserving its key and other fields. Array
+   * storage also preserves collection order. It must differ from key. */
   childField: SingularField<ChildField> &
     ValidateRequiredExactField<
       WrappedItemAt<ParentModelSchema['Type'], Field>,
@@ -335,30 +344,50 @@ const isOptionalField = (fieldSchema: unknown): boolean => {
   )
 }
 
+type RuntimeWrappedStorage =
+  | Readonly<{
+      keyFields: object
+      childField: string
+      kind: 'Array' | 'Option'
+    }>
+  | Readonly<{
+      keyFields: unknown
+      childField: undefined
+      kind: 'Array'
+    }>
+
 const wrappedStorageOf = (
   parentModel: unknown,
   childModel: unknown,
   field: string,
   childField: unknown,
-): Readonly<{ keyFields: object; childField: string }> => {
+): Extract<RuntimeWrappedStorage, Readonly<{ childField: string }>> => {
   const parentFields = fieldsOf(parentModel)
-  const arraySchema = Predicate.isObject(parentFields)
+  const storageSchema = Predicate.isObject(parentFields)
     ? Reflect.get(parentFields, field)
     : undefined
-  const itemSchema = Schema.isSchema(arraySchema)
-    ? Reflect.get(arraySchema, 'value')
+  const itemSchema = Schema.isSchema(storageSchema)
+    ? Reflect.get(storageSchema, 'value')
     : undefined
   const itemFields = fieldsOf(itemSchema)
+  const isArrayStorage =
+    Schema.isSchema(storageSchema) &&
+    Schema.isSchema(itemSchema) &&
+    hasSameDecodedSchemaShape(storageSchema, Schema.Array(itemSchema))
+  const isOptionStorage =
+    Schema.isSchema(storageSchema) &&
+    Schema.isSchema(itemSchema) &&
+    hasSameDecodedSchemaShape(storageSchema, Schema.Option(itemSchema))
 
   if (
-    !Schema.isSchema(arraySchema) ||
-    isOptionalField(arraySchema) ||
+    !Schema.isSchema(storageSchema) ||
+    isOptionalField(storageSchema) ||
     !Schema.isSchema(itemSchema) ||
     !Predicate.isObject(itemFields) ||
-    !hasSameDecodedSchemaShape(arraySchema, Schema.Array(itemSchema))
+    (!isArrayStorage && !isOptionStorage)
   ) {
     throw new Error(
-      '[foldkit] A wrapped keyed field Binding requires a required Schema.Array of declared Struct wrappers.',
+      '[foldkit] A wrapped keyed field Binding requires a required Schema.Array of declared Struct wrappers or a required Schema.Option of one declared Struct wrapper.',
     )
   }
 
@@ -399,7 +428,11 @@ const wrappedStorageOf = (
     )
   }
 
-  return { keyFields: itemFields, childField }
+  return {
+    keyFields: itemFields,
+    childField,
+    kind: isOptionStorage ? 'Option' : 'Array',
+  }
 }
 
 const readWrappedChild = (item: unknown, childField: string): unknown => {
@@ -555,14 +588,18 @@ export const normalizeKeyedFieldConfig = (config: unknown): unknown => {
     )
   }
 
-  const storage = Object.hasOwn(config, 'childField')
+  const storage: RuntimeWrappedStorage = Object.hasOwn(config, 'childField')
     ? wrappedStorageOf(
         Model,
         ChildModel,
         field,
         Reflect.get(config, 'childField'),
       )
-    : { keyFields: fieldsOf(ChildModel), childField: undefined }
+    : {
+        keyFields: fieldsOf(ChildModel),
+        childField: undefined,
+        kind: 'Array',
+      }
 
   if (
     storage.childField === undefined &&
@@ -573,7 +610,12 @@ export const normalizeKeyedFieldConfig = (config: unknown): unknown => {
     )
   }
 
-  const { keyFields, childField } = storage
+  const { keyFields, childField, kind } = storage
+  if (kind === 'Option' && Object.hasOwn(config, 'init')) {
+    throw new Error(
+      '[foldkit] An Option-wrapped keyed field Binding cannot use init.instances; the parent owns its optional presence. Use Binding.init with an explicit toParentModel when creating an occurrence.',
+    )
+  }
   if (childField !== undefined && keyField === childField) {
     throw new Error(
       '[foldkit] A wrapped keyed field Binding key and childField must be distinct.',
@@ -637,6 +679,16 @@ export const normalizeKeyedFieldConfig = (config: unknown): unknown => {
   } = config
   const readAll = (model: object): ReadonlyArray<unknown> => {
     const children = Reflect.get(model, field)
+    if (kind === 'Option') {
+      if (!Option.isOption(children)) {
+        throw new Error(
+          `[foldkit] Wrapped keyed field Binding field "${field}" must contain an Option Struct wrapper.`,
+        )
+      }
+
+      return Option.toArray(children)
+    }
+
     if (!globalThis.Array.isArray(children)) {
       throw new Error(
         childField === undefined
@@ -679,6 +731,29 @@ export const normalizeKeyedFieldConfig = (config: unknown): unknown => {
       key: InstanceKey,
       nextChildModel: unknown,
     ) => {
+      if (kind === 'Option') {
+        const maybeItem = Reflect.get(model, field)
+        if (!Option.isOption(maybeItem)) {
+          throw new Error(
+            `[foldkit] Wrapped keyed field Binding field "${field}" must contain an Option Struct wrapper.`,
+          )
+        }
+
+        if (Option.isNone(maybeItem) || keyOf(maybeItem.value) !== key) {
+          return model
+        }
+
+        readWrappedChild(maybeItem.value, childField)
+        const nextItem = modifyFields(
+          /* eslint-disable-next-line @typescript-eslint/consistent-type-assertions */
+          maybeItem.value as globalThis.Record<string, unknown>,
+          { [childField]: () => nextChildModel },
+        )
+        return modifyFields(model, {
+          [field]: () => Option.some(nextItem),
+        })
+      }
+
       if (childField === undefined) {
         assertMatchingChildKey(key, nextChildModel, keyField)
       }

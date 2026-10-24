@@ -396,6 +396,96 @@ describe('Animation', () => {
       expect(animationHide.commands).toHaveLength(1)
     })
 
+    it('requests the standard wait only while leave is animating', () => {
+      const idleModel = init({ id: 'test' }).model
+      const idleWait = block.operations.requestWaitForLeaveSettlement(idleModel)
+
+      expect(idleWait).toEqual({ model: idleModel })
+
+      const leaveStart = update(
+        init({ id: 'test', isShowing: true }).model,
+        Message.RequestedHide(),
+      )
+      const leaveAnimating = update(
+        leaveStart.model,
+        Message.CompletedWaitForPaint({
+          generation: FIRST_TRANSITION_GENERATION,
+        }),
+      )
+      const leaveWait = block.operations.requestWaitForLeaveSettlement(
+        leaveAnimating.model,
+      )
+
+      expect(leaveWait.model).toBe(leaveAnimating.model)
+      expect(
+        leaveWait.commands?.map(({ name, args }) => ({ name, args })),
+      ).toStrictEqual([
+        {
+          name: WaitForAnimationSettled.name,
+          args: {
+            id: 'test',
+            generation: FIRST_TRANSITION_GENERATION,
+          },
+        },
+      ])
+    })
+
+    it('emits TransitionedOut once when the standard wait is explicitly requested twice', () => {
+      const leaveStart = update(
+        init({ id: 'test', isShowing: true }).model,
+        Message.RequestedHide(),
+      )
+      const leaveAnimating = update(
+        leaveStart.model,
+        Message.CompletedWaitForPaint({
+          generation: FIRST_TRANSITION_GENERATION,
+        }),
+      )
+      const duplicatePaint = update(
+        leaveAnimating.model,
+        Message.CompletedWaitForPaint({
+          generation: FIRST_TRANSITION_GENERATION,
+        }),
+      )
+      const firstWait = block.operations.requestWaitForLeaveSettlement(
+        duplicatePaint.model,
+      )
+      const duplicateWait = block.operations.requestWaitForLeaveSettlement(
+        firstWait.model,
+      )
+      const expectedWait = [
+        {
+          name: WaitForAnimationSettled.name,
+          args: {
+            id: 'test',
+            generation: FIRST_TRANSITION_GENERATION,
+          },
+        },
+      ]
+
+      expect(duplicatePaint).toEqual({ model: leaveAnimating.model })
+      expect(
+        firstWait.commands?.map(({ name, args }) => ({ name, args })),
+      ).toStrictEqual(expectedWait)
+      expect(
+        duplicateWait.commands?.map(({ name, args }) => ({ name, args })),
+      ).toStrictEqual(expectedWait)
+
+      const firstCompletion = update(
+        duplicateWait.model,
+        Message.EndedAnimation({ generation: FIRST_TRANSITION_GENERATION }),
+      )
+
+      expect(firstCompletion.outMessage).toEqual(OutMessage.TransitionedOut())
+
+      const duplicateCompletion = update(
+        firstCompletion.model,
+        Message.EndedAnimation({ generation: FIRST_TRANSITION_GENERATION }),
+      )
+
+      expect(duplicateCompletion).toEqual({ model: firstCompletion.model })
+    })
+
     it('resets a leaving Animation immediately without completing the transition', () => {
       const leaveStart = update(
         init({ id: 'test', isShowing: true }).model,

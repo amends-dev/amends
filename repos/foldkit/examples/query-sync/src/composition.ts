@@ -19,55 +19,59 @@ const selectionToParam = <A extends string>(
   )
 }
 
-const foldDietListboxOutMessage = DietListboxBlock.OutMessage.match({
-  Selected: ({ value }) =>
-    ApplicationDefinition.step(model => {
-      const fields = routeToBrowseFields(model.route)
-      return {
-        model,
-        commands: [
-          ReplaceFilters({
-            ...fields,
-            diet: selectionToParam(Option.some(value), Diet),
-          }),
-        ],
-      }
-    }),
-})
+const foldDietListboxOutMessage = ApplicationDefinition.makeOutMessageFold(
+  DietListboxBlock,
+  {
+    Selected: ({ value }) =>
+      ApplicationDefinition.makeStep(model => {
+        const fields = routeToBrowseFields(model.route)
+        return {
+          model,
+          commands: [
+            ReplaceFilters({
+              ...fields,
+              diet: selectionToParam(Option.some(value), Diet),
+            }),
+          ],
+        }
+      }),
+  },
+)
 
-export const DietListboxBinding = ApplicationDefinition.bindChild(
+export const DietListboxBinding = ApplicationDefinition.makeBinding(
   DietListboxBlock,
   {
     field: 'dietListbox',
     init: { contextToArgs: () => [{ id: 'diet-filter' }] },
-    outMessage: { fold: foldDietListboxOutMessage },
+  },
+).withOutMessagePolicy({ fold: foldDietListboxOutMessage })
+
+const foldPeriodListboxOutMessage = ApplicationDefinition.makeOutMessageFold(
+  PeriodListboxBlock,
+  {
+    Selected: ({ value }) =>
+      ApplicationDefinition.makeStep(model => {
+        const fields = routeToBrowseFields(model.route)
+        return {
+          model,
+          commands: [
+            ReplaceFilters({
+              ...fields,
+              period: selectionToParam(Option.some(value), Period),
+            }),
+          ],
+        }
+      }),
   },
 )
 
-const foldPeriodListboxOutMessage = PeriodListboxBlock.OutMessage.match({
-  Selected: ({ value }) =>
-    ApplicationDefinition.step(model => {
-      const fields = routeToBrowseFields(model.route)
-      return {
-        model,
-        commands: [
-          ReplaceFilters({
-            ...fields,
-            period: selectionToParam(Option.some(value), Period),
-          }),
-        ],
-      }
-    }),
-})
-
-export const PeriodListboxBinding = ApplicationDefinition.bindChild(
+export const PeriodListboxBinding = ApplicationDefinition.makeBinding(
   PeriodListboxBlock,
   {
     field: 'periodListbox',
     init: { contextToArgs: () => [{ id: 'period-filter' }] },
-    outMessage: { fold: foldPeriodListboxOutMessage },
   },
-)
+).withOutMessagePolicy({ fold: foldPeriodListboxOutMessage })
 
 export const ApplicationComposition = ApplicationDefinition.makeComposition({
   bindings: [DietListboxBinding, PeriodListboxBinding],

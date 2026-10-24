@@ -11,8 +11,8 @@ const DeclarationCanonicalConstructorChildComposition = Block.makeDefinition(
   'DeclarationCanonicalConstructorChild',
   { Model: ChildModel, Message: ChildMessage },
 ).makeComposition()
-export const ChildBlock =
-  DeclarationCanonicalConstructorChildComposition.assembleBlock({
+const prepareChildBlock = () =>
+  DeclarationCanonicalConstructorChildComposition.prepareBlock({
     init: DeclarationCanonicalConstructorChildComposition.makeInit(() => ({
       model: ChildModel.make({ value: 0 }),
     })),
@@ -22,6 +22,10 @@ export const ChildBlock =
       }),
     ),
   })
+export const ChildBlock: Block.FromAssemblyWithoutViewOrOutMessage<
+  typeof ChildModel,
+  typeof prepareChildBlock
+> = Block.assemble(prepareChildBlock)
 const ParentModel = Schema.Struct({ child: ChildModel })
 declare const PayloadWithUnknownDecodingServices: Schema.Codec<
   string,
@@ -38,11 +42,11 @@ export const DeclarationCanonicalConstructorParentDefinition =
     Message: ParentMessage,
   })
 export const CanonicalBinding =
-  DeclarationCanonicalConstructorParentDefinition.bindChild(ChildBlock, {
+  DeclarationCanonicalConstructorParentDefinition.makeBinding(ChildBlock, {
     field: 'child',
   })
 export const AlternativeBinding =
-  DeclarationCanonicalConstructorParentDefinition.bindChild(ChildBlock, {
+  DeclarationCanonicalConstructorParentDefinition.makeBinding(ChildBlock, {
     field: 'child',
     placement: 'other',
   })

@@ -18,7 +18,7 @@ export const init = ApplicationComposition.makeInit((url: Url.Url) => {
       route,
       {
         Room: ({ roomId }) => [
-          ApplicationDefinition.step(model => initRoom(model, roomId)),
+          ApplicationDefinition.makeStep(model => initRoom(model, roomId)),
         ],
       },
       () => [],

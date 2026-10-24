@@ -2,17 +2,15 @@
 // block below is an excerpt. Fit them into your own Model, init, Message,
 // update, and view definitions.
 import { Schema, Tuple } from 'effect'
-import { Block, Update } from 'foldkit'
+import { Block } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
-import { modifyFields } from 'foldkit/struct'
 
 import { Tabs } from '@foldkit/ui'
 import type { RenderInfo as TabsRenderInfo } from '@foldkit/ui/tabs'
 
 const Framework = Schema.Literals(['Foldkit', 'React', 'Elm'])
-type Framework = typeof Framework.Type
 
-const FrameworkTabs = Tabs.create<Framework>()
+const FrameworkTabs = Tabs.create<typeof Framework.Type>()
 
 // Add fields to your Model for the Tabs Block and the active tab. The
 // Block keeps private keyboard-focus state; the parent owns the active
@@ -22,15 +20,22 @@ const Model = Schema.Struct({
   activeFramework: Framework,
   // ...your other fields
 })
-type Model = typeof Model.Type
 
 // This excerpt has no parent-owned facts. The Composition derives delivery.
 const Message = defineMessageUnion({})
-type Message = typeof Message.Type
 
-const frameworks: ReadonlyArray<Framework> = ['Foldkit', 'React', 'Elm']
+const TabsExampleDefinition = Block.makeDefinition('TabsExample', {
+  Model,
+  Message,
+})
 
-const descriptions: Record<Framework, string> = {
+const frameworks: ReadonlyArray<typeof Framework.Type> = [
+  'Foldkit',
+  'React',
+  'Elm',
+]
+
+const descriptions: Record<typeof Framework.Type, string> = {
   Foldkit: 'Model-View-Update with Effect.',
   React: 'Component-based with hooks.',
   Elm: 'The original MVU architecture.',
@@ -40,33 +45,30 @@ const descriptions: Record<Framework, string> = {
 // carries the chosen value (typed as `Framework`) and its index. Fold the
 // value into your own Model so it flows back in as selectedValue. The arm
 // returns an Update.Step over the parent Model, which already has the next
-// Tabs Model written back:
-const foldTabsOutMessage = FrameworkTabs.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  // The child has emitted `Selected`. Store the selected value as the new
-  // active tab. In this arm the parent can also update its own state or
-  // dispatch Commands, for example route to a new URL, persist the
-  // selection, or trigger a panel content fetch.
-  Selected:
-    ({ value }) =>
-    model => ({ model: modifyFields(model, { activeFramework: () => value }) }),
-})
+// Tabs Model written back. Passing the whole child lets the parent Definition
+// infer the refined `Framework` OutMessage and parent Step:
+const foldTabsOutMessage = TabsExampleDefinition.makeOutMessageFold(
+  FrameworkTabs,
+  {
+    // The child has emitted `Selected`. Store the selected value as the new
+    // active tab. In this arm the parent can also update its own state or
+    // dispatch Commands, for example route to a new URL, persist the
+    // selection, or trigger a panel content fetch.
+    Selected: ({ value }) =>
+      TabsExampleDefinition.makeFieldsStep(() => ({
+        activeFramework: () => value,
+      })),
+  },
+)
 
 // The Binding wires the completed child Block into the parent: it runs
 // FrameworkTabs.update, writes the next Tabs Model back, maps the Block's
 // Commands into your Message type, and hands any OutMessage to
 // the OutMessage fold.
-const TabsExampleDefinition = Block.makeDefinition('TabsExample', {
-  Model,
-  Message,
-})
-
-const TabsBinding = TabsExampleDefinition.bindChild(FrameworkTabs, {
+const TabsBinding = TabsExampleDefinition.makeBinding(FrameworkTabs, {
   field: 'tabs',
   init: { contextToArgs: () => Tuple.make({ id: 'framework-tabs' }) },
-  outMessage: { fold: foldTabsOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldTabsOutMessage })
 
 const TabsExampleComposition = TabsExampleDefinition.makeComposition({
   bindings: [TabsBinding],
@@ -90,7 +92,7 @@ const view = TabsExampleComposition.makeView((model, h) => {
     tablist,
     tabs,
     activeIndex,
-  }: TabsRenderInfo<Framework>) =>
+  }: TabsRenderInfo<typeof Framework.Type>) =>
     h.div(
       [],
       [

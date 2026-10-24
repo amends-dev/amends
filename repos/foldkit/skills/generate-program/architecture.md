@@ -69,7 +69,7 @@ Event handlers in the view dispatch Messages. They don't perform actions directl
 
 ### 3. Expected Command Failures Become Messages
 
-Define Command identities with the named feature’s `command`, whose config declares `args` (optional), every result Message in `messages`, optional interruption behavior, and `handler`. The handler is a generator constructor; Foldkit applies `Effect.gen` internally. Service lookups in that generator run once while the application Layer is built. The returned invocation function runs afresh for every Command with its current args. Definitions omit `execute`. Compose `Fetch.layer` directly in the owning module's `EffectsLayer`. A constructor with no service lookup still uses `function* ()` and returns the invocation function directly. Convert expected failures to Messages with `Effect.catch(() => Effect.succeed(Message.FailedX(...)))` so update can handle them as facts. Defects may still terminate the Effect and follow the runtime's crash path. Omit `handler` only for a contract whose implementation belongs to an external host; that definition has no `.layer` and the host passes its implementation constructor Effect to `toLayer`.
+Define Command identities with the named feature’s `makeCommand`, whose config declares `args` (optional), every result Message in `messages`, optional interruption behavior, and `handler`. The handler is a generator constructor; Foldkit applies `Effect.gen` internally. Service lookups in that generator run once while the application Layer is built. The returned invocation function runs afresh for every Command with its current args. Definitions omit `execute`. Compose `Fetch.layer` directly in the owning module's `EffectsLayer`. A constructor with no service lookup still uses `function* ()` and returns the invocation function directly. Do not add a fake `yield`; the recommended Foldkit Oxlint preset disables `require-yield` for this canonical constructor shape. Convert expected failures to Messages with `Effect.catch(() => Effect.succeed(Message.FailedX(...)))` so update can handle them as facts. Defects may still terminate the Effect and follow the runtime's crash path. Omit `handler` only for a contract whose implementation belongs to an external host; that definition has no `.layer` and the host passes its implementation constructor Effect to `toLayer`.
 
 Always assign definitions to PascalCase constants. Never define a Command inline in a pipe chain. Definitions live in the feature whose update produces them, alongside update or in a feature-local `command.ts`. Create a standalone `<CommandName>Layer` binding only when that individual provider is intentionally public or independently reused outside `EffectsLayer` assembly. Let TypeScript infer Command return types. The `messages` array constrains the handler's return type at the type level.
 
@@ -179,15 +179,15 @@ const update = FeatureComposition.makeUpdate((model, message) =>
 
 Update, init, Step, and component helper producers return `{ model }` when they statically create no Commands. When they compute a Commands collection, they return it directly without checking whether it is empty. Never write the literal `commands: []`.
 
-Init constructs the baseline Model and may return initial Commands. Author it through the owning Composition as `ApplicationComposition.makeInit(fn)` or `FeatureComposition.makeInit(fn)`. The Composition checks parent-owned Model fields, assembles registered child startup, and preserves the callback's exact arguments, return type, requirements, and child evidence. Give it one concrete function signature; optional, default, and rest parameters are supported. Wrap an overloaded helper or callable object in a concretely typed callback. A generic Block factory closes over its type parameters outside init. Completion checks the function with Flags, routing, final child evidence, and handler registration. Optional `boot` helpers are ordinary initial Steps called through a Binding after the child Model exists; Foldkit has no special Runtime boot phase. When an existing domain operation such as `requestOpen` or `requestRestore` already describes the transition, declare that Message-producing operation and call it through the Binding. Do not manufacture a separate startup-only Message when an existing Message already records the transition.
+Init constructs the baseline Model and may return initial Commands. Author it through the owning Composition as `ApplicationComposition.makeInit(fn)` or `FeatureComposition.makeInit(fn)`. The Composition checks parent-owned Model fields, assembles registered child startup, and preserves the callback's exact arguments, return type, requirements, and child evidence. Give it one concrete function signature; optional, default, and rest parameters are supported. Wrap an overloaded helper or callable object in a concretely typed callback. A generic Block factory closes over its type parameters outside init. Assembly checks the function with Flags, routing, final child evidence, and handler registration. Optional `boot` helpers are ordinary initial Steps called through a Binding after the child Model exists; Foldkit has no special Runtime boot phase. When an existing domain operation such as `requestOpen` or `requestRestore` already describes the transition, declare that Message-producing operation and call it through the Binding. Do not manufacture a separate startup-only Message when an existing Message already records the transition.
 
-For a required exact direct child field, omit `init` when its initializer can be called without arguments. A required-argument initializer uses `init: { contextToArgs }`; `init: false` makes the parent supply that field. Optional, keyed, and accessor storage remains parent-owned when `init` is omitted, with explicit `init.contextToArgs` or `init.instances` choosing automatic presence. Plain tuple literals preserve contextual init parameters. Add an optional `ChildInitContext` Schema to the parent Definition when selectors share context for direct child initializer arguments. It contextually types owned `init.contextToArgs` and `init.instances` callbacks without parameter annotations. The Composition initializer returns a plan: `model` contains only parent-owned fields, `childInitContext` carries the decoded context when a selector uses it, `commands` contains parent Commands, and `steps` contains ordered parent Steps applied after the complete Model exists. ChildInitContext does not describe the current Block's own init arguments. The Composition calls selected children once in `bindings` order and filters Commands for children absent from the final Model. An exact keyed array using `field` and `key`, with optional `childField`, declares `init.instances` and `init.toItem`. A direct array's `toItem` returns the exact initialized child Model with the planned key; a wrapped array's returns the parent-owned wrapper containing that exact child Model and key. Custom storage, intentional interleaved Command ordering, and dynamic creation use the exact registered `Binding.init({ key?, args, toParentModel, commands? })`. It returns a passive, noncallable recipe. Return it directly from `Composition.makeInit` or `Composition.makeUpdate`, or preserve it through a parent Definition's `step` producer. The Composition callbacks interpret it directly. The recipe exposes no `.model` or `.commands`. The compiler checks exact key, args, parent Model, requirements, and Binding requirement. During checked execution, runtime validation checks the active composition frame, schema-equivalent child placement, and exactly one requested keyed occurrence, but the available runtime metadata cannot reconstruct the TypeScript distinction among required, optional, defaulted, and rest initializer parameters. Startup stays inside the Composition boundary rather than adding a Runtime phase. Ordinary Model construction remains available.
+For a required exact direct child field, omit `init` when its initializer can be called without arguments. A required-argument initializer uses `init: { contextToArgs }`; `init: false` makes the parent supply that field. An unkeyed optional direct field remains parent-owned when `init` is omitted, while `init.contextToArgs` can choose `None` or automatic `Some(child)` creation. Plain tuple literals preserve contextual init parameters. Add an optional `ChildInitContext` Schema to the parent Definition when selectors share context for direct child initializer arguments. It contextually types owned `init.contextToArgs` and `init.instances` callbacks without parameter annotations. The Composition initializer returns a plan: `model` contains only parent-owned fields, `childInitContext` carries the decoded context when a selector uses it, `commands` contains parent Commands, and `steps` contains ordered parent Steps applied after the complete Model exists. ChildInitContext does not describe the current Block's own init arguments. The Composition calls selected children once in `bindings` order and filters Commands for children absent from the final Model. An exact keyed array using `field` and `key`, with optional `childField`, declares `init.instances` and `init.toItem`. A direct array's `toItem` returns the exact initialized child Model with the planned key; a wrapped array's returns the parent-owned wrapper containing that exact child Model and key. An exact `Option` of one closed keyed wrapper uses the same `field`, `key`, and `childField` Binding shorthand, but it does not support `init.instances`. Create that occurrence with the exact registered `Binding.init({ key, args, toParentModel })`. Custom storage and other dynamic creation use the same operation. It returns a passive, noncallable recipe. Return it directly from `Composition.makeInit` or `Composition.makeUpdate`, or preserve it through a parent Definition's `makeStep` producer. The Composition callbacks interpret it directly. The recipe exposes no `.model` or `.commands`. The compiler checks exact key, args, parent Model, requirements, and Binding requirement. Steps evolve the Model in their declared order. Their Commands join the same execution batch, so collection order does not sequence their completion. During checked execution, runtime validation checks the active composition frame, schema-equivalent child placement, and exactly one requested keyed occurrence, but the available runtime metadata cannot reconstruct the TypeScript distinction among required, optional, defaulted, and rest initializer parameters. Startup stays inside the Composition boundary rather than adding a Runtime phase. Ordinary Model construction remains available.
 
 Binding folds and Binding-projected operations return connected Steps whose Model input carries the required registered graph. A typed call with a raw domain Model fails. Apply them to the contextual Model inside `Composition.makeUpdate` or include them in `Composition.makeInit` startup. Return or compose their opaque results intact; they expose no `.model` or `.commands` and cannot narrow to a useful `{ model }` return before checked execution. A raw recipe exposes only direct channels. The Composition callbacks consume it while their graph is active and resolve registered policy into the final parent Command Message, requirements, and OutMessage channels. Derive exported parent contracts from the Composition-authored update or completed Block. A completed `FeatureBlock.operations.operation(model, ...args)` dispatches its produced Message through the Block's update, accepts the raw Block Model, and returns the readable executed result. Ordinary pure Steps remain directly callable. TypeScript may erase a connected Binding function's result through a method returning `void`; outside the graph, that call only constructs and discards passive configuration and executes no child work.
 
 Return a keyed startup wrapper as a plain record, preserving the initialized child object in its child field. Do not reconstruct that child through the wrapper's Schema constructor. Composition constructs the full parent Model through its Schema after collecting these records.
 
-Inside `FeatureComposition.makeUpdate`, let the outer helper infer the Command requirement channel through `Message.match(message, handlers)`. An explicit `Message.match<Update.Return<Model, Message>>` fixes that channel to `never` and discards the handler requirements the application must provide. When helpers or other matchers need a reusable return alias and any branch returns Commands, include the relevant requirements. Derive them with `Update.RequirementsOf<typeof update>` when the update contract is available, rather than from `EffectsLayer`, which may also contain lifecycle handlers that update never returns.
+Inside `FeatureComposition.makeUpdate`, let the outer helper infer the Command requirement channel through `Message.match(message, handlers)`. An explicit `Message.match<Update.Return<Model, Message>>` fixes that channel to `never` and discards the handler requirements the application must provide. The same rule applies to `Definition.makeStep` and `Definition.makeOutMessageFold`: their owner supplies the contextual return contract and should infer every channel. A standalone matcher that is known to be pure may use `Update.Return<Model, Message>` or `Update.Step<Model, Message>` as its return generic. That contextual type also prevents nested literal tags from widening before a later assignment. When helpers or other matchers need a reusable return alias and any branch returns Commands, include the relevant requirements. Derive them with `Update.RequirementsOf<typeof update>` when the update contract is available, rather than from `EffectsLayer`, which may also contain lifecycle handlers that update never returns.
 
 Use `Update.Return<Model, Message>` for an update that cannot emit an OutMessage. It prevents a result containing an OutMessage from entering code that would keep only its Model and Commands. A result with no `outMessage` can still be used where `Update.ReturnWithOutMessage<Model, Message, OutMessage>` is expected. The missing field means that update emitted no OutMessage. A hand-written plain-return type must preserve the `outMessage?: never` field.
 
@@ -195,26 +195,30 @@ When composing another update-shaped result, bind the whole result to a value na
 
 Pass optional Commands directly to APIs that accept them, such as `Command.mapMessages(homeInit.commands, toMessage)`. Use `result.commands ?? []` only when the next operation requires a concrete array for spreading, concatenating, execution, or an assertion.
 
-An authored update supports `update(model, message, ...context)` for Runtime dispatch and `update(message)(model, ...context)` as an internal Step. Put the local Message constructor directly under `operations` for a public operation that forwards its payload into that Message. Completion creates the callable operation without constructing a Message. A constructor with fields takes one constructor payload object followed by update context, with constructor defaults honored; an empty-fields constructor takes no payload placeholder. Keep a tuple producer under `operations` when public inputs need mapping, refinement, defaults, or an exact context tuple. Both forms pass the Message through update synchronously as part of the pure transition. Keep standalone Steps for internal Model transformations. Because `Update.combine` accepts unary Steps, adapt an update with required dispatch context through an explicit unary function that supplies that context.
+An authored update supports `update(model, message, ...context)` for Runtime dispatch and `update(message)(model, ...context)` as an internal Step. Put the local Message constructor directly under `operations` for a public operation that forwards its payload into that Message. Assembly creates the callable operation without constructing a Message. A constructor with fields takes one constructor payload object followed by update context, with constructor defaults honored; an empty-fields constructor takes no payload placeholder. Keep a tuple producer under `operations` when public inputs need mapping, refinement, defaults, or an exact context tuple. Both forms pass the Message through update synchronously as part of the pure transition. Keep standalone Steps for internal Model transformations. Because `Update.combineSteps` accepts unary Steps, adapt an update with required dispatch context through an explicit unary function that supplies that context.
 
 Parent-facing operation names describe the communication: `requestCloseMenu` produces `Message.RequestedCloseMenu`, `informJoined` produces `Message.InformedOfJoin`, and `informRouteChanged` produces `Message.InformedOfRouteChange`. Use `request*` for actions and `inform*` for notifications. Both enter child update; avoid silent `reflect*` Model synchronization. Keep an actual UI fact separate when it represents a different event.
 
 Each completed operation returns the completed update function's full return contract. If one update branch returns a Command or OutMessage, every operation carries that requirement or optional result in its type even when its own Message reaches a pure branch. Calling a pure operation does not run effects from another branch.
 
-Use `Update.combine` when a later Step should receive the Model produced by an earlier Step. It takes two or more Steps. Do not wrap one Step in `Update.combine`; call that operation directly. Name an inline Step parameter `stepModel` when combining several; it receives the Model from the preceding Step. Child composition goes through a registered Binding: connected creation returns a `binding.init({ key?, args, toParentModel, commands? })` recipe, Composition routes generated child envelopes through the Binding fold, and parent-driven operations use `binding.name(...)`. Use `delivery.when`, `delivery.toUpdateContext`, and custom keyed `keySchema` for parent delivery policy. A child whose Message Schema is `Schema.Never` needs no delivery policy.
+Use `Update.combineSteps` when a later Step should receive the Model produced by an earlier Step. It takes two or more Steps. Do not wrap one Step in `Update.combineSteps`; call that operation directly. Name an inline Step parameter `stepModel` when combining several; it receives the Model from the preceding Step. Child composition goes through a registered Binding: connected creation returns a `binding.init({ key?, args, toParentModel, commands? })` recipe, Composition routes generated child envelopes through the Binding fold, and parent-driven operations use `binding.name(...)`. Use `delivery.when`, `delivery.toUpdateContext`, and custom keyed `keySchema` for parent delivery policy. A child whose Message Schema is `Schema.Never` needs no delivery policy.
 
-When the OutMessage is already known while constructing a new result, include it directly: `{ model, commands, outMessage }`. Use `Update.withOutMessage` when attaching an OutMessage to an existing plain return or when the value has the type `OutMessage | undefined`. Pipe an existing return into the helper: `pipe(dialogClose, Update.withOutMessage(outMessage))`. When constructing the plain return in the same expression, pass it first: `Update.withOutMessage({ model, commands }, outMessage)`. Add `outMessage.forward` only when at least one child OutMessage should continue to the current Block's parent. For partial forwarding, match every child variant and return `undefined` for the variants that stop here. Omit `outMessage.forward` when every variant stops here. `outMessage.fold` still handles each variant locally, including variants that continue upward. Never add `outMessage.forward: () => undefined` only to change the fold's return type.
+Use `FeatureDefinition.makeFieldsStep(callback)` for a unary Step that only transforms owning Model fields, `FeatureDefinition.makeNoopStep()` for a Step that only preserves the Model, `FeatureDefinition.makeCommandsStep(commands)` for a Model-preserving Step returning an existing Command collection, and `FeatureDefinition.makeOutMessageStep(outMessage)` for a Model-preserving Step emitting one already-known declared OutMessage. The OutMessage helper exists only when the Definition declares an OutMessage Schema. Keep additional arguments, Model-dependent Commands or OutMessages, connected Binding, initialization, delegated, conditional, and composed results on `FeatureDefinition.makeStep`. Keep ordinary update branches as direct returns. `Update.combineSteps` rejects OutMessage-producing Steps; attach an OutMessage to its result afterward with `Update.withOutMessage`.
 
-A child Binding handles local OutMessages through `outMessage.fold`. Add `outMessage.forward` only for variants that continue upward. A derived parent OutMessage takes precedence over direct forwarding for that dispatch.
+When the OutMessage is already known while constructing a new result, include it directly: `{ model, commands, outMessage }`. Use `Update.withOutMessage` when attaching an OutMessage to an existing plain return or when the value has the type `OutMessage | undefined`. Pipe an existing return into the helper: `pipe(dialogClose, Update.withOutMessage(outMessage))`. When constructing the plain return in the same expression, pass it first: `Update.withOutMessage({ model, commands }, outMessage)`.
+
+A child with OutMessages requires explicit policy selection. Inline an ordinary unkeyed policy as `ParentDefinition.makeBinding(ChildBlock, ...).withOutMessagePolicy({ fold: ParentDefinition.makeOutMessageFold(ChildBlock, handlers), forward: ParentDefinition.makeOutMessageForward(handlers) })`. Every fold passes the whole completed child explicitly, whether inline, extracted, adapted for keyed policy, or staged for reciprocal composition. Forwarding remains contextual when inline; pass the whole completed child to `makeOutMessageForward` for an extracted callable policy, keyed adapter, or staged reciprocal policy. Include `forward` only when the parent declares OutMessages and at least one child variant continues upward; return `undefined` for named variants that stop. Register the full policy-selected Binding. A derived parent OutMessage takes precedence over forwarding for that dispatch. Missing policy, missing or extra handlers, undeclared forwarded OutMessages, and unregistered sibling operations fail type checking.
+
+Keep an ordinary one-way policy as one fluent declaration. For a self-referential or reciprocal policy, declare `FooBinding` first, author folds against the original operation-bearing Bindings, select `FooBindingWithOutMessagePolicy`, and register the selected value. Policy selection keeps the same child identity and does not start Layers, handlers, or lifecycle work.
 
 The module also carries two combinators for handlers that fan out after a mutation succeeds:
 
-- `Update.combine(model, [step, step, ...])` sequences update steps over one Model, threading the Model through and collecting the Commands.
+- `Update.combineSteps(model, [step, step, ...])` sequences update steps over one Model, threading the Model through and collecting the Commands.
 - `Update.refresh({ read, revalidate, write, load })` builds a step that reloads a cache **only when it already holds data**. When a cache is `Idle`, the step returns `{ model }` and does not load it. A `Succeeded*` handler can therefore list every possibly affected cache without fetching caches nobody has opened.
 
 ```ts
 SucceededUpdateNote: ({ note }) =>
-  Update.combine(model, [
+  Update.combineSteps(model, [
     replaceNoteInCaches(note),
     refreshNote(note.id),
     refreshAllNotes,
@@ -229,7 +233,10 @@ SucceededUpdateNote: ({ note }) =>
 When the initial Model needs data from a side effect (current time, localStorage, browser APIs), use Flags, not module-level constants:
 
 ```ts
-const ApplicationDefinition = makeApplicationDefinition({ Model, Message })
+const ApplicationDefinition = Block.makeDefinition('Application', {
+  Model,
+  Message,
+})
 const ApplicationComposition = ApplicationDefinition.makeComposition()
 
 // WRONG: module-level side effect (non-deterministic and untestable)
@@ -242,19 +249,18 @@ const unsafeInit = ApplicationComposition.makeInit(() => ({
 const Flags = Schema.Struct({
   createdAt: Schema.Number,
 })
-type Flags = typeof Flags.Type
 
 const flags = Effect.gen(function* () {
   const now = yield* Clock.currentTimeMillis
   return Flags.make({ createdAt: now })
 })
 
-const init = ApplicationComposition.makeInit((flags: Flags) => ({
+const init = ApplicationComposition.makeInit((flags: typeof Flags.Type) => ({
   model: Model.make({ createdAt: flags.createdAt }),
 }))
 ```
 
-For a fresh browser boot, Flags are produced by an `Effect<Flags>`. The runtime executes it once before init and passes the result in. This keeps init pure while still allowing side effects to populate the initial Model. Common uses:
+For a fresh browser boot, Flags are produced by an `Effect<typeof Flags.Type>`. The runtime executes it once before init and passes the result in. This keeps init pure while still allowing side effects to populate the initial Model. Common uses:
 
 - Reading from localStorage/sessionStorage (restoring saved state)
 - Getting the current time
@@ -270,32 +276,40 @@ export const SavedBoardJsonString = Schema.fromJsonString(
 
 `toCodecJson` turns the domain value into canonical JSON, then `fromJsonString` stringifies it. Leave it out and a field like `Schema.Option` writes Effect's runtime shape (`{_id:"Option",_tag:"None"}`) to storage. The next boot fails to decode it, the Flags `Effect.catch` falls back to the empty value, and the user's saved data looks gone. For a Schema that is already JSON-native, `toCodecJson` changes nothing on the wire, so composing it every time costs nothing.
 
-Import `makeApplicationDefinition` from `foldkit`. Declare the root Model and Message through `ApplicationDefinition`, establish the root graph as `ApplicationComposition`, declare the `Flags` Schema in its `assembleApplication` config, then pass the runtime input to `Runtime.run`:
+Declare the root Model and Message through an ordinary Block Definition, establish the root graph as `ApplicationComposition`, assemble `ApplicationBlock`, then declare the `Flags` Schema in `Program.make` and pass the Program to `Runtime.run`:
 
 ```ts
-import { makeApplicationDefinition } from 'foldkit'
+import { Block, Program } from 'foldkit'
 
-const ApplicationDefinition = makeApplicationDefinition({ Model, Message })
+const ApplicationDefinition = Block.makeDefinition('Application', {
+  Model,
+  Message,
+})
 const ApplicationComposition = ApplicationDefinition.makeComposition({
   bindings,
 })
 
-const application = ApplicationComposition.assembleApplication({
-  init,
-  update,
-  view,
-  EffectsLayer,
+const prepare = () =>
+  ApplicationComposition.prepareBlock({ init, update, view, EffectsLayer })
+const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)
+
+const program = Program.make({
+  block: ApplicationBlock,
+  container: document.getElementById('root'),
   Flags,
 })
 
-Runtime.run(application.provide(ApplicationLayer), { flags })
+Runtime.run(program.provide(ApplicationLayer), { flags })
 ```
 
-Hydrated applications do not provide a browser Flags Effect. `Runtime.hydrate(application)` decodes the exact Schema-encoded Flags payload emitted by the server. `@foldkit/vite-plugin` compiles the shared deployment identity into Foldkit for coordinated client and server builds; separately orchestrated builds pass the same explicit `buildId` override to each artifact. Hydration compares that identity against the id the server stamped on the root before it reads the handoff at all. Missing or invalid server handoff data, and a page from another deployment, are fatal boot errors.
+Hydrated applications do not provide a browser Flags Effect. `Runtime.hydrate(program)` decodes the exact Schema-encoded Flags payload emitted by the server. `@foldkit/vite-plugin` compiles the shared deployment identity into Foldkit for coordinated client and server builds; separately orchestrated builds pass the same explicit `buildId` override to each artifact. Hydration compares that identity against the id the server stamped on the root before it reads the handoff at all. Missing or invalid server handoff data, and a page from another deployment, are fatal boot errors.
 
 Leave a Flags service in the Effect requirements when the application root should choose or share its provider. Keep a service used by both Flags and handlers exposed from `ApplicationLayer` with `Layer.provideMerge`. A service may be private to `flags` only when startup deliberately owns it and no application environment needs to substitute or share it. The Runtime builds the resulting Layer eagerly on every start, before executing a fresh Flags Effect, init, or the first render, including a start that restores a preserved Model. `Runtime.hydrate` validates the server handoff before acquiring Layers. A construction failure stops startup before the first render. Do not also provide a root service inside `flags`: doing both builds it twice and hands the app two instances of whatever it holds.
 
-An Element owns its Flags Effect because no separate runtime call seeds it. Put both `Flags` and `flags` in the `ApplicationComposition.assembleElement` config. The embedded widget example later in this guide shows the full shape.
+An Element owns its Flags Effect because no separate Runtime call seeds it. Put both `Flags` and `flags` in the `Program.makeElement` config. The embedded widget example later in this guide shows the full shape.
 
 ## Layers
 
@@ -305,9 +319,16 @@ child Bindings contribute their selected handler and lifecycle graphs
 automatically. The root `ApplicationLayer` supplies the ordinary HTTP, storage,
 RPC, browser, and business Services that those recipes still require.
 
+Compose local Command and ManagedResource entry `.layer` recipes explicitly
+with `Layer.mergeAll`; neither has an aggregate Layer. An owned Subscription
+registry exposes `subscriptions.layer` when every entry has an attached
+handler. Merging recipes does not construct handlers or acquire a managed
+handle. The Runtime constructs handlers at startup and acquires each
+ManagedResource when its Model condition becomes active.
+
 Keep those responsibilities separate. Do not merge a registered child's Layer
-again at its parent or flatten every handler into the entry point. Completion
-and `application.provide(ApplicationLayer)` remain passive; the Runtime builds
+again at its parent or flatten every handler into the entry point. Assembly
+and `program.provide(ApplicationLayer)` remain passive; the Runtime builds
 the graph once for each start and releases it when that run stops.
 
 Read [Block composition and Layers](../foldkit/references/composition.md) when
@@ -333,7 +354,7 @@ At a glance:
 Use a Mount when work follows one rendered element and needs that live `Element`. For example, measuring a panel belongs in a Mount because `getBoundingClientRect()` must read the actual DOM node after insertion:
 
 ```ts
-export const MeasurePanel = FeatureDefinition.mount('MeasurePanel', {
+export const MeasurePanel = FeatureDefinition.makeMount('MeasurePanel', {
   messages: [Message.CompletedMeasurePanel],
   handler: function* () {
     return ({ element }) =>
@@ -349,21 +370,21 @@ export const mounts = [MeasurePanel]
 export const EffectsLayer = MeasurePanel.layer
 ```
 
-The view uses `h.OnMount(MeasurePanel())`. Put the Mount in `FeatureDefinition.makeComposition({ mounts })` and author the canonical view through that Composition; its builder receives the capability automatically. Immediately after the Composition, declare `type FeatureViewBuilder = Block.ViewBuilderFor<typeof FeatureComposition>` for ordinary feature-local helpers on the same mounted or child embedding path. Export it only when another file uses it. Give each helper only its meaningful Model, domain, or context parameters plus `h: FeatureViewBuilder`. Reusable helpers independent of one owner keep the general `HtmlBuilder<Message>`. Use `FeatureDefinition.mountStream` when the element supplies an ongoing event Stream; keep listener or observer acquisition and cleanup inside the returned Stream so each element owns its own scope.
+The view uses `h.OnMount(MeasurePanel())`. Put the Mount in `FeatureDefinition.makeComposition({ mounts })` and author the canonical view through that Composition; its builder receives the capability automatically. Immediately after the Composition, declare `type FeatureViewBuilder = Block.ViewBuilderFor<typeof FeatureComposition>` for ordinary feature-local helpers on the same mounted or child embedding path. Export it only when another file uses it. Give each helper only its meaningful Model, domain, or context parameters plus `h: FeatureViewBuilder`. Reusable helpers independent of one owner keep the general `HtmlBuilder<Message>`. Use `FeatureDefinition.makeMountStream` when the element supplies an ongoing event Stream; keep listener or observer acquisition and cleanup inside the returned Stream so each element owns its own scope.
 
-The owner-specific `FeatureViewBuilder` alias preserves its Composition's Message, child, and Mount evidence and creates no runtime value. Its owner prefix is the exception to the standard `Model`, `Message`, and `OutMessage` names because a plain builder type import must identify the Composition whose capabilities it carries. Reusable helpers retain the framework's general `HtmlBuilder<Message>`.
+The owner-specific `FeatureViewBuilder` alias preserves its Composition's Message, child, and Mount evidence and creates no runtime value. Its owner prefix is the exception to the standard `Model`, `Message`, and `OutMessage` names because a plain builder type import must identify the Composition whose capabilities it carries. A helper shared across Compositions declares a `ParentMessage` generic and takes `h: HtmlBuilder<ParentMessage>`. Add a capability generic only when forwarding Mount attributes, view callbacks, or child embeddings requires preserving that capability.
 
-Complete each feature with its local Subscription registry. Include its parent-owned Binding in the parent Composition's `bindings`; composition collects child records and preserves their Message contracts automatically. Parent Subscription activation belongs in the Binding's `subscriptions.when` policy.
+Assemble each feature with its local Subscription registry. Include its parent-owned Binding in the parent Composition's `bindings`; composition collects child records and preserves their Message contracts automatically. Parent Subscription activation belongs in the Binding's `subscriptions.when` policy.
 
 ## The Block Pattern
 
 A Block gives one feature its own state machine and effect boundary. Define its
-contracts, fix its child and Mount graph in a named Composition, then complete
+contracts, fix its child and Mount graph in a named Composition, then assemble
 that same Composition as a passive Block. The parent integrates the completed
 Block through one registered Binding.
 
 Read [Block composition and Layers](../foldkit/references/composition.md) before
-creating or changing this graph. It provides the canonical three-stage shape
+creating or changing this graph. It provides the canonical four-stage shape
 and decision tables for:
 
 - choosing a view helper or Block;
@@ -384,13 +405,15 @@ Only the Runtime starts execution.
 
 Subscriptions are model-driven streams. They automatically start and stop based on model state.
 
-Build them with `FeatureDefinition.subscriptions(entry => ({ ... }))`. Use the Layer-backed `entry(handlerName, fields, callbacks)` form when its lifetime depends on the Model. For those Subscriptions, provide:
+Build them with `FeatureDefinition.makeSubscriptions(entry => ({ ... }))`. Use the Layer-backed `entry(handlerName, fields, callbacks)` form when its lifetime depends on the Model. For those Subscriptions, provide:
 
 - A stable handler name. Distinct definitions in one application need distinct names even when their record keys differ.
-- A `fields` map (the bare field map passed as `entry`'s second argument) naming every dependency. The builder calls `Schema.Struct(fields)` internally and infers the dependency type from this map.
+- A `fields` map (the bare field map passed as `entry`'s second argument) naming every dependency. The builder calls `Schema.Struct(fields)` internally and infers the dependency type from this map. If an adapter already exposes a Struct, pass `dependenciesSchema.fields`, not the Struct itself.
 - A `messages` collection in `callbacks` listing the exact Message Schemas the attached handler or external `toLayer` Stream can emit. Use `messages: []` when the scoped Stream emits no Messages; that declaration requires `Stream<never>`. Scene uses the Schemas to validate both the selected `Subscription.emit` source and its Message before applying parent mappings.
 - A `modelToDependencies(model)` function that returns the parameters the stream needs. Wrap an absent dependency in `Option` at the field level. The runtime restarts the stream whenever the dependencies change.
 - A `handler: function* () { return dependencies => stream }` field. Errors should be mapped to a `Failed*` Message inside the stream rather than thrown. Compose the owned registry’s `subscriptions.layer` in the owning module’s `EffectsLayer` when every entry has an attached handler. It preserves all constructor errors and Service requirements. Mixed host contracts have no aggregate; the entry key `layer` is reserved. Individual entry Layers remain valid for selective assembly.
+
+When an external generic Stream helper infers its Message from one callback and rejects another declared variant, annotate the callback that determines its result with the union this entry declares. Use `typeof Message.Type` when the entry declares the full Message union. Keep the entry's exact `messages` declaration; it still checks the resulting Stream.
 
 Name the handler for the events or scoped behavior the entry supplies, such as `KeyboardPresses`, `SystemThemeChanges`, or `GameClockTicks`. The handler name identifies the Layer requirement. Keep the record key parallel, such as `keyboardPresses`, `systemThemeChanges`, or `gameClockTicks`; the key identifies the runtime registration and Stream scope. Several lifted registrations can share one definition and handler Layer while retaining distinct keys. The Model dependencies determine when its scope is active. Avoid generic `Watch*` names that identify only the input source. Compose the entry's attached recipe directly in `EffectsLayer`; create a standalone binding such as `KeyboardPressesLayer` only when that individual provider is intentionally public or independently reused outside `EffectsLayer` assembly. Subscription lifecycle entries in DevTools are follow-up work.
 
@@ -399,7 +422,7 @@ For Layer-backed Subscriptions without local Model dependencies (keyboard listen
 A silent Subscription can own scoped DOM state. Keep acquisition and cleanup inside the `Stream<never>` so dependency changes and runtime shutdown remove the owned style:
 
 ```ts
-const subscriptions = FeatureDefinition.subscriptions(entry => ({
+const subscriptions = FeatureDefinition.makeSubscriptions(entry => ({
   dragSelectionStyles: entry(
     'DragSelectionStyles',
     { isDragging: Schema.Boolean },
@@ -435,6 +458,39 @@ Canonical live examples:
 - **Animation-frame-driven game tick**: `repos/foldkit/examples/canvas-art/src/application.ts`
 - **Conditional WebSocket connection** (active only when a session exists): `repos/foldkit/examples/websocket-chat/src/managedResource.ts`
 - **Production multi-stream pattern**: `repos/foldkit/packages/typing-game/client/src/page/room/subscription.ts`
+
+## ManagedResources
+
+A ManagedResource ties one acquired handle to Model state. Declare its accessor once through the owning Definition, register that same binding in the lifecycle entry, and import it in Commands that read the active value:
+
+```ts
+export const CameraStream =
+  CameraDefinition.makeResource<MediaStream>()('CameraStream')
+
+export const managedResources = CameraDefinition.makeManagedResources(
+  entry => ({
+    camera: entry('ManageCamera', CameraRequirements, {
+      resource: CameraStream,
+      modelToMaybeRequirements: model => model.maybeCamera,
+      onAcquired: () => Message.AcquiredCamera(),
+      onReleased: () => Message.ReleasedCamera(),
+      onAcquireError: error =>
+        Message.FailedAcquireCamera({ reason: String(error) }),
+      handler: function* () {
+        return { acquire: acquireCamera, release: releaseCamera }
+      },
+    }),
+  }),
+)
+```
+
+`CameraDefinition.makeResource` qualifies the local name with the Block ID. Give independently managed handles distinct local names because assembly treats one qualified resource key as one lifecycle identity. Use `ManagedResource.tag` only for a standalone registry with no Block Definition. Keep the accessor at module scope so entry registration and `.get` calls share one exported binding.
+
+## One Foldkit module instance
+
+Each client or server module graph must load one `foldkit` module instance. The Runtime's private definition checks and the HTML builder's render state live in that module instance. A linked package resolving another copy can therefore fail at runtime even when its TypeScript types look compatible.
+
+A reusable package that imports Foldkit declares `foldkit` as a peer dependency and as a development dependency for its own build. The application declares the linked package in its own `package.json` and builds with `@foldkit/vite-plugin`. Do not alias `foldkit` to different paths inside one graph. If the Vite plugin cannot reach a linked package through the application's dependency graph, add that package to `resolve.noExternal` so its Foldkit imports are bundled with the application's copy. Use `pnpm why foldkit` from the application workspace to find an unexpected nested installation before changing application code or resource identities.
 
 ## View Identity and Keys
 
@@ -507,24 +563,32 @@ Use these instead of raw `document.querySelector`, `setTimeout`, `Date.now()`, o
 
 ## With and Without URL Routing
 
-`const ApplicationDefinition = makeApplicationDefinition({ Model, Message })` establishes root contracts. Every root then creates `ApplicationComposition = ApplicationDefinition.makeComposition({ bindings?, mounts? })`; use `makeComposition()` for a graphless app. Author init, update, and view through that Composition, then complete it with those implementation fields listed explicitly.
+`const ApplicationDefinition = Block.makeDefinition('Application', { Model, Message })` establishes root contracts. Every root then creates `ApplicationComposition = ApplicationDefinition.makeComposition({ bindings?, mounts? })`; use `makeComposition()` for a graphless app. Author init, update, and view through that Composition, then assemble `ApplicationBlock` with those implementation fields listed explicitly.
 
 ### Without Routing
 
 ```ts
-import { makeApplicationDefinition } from 'foldkit'
+import { Block, Program } from 'foldkit'
 
-const ApplicationDefinition = makeApplicationDefinition({ Model, Message })
+const ApplicationDefinition = Block.makeDefinition('Application', {
+  Model,
+  Message,
+})
 const ApplicationComposition = ApplicationDefinition.makeComposition()
 
-const application = ApplicationComposition.assembleApplication({
-  init,
-  update,
-  view,
+const prepare = () =>
+  ApplicationComposition.prepareBlock({ init, update, view })
+const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)
+
+const program = Program.make({
+  block: ApplicationBlock,
   container: document.getElementById('root'),
 })
 
-Runtime.run(application.provide(ApplicationLayer))
+Runtime.run(program.provide(ApplicationLayer))
 ```
 
 ### With Routing
@@ -532,7 +596,7 @@ Runtime.run(application.provide(ApplicationLayer))
 A routing init receives Flags, when declared, and the current URL. Add both Message constructors to `routing`:
 
 ```ts
-const HomeBinding = ApplicationDefinition.bindChild(HomeBlock, {
+const HomeBinding = ApplicationDefinition.makeBinding(HomeBlock, {
   field: 'home',
 })
 
@@ -540,41 +604,49 @@ const ApplicationComposition = ApplicationDefinition.makeComposition({
   bindings: [HomeBinding],
 })
 
-const application = ApplicationComposition.assembleApplication({
-  init,
-  update,
-  view,
+const prepare = () =>
+  ApplicationComposition.prepareBlock({ init, update, view })
+const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)
+
+const program = Program.make({
+  block: ApplicationBlock,
   container: document.getElementById('root'),
   routing: {
-    onUrlRequest: request => Message.ClickedLink({ request }),
-    onUrlChange: url => Message.ChangedUrl({ url }),
+    onUrlRequest: ApplicationBlock.Message.ClickedLink,
+    onUrlChange: ApplicationBlock.Message.ChangedUrl,
   },
 })
 ```
 
 ### Scoped to a Node (Embedded Widgets)
 
-`ApplicationComposition.assembleApplication` owns the page and completes a Document view. `ApplicationComposition.assembleElement` completes a container-scoped Html view and has no routing config:
+`Program.make` owns the page and requires a root Block whose view returns a Document. `Program.makeElement` creates a container-scoped Program from a root Block whose view returns Html and has no routing config:
 
 ```ts
-const element = ApplicationComposition.assembleElement({
-  init,
-  update,
-  view,
+const prepare = () =>
+  ApplicationComposition.prepareBlock({ init, update, view })
+const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)
+
+const program = Program.makeElement({
+  block: ApplicationBlock,
   container: document.getElementById('widget'),
 })
 
-Runtime.run(element.provide(ApplicationLayer))
+Runtime.run(program.provide(ApplicationLayer))
 ```
 
-Element Flags live in the `assembleElement` config. A host factory can turn initial data into a Flags Effect and provide the root Service Layer:
+Element Flags live in the `Program.makeElement` config. A host factory can turn initial data into a Flags Effect and provide the root Service Layer:
 
 ```ts
 export const createElement = (container: HTMLElement, flags: Flags) =>
-  ApplicationComposition.assembleElement({
-    init,
-    update,
-    view,
+  Program.makeElement({
+    block: ApplicationBlock,
     Flags,
     flags: Effect.succeed(flags),
     container,
@@ -585,13 +657,13 @@ Use `Runtime.embed(program)` when the host must mount, dispose, or communicate t
 
 ### Document Metadata
 
-With `assembleApplication`, the `view` returns a `Document`. The runtime writes `title` to `document.title` after every render. It never derives `canonical` from the address bar. Build the canonical from the typed route in the Model, where the application can decide which route and query values identify the page.
+With `Program.make`, the root `view` returns a `Document`. The Runtime writes `title` to `document.title` after every render. It never derives `canonical` from the address bar. Build the canonical from the typed route in the Model, where the application can decide which route and query values identify the page.
 
 If no render supplies `canonical`, the runtime leaves a served `<link rel="canonical">` unchanged or keeps the document without one. Before the client first writes a canonical, it records the existing `href`. A later omission restores that value, or removes the element if the runtime created it. During hydration, the recorded value can be the initial route's server-rendered canonical, so omission means restore that baseline rather than remove every canonical.
 
 `ogUrl` can be supplied independently. An omitted `ogUrl` uses an explicit `canonical`, and its restore or removal behavior is the same. `Server.renderToString` returns only a canonical supplied by the view and gives `ogUrl` the explicit canonical when `ogUrl` is omitted. It does not derive either field from `Request.url`.
 
-With `assembleElement`, the runtime does not manage the title or document metadata.
+With `Program.makeElement`, the Runtime does not manage the title or document metadata.
 
 `lang` and `dir` sync to the `<html>` element, so an app that switches language at runtime drives them from the Model. `dir` is `TextDirection` from `foldkit/html`, a Schema over `'Ltr' | 'Rtl' | 'Auto'` that you can drop straight into a Model `Schema.Struct`, and the runtime writes it as the lowercase attribute value. Both fields are optional and have no default: when a view omits one, the runtime does not touch that attribute, leaving whatever value it currently holds, so a view that never sets it leaves the served HTML in place.
 
@@ -601,7 +673,7 @@ For the canonical update-handler shapes (the exact `UrlRequest` tag names, how t
 
 ### How to Choose
 
-- App is a widget embedded on a page it does not own (must not touch the host `<head>`) → `ApplicationComposition.assembleElement`
-- The host application also needs to drive it (lifecycle, data in, values out) → `assembleElement` started with `Runtime.embed`, communicating through Flags and Ports
-- App owns the page and mentions "pages", "navigation", "routes", URLs → `ApplicationComposition.assembleApplication` with routing config
-- App owns the page with no navigation → `ApplicationComposition.assembleApplication` without routing
+- App is a widget embedded on a page it does not own (must not touch the host `<head>`) → `Program.makeElement`
+- The host application also needs to drive it (lifecycle, data in, values out) → a `Program.makeElement` result started with `Runtime.embed`, communicating through Flags and Ports
+- App owns the page and mentions "pages", "navigation", "routes", URLs → `Program.make` with routing config
+- App owns the page with no navigation → `Program.make` without routing

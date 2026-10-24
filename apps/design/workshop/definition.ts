@@ -11,7 +11,7 @@ import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Menu from "@foldkit/ui/menu"
 import * as RadioGroup from "@foldkit/ui/radioGroup"
 import * as Schema from "effect/Schema"
-import { makeApplicationDefinition } from "foldkit"
+import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 
 export const Plan = Schema.Literals(["free", "team", "enterprise"])
@@ -244,4 +244,4 @@ export const Message = defineMessageUnion({
 })
 export type Message = typeof Message.Type
 
-export const ApplicationDefinition = makeApplicationDefinition({ Model, Message })
+export const ApplicationDefinition = Block.makeDefinition("Application", { Model, Message })

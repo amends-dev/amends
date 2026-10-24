@@ -1,6 +1,5 @@
 import { Server } from 'foldkit/experimental'
 
-import { ApplicationComposition, init, update, view } from './blockProfile'
+import { ApplicationBlock } from './blockProfile'
 
-export const render = () =>
-  Server.renderToString(ApplicationComposition, { init, update, view }, {})
+export const render = () => Server.renderToString(ApplicationBlock, {}, {})

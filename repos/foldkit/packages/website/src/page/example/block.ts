@@ -1,9 +1,9 @@
-import { Option } from 'effect'
+import { Block } from 'foldkit'
 
 import { ExampleDetailComposition } from './composition'
 import { EffectsLayer, init, update, view } from './example'
 import { Message } from './message'
-import type { ExampleSources } from './sources'
+import type { Model } from './model'
 
 export { mounts } from './composition'
 export {
@@ -18,23 +18,17 @@ export {
   view,
 } from './example'
 
-export const ExampleDetailBlock = ExampleDetailComposition.assembleBlock({
-  init,
-  update,
-  view,
-  operations: {
-    requestLoadInitialSources: (
-      maybeInitialSlug: Option.Option<string>,
-      maybeExampleSources: Option.Option<
-        typeof ExampleSources.Type
-      > = Option.none(),
-    ) => [
-      Message.RequestedLoadInitialSources({
-        maybeInitialSlug,
-        maybeExampleSources,
-      }),
-    ],
-    informRouteChanged: Message.InformedOfRouteChange,
-  },
-  EffectsLayer,
-})
+const prepare = () =>
+  ExampleDetailComposition.prepareBlock({
+    init,
+    update,
+    view,
+    operations: {
+      informRouteChanged: Message.InformedOfRouteChange,
+    },
+    EffectsLayer,
+  })
+export const ExampleDetailBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

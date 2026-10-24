@@ -1,7 +1,6 @@
 import { clsx } from 'clsx'
 import { Schema } from 'effect'
-import { CustomElement, makeApplicationDefinition } from 'foldkit'
-import type { Block } from 'foldkit'
+import { Block, CustomElement } from 'foldkit'
 import { Html } from 'foldkit/html'
 import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
@@ -15,7 +14,6 @@ export const Model = Schema.Struct({
   fillColor: Schema.String,
   backgroundColor: Schema.String,
 })
-export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
   UpdatedContent: { value: Schema.String },
@@ -23,9 +21,7 @@ export const Message = defineMessageUnion({
   ChangedBackgroundColor: { value: Schema.String },
 })
 
-export type Message = typeof Message.Type
-
-export const ApplicationComposition = makeApplicationDefinition({
+export const ApplicationComposition = Block.makeDefinition('Application', {
   Model,
   Message,
 }).makeComposition()
@@ -145,7 +141,10 @@ const FIELD_LABEL_CLASS =
 const FIELD_CONTROL_CLASS =
   'px-3 py-2 text-sm rounded-md border border-slate-300 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200'
 
-const designerView = (model: Model, h: ApplicationViewBuilder): Html =>
+const designerView = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+): Html =>
   h.div(
     [
       h.Class(
@@ -155,7 +154,10 @@ const designerView = (model: Model, h: ApplicationViewBuilder): Html =>
     [controlsView(model, h), previewView(model, h)],
   )
 
-const controlsView = (model: Model, h: ApplicationViewBuilder): Html =>
+const controlsView = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+): Html =>
   h.div(
     [h.Class('flex flex-col gap-5')],
     [
@@ -181,7 +183,10 @@ const controlsView = (model: Model, h: ApplicationViewBuilder): Html =>
     ],
   )
 
-const contentFieldView = (model: Model, h: ApplicationViewBuilder): Html =>
+const contentFieldView = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+): Html =>
   Input.view(
     {
       id: 'qr-content',
@@ -214,7 +219,7 @@ const colorFieldView = (
     id: string
     label: string
     value: string
-    onChange: (value: string) => Message
+    onChange: (value: string) => typeof Message.Type
   }>,
   h: ApplicationViewBuilder,
 ): Html => {
@@ -266,7 +271,7 @@ const swatchClass = (isActive: boolean): string =>
 
 const swatchRow = (
   active: string,
-  onChange: (value: string) => Message,
+  onChange: (value: string) => typeof Message.Type,
   h: ApplicationViewBuilder,
 ): Html =>
   h.div(
@@ -293,7 +298,10 @@ const swatchRow = (
 
 const QR_SIZE = 220
 
-const previewView = (model: Model, h: ApplicationViewBuilder): Html => {
+const previewView = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+): Html => {
   const qr = qrCode.withMessage(h)
 
   return h.div(
@@ -322,3 +330,14 @@ const previewView = (model: Model, h: ApplicationViewBuilder): Html => {
     ],
   )
 }
+
+const prepare = () =>
+  ApplicationComposition.prepareBlock({
+    init,
+    update,
+    view,
+  })
+export const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

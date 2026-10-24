@@ -1,5 +1,5 @@
 import { Option, Schema, Tuple } from 'effect'
-import type * as Block from 'foldkit/block'
+import * as Block from 'foldkit/block'
 import { modifyFields } from 'foldkit/struct'
 
 import {
@@ -49,8 +49,12 @@ export type InitConfig = BaseInitConfig
  *  `Selected({ value })` for the parent to store. A nullable Combobox also
  *  emits `ClearedSelection` when it closes with an empty input. */
 const defaultUpdate = makeUpdate(
-  ComboboxDefinition.bindChild,
-  ComboboxDefinition.step,
+  ComboboxDefinition.makeBinding,
+  ComboboxDefinition.makeOutMessageFold,
+  ComboboxDefinition.makeStep,
+  ComboboxDefinition.makeFieldsStep,
+  ComboboxDefinition.makeNoopStep,
+  ComboboxDefinition.makeCommandsStep,
   'CloseWithFocus',
   {
     handleClose: (model, restingInputValue, isClearable) => {
@@ -91,7 +95,7 @@ const ComboboxComposition = ComboboxDefinition.makeComposition({
   bindings: [defaultUpdate.AnimationBinding],
 })
 
-const authoredUpdate = ComboboxDefinition.step(
+const authoredUpdate = ComboboxDefinition.makeStep(
   (model, message: Parameters<typeof defaultUpdate.update>[1]) =>
     defaultUpdate.update(model, message),
 )
@@ -103,7 +107,8 @@ export const update = ComboboxComposition.makeUpdate((model, message) =>
 type UpdateReturn = ReturnType<typeof update>
 
 /** Programmatically opens the Combobox, updating the Model and returning
- *  focus and modal Commands. Use this in domain-event handlers. */
+ *  focus and modal Commands. When it is already open, returns the Model
+ *  unchanged with no Commands. Use this in domain-event handlers. */
 export const open = (model: Model): UpdateReturn =>
   block.operations.requestOpen(model)
 
@@ -150,8 +155,12 @@ const makeBlockParts = <Item extends string, ItemEncoded>(
     OutMessage: ItemOutMessage,
   })
   const itemUpdate = makeUpdate(
-    ComboboxDefinition.bindChild,
-    ComboboxDefinition.step,
+    ComboboxDefinition.makeBinding,
+    ComboboxDefinition.makeOutMessageFold,
+    ComboboxDefinition.makeStep,
+    ComboboxDefinition.makeFieldsStep,
+    ComboboxDefinition.makeNoopStep,
+    ComboboxDefinition.makeCommandsStep,
     'CloseWithFocus',
     {
       handleClose: (model, restingInputValue, isClearable) => {
@@ -190,7 +199,7 @@ const makeBlockParts = <Item extends string, ItemEncoded>(
     mounts,
     bindings: [itemUpdate.AnimationBinding],
   })
-  const authoredUpdate = ComboboxDefinition.step(
+  const authoredUpdate = ComboboxDefinition.makeStep(
     (model, message: Parameters<typeof itemUpdate.update>[1]) =>
       itemUpdate.update(model, message),
   )
@@ -263,7 +272,13 @@ const makeBlock = <Item extends string, ItemEncoded>(
 ): Completed<Item, ItemEncoded> => {
   const { composition, implementation } = makeBlockParts(Item)
 
-  return composition.assembleBlock(implementation)
+  const prepare = () => composition.prepareBlock(implementation)
+  const completedBlock: Block.FromAssemblyWithViewAndOutMessage<
+    typeof Model,
+    typeof prepare
+  > = Block.assemble(prepare)
+
+  return completedBlock
 }
 
 /** Creates a checked single-select Combobox Block. Pass an Item Schema to

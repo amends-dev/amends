@@ -4,15 +4,13 @@ import { type CodeBlock } from './component'
 import type { SnippetDisclosureBinding } from './composition'
 import { SnippetDisclosureBlock } from './snippetDisclosure'
 
-type Model = typeof SnippetDisclosureBlock.Model.Type
-
 type Render = (
   config: Parameters<typeof SnippetDisclosureBinding.embedView>[0],
 ) => Html
 
 export const renderer =
   (
-    model: Model,
+    model: typeof SnippetDisclosureBlock.Model.Type,
     renderCopyButton: CodeBlock.RenderCopyButton,
     render: Render,
   ): CodeBlock.RenderSnippet =>

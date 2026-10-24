@@ -4,7 +4,7 @@
 
 A file drop zone that accepts files via both drag-and-drop and a hidden `<input type="file">`. FileDrop is headless. The component owns drag state and file-arrival events; your `toView` callback owns the visual.
 
-`FileDropBlock` is the completed Block to connect in the parent. Declare its startup arguments on the Binding, register that Binding in the parent Composition, and render with `h.block(Binding.embedView(...))`. The Composition update routes the generated child envelope through the Binding automatically. The update function returns `Update.ReturnWithOutMessage<Model, Message, OutMessage>`. `ReceivedFiles` fires when files arrive with a guaranteed non-empty list. `RejectedNonFiles` fires when a drop or change event produced no files, for example when someone drags non-file data. Match both in the Binding’s `outMessage.fold` policy.
+`FileDropBlock` is the completed Block to connect in the parent. Declare its startup arguments on the Binding, select its parent-owned `fold` policy through `withOutMessagePolicy`, register that Binding in the parent Composition, and render with `h.block(Binding.embedView(...))`. The Composition update routes the generated child envelope through the Binding automatically. The update function returns `Update.ReturnWithOutMessage<Model, Message, OutMessage>`. `ReceivedFiles` fires when files arrive with a guaranteed non-empty list. `RejectedNonFiles` fires when a drop or change event produced no files, for example when someone drags non-file data. Match both in the selected `fold` policy.
 
 :::Info{label="See it in an app"}
 Check out how FileDrop is wired up in a [real Foldkit app](https://github.com/foldkit/foldkit/blob/main/examples/ui-showcase/src/ui/view/fileDrop.ts).
@@ -35,7 +35,7 @@ The hidden `<input type="file">` stays in the DOM but visually hidden via the `s
 
 ### InitConfig {#init-config}
 
-Configuration object passed to `FileDrop.init()`.
+Configuration passed to the FileDrop Binding's child initializer. Direct completed Block calls use `FileDrop.FileDropBlock.init()`.
 
 | Name | Type     | Default | Description                                                                                               |
 | ---- | -------- | ------- | --------------------------------------------------------------------------------------------------------- |
@@ -63,9 +63,9 @@ Attribute groups provided to the `toView` callback.
 
 ### OutMessage {#out-message}
 
-The optional `outMessage` field of the update record. Handle it in the Binding’s `outMessage.fold` policy to process arriving files.
+The optional `outMessage` field of the update record. Handle it in the Binding’s selected `fold` policy to process arriving files.
 
-| Name               | Type                                     | Default | Description                                                                                                                                                                                                                              |
-| ------------------ | ---------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ReceivedFiles`    | `{ files: NonEmptyReadonlyArray<File> }` | —       | Emitted when the user drops files on the zone or selects them via the hidden input. The files list is guaranteed non-empty. Handle it in the Binding's `outMessage.fold` policy to process the files (validate, upload, store in Model). |
-| `RejectedNonFiles` | `{}`                                     | —       | Emitted when a drop or input-change event fires without any files, typically a drag of non-file data (text, URLs, images from another page). Consumers can ignore this or surface a hint to the user.                                    |
+| Name               | Type                                     | Default | Description                                                                                                                                                                                                                            |
+| ------------------ | ---------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ReceivedFiles`    | `{ files: NonEmptyReadonlyArray<File> }` | —       | Emitted when the user drops files on the zone or selects them via the hidden input. The files list is guaranteed non-empty. Handle it in the Binding's selected `fold` policy to process the files (validate, upload, store in Model). |
+| `RejectedNonFiles` | `{}`                                     | —       | Emitted when a drop or input-change event fires without any files, typically a drag of non-file data (text, URLs, images from another page). Consumers can ignore this or surface a hint to the user.                                  |

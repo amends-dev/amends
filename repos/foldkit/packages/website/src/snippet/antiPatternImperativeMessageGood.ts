@@ -5,7 +5,6 @@ import { defineMessageUnion } from 'foldkit/message'
 const Message = defineMessageUnion({
   ClickedRefresh: {},
 })
-type Message = typeof Message.Type
 
 const update = ApplicationComposition.makeUpdate((model, message) =>
   Message.match(message, {

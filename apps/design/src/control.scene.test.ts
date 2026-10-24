@@ -1,7 +1,7 @@
 import { describe, it } from "@effect/vitest"
 import * as RadioGroup from "@foldkit/ui/radioGroup"
 import { Option, Schema } from "effect"
-import { type Update, makeApplicationDefinition } from "foldkit"
+import { Block, type Update } from "foldkit"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
 import {
@@ -1619,16 +1619,15 @@ const VisibilityModel = Schema.Struct({
   visibility: Visibility
 })
 
-const VisibilityDefinition = makeApplicationDefinition({ Model: VisibilityModel, Message: Schema.Never })
+const VisibilityDefinition = Block.makeDefinition("Application", { Model: VisibilityModel, Message: Schema.Never })
 
-const VisibilityBinding = VisibilityDefinition.bindChild(VisibilityGroup, {
+const VisibilityBinding = VisibilityDefinition.makeBinding(VisibilityGroup, {
   field: "group",
-  init: { contextToArgs: () => [{ id: "visibility" }] },
-  outMessage: {
-    fold: VisibilityGroup.OutMessage.match({
-      Selected: ({ value }) => VisibilityDefinition.stepFields(() => ({ visibility: () => value }))
-    })
-  }
+  init: { contextToArgs: () => [{ id: "visibility" }] }
+}).withOutMessagePolicy({
+  fold: VisibilityGroup.OutMessage.match({
+    Selected: ({ value }) => VisibilityDefinition.makeFieldsStep(() => ({ visibility: () => value }))
+  })
 })
 
 const VisibilityComposition = VisibilityDefinition.makeComposition({ bindings: [VisibilityBinding] })

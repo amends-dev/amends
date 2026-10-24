@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const server = await import('foldkit/experimental/server')
-const application = await import('foldkit/application')
+const program = await import('foldkit/program')
+const block = await import('foldkit/block')
 const message = await import('foldkit/message')
 const runtime = await import('foldkit/runtime')
 const umbrella = await import('foldkit/experimental')
@@ -23,8 +24,9 @@ check(
   'foldkit/experimental/server does not export renderToString',
 )
 check(
-  typeof application.makeDefinition === 'function',
-  'foldkit/application does not export makeDefinition',
+  typeof program.make === 'function' &&
+    typeof program.makeElement === 'function',
+  'foldkit/program does not export make and makeElement',
 )
 check(
   typeof umbrella.Server?.MissingBuildId === 'function',
@@ -39,20 +41,18 @@ check(
 const { Effect, Schema } = await import('effect')
 const Model = Schema.Struct({})
 const Message = message.defineMessageUnion({ IgnoredRender: {} })
-const Application = application.makeDefinition({ Model, Message })
-const ApplicationComposition = Application.makeComposition()
+const ApplicationComposition = block
+  .makeDefinition('Application', { Model, Message })
+  .makeComposition()
+const ApplicationBlock = block.assemble(() =>
+  ApplicationComposition.prepareBlock({
+    init: ApplicationComposition.makeInit(() => ({ model: Model.make({}) })),
+    update: ApplicationComposition.makeUpdate(model => ({ model })),
+    view: ApplicationComposition.makeView(() => ({ title: 't', body: null })),
+  }),
+)
 const error = await Effect.runPromise(
-  Effect.flip(
-    server.renderToString(
-      ApplicationComposition,
-      {
-        init: () => ({ model: Model.make({}) }),
-        update: model => ({ model }),
-        view: () => ({ title: 't', body: null }),
-      },
-      {},
-    ),
-  ),
+  Effect.flip(server.renderToString(ApplicationBlock, {}, {})),
 )
 check(
   error._tag === 'MissingBuildId',

@@ -1,14 +1,11 @@
-import { Runtime } from 'foldkit'
+import { Program, Runtime } from 'foldkit'
 
-import { ApplicationComposition, init, update } from './application'
-import { view } from './view.optimised'
+import { ApplicationBlock } from './application.optimised'
 
-const application = ApplicationComposition.assembleApplication({
-  init,
-  update,
-  view: ApplicationComposition.makeView(view),
+const program = Program.make({
+  block: ApplicationBlock,
   container: document.getElementById('root'),
   devTools: false,
 })
 
-Runtime.run(application)
+Runtime.run(program)

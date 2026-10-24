@@ -13,7 +13,11 @@ import { Message } from './message'
 import type { Model } from './model'
 import { update } from './update'
 
-const card = (id: string, title: string, sortKey: string): Card => ({
+const card = (
+  id: string,
+  title: string,
+  sortKey: string,
+): typeof Card.Type => ({
   id,
   title,
   description: '',
@@ -25,7 +29,7 @@ const k2 = generateKeyBetween(k1, null)
 const k3 = generateKeyBetween(k2, null)
 const k4 = generateKeyBetween(k3, null)
 
-const testColumns: ReadonlyArray<Column.Column> = [
+const testColumns: ReadonlyArray<typeof Column.Column.Type> = [
   {
     id: 'todo',
     name: 'To Do',
@@ -51,7 +55,7 @@ const testColumns: ReadonlyArray<Column.Column> = [
   },
 ]
 
-const emptyModel: Model = {
+const emptyModel: typeof Model.Type = {
   columns: testColumns,
   dragAndDrop: DragAndDropBlock.init({ id: 'kanban' }).model,
   maybeNewCardColumnId: Option.none(),
@@ -262,11 +266,17 @@ describe('update', () => {
             }),
           ),
         ),
-        DragAndDrop.test.settleFocus({ itemId: firstCardId }),
+        DragAndDrop.test.settleFocus({
+          binding: DragAndDropBinding,
+          itemId: firstCardId,
+        }),
         message(
           dragAndDropMessage(DragAndDropBlock.Message.ConfirmedKeyboardDrop()),
         ),
-        DragAndDrop.test.settleFocus({ itemId: firstCardId }),
+        DragAndDrop.test.settleFocus({
+          binding: DragAndDropBinding,
+          itemId: firstCardId,
+        }),
         Command.resolve(SaveBoard, Message.CompletedSaveBoard()),
         model(model => {
           const todoColumn = model.columns.find(column => column.id === 'todo')
@@ -298,11 +308,17 @@ describe('update', () => {
             }),
           ),
         ),
-        DragAndDrop.test.settleFocus({ itemId: cardId }),
+        DragAndDrop.test.settleFocus({
+          binding: DragAndDropBinding,
+          itemId: cardId,
+        }),
         message(
           dragAndDropMessage(DragAndDropBlock.Message.ConfirmedKeyboardDrop()),
         ),
-        DragAndDrop.test.settleFocus({ itemId: cardId }),
+        DragAndDrop.test.settleFocus({
+          binding: DragAndDropBinding,
+          itemId: cardId,
+        }),
         Command.resolve(SaveBoard, Message.CompletedSaveBoard()),
         model(model => {
           const todoCards = model.columns
@@ -333,7 +349,10 @@ describe('update', () => {
           ),
         ),
         message(dragAndDropMessage(DragAndDropBlock.Message.CancelledDrag())),
-        DragAndDrop.test.settleFocus({ itemId: cardId }),
+        DragAndDrop.test.settleFocus({
+          binding: DragAndDropBinding,
+          itemId: cardId,
+        }),
         model(model => {
           expect(model.columns).toStrictEqual(emptyModel.columns)
         }),

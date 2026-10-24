@@ -5,14 +5,14 @@ export const ExampleSourceFile = Schema.Struct({
   highlightedHtml: Schema.String,
   rawCode: Schema.String,
 })
-export type ExampleSourceFile = typeof ExampleSourceFile.Type
 
 export const ExampleSources = Schema.Struct({
   files: Schema.Array(ExampleSourceFile),
 })
-export type ExampleSources = typeof ExampleSources.Type
 
-type SourceLoader = () => Promise<Readonly<{ default: ExampleSources }>>
+type SourceLoader = () => Promise<
+  Readonly<{ default: typeof ExampleSources.Type }>
+>
 
 const loadersBySlug: Readonly<Record<string, SourceLoader | undefined>> = {
   counter: () => import('virtual:example-sources/counter'),
@@ -56,7 +56,7 @@ const loadersBySlug: Readonly<Record<string, SourceLoader | undefined>> = {
 
 export const loadSourcesForSlug = async (
   slug: string,
-): Promise<ExampleSources> => {
+): Promise<typeof ExampleSources.Type> => {
   const loader = loadersBySlug[slug]
   if (!loader) {
     throw new Error(`Unknown example: ${slug}`)

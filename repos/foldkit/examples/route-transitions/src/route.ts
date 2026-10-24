@@ -10,8 +10,6 @@ export const ApplicationRoute = defineRouteUnion({
   NotFound: { path: Schema.String },
 })
 
-export type ApplicationRoute = typeof ApplicationRoute.Type
-
 export const homeRouter = pipe(Route.root, Route.mapTo(ApplicationRoute.Home))
 
 export const galleryRouter = pipe(

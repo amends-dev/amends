@@ -20,7 +20,7 @@ import {
 import type { UiViewBuilder } from '../composition'
 import type { City } from '../domain'
 
-const CITIES: ReadonlyArray<City> = [
+const CITIES: ReadonlyArray<typeof City.Type> = [
   'Johannesburg',
   'Kyiv',
   'Oxford',
@@ -57,7 +57,7 @@ const tagClassName =
 
 const emptyTagClassName = 'text-sm py-0.5 text-gray-400'
 
-const filterCities = (inputValue: string): ReadonlyArray<City> =>
+const filterCities = (inputValue: string): ReadonlyArray<typeof City.Type> =>
   inputValue === ''
     ? CITIES
     : Array.filter(CITIES, city =>
@@ -77,7 +77,7 @@ export const comboboxInputs = (
     wrapperClass?: string
   }>,
   h: UiViewBuilder,
-): Omit<ComboboxViewInputs<City>, 'maybeSelectedValue'> => {
+): Omit<ComboboxViewInputs<typeof City.Type>, 'maybeSelectedValue'> => {
   const filteredCities = filterCities(inputValue)
 
   return {

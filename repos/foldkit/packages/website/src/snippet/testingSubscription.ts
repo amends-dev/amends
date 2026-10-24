@@ -5,7 +5,7 @@ import {
   subscriptions as sceneSubscriptions,
 } from 'foldkit/scene'
 
-const rootSubscriptions = ApplicationDefinition.subscriptions(entry => ({
+const rootSubscriptions = ApplicationDefinition.makeSubscriptions(entry => ({
   clockTicks: entry('ClockTicks', { messages: [Message.Ticked] }),
 }))
 

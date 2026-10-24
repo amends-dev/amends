@@ -1,14 +1,10 @@
 // Pseudocode walkthrough of a custom leave Command. Fit it into the
 // foldAnimationOutMessage from the basic example.
 import { Effect, Schema } from 'effect'
-import { Block, Update } from 'foldkit'
-import type * as Command from 'foldkit/command'
+import { Block } from 'foldkit'
 import * as Dom from 'foldkit/dom'
 
 import { Animation } from '@foldkit/ui'
-
-type AnimationMessage = typeof Animation.AnimationBlock.Message.Type
-type AnimationOutMessage = typeof Animation.AnimationBlock.OutMessage.Type
 
 const AnimationExampleDefinition = Block.makeDefinition('AnimationExample', {
   Model,
@@ -20,7 +16,7 @@ const AnimationExampleDefinition = Block.makeDefinition('AnimationExample', {
 // result, so Animation can tell this leave's settlement apart from a late
 // result left over from an earlier enter. This one waits on a child panel
 // instead of the Animation wrapper:
-const WaitForPanelSettled = AnimationExampleDefinition.command(
+const WaitForPanelSettled = AnimationExampleDefinition.makeCommand(
   'WaitForPanelSettled',
   {
     args: { generation: Schema.Number },
@@ -37,17 +33,13 @@ const WaitForPanelSettled = AnimationExampleDefinition.command(
 )
 
 // StartedLeaveAnimating carries the generation. Pass it straight to the Command:
-const foldAnimationOutMessage = (
-  outMessage: AnimationOutMessage,
-  { liftCommand }: Update.FoldContext<AnimationMessage, Message>,
-) =>
-  Animation.AnimationBlock.OutMessage.match<
-    Update.Step<Model, Message, Command.HandlerOf<typeof WaitForPanelSettled>>
-  >(outMessage, {
-    StartedLeaveAnimating: ({ generation }) =>
-      AnimationExampleDefinition.step(model => ({
-        model,
-        commands: [liftCommand(WaitForPanelSettled({ generation }))],
-      })),
-    TransitionedOut: () => AnimationExampleDefinition.stepNoop(),
-  })
+const foldAnimationOutMessage = AnimationExampleDefinition.makeOutMessageFold(
+  Animation.AnimationBlock,
+  {
+    StartedLeaveAnimating: ({ generation }, { liftCommand }) =>
+      AnimationExampleDefinition.makeCommandsStep([
+        liftCommand(WaitForPanelSettled({ generation })),
+      ]),
+    TransitionedOut: AnimationExampleDefinition.makeNoopStep,
+  },
+)

@@ -40,7 +40,7 @@ import { prependToLog } from './messageLog'
 
 // CONSTANTS
 
-const NOTE_FREQUENCIES: Record<Note, number> = {
+const NOTE_FREQUENCIES: Record<typeof Note.Type, number> = {
   C: 261.63,
   D: 293.66,
   E: 329.63,
@@ -50,7 +50,7 @@ const NOTE_FREQUENCIES: Record<Note, number> = {
   B: 493.88,
 }
 
-const DURATION_MILLISECONDS: Record<NoteDuration, number> = {
+const DURATION_MILLISECONDS: Record<typeof NoteDuration.Type, number> = {
   Short: 200,
   Medium: 400,
   Long: 800,
@@ -108,7 +108,7 @@ export const init = NotePlayerDemoComposition.makeInit(() => ({
   },
 }))
 
-const DelayAdvanceNotePlayerPhase = NotePlayerDemoDefinition.command(
+const DelayAdvanceNotePlayerPhase = NotePlayerDemoDefinition.makeCommand(
   'DelayAdvanceNotePlayerPhase',
   {
     args: { generation: Schema.Number },
@@ -125,8 +125,8 @@ const DelayAdvanceNotePlayerPhase = NotePlayerDemoDefinition.command(
 )
 
 const enterNoteCommandPhase = (
-  model: Model,
-  noteSequence: ReadonlyArray<Note>,
+  model: typeof Model.Type,
+  noteSequence: ReadonlyArray<typeof Note.Type>,
   noteIndex: number,
 ) => ({
   model: modifyFields(model, {
@@ -356,9 +356,9 @@ export const update = NotePlayerDemoComposition.makeUpdate((model, message) =>
 // MANAGED RESOURCE
 
 const AudioContextResource =
-  NotePlayerDemoDefinition.resource<AudioContext>()('AudioContext')
+  NotePlayerDemoDefinition.makeResource<AudioContext>()('AudioContext')
 
-export const managedResources = NotePlayerDemoDefinition.managedResources(
+export const managedResources = NotePlayerDemoDefinition.makeManagedResources(
   entry => ({
     audioContext: entry('ManageAudioContext', Schema.Option(Schema.Null), {
       resource: AudioContextResource,
@@ -382,7 +382,7 @@ export const managedResources = NotePlayerDemoDefinition.managedResources(
   }),
 )
 
-const PlayNote = NotePlayerDemoDefinition.command('PlayNote', {
+const PlayNote = NotePlayerDemoDefinition.makeCommand('PlayNote', {
   args: { note: Note, duration: NoteDuration, noteIndex: Schema.Number },
   messages: [Message.CompletedPlayNote],
   handler: function* () {
@@ -483,7 +483,10 @@ export const view = NotePlayerDemoComposition.makeView((model, h) =>
   ),
 )
 
-const appPanel = (model: Model, h: NotePlayerDemoViewBuilder): Html => {
+const appPanel = (
+  model: typeof Model.Type,
+  h: NotePlayerDemoViewBuilder,
+): Html => {
   const isPlaying = model.playbackState._tag === 'Playing'
   const isPaused = model.playbackState._tag === 'Paused'
   const isInputLocked = isPlaying || isPaused
@@ -522,7 +525,7 @@ const appPanel = (model: Model, h: NotePlayerDemoViewBuilder): Html => {
 }
 
 const noteInputView = (
-  model: Model,
+  model: typeof Model.Type,
   isInputLocked: boolean,
   h: NotePlayerDemoViewBuilder,
 ): Html =>
@@ -591,10 +594,14 @@ const noteInputView = (
     h,
   )
 
-const noteDurations: ReadonlyArray<NoteDuration> = ['Short', 'Medium', 'Long']
+const noteDurations: ReadonlyArray<typeof NoteDuration.Type> = [
+  'Short',
+  'Medium',
+  'Long',
+]
 
 const durationSelectorView = (
-  model: Model,
+  model: typeof Model.Type,
   isInputLocked: boolean,
   h: NotePlayerDemoViewBuilder,
 ): Html =>
@@ -645,7 +652,7 @@ const durationSelectorView = (
   )
 
 const playbackControlView = (
-  model: Model,
+  model: typeof Model.Type,
   canPlay: boolean,
   h: NotePlayerDemoViewBuilder,
 ): Html => {
@@ -734,7 +741,9 @@ const playbackControlView = (
   )
 }
 
-const audioUnavailableNoticeView = (audio: AudioState): ReadonlyArray<Html> =>
+const audioUnavailableNoticeView = (
+  audio: typeof AudioState.Type,
+): ReadonlyArray<Html> =>
   Match.value(audio).pipe(
     Match.withReturnType<ReadonlyArray<Html>>(),
     Match.tag('Unavailable', () => [
@@ -762,7 +771,7 @@ const placeholderVisualizerView = (): Html =>
     ),
   )
 
-const noteSequenceView = (model: Model): Html => {
+const noteSequenceView = (model: typeof Model.Type): Html => {
   const notes = parseNotes(model.noteInput.value)
 
   return ih.div(
@@ -780,7 +789,10 @@ const noteSequenceView = (model: Model): Html => {
   )
 }
 
-const noteVisualizerView = (model: Model, notes: ReadonlyArray<Note>): Html => {
+const noteVisualizerView = (
+  model: typeof Model.Type,
+  notes: ReadonlyArray<typeof Note.Type>,
+): Html => {
   const maybeCurrentIndex = Match.value(model.playbackState).pipe(
     Match.tag('Playing', 'Paused', ({ currentNoteIndex }) =>
       Option.some(currentNoteIndex),
@@ -819,7 +831,7 @@ const noteVisualizerView = (model: Model, notes: ReadonlyArray<Note>): Html => {
   )
 }
 
-const noteInputLabel = (model: Model): string =>
+const noteInputLabel = (model: typeof Model.Type): string =>
   FieldValidation.match(model.noteInput, {
     onNotValidated: value => `NotValidated("${value}")`,
     onValidating: value => `Validating("${value}")`,
@@ -827,7 +839,7 @@ const noteInputLabel = (model: Model): string =>
     onInvalid: ({ errors }) => `Invalid("${Array.headNonEmpty(errors)}")`,
   })
 
-const playbackStateLabel = (model: Model): string =>
+const playbackStateLabel = (model: typeof Model.Type): string =>
   PlaybackState.match(model.playbackState, {
     Idle: () => 'Idle',
     Playing: ({ currentNoteIndex, noteSequence }) =>
@@ -836,7 +848,7 @@ const playbackStateLabel = (model: Model): string =>
       `PlaybackState.Paused(${currentNoteIndex + 1}/${noteSequence.length})`,
   })
 
-const phaseLabel = (phase: NoteHighlightPhase): string =>
+const phaseLabel = (phase: typeof NoteHighlightPhase.Type): string =>
   Match.value(phase).pipe(
     Match.when('Idle', () => 'Idle'),
     Match.whenOr('PlayMessage', 'PauseMessage', 'NoteMessage', () => 'Message'),
@@ -846,7 +858,7 @@ const phaseLabel = (phase: NoteHighlightPhase): string =>
     Match.exhaustive,
   )
 
-const phaseColorClass = (phase: NoteHighlightPhase): string =>
+const phaseColorClass = (phase: typeof NoteHighlightPhase.Type): string =>
   Match.value(phase).pipe(
     Match.when('Idle', () => 'text-gray-600 dark:text-gray-400'),
     Match.whenOr(
@@ -869,7 +881,7 @@ const phaseColorClass = (phase: NoteHighlightPhase): string =>
     Match.exhaustive,
   )
 
-const phaseIndicatorView = (model: Model): Html =>
+const phaseIndicatorView = (model: typeof Model.Type): Html =>
   DemoView.phaseIndicator(
     phaseLabel(model.highlightPhase),
     phaseColorClass(model.highlightPhase),

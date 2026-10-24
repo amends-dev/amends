@@ -5,7 +5,7 @@ import { modifyFields } from 'foldkit/struct'
 import { Message } from './message'
 import type { Model } from './model'
 
-const FocusSearchInput = ApplicationDefinition.command('FocusSearchInput', {
+const FocusSearchInput = ApplicationDefinition.makeCommand('FocusSearchInput', {
   messages: [Message.CompletedFocusSearchInput],
   handler: function* () {
     return () =>

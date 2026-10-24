@@ -33,7 +33,7 @@ export const logMessagesOf = <E, R>(turnId: TurnId.TurnId, logMessages: Stream.S
     Stream.catchCause(() => Stream.make(Message.FailedFollowLog({ turnId, error: unfollowable })))
   )
 
-export const subscriptions = TurnsDefinition.subscriptions((entry) => ({
+export const subscriptions = TurnsDefinition.makeSubscriptions((entry) => ({
   turns: entry(
     "ReadTurns",
     { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, threadId: ThreadId.ThreadId },

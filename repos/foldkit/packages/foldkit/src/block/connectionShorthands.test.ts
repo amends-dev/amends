@@ -18,6 +18,7 @@ import { aggregateChildren, inspectBinding } from './binding.js'
 import { makeDefinition } from './define.js'
 import { normalizeConnectionConfig } from './directConnection.js'
 import { ViewScopeTypeId } from './identity.js'
+import * as Block from './public.js'
 import type { Qualify } from './scope.js'
 
 class ValueSource extends Context.Service<
@@ -38,7 +39,7 @@ const Message = defineMessageUnion({
 })
 const OutMessage = defineMessageUnion({ ReadRequested: {} })
 const Child = makeDefinition('Child', { Model, Message, OutMessage })
-const Read = Child.command('Read', {
+const Read = Child.makeCommand('Read', {
   messages: [Message.CompletedRead],
   handler: function* () {
     const source = yield* ValueSource
@@ -46,14 +47,14 @@ const Read = Child.command('Read', {
     return () => Effect.succeed(Message.CompletedRead({ count: source.value }))
   },
 })
-const Observe = Child.mount('Observe', {
+const Observe = Child.makeMount('Observe', {
   messages: [Message.CompletedObserve],
   handler: function* () {
     return () => Effect.succeed(Message.CompletedObserve())
   },
 })
-const Session = Child.resource<string>()('Session')
-const subscriptions = Child.subscriptions(entry => ({
+const Session = Child.makeResource<string>()('Session')
+const subscriptions = Child.makeSubscriptions(entry => ({
   ticks: entry('Ticks', {
     messages: [Message.ObservedTick],
     handler: function* () {
@@ -61,7 +62,7 @@ const subscriptions = Child.subscriptions(entry => ({
     },
   }),
 }))
-const managedResources = Child.managedResources(entry => ({
+const managedResources = Child.makeManagedResources(entry => ({
   session: entry('ManageSession', Schema.Option(Schema.Null), {
     resource: Session,
     modelToMaybeRequirements: () => Option.some(null),
@@ -98,22 +99,27 @@ const childUpdate = registered.makeUpdate((model, message) =>
     FailedAcquireSession: () => ({ model }),
   }),
 )
-const block = registered.assembleBlock({
-  init: () => ({ model: Model.make({ count: 0 }) }),
-  update: childUpdate,
-  view,
-  subscriptions,
-  managedResources,
-  EffectsLayer: Layer.mergeAll(
-    Read.layer,
-    Observe.layer,
-    subscriptions.ticks.layer,
-    managedResources.session.layer,
-  ),
-  operations: {
-    read: () => Tuple.make(Message.RequestedReadOperation()),
-  },
-})
+const prepareBlock = () =>
+  registered.prepareBlock({
+    init: () => ({ model: Model.make({ count: 0 }) }),
+    update: childUpdate,
+    view,
+    subscriptions,
+    managedResources,
+    EffectsLayer: Layer.mergeAll(
+      Read.layer,
+      Observe.layer,
+      subscriptions.ticks.layer,
+      managedResources.session.layer,
+    ),
+    operations: {
+      read: () => Tuple.make(Message.RequestedReadOperation()),
+    },
+  })
+const block: Block.FromAssemblyWithViewAndOutMessage<
+  typeof Model,
+  typeof prepareBlock
+> = Block.assemble(prepareBlock)
 const Entry = Schema.Struct({ id: Schema.String, child: Model })
 const ParentModel = Schema.Struct({
   primary: Model,
@@ -142,28 +148,24 @@ const foldChildOutMessage = OutMessage.match<
     model: modifyFields(model, { requests: requests => requests + 1 }),
   }),
 })
-const PrimaryBinding = Parent.bindChild(block, {
+const PrimaryBinding = Parent.makeBinding(block, {
   field: 'primary',
-  outMessage: { fold: foldChildOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldChildOutMessage })
 const primaryInspection = inspectBinding(PrimaryBinding)
-const SecondaryBinding = Parent.bindChild(block, {
+const SecondaryBinding = Parent.makeBinding(block, {
   field: 'secondary',
-  outMessage: { fold: foldChildOutMessage },
-})
-const OverriddenBinding = Parent.bindChild(block, {
+}).withOutMessagePolicy({ fold: foldChildOutMessage })
+const OverriddenBinding = Parent.makeBinding(block, {
   field: 'secondary',
   placement: 'alternate',
-  outMessage: { fold: foldChildOutMessage },
-})
-const AccessorBinding = Parent.bindChild(block, {
+}).withOutMessagePolicy({ fold: foldChildOutMessage })
+const AccessorBinding = Parent.makeBinding(block, {
   read: model => Option.some(model.primary),
   write: (model, nextPrimary) =>
     modifyFields(model, { primary: () => nextPrimary }),
-  outMessage: { fold: foldChildOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldChildOutMessage })
 const entryKey = (entry: typeof Entry.Type): string => entry.id
-const KeyedBinding = Parent.bindChild(block, {
+const KeyedBinding = Parent.makeBinding(block, {
   placement: 'entries',
   readAll: (model: ParentModel) => model.entries,
   key: entryKey,
@@ -177,10 +179,9 @@ const KeyedBinding = Parent.bindChild(block, {
           : entry,
       ),
     }),
-  outMessage: {
-    fold: (_key: string, outMessage: typeof OutMessage.Type) =>
-      foldChildOutMessage(outMessage),
-  },
+}).withOutMessagePolicy({
+  fold: (_key: string, outMessage: typeof OutMessage.Type) =>
+    foldChildOutMessage(outMessage),
 })
 const ParentComposition = Parent.makeComposition({
   bindings: [PrimaryBinding, KeyedBinding],
@@ -203,7 +204,12 @@ const initial = ParentModel.make({
 
 it('keeps exact placement literals and child operation arguments', () => {
   expectTypeOf<Extract<keyof typeof PrimaryBinding, string>>().toEqualTypeOf<
-    'placement' | 'init' | 'fold' | 'embedView' | 'read'
+    | 'placement'
+    | 'init'
+    | 'fold'
+    | 'embedView'
+    | 'read'
+    | 'withOutMessagePolicy'
   >()
   expectTypeOf(PrimaryBinding.placement).toEqualTypeOf<'primary'>()
   expectTypeOf(SecondaryBinding.placement).toEqualTypeOf<'secondary'>()

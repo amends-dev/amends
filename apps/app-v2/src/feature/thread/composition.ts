@@ -13,7 +13,7 @@ import { type Model, OutMessage, ThreadDefinition } from "./definition.ts"
  */
 const foldReplyOutMessage = ComposerBlock.OutMessage.match({
   ChangedText: ({ text }) =>
-    ThreadDefinition.step((model: Model) => {
+    ThreadDefinition.makeStep((model: Model) => {
       const telling = text !== "" && !model.typingTold
       return {
         model: modifyFields(model, { typingTold: (told) => told || telling }),
@@ -21,17 +21,17 @@ const foldReplyOutMessage = ComposerBlock.OutMessage.match({
       }
     }),
   SubmittedText: ({ text }) =>
-    ThreadDefinition.step((model: Model) => ({
+    ThreadDefinition.makeStep((model: Model) => ({
       model,
       commands: [
         PostReply({ workspaceId: model.workspaceId, memberId: model.memberId, threadId: model.threadId, text }),
         TellTyping({ workspaceId: model.workspaceId, threadId: null })
       ]
     })),
-  RanSlashCommand: () => ThreadDefinition.stepNoop()
+  RanSlashCommand: () => ThreadDefinition.makeNoopStep()
 })
 
-export const ReplyBinding = ThreadDefinition.bindChild(ComposerBlock, {
+export const ReplyBinding = ThreadDefinition.makeBinding(ComposerBlock, {
   field: "reply",
   init: {
     contextToArgs: ({ workspaceId, memberId, threadId }) => [
@@ -39,11 +39,10 @@ export const ReplyBinding = ThreadDefinition.bindChild(ComposerBlock, {
       memberId,
       Drafts.Place.cases.Reply.make({ threadId })
     ]
-  },
-  outMessage: { fold: foldReplyOutMessage }
-})
+  }
+}).withOutMessagePolicy({ fold: foldReplyOutMessage })
 
-export const TaskBinding = ThreadDefinition.bindChild(TaskBlock, {
+export const TaskBinding = ThreadDefinition.makeBinding(TaskBlock, {
   field: "task",
   init: { contextToArgs: ({ workspaceId, memberId, threadId }) => [workspaceId, memberId, threadId] }
 })
@@ -54,12 +53,12 @@ export const TaskBinding = ThreadDefinition.bindChild(TaskBlock, {
  */
 const foldTurnsOutMessage = TurnsBlock.OutMessage.match({
   ReturnedToThread: () =>
-    ThreadDefinition.step((model: Model) => ({
+    ThreadDefinition.makeStep((model: Model) => ({
       model,
       commands: [ScrollMessagesToEnd({ threadId: model.threadId, onlyIfNearEnd: false })]
     })),
-  ClosedLog: () => ThreadDefinition.stepNoop(),
-  OpenedAgent: () => ThreadDefinition.stepNoop()
+  ClosedLog: () => ThreadDefinition.makeNoopStep(),
+  OpenedAgent: () => ThreadDefinition.makeNoopStep()
 })
 
 /** Closing a turn's log is the person closing the thread's pane; an agent's settings are the page's to open. */
@@ -69,11 +68,10 @@ const forwardTurnsOutMessage = TurnsBlock.OutMessage.match({
   OpenedAgent: ({ agentId }) => OutMessage.OpenedAgent({ agentId })
 })
 
-export const TurnsBinding = ThreadDefinition.bindChild(TurnsBlock, {
+export const TurnsBinding = ThreadDefinition.makeBinding(TurnsBlock, {
   field: "turns",
-  init: { contextToArgs: ({ workspaceId, memberId, threadId }) => [workspaceId, memberId, threadId] },
-  outMessage: { forward: forwardTurnsOutMessage, fold: foldTurnsOutMessage }
-})
+  init: { contextToArgs: ({ workspaceId, memberId, threadId }) => [workspaceId, memberId, threadId] }
+}).withOutMessagePolicy({ forward: forwardTurnsOutMessage, fold: foldTurnsOutMessage })
 
 export const ThreadComposition = ThreadDefinition.makeComposition({
   bindings: [ReplyBinding, TaskBinding, TurnsBinding],

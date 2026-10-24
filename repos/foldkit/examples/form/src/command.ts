@@ -18,29 +18,32 @@ const isEmailOnWaitlist = (email: string): Effect.Effect<boolean> =>
     return Array.contains(EMAILS_ON_WAITLIST, email.toLowerCase())
   })
 
-export const ValidateEmail = ApplicationDefinition.command('ValidateEmail', {
-  args: { email: Schema.String },
-  messages: [Message.CompletedValidateEmail],
-  handler: function* () {
-    return ({ email }) =>
-      Effect.gen(function* () {
-        if (yield* isEmailOnWaitlist(email)) {
-          return Message.CompletedValidateEmail({
-            field: Invalid({
-              value: email,
-              errors: ['This email is already on our waitlist'],
-            }),
-          })
-        } else {
-          return Message.CompletedValidateEmail({
-            field: Valid({ value: email }),
-          })
-        }
-      })
+export const ValidateEmail = ApplicationDefinition.makeCommand(
+  'ValidateEmail',
+  {
+    args: { email: Schema.String },
+    messages: [Message.CompletedValidateEmail],
+    handler: function* () {
+      return ({ email }) =>
+        Effect.gen(function* () {
+          if (yield* isEmailOnWaitlist(email)) {
+            return Message.CompletedValidateEmail({
+              field: Invalid({
+                value: email,
+                errors: ['This email is already on our waitlist'],
+              }),
+            })
+          } else {
+            return Message.CompletedValidateEmail({
+              field: Valid({ value: email }),
+            })
+          }
+        })
+    },
   },
-})
+)
 
-export const SubmitForm = ApplicationDefinition.command('SubmitForm', {
+export const SubmitForm = ApplicationDefinition.makeCommand('SubmitForm', {
   args: {
     name: Schema.String,
     email: Schema.String,

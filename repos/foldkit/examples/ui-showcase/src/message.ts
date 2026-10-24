@@ -9,5 +9,3 @@ export const Message = defineMessageUnion({
   ChangedUrl: { url: Url },
   ClickedOpenMobileMenu: {},
 })
-
-export type Message = typeof Message.Type

@@ -5,7 +5,7 @@ import * as Composer from './composer'
 import { ChatDefinition } from './definition'
 import { Message } from './message'
 
-export const PrimaryComposerBinding = ChatDefinition.bindChild(
+export const PrimaryComposerBinding = ChatDefinition.makeBinding(
   Composer.ComposerBlock,
   {
     read: model => Option.some(model.primaryPanel.composer),
@@ -17,7 +17,7 @@ export const PrimaryComposerBinding = ChatDefinition.bindChild(
   },
 )
 
-export const SecondaryComposerBinding = ChatDefinition.bindChild(
+export const SecondaryComposerBinding = ChatDefinition.makeBinding(
   Composer.ComposerBlock,
   {
     placement: 'SecondaryComposer',

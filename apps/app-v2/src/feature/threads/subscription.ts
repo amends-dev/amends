@@ -7,7 +7,7 @@ import * as Stream from "effect/Stream"
 import * as Stores from "../../store/Stores.ts"
 import { Message, ThreadsDefinition } from "./definition.ts"
 
-export const subscriptions = ThreadsDefinition.subscriptions((entry) => ({
+export const subscriptions = ThreadsDefinition.makeSubscriptions((entry) => ({
   threads: entry(
     "ReadThreads",
     {

@@ -1,5 +1,5 @@
 import { Array, Schema } from 'effect'
-import { Update, makeApplicationDefinition } from 'foldkit'
+import { Block, Update } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
 
@@ -15,15 +15,18 @@ type Model = typeof Model.Type
 const Message = defineMessageUnion({
   ClickedApplyTheme: {},
 })
-const ApplicationDefinition = makeApplicationDefinition({ Model, Message })
-const ChildBinding = ApplicationDefinition.bindChild(
+const ApplicationDefinition = Block.makeDefinition('Application', {
+  Model,
+  Message,
+})
+const ChildBinding = ApplicationDefinition.makeBinding(
   Child.FunctionReferenceChildBlock,
   {
     field: 'child',
     init: false,
   },
 )
-const EntriesBinding = ApplicationDefinition.bindChild(
+const EntriesBinding = ApplicationDefinition.makeBinding(
   Child.FunctionReferenceChildBlock,
   {
     field: 'entries',
@@ -33,7 +36,7 @@ const EntriesBinding = ApplicationDefinition.bindChild(
 const ApplicationComposition = ApplicationDefinition.makeComposition({
   bindings: [ChildBinding, EntriesBinding],
 })
-const revealPreferenceErrors = ApplicationDefinition.stepFields(() => ({
+const revealPreferenceErrors = ApplicationDefinition.makeFieldsStep(() => ({
   preferences: Foreign.revealErrors,
 }))
 
@@ -49,9 +52,9 @@ export const update = ApplicationComposition.makeUpdate(model => {
     entries: Array.filter(entry => entry.id !== 'removed'),
   })
 
-  return Update.combine(model, [
+  return Update.combineSteps(model, [
     revealPreferenceErrors,
-    ApplicationDefinition.stepNoop(),
+    ApplicationDefinition.makeNoopStep(),
     ChildBinding.informThemeChanged({ theme: 'Light' }),
     EntriesBinding.informThemeChanged('retained', { theme: 'Light' }),
   ])

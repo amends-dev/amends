@@ -24,7 +24,7 @@ This page builds on the [Blocks](/core/block) pattern. Read that first for the l
 
 ### Keep the Message Private
 
-People declares its Model, Message, and early `PeopleDefinition` in cycle-safe files. The internal `InformedOfRouteChange` Message carries only `PeopleRoute`, the part of the application Route that the feature understands. Commands import that early definition and the Message constructors they produce; the completed Block imports the Commands and their handler recipes.
+People declares its Model, Message, and early `PeopleDefinition` in cycle-safe files. The internal `InformedOfRouteChange` Message carries only `typeof ApplicationRoute.People.Type`, the variant Schema query for the part of the application Route that the feature understands. Commands import that early definition and the Message constructors they produce; the completed Block imports the Commands and their handler recipes.
 
 ::Snippet{name="informingBlocksMessage" label="People Message contract"}
 
@@ -46,7 +46,7 @@ Update copies the route query into the input, records it in recent searches, and
 
 ### Define the Parent Folds
 
-The People Binding declares its parent Model `field` once; Composition derives its child delivery. The parent Composition routes regular People Messages through that Binding, while `PeopleBinding.informRouteChanged` produces and handles the public `InformedOfRouteChange` operation through the same boundary. The `ChangedUrl` handler matches the next Route and composes the resulting connected child Step with the pure `setRoute` Step through `Update.combine`. The `makeUpdate` Model supplies the registered graph, and the projected operation retains the Binding and child update requirements for application composition.
+The People Binding declares its parent Model `field` once; Composition derives its child delivery. If People declares OutMessages, select its parent-owned policy with `withOutMessagePolicy` and register that full Binding. The selected Binding keeps the same projected operations, so `PeopleBinding.informRouteChanged` still produces and handles the public `InformedOfRouteChange` operation through the same boundary. The `ChangedUrl` handler matches the next Route and composes the resulting connected child Step with the pure `setRoute` Step through `Update.combineSteps`. The `makeUpdate` Model supplies the registered graph, and the projected operation retains the Binding and child update requirements for application composition.
 
 ::Snippet{name="informingBlocksParent" label="Parent route fold"}
 

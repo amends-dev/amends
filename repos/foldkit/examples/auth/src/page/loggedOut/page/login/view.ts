@@ -2,12 +2,12 @@ import { clsx } from 'clsx'
 import { Array } from 'effect'
 import { FieldValidation } from 'foldkit'
 import { type Field } from 'foldkit/fieldValidation'
-import { type Html, type HtmlBuilder } from 'foldkit/html'
+import { type Html } from 'foldkit/html'
 
 import { Button, Input } from '@foldkit/ui'
 
 import { homeRouter } from '../../../../route'
-import { LoginComposition } from './composition'
+import { LoginComposition, type LoginViewBuilder } from './composition'
 import { Message } from './definition'
 import { isFormValid } from './login'
 
@@ -23,10 +23,10 @@ const fieldView = (
   id: string,
   labelText: string,
   field: Field<string>,
-  onUpdate: (value: string) => Message,
+  onUpdate: (value: string) => typeof Message.Type,
   type: 'text' | 'email' | 'password',
   placeholder: string,
-  h: HtmlBuilder<Message>,
+  h: LoginViewBuilder,
 ): Html => {
   const inputClass = clsx(
     'w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',

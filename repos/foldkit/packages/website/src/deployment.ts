@@ -8,11 +8,10 @@ export const Deployment = defineTaggedUnion({
   Canary: { commit: Schema.NonEmptyString },
   Preview: { release: PreviewRelease },
 })
-export type Deployment = typeof Deployment.Type
 
 export const deploymentFromCanaryCommit = (
   canaryCommit: string | undefined,
-): Deployment => {
+): typeof Deployment.Type => {
   if (canaryCommit === undefined) {
     return Deployment.Production()
   } else {
@@ -25,7 +24,7 @@ export const deploymentFromCanaryCommit = (
 export const deploymentFromEnvironment = (
   canaryCommit: string | undefined,
   previewRelease: string | undefined,
-): Deployment => {
+): typeof Deployment.Type => {
   if (canaryCommit !== undefined && previewRelease !== undefined) {
     throw new Error('A website build cannot be both canary and preview')
   }
@@ -38,7 +37,9 @@ export const deploymentFromEnvironment = (
   return deploymentFromCanaryCommit(canaryCommit)
 }
 
-export const isTelemetryEnabled = (deployment: Deployment): boolean =>
+export const isTelemetryEnabled = (
+  deployment: typeof Deployment.Type,
+): boolean =>
   Deployment.match(deployment, {
     Production: () => true,
     Canary: () => false,

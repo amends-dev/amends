@@ -338,11 +338,14 @@ HomeBinding.resetJoinForm()
 // @ts-expect-error Emitted informJoined requires its Room context.
 RoomBinding.informJoined('room-1', 'alice')
 
-// @ts-expect-error Emitted OutMessage children still require a policy.
-ApplicationDefinition.bindChild(HomeBlock, { field: 'home' })
+const PendingHomeBinding = ApplicationDefinition.makeBinding(HomeBlock, {
+  field: 'home',
+})
+// @ts-expect-error Emitted OutMessage children still require a policy before Composition.
+ApplicationDefinition.makeComposition({ bindings: [PendingHomeBinding] })
 
-// @ts-expect-error Emitted keyed OutMessage children still require a policy.
-ApplicationDefinition.bindChild(RoomBlock, {
+const PendingRoomBinding = ApplicationDefinition.makeBinding(RoomBlock, {
+  placement: 'pending-room',
   readAll: (model: typeof ApplicationDefinition.Model.Type) =>
     Option.toArray(model.maybeRoomInstance),
   key: (instance: typeof RoomInstance.Type) => instance.roomId,
@@ -356,18 +359,19 @@ ApplicationDefinition.bindChild(RoomBlock, {
     ) => [{ roomId }],
   },
 })
+// @ts-expect-error Emitted keyed OutMessage children still require a policy before Composition.
+ApplicationDefinition.makeComposition({ bindings: [PendingRoomBinding] })
 
-// @ts-expect-error Emitted static policies must accept every refined child OutMessage.
-ApplicationDefinition.bindChild(HomeBlock, {
+ApplicationDefinition.makeBinding(HomeBlock, {
   field: 'home',
-  outMessage: {
-    fold: (
-      _outMessage: Extract<
-        typeof HomeOutMessage.Type,
-        Readonly<{ username: 'alice' }>
-      >,
-    ) => ApplicationDefinition.step(model => ({ model })),
-  },
+}).withOutMessagePolicy({
+  // @ts-expect-error Emitted static policies must accept every refined child OutMessage.
+  fold: (
+    _outMessage: Extract<
+      typeof HomeOutMessage.Type,
+      Readonly<{ username: 'alice' }>
+    >,
+  ) => ApplicationDefinition.makeStep(model => ({ model })),
 })
 
 export type EmittedReciprocalCoordinationAssertions = [

@@ -13,7 +13,7 @@ const FakeEffect = {
   sync: <Value>(evaluate: () => Value): Value => evaluate(),
 }
 
-export const update = (model: Model) => ({
+export const update = (model: typeof Model.Type) => ({
   model,
   commands: [
     Save({
@@ -52,7 +52,7 @@ export const cancel = Effect.runCallback(Effect.succeed(1), {
 export const missing = Effect.fromOption(Option.none(), () => Date.now())
 export const functionValue = Effect.succeed(() => Math.random())
 
-export const subscriptions = Subscription.make<Model, Message>()(entry => {
+export const subscriptions = Subscription.make<typeof Model.Type, Message>()(entry => {
   const initializedSubscriptionAt = Date.now()
 
   return {
@@ -69,7 +69,7 @@ export const subscriptions = Subscription.make<Model, Message>()(entry => {
   }
 })
 
-export const managedResources = ManagedResource.make<Model, Message>()(
+export const managedResources = ManagedResource.make<typeof Model.Type, Message>()(
   entry => ({
     connection: entry(
       'Connection',

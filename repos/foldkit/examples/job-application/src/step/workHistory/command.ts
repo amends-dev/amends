@@ -2,7 +2,7 @@ import { Crypto, Effect } from 'effect'
 
 import { Message, WorkHistoryDefinition } from './definition'
 
-export const GenerateWorkHistoryEntryId = WorkHistoryDefinition.command(
+export const GenerateWorkHistoryEntryId = WorkHistoryDefinition.makeCommand(
   'GenerateWorkHistoryEntryId',
   {
     messages: [

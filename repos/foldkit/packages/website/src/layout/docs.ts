@@ -38,6 +38,8 @@ import {
   NotFound,
   Patterns,
   Performance,
+  PreviewMigration,
+  PreviewUpgrade,
   Privacy,
   ProjectOrganization,
   ReactComparison,
@@ -75,7 +77,10 @@ const LlmIgnore = ih.DataAttribute('llm-ignore', '')
 
 // DOCS HEADER
 
-export const headerView = (model: Model, h: ApplicationViewBuilder) =>
+export const headerView = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+) =>
   h.header(
     [
       h.Class(
@@ -163,7 +168,10 @@ export const headerView = (model: Model, h: ApplicationViewBuilder) =>
 
 // DOCS FOOTER
 
-export const footerView = (model: Model, h: ApplicationViewBuilder): Html =>
+export const footerView = (
+  model: typeof Model.Type,
+  h: ApplicationViewBuilder,
+): Html =>
   h.footer(
     [
       h.Class(
@@ -426,8 +434,8 @@ const lazyProseContent = (
 const lazyApiReference = createLazy()
 
 export const view = (
-  model: Model,
-  docsRoute: DocsRoute,
+  model: typeof Model.Type,
+  docsRoute: typeof DocsRoute.Type,
   h: ApplicationViewBuilder,
 ) => {
   const renderCopyButton = SnippetCopyRenderer.renderer(
@@ -576,6 +584,16 @@ export const view = (
         withTableOfContents(
           lazyDocsContent(BestPractices.Immutability.view, docContentArgs),
           BestPractices.Immutability.tableOfContents,
+        ),
+      PreviewMigration: () =>
+        withTableOfContents(
+          lazyDocsContent(PreviewMigration.view, docContentArgs),
+          PreviewMigration.tableOfContents,
+        ),
+      PreviewUpgrade: () =>
+        withTableOfContents(
+          lazyDocsContent(PreviewUpgrade.view, docContentArgs),
+          PreviewUpgrade.tableOfContents,
         ),
       ProjectOrganization: () =>
         withTableOfContents(

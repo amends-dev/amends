@@ -19,5 +19,3 @@ export const Message = defineMessageUnion({
     isSent: Schema.Boolean,
   },
 })
-
-export type Message = typeof Message.Type

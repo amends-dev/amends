@@ -198,7 +198,7 @@ const urlPathToSlug = (urlPath: string): string => {
 // COVER IMAGES
 
 const maybeRoutePostEntry = (
-  route: ApplicationRoute,
+  route: typeof ApplicationRoute.Type,
 ): Option.Option<BlogPostEntry> =>
   Match.value(route).pipe(
     Match.tag('BlogPost', ({ postSlug }) =>
@@ -207,7 +207,9 @@ const maybeRoutePostEntry = (
     Match.orElse(() => Option.none()),
   )
 
-const maybeRouteCover = (route: ApplicationRoute): Option.Option<PostCover> =>
+const maybeRouteCover = (
+  route: typeof ApplicationRoute.Type,
+): Option.Option<PostCover> =>
   Option.flatMap(maybeRoutePostEntry(route), ({ frontmatter }) =>
     maybePostCover(frontmatter),
   )
@@ -313,11 +315,11 @@ const renderOgImage =
   (
     fonts: Array<Font>,
     ogDir: string,
-    routeToUrlPath: (route: ApplicationRoute) => string,
+    routeToUrlPath: (route: typeof ApplicationRoute.Type) => string,
     resolveApiModuleName: ApiModuleNameResolver,
     browser: Browser,
   ) =>
-  (route: ApplicationRoute) => {
+  (route: typeof ApplicationRoute.Type) => {
     const slug = urlPathToSlug(routeToUrlPath(route))
     return pipe(
       Effect.gen(function* () {
@@ -344,8 +346,8 @@ const renderOgImage =
   }
 
 export const generateOgImages = (
-  routes: ReadonlyArray<ApplicationRoute>,
-  routeToUrlPath: (route: ApplicationRoute) => string,
+  routes: ReadonlyArray<typeof ApplicationRoute.Type>,
+  routeToUrlPath: (route: typeof ApplicationRoute.Type) => string,
   distDir: string,
   resolveApiModuleName: ApiModuleNameResolver,
   browser: Browser,
@@ -479,7 +481,7 @@ const sitePageJsonLd = (
   })
 
 const maybeSitePageSchemaType = (
-  route: ApplicationRoute,
+  route: typeof ApplicationRoute.Type,
 ): Option.Option<string> =>
   Match.value(route).pipe(
     Match.withReturnType<Option.Option<string>>(),
@@ -525,7 +527,7 @@ const replaceOrThrow = (
 
 export const injectMetaTags = (
   html: string,
-  route: ApplicationRoute,
+  route: typeof ApplicationRoute.Type,
   urlPath: string,
   resolveApiModuleName: ApiModuleNameResolver,
 ): string => {

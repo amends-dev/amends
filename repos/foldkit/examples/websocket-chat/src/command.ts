@@ -8,7 +8,7 @@ const getZonedTime = DateTime.now.pipe(
   Effect.map(utc => DateTime.setZone(utc, DateTime.zoneMakeLocal())),
 )
 
-export const TimestampSentMessage = ApplicationDefinition.command(
+export const TimestampSentMessage = ApplicationDefinition.makeCommand(
   'TimestampSentMessage',
   {
     args: { text: Schema.String },
@@ -24,7 +24,7 @@ export const TimestampSentMessage = ApplicationDefinition.command(
   },
 )
 
-export const TimestampReceivedMessage = ApplicationDefinition.command(
+export const TimestampReceivedMessage = ApplicationDefinition.makeCommand(
   'TimestampReceivedMessage',
   {
     args: { text: Schema.String },
@@ -40,7 +40,7 @@ export const TimestampReceivedMessage = ApplicationDefinition.command(
   },
 )
 
-export const SendMessage = ApplicationDefinition.command('SendMessage', {
+export const SendMessage = ApplicationDefinition.makeCommand('SendMessage', {
   args: { text: Schema.String },
   messages: [Message.SucceededSendMessage, Message.FailedSendMessage],
   handler: function* () {

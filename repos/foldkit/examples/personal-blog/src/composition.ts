@@ -3,7 +3,7 @@ import type { Block } from 'foldkit'
 import { ApplicationDefinition } from './definition'
 import { CounterBlock } from './island'
 
-export const CounterBinding = ApplicationDefinition.bindChild(CounterBlock, {
+export const CounterBinding = ApplicationDefinition.makeBinding(CounterBlock, {
   field: 'counter',
 })
 

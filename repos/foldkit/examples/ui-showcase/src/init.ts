@@ -5,7 +5,7 @@ import type { Flags } from './flags'
 import { urlToApplicationRoute } from './route'
 
 export const init = ApplicationComposition.makeInit(
-  (flags: Flags, url: Url) => ({
+  (flags: typeof Flags.Type, url: Url) => ({
     childInitContext: flags,
     model: {
       route: urlToApplicationRoute(url),

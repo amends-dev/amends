@@ -8,7 +8,7 @@ const Message = defineMessageUnion({
 const Model = Schema.Struct({})
 const PanelDefinition = Block.makeDefinition('Panel', { Model, Message })
 
-const TrackPointer = PanelDefinition.mountStream('TrackPointer', {
+const TrackPointer = PanelDefinition.makeMountStream('TrackPointer', {
   messages: [Message.MovedPointer],
   handler: function* () {
     return ({ element }) =>

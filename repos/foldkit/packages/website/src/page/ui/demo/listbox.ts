@@ -19,7 +19,7 @@ import {
 
 // DEMO CONTENT
 
-const LISTBOX_ITEMS: ReadonlyArray<ListboxItem> = [
+const LISTBOX_ITEMS: ReadonlyArray<typeof ListboxItem.Type> = [
   'Michael Bluth',
   'Lindsay Funke',
   'Gob Bluth',
@@ -67,7 +67,7 @@ const LISTBOX_ANCHOR: AnchorConfig = {
 
 export const basicDemo = (
   listboxModel: typeof ItemListboxBlock.Model.Type,
-  maybeSelectedItem: Option.Option<ListboxItem>,
+  maybeSelectedItem: Option.Option<typeof ListboxItem.Type>,
   h: UiViewBuilder,
 ) => {
   const buttonLabel = Option.getOrElse(
@@ -130,7 +130,7 @@ export const basicDemo = (
 
 export const multiSelectDemo = (
   listboxModel: typeof ItemMultiListboxBlock.Model.Type,
-  selectedItems: ReadonlyArray<ListboxItem>,
+  selectedItems: ReadonlyArray<typeof ListboxItem.Type>,
   h: UiViewBuilder,
 ) => {
   const buttonLabel = Array.match(selectedItems, {

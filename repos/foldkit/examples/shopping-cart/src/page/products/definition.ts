@@ -8,7 +8,6 @@ export const Model = Schema.Struct({
   products: Schema.Array(Item.Item),
   searchText: Schema.String,
 })
-export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
   CompletedReplaceSearchUrl: {},
@@ -18,19 +17,11 @@ export const Message = defineMessageUnion({
   ClickedDecrementQuantity: { itemId: Schema.String },
 })
 
-export type Message = typeof Message.Type
-
 export const OutMessage = defineMessageUnion({
   AddedToCart: { item: Item.Item },
   IncrementedQuantity: { itemId: Schema.String },
   DecrementedQuantity: { itemId: Schema.String },
 })
-
-export type OutMessage = typeof OutMessage.Type
-
-export type AddedToCart = typeof OutMessage.AddedToCart.Type
-export type IncrementedQuantity = typeof OutMessage.IncrementedQuantity.Type
-export type DecrementedQuantity = typeof OutMessage.DecrementedQuantity.Type
 
 export const ProductsDefinition = Block.makeDefinition('Products', {
   Model,

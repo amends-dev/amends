@@ -6,13 +6,13 @@ import { expect } from 'vitest'
 import { describe, it } from '@effect/vitest'
 
 import * as Animation from '../animation/block.js'
-import { Message, SwipeState, test as toastTest } from './toast.js'
+import { Message, SwipeState } from './toast.js'
 import { makeFixture } from './toast.js'
 
 const TestPayload = Schema.Struct({ body: Schema.String })
-type TestPayload = typeof TestPayload.Type
 
 const ToastFixture = makeFixture(TestPayload)
+const toastTest = ToastFixture.test
 const block = ToastFixture.block
 const toastInit = ToastFixture.init
 const WaitBeforeDismissal = ToastFixture.WaitBeforeDismissal
@@ -669,82 +669,6 @@ describe('Toast', () => {
             }),
           ],
         ),
-        Story.model(next => {
-          expect(next.entries).toHaveLength(0)
-        }),
-      )
-    })
-
-    it('test.drainEntry drains the whole lifecycle in one step', () => {
-      const entry = makeFreshEntry({
-        maybeDuration: Option.some(Duration.millis(100)),
-      })
-      Story.story(
-        block.update,
-        givenEmpty,
-        Story.message(ToastFixture.Message.Added({ entry })),
-        toastTest.drainEntry({
-          entryId: firstEntryId,
-          waitBeforeDismissal: [
-            ToastFixture.WaitBeforeDismissal,
-            block.Message.CompletedWaitBeforeDismissal({
-              entryId: firstEntryId,
-              version: 0,
-            }),
-          ],
-        }),
-        Story.model(next => {
-          expect(next.entries).toHaveLength(0)
-        }),
-      )
-    })
-
-    it('test.drainEntry drains an entry after its enter has settled', () => {
-      const entry = makeFreshEntry({
-        maybeDuration: Option.some(Duration.millis(100)),
-      })
-      Story.story(
-        block.update,
-        givenEmpty,
-        Story.message(ToastFixture.Message.Added({ entry })),
-        Story.Command.resolveAll(
-          [
-            toastTest.matchWaitForPaint(
-              firstEntryId,
-              ENTER_TRANSITION_GENERATION,
-            ),
-            Animation.Message.CompletedWaitForPaint({
-              generation: ENTER_TRANSITION_GENERATION,
-            }),
-          ],
-          [
-            toastTest.matchWaitForAnimationSettled(
-              firstEntryId,
-              ENTER_TRANSITION_GENERATION,
-            ),
-            Animation.Message.EndedAnimation({
-              generation: ENTER_TRANSITION_GENERATION,
-            }),
-          ],
-        ),
-        Story.model(next => {
-          expect(
-            Array.map(
-              next.entries,
-              ({ animation }) => animation.transitionState,
-            ),
-          ).toStrictEqual(['Idle'])
-        }),
-        toastTest.drainEntry({
-          entryId: firstEntryId,
-          waitBeforeDismissal: [
-            ToastFixture.WaitBeforeDismissal,
-            block.Message.CompletedWaitBeforeDismissal({
-              entryId: firstEntryId,
-              version: 0,
-            }),
-          ],
-        }),
         Story.model(next => {
           expect(next.entries).toHaveLength(0)
         }),

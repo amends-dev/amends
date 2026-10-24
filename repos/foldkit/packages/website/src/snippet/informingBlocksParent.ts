@@ -1,7 +1,7 @@
-import { Match, Schema } from 'effect'
-import { Update, makeApplicationDefinition } from 'foldkit'
+import { Schema } from 'effect'
+import { Block, Update } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
-import { modifyFields } from 'foldkit/struct'
+import { Transition } from 'foldkit/route'
 import { Url } from 'foldkit/url'
 
 import * as People from './informingBlocksIndex'
@@ -11,19 +11,17 @@ export const Model = Schema.Struct({
   route: ApplicationRoute,
   people: People.PeopleBlock.Model,
 })
-export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
   ChangedUrl: { url: Url },
 })
-export type Message = typeof Message.Type
 
-export const ApplicationDefinition = makeApplicationDefinition({
+export const ApplicationDefinition = Block.makeDefinition('Application', {
   Model,
   Message,
 })
 
-export const PeopleBinding = ApplicationDefinition.bindChild(
+export const PeopleBinding = ApplicationDefinition.makeBinding(
   People.PeopleBlock,
   {
     field: 'people',
@@ -35,24 +33,37 @@ export const ApplicationComposition = ApplicationDefinition.makeComposition({
   bindings: [PeopleBinding],
 })
 
-const setRoute =
-  (nextRoute: ApplicationRoute): Update.Step<Model, Message> =>
-  model => ({ model: modifyFields(model, { route: () => nextRoute }) })
+const setRoute = (nextRoute: typeof ApplicationRoute.Type) =>
+  ApplicationDefinition.makeFieldsStep(() => ({ route: () => nextRoute }))
+
+const keepModel = ApplicationDefinition.makeNoopStep()
+
+type InformPeopleRouteStep =
+  | typeof keepModel
+  | ReturnType<typeof PeopleBinding.informRouteChanged>
 
 export const update = ApplicationComposition.makeUpdate((model, message) =>
   Message.match(message, {
     ChangedUrl: ({ url }) => {
       const nextRoute = urlToApplicationRoute(url)
 
-      return Match.value(nextRoute).pipe(
-        Match.tag('People', peopleRoute =>
-          Update.combine(model, [
-            setRoute(nextRoute),
+      const transition = Transition.make(model.route, nextRoute)
+      const informPeopleRoute = Transition.matchOrElse<InformPeopleRouteStep>()(
+        transition,
+        'People',
+        {
+          Entered: peopleRoute =>
             PeopleBinding.informRouteChanged({ route: peopleRoute }),
-          ]),
-        ),
-        Match.orElse(() => setRoute(nextRoute)(model)),
+          Stayed: ({ nextRoute }) =>
+            PeopleBinding.informRouteChanged({ route: nextRoute }),
+        },
+        () => keepModel,
       )
+
+      return Update.combineSteps(model, [
+        setRoute(nextRoute),
+        informPeopleRoute,
+      ])
     },
   }),
 )

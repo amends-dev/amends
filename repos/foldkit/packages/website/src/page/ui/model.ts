@@ -117,4 +117,3 @@ export const Model = Schema.Struct({
   virtualListChatNextId: Schema.Number,
   virtualListChatStartProximity: VirtualListChatStartProximity,
 })
-export type Model = typeof Model.Type

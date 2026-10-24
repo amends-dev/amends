@@ -41,7 +41,7 @@ import { submitAdding, submitName, submitSettings, submitNewKey, submitRemoval }
  * Ask for the dialog on the integrations to add a connection through, among those that give `capability` when given.
  */
 const openAdding = (capability: Option.Option<Integration.Capability>) =>
-  ConnectionsDefinition.stepFields(() => ({
+  ConnectionsDefinition.makeFieldsStep(() => ({
     adding: () => Option.some(Adding.Choosing({ capability, query: "" })),
     replacing: () => Option.none(),
     removing: () => Option.none()
@@ -49,7 +49,7 @@ const openAdding = (capability: Option.Option<Integration.Capability>) =>
 
 /** Ask for the dialog on a blank form that replaces the key of `connectionId`, which is called `name` now. */
 const openReplacing = (connectionId: ConnectionContract.ConnectionId, name: string) =>
-  ConnectionsDefinition.stepFields(() => ({
+  ConnectionsDefinition.makeFieldsStep(() => ({
     adding: () => Option.none(),
     replacing: () => Option.some({ connectionId, name, apiKey: "", isSending: false, failure: Option.none() }),
     removing: () => Option.none()
@@ -57,18 +57,18 @@ const openReplacing = (connectionId: ConnectionContract.ConnectionId, name: stri
 
 /** Ask for the dialog on the confirmation that removes `connectionId`, which is called `name` now. */
 const openRemoving = (connectionId: ConnectionContract.ConnectionId, name: string, hasKey: boolean) =>
-  ConnectionsDefinition.stepFields(() => ({
+  ConnectionsDefinition.makeFieldsStep(() => ({
     adding: () => Option.none(),
     replacing: () => Option.none(),
     removing: () => Option.some({ connectionId, name, hasKey, isSending: false, failure: Option.none() })
   }))
 
 /** Close the dialog, whose form or confirmation is done with. */
-const closeDialog = Update.combine([leaveDialog, DialogBinding.requestClose()])
+const closeDialog = Update.combineSteps([leaveDialog, DialogBinding.requestClose()])
 
 /** Move focus to the field `id`. */
 const focusField = (id: string) =>
-  ConnectionsDefinition.step((model: Model) => ({ model, commands: [FocusField({ id })] }))
+  ConnectionsDefinition.makeStep((model: Model) => ({ model, commands: [FocusField({ id })] }))
 
 export const update = ConnectionsComposition.makeUpdate((model, message) => {
   /**
@@ -85,7 +85,7 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
         onSome: ({ id, name }) =>
           Option.isSome(findConnection(current, id))
             ? pipe(
-                Update.combine(current, [closeDialog, checkStep(id)]),
+                Update.combineSteps(current, [closeDialog, checkStep(id)]),
                 Update.withOutMessage(OutMessage.CreatedConnection({ connectionId: id, name }))
               )
             : { model: current }
@@ -102,14 +102,14 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
 
     return Option.exists(current.removing, ({ connectionId, isSending }) => !isSending && isGone(connectionId)) ||
       Option.exists(current.replacing, ({ connectionId, isSending }) => !isSending && isGone(connectionId))
-      ? Update.combine(current, [closeDialog])
+      ? Update.combineSteps(current, [closeDialog])
       : { model: current }
   }
 
   /** Open the dialog on the integrations to add a connection through, where the person may add one. */
   const askToAdd = (capability: Option.Option<Integration.Capability>) =>
     mayAdd(model) && Option.isNone(model.adding)
-      ? Update.combine(model, [openAdding(capability), DialogBinding.requestOpen()])
+      ? Update.combineSteps(model, [openAdding(capability), DialogBinding.requestOpen()])
       : { model }
 
   /** Open the dialog on the form that replaces the key of `connectionId`, where the person may and it has a key. */
@@ -118,7 +118,7 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
       onNone: () => ({ model }),
       onSome: (item) =>
         mayManage(model, item) && !item.pending && item.connection.auth === "apiKey"
-          ? Update.combine(model, [openReplacing(connectionId, item.connection.name), DialogBinding.requestOpen()])
+          ? Update.combineSteps(model, [openReplacing(connectionId, item.connection.name), DialogBinding.requestOpen()])
           : { model }
     })
 
@@ -128,7 +128,7 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
       onNone: () => ({ model }),
       onSome: (item) =>
         mayManage(model, item) && !item.pending
-          ? Update.combine(model, [
+          ? Update.combineSteps(model, [
               openRemoving(connectionId, item.connection.name, item.connection.auth === "apiKey"),
               DialogBinding.requestOpen()
             ])
@@ -149,7 +149,7 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
                 {
                   onNone: () => ({ model }),
                   onSome: (integration) =>
-                    Update.combine(
+                    Update.combineSteps(
                       modifyFields(model, { adding: () => Option.some(startConfiguring(integration, capability)) }),
                       [focusField("add-connection-name")]
                     )
@@ -169,7 +169,7 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
       onSome: ({ capability, creating }) =>
         Option.isSome(creating)
           ? { model }
-          : Update.combine(
+          : Update.combineSteps(
               modifyFields(model, { adding: () => Option.some(Adding.Choosing({ capability, query: "" })) }),
               [focusField("search-integrations")]
             )
@@ -193,7 +193,7 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
             onNone: () => ({ model }),
             onSome: ({ name }) =>
               pipe(
-                Update.combine(modifyFields(model, { notice: () => Option.none() }), [closeDialog]),
+                Update.combineSteps(modifyFields(model, { notice: () => Option.none() }), [closeDialog]),
                 Update.withOutMessage(OutMessage.RemovedConnection({ name }))
               )
           }
@@ -201,7 +201,7 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
     })
 
   return Message.match(message, {
-    RequestedDismiss: () => Update.combine(model, [DialogBinding.requestClose()]),
+    RequestedDismiss: () => Update.combineSteps(model, [DialogBinding.requestClose()]),
     ReceivedConnections: ({ connections }) => {
       const sorted = connections.toSorted(byName)
       const isListed = (connectionId: ConnectionContract.ConnectionId) =>
@@ -315,7 +315,7 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
     ReplacedConnectionKey: ({ connectionId }) =>
       Option.exists(model.replacing, (replacing) => replacing.connectionId === connectionId)
         ? pipe(
-            Update.combine(modifyFields(model, { notice: () => Option.none() }), [closeDialog]),
+            Update.combineSteps(modifyFields(model, { notice: () => Option.none() }), [closeDialog]),
             Update.withOutMessage(OutMessage.ReplacedKey())
           )
         : { model },
@@ -364,7 +364,7 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
       )
     }),
     SubmittedSettings: ({ connectionId }) => submitSettings(model, connectionId),
-    ClickedCheck: ({ connectionId }) => Update.combine(model, [checkStep(connectionId)]),
+    ClickedCheck: ({ connectionId }) => Update.combineSteps(model, [checkStep(connectionId)]),
     CheckedConnection: ({ connectionId, health }) => ({
       model: modifyFields(model, { checks: (checks) => withCheck(checks, connectionId, Check.Checked({ health })) })
     }),

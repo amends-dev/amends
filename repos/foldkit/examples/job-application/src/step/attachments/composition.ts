@@ -1,55 +1,42 @@
 import { Array, Option } from 'effect'
-import { type Block, type Update } from 'foldkit'
-import { modifyFields } from 'foldkit/struct'
+import type { Block } from 'foldkit'
 
 import { FileDropBlock } from '@foldkit/ui'
 
-import { AttachmentsDefinition, Message, type Model } from './definition'
+import { AttachmentsDefinition } from './definition'
 
-const foldResumeDropOutMessage = FileDropBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  ReceivedFiles:
-    ({ files }) =>
-    model => ({
-      model: modifyFields(model, {
-        maybeResume: () =>
-          Option.orElse(Array.head(files), () => model.maybeResume),
-      }),
-    }),
-  RejectedNonFiles: () => AttachmentsDefinition.stepNoop(),
-})
-
-export const ResumeDropBinding = AttachmentsDefinition.bindChild(
+export const ResumeDropBinding = AttachmentsDefinition.makeBinding(
   FileDropBlock,
   {
     field: 'resumeDrop',
     init: { contextToArgs: () => [{ id: 'attachments-resume' }] },
-    outMessage: { fold: foldResumeDropOutMessage },
   },
-)
-
-const foldAdditionalFilesDropOutMessage = FileDropBlock.OutMessage.match<
-  Update.Step<Model, Message>
->({
-  ReceivedFiles:
-    ({ files }) =>
-    model => ({
-      model: modifyFields(model, {
-        additionalFiles: Array.appendAll(files),
-      }),
-    }),
-  RejectedNonFiles: () => AttachmentsDefinition.stepNoop(),
+).withOutMessagePolicy({
+  fold: AttachmentsDefinition.makeOutMessageFold(FileDropBlock, {
+    ReceivedFiles: ({ files }) =>
+      AttachmentsDefinition.makeFieldsStep(() => ({
+        maybeResume: maybeResume =>
+          Option.orElse(Array.head(files), () => maybeResume),
+      })),
+    RejectedNonFiles: AttachmentsDefinition.makeNoopStep,
+  }),
 })
 
-export const AdditionalFilesDropBinding = AttachmentsDefinition.bindChild(
+export const AdditionalFilesDropBinding = AttachmentsDefinition.makeBinding(
   FileDropBlock,
   {
     field: 'additionalFilesDrop',
     init: { contextToArgs: () => [{ id: 'attachments-additional' }] },
-    outMessage: { fold: foldAdditionalFilesDropOutMessage },
   },
-)
+).withOutMessagePolicy({
+  fold: AttachmentsDefinition.makeOutMessageFold(FileDropBlock, {
+    ReceivedFiles: ({ files }) =>
+      AttachmentsDefinition.makeFieldsStep(() => ({
+        additionalFiles: Array.appendAll(files),
+      })),
+    RejectedNonFiles: AttachmentsDefinition.makeNoopStep,
+  }),
+})
 
 export const AttachmentsComposition = AttachmentsDefinition.makeComposition({
   bindings: [ResumeDropBinding, AdditionalFilesDropBinding],

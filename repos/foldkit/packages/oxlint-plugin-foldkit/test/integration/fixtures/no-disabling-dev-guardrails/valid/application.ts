@@ -1,16 +1,15 @@
-import { makeApplicationDefinition } from 'foldkit'
+import { Program as RootProgram } from 'foldkit'
+import { make as makeProgram } from 'foldkit/program'
+import * as ProgramModule from 'foldkit/program'
 
-import { init, Message, Model, update, view } from './implementation'
+RootProgram.make({ block: ApplicationBlock, container, freezeModel: true })
+makeProgram({
+  block: ApplicationBlock,
+  container,
+  slow: { thresholdOverrides: { View: 32 } },
+})
+ProgramModule.makeElement({ block: ApplicationBlock, slow: true })
 
-const ApplicationDefinition = makeApplicationDefinition({ Model, Message })
-
-export const application =
-  ApplicationDefinition.makeComposition().assembleApplication({
-    init,
-    update,
-    view,
-  })
-
-export const makeLocal = (Application: {
+export const makeLocal = (Program: {
   make: (config: unknown) => unknown
-}) => Application.makeComposition().assembleApplication({ freezeModel: false })
+}) => Program.make({ freezeModel: false, slow: false })

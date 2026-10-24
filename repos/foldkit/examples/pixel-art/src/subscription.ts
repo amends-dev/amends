@@ -46,7 +46,7 @@ const toToolMessage = (
   )
 }
 
-export const subscriptions = ApplicationDefinition.subscriptions(entry => ({
+export const subscriptions = ApplicationDefinition.makeSubscriptions(entry => ({
   undoRedoKeyPresses: entry('UndoRedoKeyPresses', {
     messages: [Message.ClickedUndo, Message.ClickedRedo],
     handler: function* () {

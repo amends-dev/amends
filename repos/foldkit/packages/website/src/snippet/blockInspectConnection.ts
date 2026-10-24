@@ -3,7 +3,7 @@ import { Block } from 'foldkit'
 import { ApplicationDefinition } from './definition'
 import { Room } from './page'
 
-const RoomBinding = ApplicationDefinition.bindChild(Room.RoomBlock, {
+const RoomBinding = ApplicationDefinition.makeBinding(Room.RoomBlock, {
   field: 'room',
 })
 

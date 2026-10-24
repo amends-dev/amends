@@ -1,6 +1,5 @@
 import { Effect, Layer, Schema } from 'effect'
-import { makeApplicationDefinition } from 'foldkit'
-import type { Block } from 'foldkit'
+import { Block } from 'foldkit'
 import { type Html } from 'foldkit/html'
 import { defineMessageUnion } from 'foldkit/message'
 import { UrlRequest, load, pushUrl } from 'foldkit/navigation'
@@ -18,7 +17,6 @@ export const Model = Schema.Struct({
   route: ApplicationRoute,
   count: Schema.Number,
 })
-export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
   ClickedIncrement: {},
@@ -28,9 +26,7 @@ export const Message = defineMessageUnion({
   CompletedLoadExternal: {},
 })
 
-export type Message = typeof Message.Type
-
-export const ApplicationDefinition = makeApplicationDefinition({
+export const ApplicationDefinition = Block.makeDefinition('Application', {
   Model,
   Message,
 })
@@ -44,7 +40,7 @@ export const init = ApplicationComposition.makeInit((url: Url) => ({
   model: { route: urlToApplicationRoute(url), count: 0 },
 }))
 
-const NavigateInternal = ApplicationDefinition.command('NavigateInternal', {
+const NavigateInternal = ApplicationDefinition.makeCommand('NavigateInternal', {
   args: { url: Schema.String },
   messages: [Message.CompletedNavigateInternal],
   handler: function* () {
@@ -53,7 +49,7 @@ const NavigateInternal = ApplicationDefinition.command('NavigateInternal', {
   },
 })
 
-const LoadExternal = ApplicationDefinition.command('LoadExternal', {
+const LoadExternal = ApplicationDefinition.makeCommand('LoadExternal', {
   args: { href: Schema.String },
   messages: [Message.CompletedLoadExternal],
   handler: function* () {
@@ -91,7 +87,7 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
   }),
 )
 
-const routeTitle = (route: ApplicationRoute): string =>
+const routeTitle = (route: typeof ApplicationRoute.Type): string =>
   ApplicationRoute.match(route, {
     Home: () => 'Home | Static Generation | Foldkit',
     About: () => 'About | Static Generation | Foldkit',
@@ -107,7 +103,7 @@ const navigationView = (h: ApplicationViewBuilder): Html =>
     ],
   )
 
-const pageView = (model: Model, h: ApplicationViewBuilder): Html =>
+const pageView = (model: typeof Model.Type, h: ApplicationViewBuilder): Html =>
   ApplicationRoute.match(model.route, {
     Home: () =>
       h.section(
@@ -166,3 +162,15 @@ export const view = ApplicationComposition.makeView((model, h) => ({
     [navigationView(h), pageView(model, h)],
   ),
 }))
+
+const prepare = () =>
+  ApplicationComposition.prepareBlock({
+    init,
+    update,
+    view,
+    EffectsLayer,
+  })
+export const ApplicationBlock: Block.FromAssemblyWithView<
+  typeof Model,
+  typeof prepare
+> = Block.assemble(prepare)

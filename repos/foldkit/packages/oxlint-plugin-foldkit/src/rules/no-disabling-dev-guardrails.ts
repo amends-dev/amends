@@ -1,4 +1,4 @@
-import { Array, Effect, Option, pipe } from 'effect'
+import { Effect, Option, pipe } from 'effect'
 import {
   AST,
   Diagnostic,
@@ -11,11 +11,8 @@ import {
 import {
   indexReferences,
   isCallExpression,
-  isOwnedDefinitionCall,
   resolveFoldkitApiPath,
 } from '../guards.ts'
-
-const FACTORY_NAMES = ['assembleApplication', 'assembleElement']
 
 const FREEZE_MODEL_MESSAGE =
   "`freezeModel: false` turns off Foldkit's dev mutation guard. When on, the runtime deep-freezes the Model after init and after every update, so an accidental mutation throws at the exact write site during development and costs nothing in production. Fix the mutation instead of disabling the guard. A deliberate disable belongs behind an oxlint-disable comment at this line."
@@ -27,13 +24,6 @@ const isFactoryCallee = (
   node: ESTree.CallExpression,
   references: WeakMap<ESTree.Node, Reference> | undefined,
 ): boolean => {
-  if (
-    isOwnedDefinitionCall(node, 'assembleApplication', references) ||
-    isOwnedDefinitionCall(node, 'assembleElement', references)
-  ) {
-    return true
-  }
-
   const { callee } = node
 
   if (references !== undefined) {
@@ -41,24 +31,17 @@ const isFactoryCallee = (
       const [namespace, factoryName, extraMember] = path
 
       return (
-        (namespace === 'Runtime' || namespace === 'Application') &&
-        factoryName !== undefined &&
-        FACTORY_NAMES.includes(factoryName) &&
+        namespace === 'Program' &&
+        (factoryName === 'make' || factoryName === 'makeElement') &&
         extraMember === undefined
       )
     })
   }
 
-  if (callee.type === 'Identifier') {
-    return FACTORY_NAMES.includes(callee.name)
-  }
-  if (callee.type === 'MemberExpression') {
-    return Option.match(AST.memberPath(callee), {
-      onNone: () => false,
-      onSome: path => FACTORY_NAMES.includes(Array.lastNonEmpty(path)),
-    })
-  }
-  return false
+  return (
+    AST.isCallOf(node, 'Program', 'make') ||
+    AST.isCallOf(node, 'Program', 'makeElement')
+  )
 }
 
 const staticKeyName = (
@@ -95,13 +78,13 @@ const disabledGuardrailMessage = (
   return pipe(staticKeyName(property), Option.flatMap(guardrailMessageForKey))
 }
 
-/** Flags `freezeModel: false` and `slow: false` in config objects passed directly to Application completion. Disabling a dev guardrail hides the problem it would have surfaced; a deliberate disable belongs behind an oxlint-disable comment. */
+/** Flags `freezeModel: false` and `slow: false` in config objects passed directly to Program construction. Disabling a dev guardrail hides the problem it would have surfaced; a deliberate disable belongs behind an oxlint-disable comment. */
 export const noDisablingDevGuardrails = Rule.define({
   name: 'no-disabling-dev-guardrails',
   meta: Rule.meta({
     type: 'suggestion',
     description:
-      'Keep the freezeModel and slow dev guardrails enabled in Foldkit app configs.',
+      'Keep the freezeModel and slow dev guardrails enabled in Foldkit Program configs.',
   }),
   create: function* () {
     const ctx = yield* RuleContext

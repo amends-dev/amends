@@ -69,13 +69,13 @@ const assertDefinitionContracts: (
 /** Effect declaration helpers scoped to one Block identity. */
 export type Primitives<Id extends string, Message = unknown> = Readonly<{
   /** Defines a Command whose runtime name is owned by this Block. */
-  command: DefineCommand<Id, Message>
+  makeCommand: DefineCommand<Id, Message>
   /** Defines a one-shot Mount whose runtime name is owned by this Block. */
-  mount: DefineMount<Id, Message>
+  makeMount: DefineMount<Id, Message>
   /** Defines a streaming Mount whose runtime name is owned by this Block. */
-  mountStream: DefineMountStream<Id, Message>
+  makeMountStream: DefineMountStream<Id, Message>
   /** Defines a ManagedResource service identity owned by this Block. */
-  resource: DefineResource<Id>
+  makeResource: DefineResource<Id>
 }>
 
 /** Registers the child and Mount graph for init, update and view authoring. This step only records composition; it does not construct Layers or
@@ -252,10 +252,10 @@ export function makeNamespace<const Id extends string>(
 export function makeNamespace(id: string): any {
   const authoring = makeAuthoringContext(id)
   const primitives = {
-    command: authoring.command,
-    mount: authoring.mount,
-    mountStream: authoring.mountStream,
-    resource: authoring.resource,
+    makeCommand: authoring.makeCommand,
+    makeMount: authoring.makeMount,
+    makeMountStream: authoring.makeMountStream,
+    makeResource: authoring.makeResource,
   }
   const makeDefinition = (contracts: unknown) => {
     assertDefinitionContracts(contracts)

@@ -31,6 +31,8 @@ import {
   GetStarted,
   Patterns,
   Performance,
+  PreviewMigration,
+  PreviewUpgrade,
   Privacy,
   ProjectOrganization,
   ReactComparison,
@@ -48,7 +50,7 @@ import * as ComingFromReact from '../page/comingFromReact/domain'
 import * as CoreBlockMetadata from '../page/core/blockPage/domain'
 import * as UiDocumentation from '../page/ui/domain'
 
-export const subscriptions = ApplicationDefinition.subscriptions(entry => ({
+export const subscriptions = ApplicationDefinition.makeSubscriptions(entry => ({
   activeSectionChanges: entry(
     'ActiveSectionChanges',
     {
@@ -79,6 +81,8 @@ export const subscriptions = ApplicationDefinition.subscriptions(entry => ({
             BestPracticesKeying: () => BestPractices.Keying.tableOfContents,
             BestPracticesImmutability: () =>
               BestPractices.Immutability.tableOfContents,
+            PreviewMigration: () => PreviewMigration.tableOfContents,
+            PreviewUpgrade: () => PreviewUpgrade.tableOfContents,
             ProjectOrganization: () => ProjectOrganization.tableOfContents,
             ToolingLinting: () => ToolingLinting.tableOfContents,
             ApiModule: ({ moduleSlug }) =>

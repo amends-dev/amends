@@ -1,5 +1,6 @@
 import {
   Array,
+  Context,
   Effect,
   Exit,
   Function,
@@ -8,10 +9,11 @@ import {
   Redacted,
   Result,
   Schema,
+  SchemaTransformation,
   Scope,
   SubscriptionRef,
 } from 'effect'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { defineMessageUnion } from '../message/index.js'
 import { modifyFields } from '../struct/index.js'
@@ -19,7 +21,9 @@ import {
   EventFrame,
   MAX_DISPATCH_BATCH_SIZE,
   Request,
+  RequestFrame,
   Response,
+  ResponseFrame,
 } from './protocol.js'
 import {
   type Bridge,
@@ -46,6 +50,25 @@ type CounterMessage = typeof CounterMessage.Type
 
 const clickedIncrement = CounterMessage.ClickedIncrement()
 const clickedDecrement = CounterMessage.ClickedDecrement()
+
+class DispatchPrefix extends Context.Service<
+  DispatchPrefix,
+  Readonly<{ value: string }>
+>()('WebSocketBridgeTest/DispatchPrefix') {}
+
+const ServiceDecodedString = Schema.String.pipe(
+  Schema.decodeTo(
+    Schema.String,
+    SchemaTransformation.transformEffect({
+      decode: value =>
+        Effect.map(DispatchPrefix, prefix => `${prefix.value}${value}`),
+      encode: Effect.succeed,
+    }),
+  ),
+)
+const ServiceMessage = defineMessageUnion({
+  SubmittedValue: { value: ServiceDecodedString },
+})
 
 const update = (model: CounterModel, message: CounterMessage): CounterModel =>
   CounterMessage.match<CounterModel>(message, {
@@ -137,6 +160,38 @@ const makeHarness = (
 }
 
 describe('dispatchRequest', () => {
+  it('decodes with Services from the bridge execution Context', () => {
+    const store = run(createDevToolsStore(makeBridge()))
+    const prepared: Array<unknown> = []
+    const callBridge = (message: unknown) =>
+      Effect.runSync(
+        dispatchRequest(
+          store,
+          Option.some(Schema.toCodecJson(ServiceMessage)),
+          Option.none(),
+          Request.RequestDispatchMessage({ message }),
+          decoded => {
+            prepared.push(decoded)
+            return Result.succeed(
+              Effect.succeed(Result.succeed(Option.some(0))),
+            )
+          },
+        ).pipe(Effect.provideService(DispatchPrefix, { value: 'decoded:' })),
+      )
+
+    expect(
+      callBridge({ _tag: 'SubmittedValue', value: 'ready' }),
+    ).toMatchObject({ _tag: 'ResponseDispatched' })
+    expect(prepared).toEqual([
+      ServiceMessage.SubmittedValue({ value: 'decoded:ready' }),
+    ])
+
+    expect(callBridge({ _tag: 'SubmittedValue', value: 1 })).toMatchObject({
+      _tag: 'ResponseError',
+    })
+    expect(prepared).toHaveLength(1)
+  })
+
   describe('RequestDispatchMessage', () => {
     it('decodes the payload, dispatches it, and predicts the history index', () => {
       const { dispatched, callBridge, tagAt } = makeHarness()
@@ -188,6 +243,29 @@ describe('dispatchRequest', () => {
         reason:
           'Message ClickedIncrement is excluded from DevTools history and cannot be dispatched externally.',
       })
+      expect(dispatched).toEqual([])
+    })
+
+    it('rejects a stale generated child occurrence before dispatching it', () => {
+      const { dispatched, callBridge } = makeHarness(
+        Option.some(CounterMessage),
+        {},
+        () =>
+          Result.fail(
+            'Rejected stale child Message: its placement, key, or generation does not identify the currently active occurrence.',
+          ),
+      )
+
+      const response = callBridge(
+        Request.RequestDispatchMessage({ message: clickedIncrement }),
+      )
+
+      expect(response).toEqual(
+        Response.ResponseError({
+          reason:
+            'Rejected stale child Message: its placement, key, or generation does not identify the currently active occurrence.',
+        }),
+      )
       expect(dispatched).toEqual([])
     })
 
@@ -562,7 +640,7 @@ describe('dispatchRequest', () => {
       if (response._tag !== 'ResponseError') {
         throw new Error(`Expected Response.ResponseError, got ${response._tag}`)
       }
-      expect(response.reason).toContain('DevToolsConfig.Message not configured')
+      expect(response.reason).toContain('external dispatch is disabled')
       expect(dispatched).toEqual([])
       expect(recordedTags()).toEqual(['ClickedIncrement', 'ClickedIncrement'])
     })
@@ -822,6 +900,108 @@ const startBridgeInScope = (hot: NonNullable<ImportMeta['hot']>) => {
 // closing. `beforeunload` fires for events the document survives, so a bridge
 // that announced a disconnect there reported a live app as gone.
 describe('startWebSocketBridge', () => {
+  it('uses the captured bridge Context to decode later dispatch requests', async () => {
+    const scope = run(Scope.make())
+    const store = run(createDevToolsStore(makeBridge()))
+    const prepared: Array<unknown> = []
+    const responses: Array<ResponseFrame> = []
+    const decodeEventFrame = Schema.decodeUnknownSync(EventFrame)
+    const decodeResponseFrame = Schema.decodeUnknownSync(ResponseFrame)
+    const encodeRequestFrame = Schema.encodeUnknownSync(RequestFrame)
+    let connectionId: string | undefined
+    let handleRequestFrame: ((frame: any) => void) | undefined
+
+    const hot: NonNullable<ImportMeta['hot']> = {
+      data: {},
+      accept: Function.constVoid,
+      acceptExports: Function.constVoid,
+      dispose: Function.constVoid,
+      prune: Function.constVoid,
+      invalidate: Function.constVoid,
+      on: (channel, callback) => {
+        if (channel === 'foldkit:devTools:request') {
+          handleRequestFrame = callback
+        }
+      },
+      off: Function.constVoid,
+      send: (channel, payload) => {
+        if (channel === EVENT_CHANNEL) {
+          const event = decodeEventFrame(payload).event
+          if (event._tag === 'EventConnected') {
+            connectionId = event.runtime.connectionId
+          }
+        } else if (channel === 'foldkit:devTools:response') {
+          responses.push(decodeResponseFrame(payload))
+        }
+      },
+    }
+
+    try {
+      run(
+        Effect.provideService(
+          Effect.provideService(
+            startWebSocketBridge(
+              store,
+              hot,
+              Option.some(ServiceMessage),
+              decoded => {
+                prepared.push(decoded)
+                return Result.succeed(
+                  Effect.succeed(Result.succeed(Option.some(0))),
+                )
+              },
+            ),
+            DispatchPrefix,
+            { value: 'captured:' },
+          ),
+          Scope.Scope,
+          scope,
+        ),
+      )
+
+      if (connectionId === undefined || handleRequestFrame === undefined) {
+        throw new Error('Expected the bridge to connect and register a handler')
+      }
+
+      handleRequestFrame(
+        encodeRequestFrame({
+          id: 'service-dispatch',
+          maybeConnectionId: Option.some(connectionId),
+          request: Request.RequestDispatchMessage({
+            message: { _tag: 'SubmittedValue', value: 'ready' },
+          }),
+        }),
+      )
+
+      await vi.waitFor(() => expect(responses).toHaveLength(1))
+      expect(Array.map(responses, ({ response }) => response._tag)).toEqual([
+        'ResponseDispatched',
+      ])
+      expect(prepared).toEqual([
+        ServiceMessage.SubmittedValue({ value: 'captured:ready' }),
+      ])
+
+      handleRequestFrame(
+        encodeRequestFrame({
+          id: 'malformed-service-dispatch',
+          maybeConnectionId: Option.some(connectionId),
+          request: Request.RequestDispatchMessage({
+            message: { _tag: 'SubmittedValue', value: 1 },
+          }),
+        }),
+      )
+
+      await vi.waitFor(() => expect(responses).toHaveLength(2))
+      expect(Array.map(responses, ({ response }) => response._tag)).toEqual([
+        'ResponseDispatched',
+        'ResponseError',
+      ])
+      expect(prepared).toHaveLength(1)
+    } finally {
+      run(Scope.close(scope, Exit.void))
+    }
+  })
+
   it('stays connected through a beforeunload the document survives', () => {
     const { hot, sentEventTags } = makeHotStub()
     const { closeScope } = startBridgeInScope(hot)

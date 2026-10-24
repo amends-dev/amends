@@ -8,3 +8,6 @@ export const LoggedInComposition = Block.makeDefinition('LoggedIn', {
   Message,
   OutMessage,
 }).makeComposition()
+export type LoggedInViewBuilder = Block.ViewBuilderFor<
+  typeof LoggedInComposition
+>

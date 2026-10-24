@@ -132,7 +132,7 @@ export const init = TabsComposition.makeInit((config: InitConfig) => ({
 }))
 
 /** Moves focus to the tab at the given index. */
-export const FocusTab = TabsDefinition.command('FocusTab', {
+export const FocusTab = TabsDefinition.makeCommand('FocusTab', {
   args: { id: Schema.String, index: Schema.Number },
   messages: [Message.CompletedFocusTab],
   handler: function* () {
@@ -387,13 +387,18 @@ const internalView = TabsComposition.makeView.withInputs<ViewInputs>(
   },
 )
 
+const prepareTabsBlock = () =>
+  TabsComposition.prepareBlock({
+    init,
+    update,
+    view: internalView,
+    EffectsLayer,
+  })
 /** Complete Tabs Block definition. */
-export const block = TabsComposition.assembleBlock({
-  init,
-  update,
-  view: internalView,
-  EffectsLayer,
-})
+export const block: Block.FromAssemblyWithViewAndOutMessage<
+  typeof Model,
+  typeof prepareTabsBlock
+> = Block.assemble(prepareTabsBlock)
 
 const makeBlockParts = <Value extends string>() => {
   type GenericReturn = Update.ReturnWithOutMessage<
@@ -454,7 +459,13 @@ export interface Completed<
 const makeBlock = <Value extends string>(): Completed<Value> => {
   const { composition, implementation } = makeBlockParts<Value>()
 
-  return composition.assembleBlock(implementation)
+  const prepare = () => composition.prepareBlock(implementation)
+  const completedBlock: Block.FromAssemblyWithViewAndOutMessage<
+    typeof Model,
+    typeof prepare
+  > = Block.assemble(prepare)
+
+  return completedBlock
 }
 
 /**

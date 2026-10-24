@@ -7,7 +7,6 @@ import { SavedBoard, SavedBoardJsonString } from './model'
 export const Flags = Schema.Struct({
   maybeSavedBoard: Schema.Option(SavedBoard),
 })
-export type Flags = typeof Flags.Type
 
 export const flags = Effect.gen(function* () {
   const store = yield* KeyValueStore.KeyValueStore

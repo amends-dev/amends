@@ -18,8 +18,10 @@ import {
   type ValidateConstructionRequirements,
 } from '../block/scope.js'
 import { type Handler, type ToLayer, makeHandler } from './handler.js'
+import type { ManagedResourceService } from './public.js'
 
 export type { Handler, HandlerOf, ToLayer } from './handler.js'
+export type { ManagedResourceService } from './public.js'
 
 /** Typed error raised when a command accesses a managed resource that is not currently acquired. */
 export class ResourceNotAvailable extends Data.TaggedError(
@@ -37,13 +39,6 @@ type ManagedResourceTypeId = typeof ManagedResourceTypeId
 type ValidateHandlerConstruction<
   Yielded extends Effect.Effect<unknown, unknown, unknown>,
 > = ValidateConstructionRequirements<Effect.Services<Yielded>>
-
-declare const ManagedResourceBrand: unique symbol
-
-/** Branded identity type for a managed resource, used in the Effect R channel. */
-export interface ManagedResourceService<Key extends string> {
-  readonly [ManagedResourceBrand]: Key
-}
 
 /**
  * A model-driven resource with acquire/release lifecycle. Access the resource
@@ -369,7 +364,7 @@ export interface EntryBuilder<Model, Message> {
  * Application features create accessors through their named Block's
  * `resource` and registries through their definition's `managedResources`.
  * Pass the registry as `managedResources` and its local handler recipes through
- * `EffectsLayer` when calling `Composition.assembleBlock`; registered child bindings
+ * `EffectsLayer` when calling `Composition.prepareBlock`; registered child bindings
  * collect their own registries and derive independent occurrence lifetimes.
  *
  * Use this when a resource is expensive or stateful and should only exist while

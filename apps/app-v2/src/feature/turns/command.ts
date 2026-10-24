@@ -12,7 +12,7 @@ import { logListId, Message, TurnsDefinition } from "./definition.ts"
 const outcomes = [Message.WroteAction, Message.FailedStop, Message.FailedRetry]
 
 /** Ask the turn `turnId` to stop. */
-export const StopTurn = TurnsDefinition.command("StopTurn", {
+export const StopTurn = TurnsDefinition.makeCommand("StopTurn", {
   args: { ...Stores.AsMember, turnId: TurnId.TurnId },
   messages: outcomes,
   handler: function* () {
@@ -25,7 +25,7 @@ export const StopTurn = TurnsDefinition.command("StopTurn", {
 })
 
 /** Retry the turn `turnId`, after it failed or stopped. */
-export const RetryTurn = TurnsDefinition.command("RetryTurn", {
+export const RetryTurn = TurnsDefinition.makeCommand("RetryTurn", {
   args: { ...Stores.AsMember, turnId: TurnId.TurnId },
   messages: outcomes,
   handler: function* () {
@@ -41,7 +41,7 @@ export const RetryTurn = TurnsDefinition.command("RetryTurn", {
  * Scroll the log of `turnId` to its end once it is drawn, so that it opens there and returns there when the person asks
  * for the latest.
  */
-export const ScrollLogToEnd = TurnsDefinition.command("ScrollLogToEnd", {
+export const ScrollLogToEnd = TurnsDefinition.makeCommand("ScrollLogToEnd", {
   args: { turnId: TurnId.TurnId },
   messages: [Message.CompletedScrollLogToEnd],
   handler: function* () {
@@ -54,7 +54,7 @@ export const ScrollLogToEnd = TurnsDefinition.command("ScrollLogToEnd", {
  * Keep the log of `turnId` at its end after it grew, if the person was near its end, and say whether they were, so that
  * what grew out of their view is told to them.
  */
-export const FollowLogEnd = TurnsDefinition.command("FollowLogEnd", {
+export const FollowLogEnd = TurnsDefinition.makeCommand("FollowLogEnd", {
   args: { turnId: TurnId.TurnId },
   messages: [Message.FollowedLogEnd, Message.LeftLogBehind],
   handler: function* () {

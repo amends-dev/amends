@@ -32,11 +32,11 @@ import {
   parentUpdate,
 } from './exposed-message.accepted.js'
 
-const directModelStep = ChildDefinition.step((model, value: string) => ({
+const directModelStep = ChildDefinition.makeStep((model, value: string) => ({
   model: modifyFields(model, { value: () => value }),
 }))
 
-ChildComposition.assembleBlock({
+ChildComposition.prepareBlock({
   init: () => ({ model: ChildModel.make({ value: '' }) }),
   update: childUpdate,
   operations: {
@@ -50,7 +50,7 @@ ChildComposition.assembleBlock({
 // oxlint-disable-next-line typescript/no-explicit-any -- This fixture deliberately probes erased any channels or detects any in an inferred public type.
 const erasedAnyProducer = (): any => [ChildMessage.RequestedReset()]
 // @ts-expect-error An any-returning producer cannot bypass tuple validation.
-ChildComposition.assembleBlock({
+ChildComposition.prepareBlock({
   init: () => ({ model: ChildModel.make({ value: '' }) }),
   update: childUpdate,
   operations: { erasedAnyProducer },
@@ -61,7 +61,7 @@ ChildComposition.assembleBlock({
 // oxlint-disable-next-line typescript/no-explicit-any -- This fixture deliberately probes erased any channels or detects any in an inferred public type.
 const erasedExpose: any = { reset: () => [ChildMessage.RequestedReset()] }
 // @ts-expect-error An any-typed operations record cannot bypass operation validation.
-ChildComposition.assembleBlock({
+ChildComposition.prepareBlock({
   init: () => ({ model: ChildModel.make({ value: '' }) }),
   update: childUpdate,
   operations: erasedExpose,
@@ -70,7 +70,7 @@ ChildComposition.assembleBlock({
 })
 
 const erasedUnknownProducer = (): unknown => [ChildMessage.RequestedReset()]
-ChildComposition.assembleBlock({
+ChildComposition.prepareBlock({
   init: () => ({ model: ChildModel.make({ value: '' }) }),
   update: childUpdate,
   operations: {
@@ -82,7 +82,7 @@ ChildComposition.assembleBlock({
 })
 
 const ForeignMessage = defineMessageUnion({ UpdatedForeignValue: {} })
-ChildComposition.assembleBlock({
+ChildComposition.prepareBlock({
   init: () => ({ model: ChildModel.make({ value: '' }) }),
   update: childUpdate,
   operations: {
@@ -93,7 +93,7 @@ ChildComposition.assembleBlock({
   hostHandlers: [RecordValue],
 })
 
-ContextComposition.assembleBlock({
+ContextComposition.prepareBlock({
   init: () => ({ model: ContextModel.make({ value: '' }) }),
   update: contextUpdate,
   operations: {
@@ -103,7 +103,7 @@ ContextComposition.assembleBlock({
   EffectsLayer: Layer.empty,
 })
 
-ContextComposition.assembleBlock({
+ContextComposition.prepareBlock({
   init: () => ({ model: ContextModel.make({ value: '' }) }),
   update: contextUpdate,
   operations: {
@@ -113,7 +113,7 @@ ContextComposition.assembleBlock({
   EffectsLayer: Layer.empty,
 })
 
-ParentComposition.assembleBlock({
+ParentComposition.prepareBlock({
   init: ParentComposition.makeInit(() => ({
     model: { entries: [{ id: 'first', child: { value: 'entry' } }] },
   })),
@@ -133,7 +133,7 @@ ParentComposition.assembleBlock({
 })
 
 // @ts-expect-error Exposed operation names cannot collide with Binding members.
-ChildComposition.assembleBlock({
+ChildComposition.prepareBlock({
   init: () => ({ model: ChildModel.make({ value: '' }) }),
   update: childUpdate,
   operations: { fold: () => [ChildMessage.RequestedReset()] },
@@ -155,7 +155,7 @@ FruitChoice.operations.select(
 const ForeignMountedChoiceMessage = defineMessageUnion({
   UpdatedForeignSelection: { value: Schema.String },
 })
-MountedChoiceComposition.assembleBlock({
+MountedChoiceComposition.prepareBlock({
   init: (selected: string) => ({
     model: MountedChoiceModel.make({ selected }),
   }),
@@ -171,7 +171,7 @@ MountedChoiceComposition.assembleBlock({
   EffectsLayer: ObserveSelection.layer,
 })
 
-MountedChoiceComposition.assembleBlock({
+MountedChoiceComposition.prepareBlock({
   init: (selected: string) => ({
     model: MountedChoiceModel.make({ selected }),
   }),
@@ -189,7 +189,7 @@ MountedChoiceComposition.assembleBlock({
 })
 
 // @ts-expect-error The registered Mount's handler must be present in EffectsLayer.
-MountedChoiceComposition.assembleBlock({
+MountedChoiceComposition.prepareBlock({
   init: (selected: string) => ({
     model: MountedChoiceModel.make({ selected }),
   }),
@@ -204,7 +204,7 @@ MountedChoiceComposition.assembleBlock({
 
 const GraphlessMountedChoiceComposition =
   MountedChoiceDefinition.makeComposition()
-GraphlessMountedChoiceComposition.assembleBlock({
+GraphlessMountedChoiceComposition.prepareBlock({
   init: (selected: string) => ({
     model: MountedChoiceModel.make({ selected }),
   }),
@@ -221,7 +221,7 @@ GraphlessMountedChoiceComposition.assembleBlock({
 const ForeignMountedChoiceNamespace = Block.makeNamespace(
   'ForeignMountedChoice',
 )
-const ObserveForeignSelection = ForeignMountedChoiceNamespace.mount(
+const ObserveForeignSelection = ForeignMountedChoiceNamespace.makeMount(
   'ObserveForeignSelection',
   {
     messages: [MountedChoiceMessage.CompletedObserveSelection],
@@ -235,7 +235,7 @@ const IncorrectMountedChoiceComposition =
   MountedChoiceDefinition.makeComposition({
     mounts: [ObserveForeignSelection],
   })
-IncorrectMountedChoiceComposition.assembleBlock({
+IncorrectMountedChoiceComposition.prepareBlock({
   init: (selected: string) => ({
     model: MountedChoiceModel.make({ selected }),
   }),
@@ -250,7 +250,7 @@ IncorrectMountedChoiceComposition.assembleBlock({
 })
 
 // @ts-expect-error Exposed operation names cannot collide with Binding members.
-MountedChoiceComposition.assembleBlock({
+MountedChoiceComposition.prepareBlock({
   init: (selected: string) => ({
     model: MountedChoiceModel.make({ selected }),
   }),
@@ -264,11 +264,10 @@ MountedChoiceComposition.assembleBlock({
 })
 
 const foldChildOutMessage = () => (model: ParentModel) => ({ model })
-const AlternativeChildBinding = ParentDefinition.bindChild(ChildBlock, {
+const AlternativeChildBinding = ParentDefinition.makeBinding(ChildBlock, {
   field: 'child',
   placement: 'alternative',
-  outMessage: { fold: foldChildOutMessage },
-})
+}).withOutMessagePolicy({ fold: foldChildOutMessage })
 const OmittedComposition = ParentDefinition.makeComposition({
   bindings: [AlternativeChildBinding, EntryBinding],
 })

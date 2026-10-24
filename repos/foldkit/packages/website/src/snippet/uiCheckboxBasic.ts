@@ -20,7 +20,6 @@ const Message = defineMessageUnion({
   ToggledTerms: { isChecked: Schema.Boolean },
 })
 
-type Message = typeof Message.Type
 const TermsFormComposition = Block.makeDefinition('TermsForm', {
   Model,
   Message,
@@ -47,7 +46,9 @@ const update = TermsFormComposition.makeUpdate((model, message) =>
 // Inside your view function, render the checkbox with Checkbox.view. It reads
 // the checked state from your Model and calls onToggle with the new state.
 const view = TermsFormComposition.makeView((model, h) => {
-  const checkboxView = (attributes: Checkbox.CheckboxAttributes<Message>) =>
+  const checkboxView = (
+    attributes: Checkbox.CheckboxAttributes<typeof Message.Type>,
+  ) =>
     h.div(
       [h.Class('flex flex-col gap-1')],
       [

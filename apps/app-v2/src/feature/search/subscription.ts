@@ -6,7 +6,7 @@ import * as Stream from "effect/Stream"
 import * as Stores from "../../store/Stores.ts"
 import { Message, SearchDefinition } from "./definition.ts"
 
-export const subscriptions = SearchDefinition.subscriptions((entry) => ({
+export const subscriptions = SearchDefinition.makeSubscriptions((entry) => ({
   targets: entry(
     "ReadJumpTargets",
     { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, isOpen: Schema.Boolean },

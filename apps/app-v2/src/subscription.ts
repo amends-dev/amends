@@ -15,7 +15,7 @@ import { Message } from "./message.ts"
 import { openedWorkspaceId } from "./model.ts"
 import { viewportChanges } from "./viewport.ts"
 
-export const subscriptions = ApplicationDefinition.subscriptions((entry) => ({
+export const subscriptions = ApplicationDefinition.makeSubscriptions((entry) => ({
   viewport: entry("WatchViewport", {
     messages: [Message.ChangedViewport],
     handler: function* () {

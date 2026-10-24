@@ -10,14 +10,11 @@ export const Model = Schema.Struct({
   additionalFilesDrop: FileDropBlock.Model,
   additionalFiles: Schema.Array(File.File),
 })
-export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
   RemovedResume: {},
   RemovedAdditionalFile: { fileIndex: Schema.Number },
 })
-
-export type Message = typeof Message.Type
 
 export const AttachmentsDefinition = Block.makeDefinition('Attachments', {
   Model,

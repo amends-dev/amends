@@ -43,7 +43,7 @@ const weatherCodeToDescription = (code: number): string =>
     Match.orElse(() => 'Unknown'),
   )
 
-export const FetchWeather = ApplicationDefinition.command('FetchWeather', {
+export const FetchWeather = ApplicationDefinition.makeCommand('FetchWeather', {
   args: { zipCode: Schema.String },
   messages: [Message.SucceededFetchWeather, Message.FailedFetchWeather],
   handler: function* () {
